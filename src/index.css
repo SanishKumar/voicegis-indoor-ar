@@ -114,12 +114,16 @@
   --shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.3);
   --shadow-glow-green: 0 0 20px rgba(16, 185, 129, 0.3);
 
-  --map-grid: rgba(0, 0, 0, 0.06);
-  --map-wall: rgba(0, 0, 0, 0.15);
+  --map-bg: #f8fafc;
+  --map-grid: rgba(0, 0, 0, 0.05);
+  --map-corridor: #e2e8f0;
+  --map-wall-color: #94a3b8;
   --map-room-fill: #ffffff;
   --map-room-hover: #f1f5f9;
-  --map-room-stroke: rgba(0, 0, 0, 0.1);
-  --map-corridor-fill: rgba(0, 0, 0, 0.03);
+  --map-room-stroke: #cbd5e1;
+  --map-room-selected-fill: rgba(59, 130, 246, 0.08);
+  --map-text-primary: #1e293b;
+  --map-text-muted: #64748b;
 }
 
 /* ---- Dark Theme ---- */
@@ -146,12 +150,16 @@
   --shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.3);
   --shadow-glow-green: 0 0 20px rgba(16, 185, 129, 0.3);
 
-  --map-grid: rgba(148, 163, 219, 0.06);
-  --map-wall: rgba(148, 163, 219, 0.15);
-  --map-room-fill: #111631;
-  --map-room-hover: #1a2042;
-  --map-room-stroke: rgba(148, 163, 219, 0.15);
-  --map-corridor-fill: rgba(148, 163, 219, 0.03);
+  --map-bg: #020617;
+  --map-grid: rgba(255, 255, 255, 0.03);
+  --map-corridor: #0f172a;
+  --map-wall-color: #1e293b;
+  --map-room-fill: #1e293b;
+  --map-room-hover: #334155;
+  --map-room-stroke: #475569;
+  --map-room-selected-fill: rgba(59, 130, 246, 0.15);
+  --map-text-primary: #f8fafc;
+  --map-text-muted: #94a3b8;
 }
 
 /* --------------------------------------------------------------------------
@@ -266,55 +274,103 @@ img, svg { display: block; max-width: 100%; }
 }
 .floorplan-svg-wrapper:active { cursor: grabbing; }
 
-/* SVG Map Styling */
-.room-fill {
+/* ── Architectural Floorplan Styling ── */
+
+/* Building footprint (acts as corridor floor) */
+.building-footprint {
+  fill: var(--map-corridor);
+  stroke: var(--map-wall-color);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+/* Room rectangles */
+.room-floor {
   fill: var(--map-room-fill);
   stroke: var(--map-room-stroke);
-  stroke-width: 1;
-  transition: all var(--transition-fast);
+  stroke-width: 1.2;
+  transition: fill var(--transition-fast), stroke var(--transition-fast);
   cursor: pointer;
 }
-.room-fill:hover { fill: var(--map-room-hover); stroke: var(--color-accent-blue-light); }
-.room-fill.selected { fill: var(--color-accent-blue-dim); stroke: var(--color-accent-blue); stroke-width: 1.5; }
-.room-fill.destination { fill: var(--color-accent-green-dim); stroke: var(--color-accent-green); stroke-width: 1.5; animation: room-pulse 2s ease-in-out infinite; }
+.room-floor:hover { fill: var(--map-room-hover); stroke: var(--color-accent-blue-light); stroke-width: 1.5; }
+.room-selected { fill: var(--map-room-selected-fill); stroke: var(--color-accent-blue); stroke-width: 1.5; }
+.room-start { fill: var(--color-accent-blue-dim); stroke: var(--color-accent-blue); stroke-width: 1.5; }
+.room-destination { fill: var(--color-accent-green-dim); stroke: var(--color-accent-green); stroke-width: 2; animation: room-dest-pulse 2s ease-in-out infinite; }
+@keyframes room-dest-pulse { 0%, 100% { stroke-width: 2; } 50% { stroke-width: 3; } }
 
-.corridor-fill { fill: var(--map-corridor-fill); }
-.wall-line { stroke: var(--map-wall); stroke-width: 2; fill: none; stroke-linecap: round; }
+/* Category color strip (left edge of each room) */
+.room-category-strip { pointer-events: none; }
 
-.room-label {
-  font-family: var(--font-family); font-size: 6px; fill: var(--color-text-secondary);
-  text-anchor: middle; dominant-baseline: middle; pointer-events: none; user-select: none; font-weight: var(--font-weight-semibold);
+/* Room text labels */
+.room-label-text {
+  font-family: var(--font-family); font-size: 18px; fill: var(--map-text-primary);
+  text-anchor: middle; dominant-baseline: middle; pointer-events: none; user-select: none;
+  font-weight: var(--font-weight-bold); letter-spacing: 0.01em;
+}
+.room-sublabel-text {
+  font-family: var(--font-family); font-size: 11px; fill: var(--map-text-muted);
+  text-anchor: middle; dominant-baseline: middle; pointer-events: none; user-select: none;
+  font-weight: var(--font-weight-medium);
+}
+.room-icon-text {
+  font-size: 24px; text-anchor: middle; dominant-baseline: central; pointer-events: none;
 }
 
-/* POI Markers Fix */
+/* Fixture elements (elevator, waiting area) */
+.fixture-rect {
+  fill: var(--map-corridor); stroke: var(--map-room-stroke); stroke-width: 0.8;
+  stroke-dasharray: 4 2;
+}
+.fixture-label {
+  font-family: var(--font-family); font-size: 5.5px; fill: var(--color-text-muted);
+  text-anchor: middle; dominant-baseline: middle; pointer-events: none; user-select: none;
+  font-weight: var(--font-weight-medium);
+}
+.fixture-icon {
+  font-size: 9px; text-anchor: middle; dominant-baseline: central; pointer-events: none;
+}
+
+/* Door markers */
+.door-marker { pointer-events: none; }
+
+/* Corridor labels */
+.corridor-label-text {
+  font-family: var(--font-family); font-size: 18px; fill: var(--map-text-muted);
+  text-anchor: middle; dominant-baseline: middle; pointer-events: none; user-select: none;
+  font-weight: var(--font-weight-bold); letter-spacing: 0.15em; opacity: 0.45;
+}
+
+/* Entrance marker */
+.entrance-label-text {
+  font-family: var(--font-family); font-size: 14px; fill: var(--color-accent-blue);
+  text-anchor: middle; dominant-baseline: hanging; pointer-events: none;
+  font-weight: var(--font-weight-bold); letter-spacing: 0.03em;
+}
+
+/* POI Markers (room groups — hover/click interaction) */
 .poi-marker {
   cursor: pointer;
-  /* Key fix: transform origin and box for SVG scaling */
   transform-box: fill-box;
   transform-origin: center;
-  transition: transform var(--transition-spring), filter var(--transition-fast);
+  transition: transform var(--transition-fast), filter var(--transition-fast);
 }
 .poi-marker:hover {
-  transform: scale(1.1);
-  filter: brightness(1.1);
-}
-
-.poi-marker-icon {
-  font-size: 10px; text-anchor: middle; dominant-baseline: central; pointer-events: none;
+  transform: scale(1.02);
+  filter: brightness(1.04);
 }
 
 /* Route Styling */
 .route-path {
-  fill: none; stroke: var(--color-accent-blue); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round;
-  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.4));
+  fill: none; stroke: var(--color-accent-blue); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
 }
-.route-path-animated { stroke-dasharray: 8 6; animation: route-march 0.8s linear infinite; }
-.route-path-bg { fill: none; stroke: rgba(59, 130, 246, 0.15); stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; }
+.route-path-animated { stroke-dasharray: 10 6; animation: route-march 0.7s linear infinite; }
+.route-path-bg { fill: none; stroke: rgba(59, 130, 246, 0.12); stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; }
 
 .current-pos-outer { fill: rgba(59, 130, 246, 0.2); animation: pos-pulse 2s ease-in-out infinite; }
-.current-pos-inner { fill: var(--color-accent-blue); stroke: var(--color-bg-primary); stroke-width: 2; }
+.current-pos-inner { fill: var(--color-accent-blue); stroke: white; stroke-width: 2.5; }
 .dest-marker-glow { fill: rgba(16, 185, 129, 0.15); animation: dest-pulse 2s ease-in-out infinite; }
-.dest-marker-bg { fill: var(--color-accent-green); stroke: var(--color-bg-primary); stroke-width: 1.5; }
+.dest-marker-bg { fill: var(--color-accent-green); stroke: white; stroke-width: 2; }
 .dest-marker-icon { fill: white; font-size: 8px; text-anchor: middle; dominant-baseline: central; }
 
 .zoom-controls {
@@ -368,10 +424,10 @@ img, svg { display: block; max-width: 100%; }
   position: absolute; bottom: 0; left: 0; right: 0; max-height: var(--search-panel-max-height);
   z-index: calc(var(--z-overlay) + 1); background: var(--color-bg-secondary);
   border-top: 1px solid var(--color-border); border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  transform: translateY(100%); transition: transform var(--transition-slow);
+  transform: translateY(120%); opacity: 0; pointer-events: none; transition: transform var(--transition-slow), opacity var(--transition-fast);
   display: flex; flex-direction: column; box-shadow: var(--shadow-xl);
 }
-.search-panel.open { transform: translateY(0); }
+.search-panel.open { transform: translateY(0); opacity: 1; pointer-events: all; }
 .search-panel-handle { width: 40px; height: 5px; background: var(--color-text-muted); border-radius: var(--radius-full); margin: var(--space-3) auto var(--space-4); opacity: 0.3; }
 
 .search-input-wrapper {

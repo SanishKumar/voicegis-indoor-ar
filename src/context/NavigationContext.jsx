@@ -18,7 +18,8 @@ import { BUILDING_CONFIG } from '../data/buildingConfig.js';
 const ACTION = {
   SET_START: 'SET_START',
   SET_DESTINATION: 'SET_DESTINATION',
-  COMPUTE_ROUTE: 'COMPUTE_ROUTE',
+  SET_ROUTE_START: 'SET_ROUTE_START',
+  SET_ROUTE_RESULT: 'SET_ROUTE_RESULT',
   CLEAR_ROUTE: 'CLEAR_ROUTE',
   SET_VIEW: 'SET_VIEW',
   SET_SELECTED_POI: 'SET_SELECTED_POI',
@@ -71,17 +72,25 @@ function navigationReducer(state, action) {
         destinationNodeId: action.payload,
       };
 
-    case ACTION.COMPUTE_ROUTE: {
+    case ACTION.SET_ROUTE_START: {
       const { startId, endId } = action.payload;
-      const route = findRoute(startId, endId);
       return {
         ...state,
         startNodeId: startId,
         destinationNodeId: endId,
+        route: null,
+        navStatus: NAV_STATUS.ROUTING,
+        selectedPOI: null,
+      };
+    }
+
+    case ACTION.SET_ROUTE_RESULT: {
+      const route = action.payload;
+      return {
+        ...state,
         route,
         currentStepIndex: 0,
         navStatus: route.found ? NAV_STATUS.NAVIGATING : NAV_STATUS.IDLE,
-        selectedPOI: null,
       };
     }
 
@@ -177,10 +186,17 @@ export function NavigationProvider({ children }) {
       dispatch({ type: ACTION.SET_DESTINATION, payload: nodeId });
     }, []),
 
-    navigateTo: useCallback((destNodeId, startNodeId) => {
+    navigateTo: async (destNodeId, startNodeId) => {
       const startId = startNodeId || state.startNodeId;
-      dispatch({ type: ACTION.COMPUTE_ROUTE, payload: { startId, endId: destNodeId } });
-    }, [state.startNodeId]),
+      dispatch({ type: ACTION.SET_ROUTE_START, payload: { startId, endId: destNodeId } });
+      try {
+        const route = await findRoute(startId, destNodeId);
+        dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: route });
+      } catch (err) {
+        console.error("Routing error:", err);
+        dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: { found: false, error: 'Routing failed' } });
+      }
+    },
 
     clearRoute: useCallback(() => {
       dispatch({ type: ACTION.CLEAR_ROUTE });

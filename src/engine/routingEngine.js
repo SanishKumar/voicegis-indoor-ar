@@ -82,83 +82,48 @@ function getTurnType(prevBearing, newBearing) {
  * }}
  */
 export function findRoute(startId, endId) {
-  const adj = getAdjacencyList();
-  const startNode = getNodeById(startId);
-  const endNode = getNodeById(endId);
+  return new Promise((resolve, reject) => {
+    if (!startId || !endId || startId === endId) {
+      resolve({ found: false, error: 'Invalid start or end node.' });
+      return;
+    }
 
-  if (!startNode || !endNode) {
-    return { path: [], pathIds: [], totalDistance: 0, steps: [], found: false };
-  }
+    // Convert map to plain object for serialization to the worker
+    const adjMap = getAdjacencyList();
+    const adjObj = {};
+    for (const [key, val] of adjMap.entries()) {
+      adjObj[key] = val;
+    }
 
-  if (startId === endId) {
-    return { 
-      path: [startNode], 
-      pathIds: [startId], 
-      totalDistance: 0, 
-      steps: [{ type: STEP_TYPE.ARRIVE, instruction: 'You are already here', distance: 0 }], 
-      found: true 
+    // Initialize worker
+    const worker = new Worker(new URL('./routing.worker.js', import.meta.url), { type: 'module' });
+
+    worker.onmessage = (e) => {
+      const { type, result, error } = e.data;
+      if (type === 'ROUTE_RESULT') {
+        resolve(result);
+      } else if (type === 'ROUTE_ERROR') {
+        resolve({ found: false, error });
+      }
+      worker.terminate();
     };
-  }
 
-  // A* implementation
-  const openSet = new Set([startId]);
-  const cameFrom = new Map();
-  const gScore = new Map();
-  const fScore = new Map();
+    worker.onerror = (err) => {
+      console.error('Routing worker error:', err);
+      resolve({ found: false, error: 'Worker error occurred.' });
+      worker.terminate();
+    };
 
-  for (const node of NODES) {
-    gScore.set(node.id, Infinity);
-    fScore.set(node.id, Infinity);
-  }
-  gScore.set(startId, 0);
-  fScore.set(startId, heuristic(startNode, endNode));
-
-  while (openSet.size > 0) {
-    // Find node in openSet with lowest fScore
-    let current = null;
-    let lowestF = Infinity;
-    for (const id of openSet) {
-      const f = fScore.get(id);
-      if (f < lowestF) {
-        lowestF = f;
-        current = id;
-      }
-    }
-
-    if (current === endId) {
-      // Reconstruct path
-      const pathIds = [];
-      let node = endId;
-      while (node) {
-        pathIds.unshift(node);
-        node = cameFrom.get(node);
-      }
-
-      const path = pathIds.map(id => getNodeById(id));
-      const totalDistance = gScore.get(endId);
-      const steps = generateSteps(path, totalDistance);
-
-      return { path, pathIds, totalDistance, steps, found: true };
-    }
-
-    openSet.delete(current);
-
-    const neighbors = adj.get(current) || [];
-    for (const neighbor of neighbors) {
-      const tentativeG = gScore.get(current) + neighbor.distance;
-      
-      if (tentativeG < gScore.get(neighbor.to)) {
-        cameFrom.set(neighbor.to, current);
-        gScore.set(neighbor.to, tentativeG);
-        const neighborNode = getNodeById(neighbor.to);
-        fScore.set(neighbor.to, tentativeG + heuristic(neighborNode, endNode));
-        openSet.add(neighbor.to);
-      }
-    }
-  }
-
-  // No path found
-  return { path: [], pathIds: [], totalDistance: 0, steps: [], found: false };
+    // Dispatch payload
+    worker.postMessage({
+      type: 'COMPUTE_ROUTE',
+      startId,
+      endId,
+      nodes: NODES,
+      edges: EDGES,
+      adjacencyList: adjObj
+    });
+  });
 }
 
 /**

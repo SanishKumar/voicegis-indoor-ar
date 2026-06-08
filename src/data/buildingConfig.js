@@ -17,7 +17,7 @@ export const BUILDING_CONFIG = {
   ],
   
   // SVG viewBox dimensions for the floorplan
-  viewBox: { width: 800, height: 500 },
+  viewBox: { width: 3000, height: 2000 },
   
   // Default entrance node — where users start
   defaultStartNode: 'entrance-main',

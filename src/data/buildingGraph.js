@@ -1,19 +1,9 @@
 /**
  * buildingGraph.js
  * 
- * Data model for the hospital wing floorplan.
- * Defines all navigable nodes (intersections + POIs), edges (corridors),
- * and POI metadata.
- * 
- * Coordinate system: SVG viewBox units (0-800 x 0-500)
- * Designed for single-floor MVP with floor_id for future multi-floor support.
- * 
- * @module data/buildingGraph
+ * Scaled 3000x2000 complex routing graph for the Mega-Hospital layout.
  */
 
-/**
- * POI Category definitions with display metadata.
- */
 export const CATEGORIES = {
   emergency:  { id: 'emergency',  label: 'Emergency',   color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.15)',  icon: '🚨' },
   medical:    { id: 'medical',    label: 'Medical',      color: '#3b82f6', bgColor: 'rgba(59, 130, 246, 0.15)', icon: '🏥' },
@@ -25,168 +15,115 @@ export const CATEGORIES = {
   restroom:   { id: 'restroom',   label: 'Restroom',     color: '#64748b', bgColor: 'rgba(100, 116, 139, 0.15)', icon: '🚻' },
 };
 
-/**
- * All navigable nodes in the hospital wing.
- * Types: 'poi' (point of interest / room) or 'junction' (corridor intersection)
- */
 export const NODES = [
-  // ── Entrances ──
-  { id: 'entrance-main', x: 400, y: 460, floor: 1, type: 'poi', poi: { name: 'Main Entrance', category: 'entrance', icon: '🚪', description: 'Hospital main entrance and reception lobby' } },
+  // ── Entrance ──
+  { id: 'entrance-main', x: 1400, y: 1350, floor: 1, type: 'poi', poi: { name: 'Main Entrance', category: 'entrance', icon: '🚪', description: 'South Atrium Entrance' } },
   
-  // ── Main corridor junctions ──
-  { id: 'j1',  x: 400, y: 400, floor: 1, type: 'junction' },
-  { id: 'j2',  x: 400, y: 300, floor: 1, type: 'junction' },
-  { id: 'j3',  x: 400, y: 200, floor: 1, type: 'junction' },
-  { id: 'j4',  x: 400, y: 120, floor: 1, type: 'junction' },
+  // ── POIs (Centers of rooms) ──
+  { id: 'icu',        x: 350, y: 1000, floor: 1, type: 'poi', poi: { name: 'Intensive Care Unit', category: 'medical', icon: '🫀', description: 'West Wing' } },
+  { id: 'er',         x: 700, y: 1100, floor: 1, type: 'poi', poi: { name: 'Emergency Room', category: 'emergency', icon: '🚨', description: 'West Wing Triage' } },
+  { id: 'lab',        x: 1350, y: 350, floor: 1, type: 'poi', poi: { name: 'Laboratory', category: 'diagnostic', icon: '🔬', description: 'North Wing' } },
+  { id: 'radiology',  x: 1650, y: 450, floor: 1, type: 'poi', poi: { name: 'Radiology', category: 'diagnostic', icon: '📡', description: 'North Wing' } },
+  { id: 'surgery',    x: 2450, y: 1000, floor: 1, type: 'poi', poi: { name: 'Surgery Center', category: 'medical', icon: '🏥', description: 'East Wing' } },
+  { id: 'pediatrics', x: 2100, y: 1100, floor: 1, type: 'poi', poi: { name: 'Pediatrics', category: 'medical', icon: '👶', description: 'East Wing' } },
+  { id: 'cafeteria',  x: 1350, y: 1650, floor: 1, type: 'poi', poi: { name: 'Cafeteria', category: 'service', icon: '🍽️', description: 'South Wing' } },
+  { id: 'ward-a',     x: 1650, y: 1550, floor: 1, type: 'poi', poi: { name: 'Ward A', category: 'medical', icon: '🛏️', description: 'South Wing' } },
+  { id: 'ward-b',     x: 1650, y: 1800, floor: 1, type: 'poi', poi: { name: 'Ward B', category: 'medical', icon: '🛏️', description: 'South Wing' } },
+  { id: 'reception',  x: 1400, y: 1010, floor: 1, type: 'poi', poi: { name: 'Main Reception', category: 'admin', icon: '📋', description: 'Central Atrium' } },
+  { id: 'pharmacy',   x: 1100, y: 1200, floor: 1, type: 'poi', poi: { name: 'Pharmacy', category: 'pharmacy', icon: '💊', description: 'Central Atrium' } },
+  { id: 'restroom-1', x: 1700, y: 800,  floor: 1, type: 'poi', poi: { name: 'Restroom', category: 'restroom', icon: '🚻', description: 'Central Atrium' } },
+
+  // ── Atrium Intersections ──
+  { id: 'j_A_C',  x: 1400, y: 1000, floor: 1, type: 'junction' },
+  { id: 'j_A_NW', x: 1200, y: 800,  floor: 1, type: 'junction' },
+  { id: 'j_A_NE', x: 1600, y: 800,  floor: 1, type: 'junction' },
+  { id: 'j_A_SW', x: 1200, y: 1200, floor: 1, type: 'junction' },
+  { id: 'j_A_SE', x: 1600, y: 1200, floor: 1, type: 'junction' },
+
+  // ── Wing Hubs (Corridors) ──
+  { id: 'j_N_Hub', x: 1400, y: 650, floor: 1, type: 'junction' },
+  { id: 'j_S_Hub', x: 1400, y: 1350, floor: 1, type: 'junction' },
+  { id: 'j_W_Hub', x: 950, y: 1000, floor: 1, type: 'junction' },
+  { id: 'j_E_Hub', x: 1850, y: 1000, floor: 1, type: 'junction' },
+
+  // ── Deep Wing Nodes ──
+  { id: 'j_N_1', x: 1350, y: 650, floor: 1, type: 'junction' },
+  { id: 'j_N_2', x: 1650, y: 650, floor: 1, type: 'junction' },
   
-  // ── Left wing junctions ──
-  { id: 'j5',  x: 200, y: 300, floor: 1, type: 'junction' },
-  { id: 'j6',  x: 100, y: 300, floor: 1, type: 'junction' },
-  { id: 'j7',  x: 200, y: 200, floor: 1, type: 'junction' },
-  
-  // ── Right wing junctions ──
-  { id: 'j8',  x: 600, y: 300, floor: 1, type: 'junction' },
-  { id: 'j9',  x: 700, y: 300, floor: 1, type: 'junction' },
-  { id: 'j10', x: 600, y: 200, floor: 1, type: 'junction' },
-  
-  // ── Emergency Department (Left, upper) ──
-  { id: 'er', x: 100, y: 200, floor: 1, type: 'poi', poi: { name: 'Emergency Room', category: 'emergency', icon: '🚨', description: 'Emergency department — 24/7 critical care and triage' } },
-  
-  // ── Medical Rooms (Left wing) ──
-  { id: 'icu', x: 100, y: 380, floor: 1, type: 'poi', poi: { name: 'ICU', category: 'medical', icon: '🫀', description: 'Intensive Care Unit — critical patient monitoring' } },
-  { id: 'ward-a', x: 200, y: 380, floor: 1, type: 'poi', poi: { name: 'Ward A', category: 'medical', icon: '🛏️', description: 'General ward — beds 101-120' } },
-  
-  // ── Diagnostic (Center-left) ──
-  { id: 'radiology', x: 200, y: 120, floor: 1, type: 'poi', poi: { name: 'Radiology', category: 'diagnostic', icon: '📡', description: 'X-ray, CT scan, and MRI imaging center' } },
-  { id: 'lab', x: 300, y: 120, floor: 1, type: 'poi', poi: { name: 'Laboratory', category: 'diagnostic', icon: '🔬', description: 'Blood tests, pathology, and sample analysis' } },
-  
-  // ── Admin & Reception (Center) ──
-  { id: 'reception', x: 400, y: 380, floor: 1, type: 'poi', poi: { name: 'Reception', category: 'admin', icon: '📋', description: 'Patient registration and information desk' } },
-  { id: 'admin-office', x: 500, y: 120, floor: 1, type: 'poi', poi: { name: 'Admin Office', category: 'admin', icon: '🏢', description: 'Hospital administration and billing' } },
-  
-  // ── Pharmacy ──
-  { id: 'pharmacy', x: 300, y: 380, floor: 1, type: 'poi', poi: { name: 'Pharmacy', category: 'pharmacy', icon: '💊', description: 'Prescription pickup and over-the-counter medicines' } },
-  
-  // ── Right wing — Medical ──
-  { id: 'ward-b', x: 600, y: 380, floor: 1, type: 'poi', poi: { name: 'Ward B', category: 'medical', icon: '🛏️', description: 'General ward — beds 201-220' } },
-  { id: 'surgery', x: 700, y: 200, floor: 1, type: 'poi', poi: { name: 'Surgery', category: 'medical', icon: '🏥', description: 'Operating theatres 1-4 — scheduled surgeries' } },
-  { id: 'pediatrics', x: 700, y: 380, floor: 1, type: 'poi', poi: { name: 'Pediatrics', category: 'medical', icon: '👶', description: 'Children\'s care department — ages 0-16' } },
-  
-  // ── Right wing — Diagnostic ──
-  { id: 'cardiology', x: 600, y: 120, floor: 1, type: 'poi', poi: { name: 'Cardiology', category: 'diagnostic', icon: '❤️', description: 'Heart health — ECG, echo, and cardiac consultations' } },
-  
-  // ── Services ──
-  { id: 'cafeteria', x: 100, y: 420, floor: 1, type: 'poi', poi: { name: 'Cafeteria', category: 'service', icon: '🍽️', description: 'Food court — breakfast, lunch, snacks, and beverages' } },
-  { id: 'restroom-1', x: 300, y: 250, floor: 1, type: 'poi', poi: { name: 'Restroom', category: 'restroom', icon: '🚻', description: 'Public restroom facilities' } },
-  
-  // ── Junction for restroom connection ──
-  { id: 'j11', x: 300, y: 300, floor: 1, type: 'junction' },
-  { id: 'j12', x: 500, y: 300, floor: 1, type: 'junction' },
-  { id: 'j13', x: 300, y: 200, floor: 1, type: 'junction' },
-  { id: 'j14', x: 500, y: 200, floor: 1, type: 'junction' },
-  { id: 'j15', x: 100, y: 200, floor: 1, type: 'junction' }, // ER junction
-  { id: 'j16', x: 700, y: 200, floor: 1, type: 'junction' }, // Surgery junction
+  { id: 'j_S_1', x: 1350, y: 1350, floor: 1, type: 'junction' },
+  { id: 'j_S_2', x: 1650, y: 1350, floor: 1, type: 'junction' },
+  { id: 'j_S_3', x: 1650, y: 1650, floor: 1, type: 'junction' },
+
+  { id: 'j_W_1', x: 950, y: 1100, floor: 1, type: 'junction' },
+  { id: 'j_E_1', x: 1850, y: 1100, floor: 1, type: 'junction' },
 ];
 
-/**
- * Edges connecting nodes. Each edge represents a walkable corridor segment.
- * Distance is in meters (approximate for demo).
- */
 export const EDGES = [
-  // Main vertical corridor
-  { from: 'entrance-main', to: 'j1',  distance: 8,  corridor: 'Main Lobby' },
-  { from: 'j1',  to: 'j2',  distance: 12, corridor: 'Central Corridor' },
-  { from: 'j2',  to: 'j3',  distance: 12, corridor: 'Central Corridor' },
-  { from: 'j3',  to: 'j4',  distance: 10, corridor: 'Central Corridor' },
+  // Atrium Diamond
+  { from: 'j_A_C', to: 'j_A_NW', distance: 28, corridor: 'Main Atrium' },
+  { from: 'j_A_C', to: 'j_A_NE', distance: 28, corridor: 'Main Atrium' },
+  { from: 'j_A_C', to: 'j_A_SW', distance: 28, corridor: 'Main Atrium' },
+  { from: 'j_A_C', to: 'j_A_SE', distance: 28, corridor: 'Main Atrium' },
+
+  // Atrium to Hubs
+  { from: 'j_A_C', to: 'j_N_Hub', distance: 35, corridor: 'North Atrium Connector' },
+  { from: 'j_A_C', to: 'j_S_Hub', distance: 35, corridor: 'South Atrium Connector' },
+  { from: 'j_A_C', to: 'j_W_Hub', distance: 45, corridor: 'West Atrium Connector' },
+  { from: 'j_A_C', to: 'j_E_Hub', distance: 45, corridor: 'East Atrium Connector' },
+
+  // Hubs to Deep Nodes
+  { from: 'j_N_Hub', to: 'j_N_1', distance: 5, corridor: 'North Wing Corridor' },
+  { from: 'j_N_Hub', to: 'j_N_2', distance: 25, corridor: 'North Wing Corridor' },
   
-  // Left horizontal corridor (y=300)
-  { from: 'j2',  to: 'j11', distance: 10, corridor: 'West Corridor' },
-  { from: 'j11', to: 'j5',  distance: 10, corridor: 'West Corridor' },
-  { from: 'j5',  to: 'j6',  distance: 12, corridor: 'West Corridor' },
-  
-  // Right horizontal corridor (y=300)
-  { from: 'j2',  to: 'j12', distance: 10, corridor: 'East Corridor' },
-  { from: 'j12', to: 'j8',  distance: 10, corridor: 'East Corridor' },
-  { from: 'j8',  to: 'j9',  distance: 12, corridor: 'East Corridor' },
-  
-  // Left wing vertical connectors
-  { from: 'j5',  to: 'j7',  distance: 12, corridor: 'West Wing' },
-  { from: 'j6',  to: 'j15', distance: 12, corridor: 'Emergency Wing' },
-  
-  // Right wing vertical connectors
-  { from: 'j8',  to: 'j10', distance: 12, corridor: 'East Wing' },
-  { from: 'j9',  to: 'j16', distance: 12, corridor: 'Surgery Wing' },
-  
-  // Upper horizontal corridor (y=200)
-  { from: 'j15', to: 'j7',  distance: 12, corridor: 'North Corridor' },
-  { from: 'j7',  to: 'j13', distance: 10, corridor: 'North Corridor' },
-  { from: 'j13', to: 'j3',  distance: 10, corridor: 'North Corridor' },
-  { from: 'j3',  to: 'j14', distance: 10, corridor: 'North Corridor' },
-  { from: 'j14', to: 'j10', distance: 10, corridor: 'North Corridor' },
-  { from: 'j10', to: 'j16', distance: 12, corridor: 'North Corridor' },
-  
-  // ── POI connections ──
-  // Entrance
-  { from: 'j1',  to: 'reception', distance: 3, corridor: 'Lobby' },
-  
-  // Left wing POIs
-  { from: 'j6',  to: 'icu', distance: 5,  corridor: 'ICU Access' },
-  { from: 'j6',  to: 'cafeteria', distance: 6, corridor: 'Service Corridor' },
-  { from: 'j5',  to: 'ward-a', distance: 5, corridor: 'Ward A Access' },
-  { from: 'j15', to: 'er', distance: 2, corridor: 'ER Access' },
-  
-  // Center POIs
-  { from: 'j11', to: 'pharmacy', distance: 5, corridor: 'Pharmacy Access' },
-  { from: 'j11', to: 'restroom-1', distance: 5, corridor: 'Restroom Access' },
-  { from: 'j13', to: 'radiology', distance: 5, corridor: 'Radiology Access' },
-  { from: 'j13', to: 'lab', distance: 3, corridor: 'Lab Corridor' },
-  { from: 'j4',  to: 'lab', distance: 5, corridor: 'Lab Corridor' },
-  
-  // Right wing POIs
-  { from: 'j8',  to: 'ward-b', distance: 5, corridor: 'Ward B Access' },
-  { from: 'j9',  to: 'pediatrics', distance: 5, corridor: 'Pediatrics Access' },
-  { from: 'j16', to: 'surgery', distance: 2, corridor: 'Surgery Access' },
-  { from: 'j10', to: 'cardiology', distance: 5, corridor: 'Cardiology Access' },
-  { from: 'j14', to: 'admin-office', distance: 5, corridor: 'Admin Access' },
-  { from: 'j4',  to: 'admin-office', distance: 5, corridor: 'Admin Access' },
+  { from: 'j_S_Hub', to: 'j_S_1', distance: 5, corridor: 'South Wing Corridor' },
+  { from: 'j_S_Hub', to: 'j_S_2', distance: 25, corridor: 'South Wing Corridor' },
+  { from: 'j_S_2',   to: 'j_S_3', distance: 30, corridor: 'South Wing Corridor' },
+
+  { from: 'j_W_Hub', to: 'j_W_1', distance: 10, corridor: 'West Wing Corridor' },
+  { from: 'j_E_Hub', to: 'j_E_1', distance: 10, corridor: 'East Wing Corridor' },
+
+  // POIs to Atrium
+  { from: 'entrance-main', to: 'j_S_Hub', distance: 5, corridor: 'Lobby' },
+  { from: 'reception', to: 'j_A_C', distance: 5, corridor: 'Atrium' },
+  { from: 'pharmacy', to: 'j_A_SW', distance: 10, corridor: 'Atrium West' },
+  { from: 'restroom-1', to: 'j_A_NE', distance: 10, corridor: 'Atrium East' },
+
+  // POIs to North Wing
+  { from: 'lab', to: 'j_N_1', distance: 30, corridor: 'Lab Access' },
+  { from: 'radiology', to: 'j_N_2', distance: 20, corridor: 'Radiology Access' },
+
+  // POIs to South Wing
+  { from: 'cafeteria', to: 'j_S_1', distance: 30, corridor: 'Cafeteria Access' },
+  { from: 'ward-a', to: 'j_S_2', distance: 20, corridor: 'Ward A Access' },
+  { from: 'ward-b', to: 'j_S_3', distance: 15, corridor: 'Ward B Access' },
+
+  // POIs to West Wing
+  { from: 'icu', to: 'j_W_Hub', distance: 60, corridor: 'ICU Access' },
+  { from: 'er', to: 'j_W_1', distance: 25, corridor: 'ER Access' },
+
+  // POIs to East Wing
+  { from: 'surgery', to: 'j_E_Hub', distance: 60, corridor: 'Surgery Access' },
+  { from: 'pediatrics', to: 'j_E_1', distance: 25, corridor: 'Pediatrics Access' },
 ];
 
-/**
- * Get all POI nodes (nodes with poi data).
- */
 export function getPOIs() {
   return NODES.filter(n => n.type === 'poi' && n.poi);
 }
 
-/**
- * Get a node by its ID.
- */
 export function getNodeById(id) {
   return NODES.find(n => n.id === id) || null;
 }
 
-/**
- * Get POIs filtered by category.
- */
 export function getPOIsByCategory(category) {
   return getPOIs().filter(n => n.poi.category === category);
 }
 
-/**
- * Build an adjacency list representation of the graph.
- * Returns Map<nodeId, Array<{ to: string, distance: number, corridor: string }>>
- */
 export function buildAdjacencyList() {
   const adj = new Map();
-  
-  for (const node of NODES) {
-    adj.set(node.id, []);
-  }
-  
+  for (const node of NODES) adj.set(node.id, []);
   for (const edge of EDGES) {
     adj.get(edge.from)?.push({ to: edge.to, distance: edge.distance, corridor: edge.corridor });
     adj.get(edge.to)?.push({ to: edge.from, distance: edge.distance, corridor: edge.corridor });
   }
-  
   return adj;
 }
