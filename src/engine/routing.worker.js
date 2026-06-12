@@ -46,11 +46,12 @@ function generateDirections(pathNodes, edges) {
     );
 
     if (edge) {
+      const corridor = edge.corridor || 'corridor';
       if (currentCorridor === null) {
-        currentCorridor = edge.corridor;
+        currentCorridor = corridor;
       }
 
-      if (currentCorridor === edge.corridor) {
+      if (currentCorridor === corridor) {
         currentDistance += edge.distance;
       } else {
         // Corridor change implies a turn
@@ -59,7 +60,7 @@ function generateDirections(pathNodes, edges) {
           distance: currentDistance,
           type: 'straight'
         });
-        currentCorridor = edge.corridor;
+        currentCorridor = corridor;
         currentDistance = edge.distance;
       }
     }
@@ -80,7 +81,7 @@ function generateDirections(pathNodes, edges) {
 /**
  * Dijkstra's algorithm for pathfinding.
  */
-function calculateRoute(startId, endId, nodes, edges, adjacencyList) {
+function calculateRoute(startId, endId, nodes, edges, adjacencyList, options = {}) {
   const distances = {};
   const previous = {};
   const pq = new PriorityQueue();
@@ -128,6 +129,9 @@ function calculateRoute(startId, endId, nodes, edges, adjacencyList) {
     if (smallest || distances[smallest] !== Infinity) {
       const neighbors = adjacencyList[smallest] || [];
       for (const neighbor of neighbors) {
+        if (options.accessibleOnly && neighbor.accessible === false) {
+          continue;
+        }
         // Calculate new distance to neighboring node
         const candidate = distances[smallest] + neighbor.distance;
         const nextNode = neighbor.to;
@@ -147,11 +151,11 @@ function calculateRoute(startId, endId, nodes, edges, adjacencyList) {
 
 // Listen for messages from the main thread
 self.onmessage = function (e) {
-  const { type, startId, endId, nodes, edges, adjacencyList } = e.data;
+  const { type, startId, endId, nodes, edges, adjacencyList, options } = e.data;
 
   if (type === 'COMPUTE_ROUTE') {
     try {
-      const result = calculateRoute(startId, endId, nodes, edges, adjacencyList);
+      const result = calculateRoute(startId, endId, nodes, edges, adjacencyList, options);
       self.postMessage({ type: 'ROUTE_RESULT', result });
     } catch (error) {
       self.postMessage({ type: 'ROUTE_ERROR', error: error.message });

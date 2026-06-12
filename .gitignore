@@ -24,3 +24,8 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+
+voicegis-indoor-implementation_plan.md
+
+.gitignore

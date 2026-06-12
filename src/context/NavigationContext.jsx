@@ -168,13 +168,71 @@ export function NavigationProvider({ children }) {
     return 'light';
   });
 
+  const [onboardingComplete, setOnboardingComplete] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('onboarding_complete') === 'true';
+    }
+    return false;
+  });
+
+  const [highContrast, setHighContrast] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('high_contrast') === 'true';
+    }
+    return false;
+  });
+
+  const [accessibleRouting, setAccessibleRouting] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('accessible_routing') === 'true';
+    }
+    return false;
+  });
+
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+
+  const completeOnboarding = useCallback(() => {
+    setOnboardingComplete(true);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('onboarding_complete', 'true');
+    }
+  }, []);
+
+  const resetOnboarding = useCallback(() => {
+    setOnboardingComplete(false);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('onboarding_complete');
+    }
+  }, []);
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    if (highContrast) {
+      document.documentElement.setAttribute('data-contrast', 'high');
+    } else {
+      document.documentElement.removeAttribute('data-contrast');
+    }
+    localStorage.setItem('high_contrast', String(highContrast));
+  }, [highContrast]);
+
   const toggleTheme = useCallback(() => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  }, []);
+
+  const toggleHighContrast = useCallback(() => {
+    setHighContrast(prev => !prev);
+  }, []);
+
+  const toggleAccessibleRouting = useCallback(() => {
+    setAccessibleRouting(prev => {
+      const next = !prev;
+      localStorage.setItem('accessible_routing', String(next));
+      return next;
+    });
   }, []);
 
   const actions = {
@@ -190,7 +248,7 @@ export function NavigationProvider({ children }) {
       const startId = startNodeId || state.startNodeId;
       dispatch({ type: ACTION.SET_ROUTE_START, payload: { startId, endId: destNodeId } });
       try {
-        const route = await findRoute(startId, destNodeId);
+        const route = await findRoute(startId, destNodeId, { accessibleOnly: accessibleRouting });
         dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: route });
       } catch (err) {
         console.error("Routing error:", err);
@@ -224,7 +282,11 @@ export function NavigationProvider({ children }) {
   };
 
   return (
-    <NavigationContext.Provider value={{ state, actions, theme, toggleTheme }}>
+    <NavigationContext.Provider value={{ 
+      state, actions, theme, toggleTheme, onboardingComplete, completeOnboarding, resetOnboarding, 
+      showLocationPicker, setShowLocationPicker, 
+      highContrast, toggleHighContrast, accessibleRouting, toggleAccessibleRouting 
+    }}>
       {children}
     </NavigationContext.Provider>
   );

@@ -81,7 +81,7 @@ function getTurnType(prevBearing, newBearing) {
  *   found: boolean 
  * }}
  */
-export function findRoute(startId, endId) {
+export function findRoute(startId, endId, options = {}) {
   return new Promise((resolve, reject) => {
     if (!startId || !endId || startId === endId) {
       resolve({ found: false, error: 'Invalid start or end node.' });
@@ -119,6 +119,7 @@ export function findRoute(startId, endId) {
       type: 'COMPUTE_ROUTE',
       startId,
       endId,
+      options,
       nodes: NODES,
       edges: EDGES,
       adjacencyList: adjObj

@@ -9,9 +9,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X, Navigation, MapPin } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs, getAvailableCategories } from '../engine/searchIndex.js';
-import { CATEGORIES } from '../data/buildingGraph.js';
+import { CATEGORIES, getNodeById } from '../data/buildingGraph.js';
 import { formatDistance } from '../data/buildingConfig.js';
-import { findRoute } from '../engine/routingEngine.js';
 
 export default function SearchPanel() {
   const { state, actions } = useNavigation();
@@ -56,9 +55,14 @@ export default function SearchPanel() {
 
   // Estimate distance from current position
   const getDistanceEstimate = useCallback((node) => {
-    if (!state.startNodeId) return null;
-    const route = findRoute(state.startNodeId, node.id);
-    return route.found ? route.totalDistance : null;
+    if (!state.startNodeId || state.startNodeId === node.id) return null;
+    const startNode = getNodeById(state.startNodeId);
+    if (startNode && node) {
+      const dx = startNode.x - node.x;
+      const dy = startNode.y - node.y;
+      return Math.sqrt(dx * dx + dy * dy) * 0.15;
+    }
+    return null;
   }, [state.startNodeId]);
 
   // Don't show search trigger when navigating

@@ -5,11 +5,11 @@
  * Shows room info and a "Navigate Here" CTA.
  */
 
+import { useState, useEffect } from 'react';
 import { X, Navigation, MapPin, Clock } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
-import { CATEGORIES } from '../data/buildingGraph.js';
+import { CATEGORIES, getNodeById } from '../data/buildingGraph.js';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
-import { findRoute } from '../engine/routingEngine.js';
 
 export default function POICard() {
   const { state, actions } = useNavigation();
@@ -20,14 +20,18 @@ export default function POICard() {
   const poi = selectedPOI.poi;
   const cat = CATEGORIES[poi.category];
 
-  // Calculate distance from current position
+  // Calculate straight-line approximate distance (no async call)
   let distanceInfo = null;
   if (startNodeId && startNodeId !== selectedPOI.id) {
-    const route = findRoute(startNodeId, selectedPOI.id);
-    if (route.found) {
+    const startNode = getNodeById(startNodeId);
+    const endNode = getNodeById(selectedPOI.id);
+    if (startNode && endNode) {
+      const dx = startNode.x - endNode.x;
+      const dy = startNode.y - endNode.y;
+      const approxDist = Math.sqrt(dx * dx + dy * dy) * 0.15;
       distanceInfo = {
-        distance: route.totalDistance,
-        walkTime: estimateWalkTime(route.totalDistance),
+        distance: approxDist,
+        walkTime: estimateWalkTime(approxDist),
       };
     }
   }
@@ -87,7 +91,7 @@ export default function POICard() {
           <div className="poi-card-meta">
             <div className="poi-card-meta-item">
               <MapPin size={14} />
-              {formatDistance(distanceInfo.distance)} away
+              ~{formatDistance(distanceInfo.distance)} away
             </div>
             <div className="poi-card-meta-item">
               <Clock size={14} />

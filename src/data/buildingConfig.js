@@ -20,7 +20,7 @@ export const BUILDING_CONFIG = {
   viewBox: { width: 3000, height: 2000 },
   
   // Default entrance node — where users start
-  defaultStartNode: 'entrance-main',
+  defaultStartNode: 'lobby',
   
   // Walk speed in meters per second (average indoor walking)
   walkSpeedMps: 1.2,

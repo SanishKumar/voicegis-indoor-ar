@@ -91,8 +91,8 @@ export default function NavigationPanel() {
 
       {/* Current Step (Hero) */}
       {currentStep && !isArrived && (
-        <div className="nav-current-step animate-slide-down" id="current-step">
-          <div className="nav-step-direction-icon">
+        <div className="nav-current-step animate-slide-down" id="current-step" aria-live="polite">
+          <div className="nav-step-direction-icon" aria-hidden="true">
             <StepIcon type={currentStep.type} size={24} />
           </div>
           <div style={{ flex: 1 }}>
@@ -132,8 +132,8 @@ export default function NavigationPanel() {
         <div className="nav-current-step" style={{ 
           background: 'var(--color-accent-green-dim)', 
           borderColor: 'rgba(16, 185, 129, 0.2)' 
-        }}>
-          <div className="nav-step-direction-icon" style={{ background: 'var(--color-accent-green)' }}>
+        }} aria-live="assertive">
+          <div className="nav-step-direction-icon" style={{ background: 'var(--color-accent-green)' }} aria-hidden="true">
             <MapPin size={24} />
           </div>
           <div>
@@ -146,15 +146,15 @@ export default function NavigationPanel() {
       )}
 
       {/* Steps List */}
-      <div className="nav-steps-list" id="nav-steps-list">
+      <div className="nav-steps-list" id="nav-steps-list" role="list">
         {steps.map((step, i) => {
           let itemClass = 'nav-step-item';
           if (i < currentStepIndex) itemClass += ' completed';
           if (i === currentStepIndex) itemClass += ' active';
 
           return (
-            <div key={i} className={itemClass}>
-              <div className="nav-step-num">
+            <div key={i} className={itemClass} role="listitem">
+              <div className="nav-step-num" aria-hidden="true">
                 {i < currentStepIndex ? '✓' : i + 1}
               </div>
               <div className="nav-step-text">

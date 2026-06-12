@@ -1,130 +1,78 @@
 /**
  * buildingGeometry.js
  * 
- * Complex, sprawling 3000x2000 architectural geometry.
- * Utilizes SVG path strings (M, L, Q, Z) for organic shapes, L-shaped rooms,
- * and massive multi-wing layouts.
+ * Extreme High-Density Mall/Hospital Layout.
+ * Dozens of tightly packed rooms with thick distinct walls to match the 
+ * professional blueprint complexity requested.
  */
 
-// Total campus footprint for background rendering
-export const CAMPUS_WIDTH = 3000;
-export const CAMPUS_HEIGHT = 2000;
+export const CAMPUS_WIDTH = 2000;
+export const CAMPUS_HEIGHT = 1500;
 
+// The main background floor is the entire walkable rectangle.
+// Rooms will be drawn on top of this floor, leaving the corridors as negative space.
 export const BUILDING_OUTLINE = {
-  // A giant cross-shape representing the walkable floor of all wings
-  path: `
-    M 1000,100 L 1800,100 
-    L 1800,700 L 2600,700 
-    L 2600,1300 L 1800,1300 
-    L 1800,1900 L 1200,1900 
-    L 1200,1300 L 200,1300 
-    L 200,700 L 1000,700 Z
-  `
+  path: `M 100,100 L 1900,100 L 1900,1300 L 100,1300 Z`
 };
+
+// Helper to easily define rectangular rooms
+const makeRoom = (id, category, label, icon, x, y, w, h) => ({
+  id, category, label, icon,
+  path: `M ${x},${y} L ${x+w},${y} L ${x+w},${y+h} L ${x},${y+h} Z`,
+  center: { x: x + w/2, y: y + h/2 },
+  bounds: { x, y, w, h }
+});
 
 export const ROOMS = [
-  // ── West Wing (Emergency & ICU) ──
-  {
-    id: 'icu', category: 'medical', label: 'Intensive Care Unit', icon: '🫀', sublabel: 'Level 1 Trauma',
-    // L-Shaped Path
-    path: 'M 200,700 L 900,700 L 900,900 L 500,900 L 500,1300 L 200,1300 Z',
-    center: { x: 350, y: 1000 }
-  },
-  {
-    id: 'er', category: 'emergency', label: 'Emergency Room', icon: '🚨', sublabel: '24/7 Triage',
-    path: 'M 500,900 L 900,900 L 900,1300 L 500,1300 Z',
-    center: { x: 700, y: 1100 }
-  },
+  // ── TOP ROW (Y: 100 to 300) ──
+  makeRoom('ward-1', 'medical', 'Ward 1', '🛏️', 100, 100, 300, 200),
+  makeRoom('ward-2', 'medical', 'Ward 2', '🛏️', 400, 100, 300, 200),
+  makeRoom('ward-3', 'medical', 'Ward 3', '🛏️', 700, 100, 300, 200),
+  makeRoom('ward-4', 'medical', 'Ward 4', '🛏️', 1000, 100, 300, 200),
+  makeRoom('pharmacy', 'pharmacy', 'Pharmacy', '💊', 1300, 100, 300, 200),
+  makeRoom('gift-shop', 'service', 'Gift Shop', '🛍️', 1600, 100, 300, 200),
 
-  // ── North Wing (Diagnostics) ──
-  {
-    id: 'lab', category: 'diagnostic', label: 'Laboratory', icon: '🔬', sublabel: 'Pathology & Bloodwork',
-    // L-Shaped Path
-    path: 'M 1200,100 L 1800,100 L 1800,300 L 1500,300 L 1500,600 L 1200,600 Z',
-    center: { x: 1350, y: 350 }
-  },
-  {
-    id: 'radiology', category: 'diagnostic', label: 'Radiology', icon: '📡', sublabel: 'MRI, CT, X-Ray',
-    path: 'M 1500,300 L 1800,300 L 1800,600 L 1500,600 Z',
-    center: { x: 1650, y: 450 }
-  },
+  // ── LEFT WING (X: 100 to 300, Y: 400 to 1000) ──
+  makeRoom('storage', 'admin', 'Storage', '📦', 100, 400, 200, 150),
+  makeRoom('office-1', 'admin', 'Office A', '💻', 100, 550, 200, 150),
+  makeRoom('office-2', 'admin', 'Office B', '💻', 100, 700, 200, 150),
+  makeRoom('restroom-w', 'restroom', 'Restroom', '🚻', 100, 850, 200, 150),
 
-  // ── East Wing (Surgery & Pediatrics) ──
-  {
-    id: 'surgery', category: 'medical', label: 'Surgery Center', icon: '🏥', sublabel: 'Theatres 1-8',
-    // L-Shaped Path
-    path: 'M 1900,700 L 2600,700 L 2600,1300 L 2300,1300 L 2300,900 L 1900,900 Z',
-    center: { x: 2450, y: 1000 }
-  },
-  {
-    id: 'pediatrics', category: 'medical', label: 'Pediatrics', icon: '👶', sublabel: 'Children\'s Wing',
-    path: 'M 1900,900 L 2300,900 L 2300,1300 L 1900,1300 Z',
-    center: { x: 2100, y: 1100 }
-  },
+  // ── RIGHT WING (X: 1700 to 1900, Y: 400 to 1000) ──
+  makeRoom('er-triage', 'emergency', 'ER Triage', '📋', 1700, 400, 200, 150),
+  makeRoom('er-bay-1', 'emergency', 'ER Bay 1', '🚨', 1700, 550, 200, 150),
+  makeRoom('er-bay-2', 'emergency', 'ER Bay 2', '🚨', 1700, 700, 200, 150),
+  makeRoom('er-bay-3', 'emergency', 'ER Bay 3', '🚨', 1700, 850, 200, 150),
 
-  // ── South Wing (Wards & Service) ──
-  {
-    id: 'cafeteria', category: 'service', label: 'Cafeteria', icon: '🍽️', sublabel: 'Food & Beverage',
-    path: 'M 1200,1400 L 1500,1400 L 1500,1900 L 1200,1900 Z',
-    center: { x: 1350, y: 1650 }
-  },
-  {
-    id: 'ward-a', category: 'medical', label: 'Ward A', icon: '🛏️', sublabel: 'Inpatient Rooms 100-150',
-    path: 'M 1500,1400 L 1800,1400 L 1800,1700 L 1500,1700 Z',
-    center: { x: 1650, y: 1550 }
-  },
-  {
-    id: 'ward-b', category: 'medical', label: 'Ward B', icon: '🛏️', sublabel: 'Inpatient Rooms 200-250',
-    path: 'M 1500,1700 L 1800,1700 L 1800,1900 L 1500,1900 Z',
-    center: { x: 1650, y: 1800 }
-  },
+  // ── BOTTOM ROW (Y: 1100 to 1300) ──
+  makeRoom('cafeteria', 'service', 'Cafeteria', '🍽️', 100, 1100, 300, 200),
+  makeRoom('kitchen', 'service', 'Kitchen', '🍳', 400, 1100, 300, 200),
+  makeRoom('admin-main', 'admin', 'Admin', '📁', 700, 1100, 300, 200),
+  makeRoom('security', 'admin', 'Security', '🛡️', 1000, 1100, 300, 200),
+  makeRoom('reception', 'admin', 'Reception', '💁', 1300, 1100, 300, 200),
+  makeRoom('lobby', 'entrance', 'Main Lobby', '🛋️', 1600, 1100, 300, 200),
 
-  // ── Central Atrium ──
-  {
-    id: 'reception', category: 'admin', label: 'Main Reception', icon: '📋', sublabel: 'Information & Registration',
-    // Organic sweeping curved desk in the center of the atrium
-    path: 'M 1300,1000 Q 1400,850 1500,1000 L 1460,1080 Q 1400,980 1340,1080 Z',
-    center: { x: 1400, y: 1010 }
-  },
-  {
-    id: 'pharmacy', category: 'pharmacy', label: 'Pharmacy', icon: '💊', sublabel: 'Prescription Pickup',
-    path: 'M 1000,1100 L 1200,1100 L 1200,1300 L 1000,1300 Z',
-    center: { x: 1100, y: 1200 }
-  },
-  {
-    id: 'restroom-1', category: 'restroom', label: 'Restrooms', icon: '🚻', sublabel: '',
-    path: 'M 1600,700 L 1800,700 L 1800,900 L 1600,900 Z',
-    center: { x: 1700, y: 800 }
-  }
+  // ── CENTRAL ISLAND LEFT (X: 400 to 900, Y: 400 to 1000) ──
+  makeRoom('surgery', 'medical', 'Surgery Center', '🏥', 400, 400, 500, 300),
+  makeRoom('icu', 'medical', 'Intensive Care Unit', '🫀', 400, 700, 500, 300),
+
+  // ── CENTRAL ISLAND RIGHT (X: 1100 to 1600, Y: 400 to 1000) ──
+  makeRoom('pediatrics', 'medical', 'Pediatrics', '👶', 1100, 400, 500, 200),
+  makeRoom('radiology', 'diagnostic', 'Radiology', '📡', 1100, 600, 500, 200),
+  makeRoom('lab', 'diagnostic', 'Laboratory', '🔬', 1100, 800, 500, 200),
 ];
 
-export const ARCHITECTURAL_DETAILS = [
-  // Elevator Banks (boxes with crosses)
-  { type: 'elevator', x: 1350, y: 500, w: 100, h: 80, label: 'North Elevators' },
-  { type: 'elevator', x: 1350, y: 1320, w: 100, h: 80, label: 'South Elevators' },
-  
-  // Thick Structural Pillars in the Atrium
-  { type: 'pillar', x: 1100, y: 800, r: 25 },
-  { type: 'pillar', x: 1700, y: 800, r: 25 },
-  { type: 'pillar', x: 1100, y: 1200, r: 25 },
-  { type: 'pillar', x: 1700, y: 1200, r: 25 },
-  
-  // Stairwells
-  { type: 'stairs', x: 1200, y: 500, w: 80, h: 100, steps: 8 },
-  { type: 'stairs', x: 1200, y: 1300, w: 80, h: 100, steps: 8 },
-];
+// No floating external details, everything is tightly bound inside the rooms to look
+// like a real densely packed blueprint.
+export const ARCHITECTURAL_DETAILS = [];
 
+// Labels placed perfectly in the negative space (the corridors)
 export const CORRIDOR_LABELS = [
-  { text: 'NORTH WING CORRIDOR', x: 1400, y: 650, rotate: 0 },
-  { text: 'SOUTH WING CORRIDOR', x: 1400, y: 1350, rotate: 0 },
-  { text: 'WEST WING CORRIDOR', x: 950, y: 1000, rotate: -90 },
-  { text: 'EAST WING CORRIDOR', x: 1850, y: 1000, rotate: 90 },
-  { text: 'MAIN ATRIUM', x: 1400, y: 850, rotate: 0, size: 'large' },
+  { text: 'NORTH CORRIDOR', x: 1000, y: 350, rotate: 0 },
+  { text: 'SOUTH CORRIDOR', x: 1000, y: 1050, rotate: 0 },
+  { text: 'WEST CORRIDOR', x: 350, y: 700, rotate: -90 },
+  { text: 'EAST CORRIDOR', x: 1650, y: 700, rotate: 90 },
+  { text: 'CENTRAL ATRIUM', x: 1000, y: 700, rotate: 90 },
 ];
 
-// ── Entrance Marker ──
-export const ENTRANCE = {
-  x: 1400,
-  y: 1300,
-  label: 'Main Atrium Entrance',
-};
+export const ENTRANCE = { x: 1750, y: 1250, label: 'South East Entrance' };

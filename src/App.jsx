@@ -2,22 +2,28 @@
  * App.jsx
  * 
  * Root application component.
- * Assembles the layout: Header → Main (Floorplan / AR) → StatusBar
- * with Search, POICard, and NavigationPanel overlays.
+ * Shows the WelcomeScreen on first visit, then the main navigation app.
  */
 
 import { NavigationProvider, useNavigation, VIEW_TYPE } from './context/NavigationContext.jsx';
+import WelcomeScreen from './components/WelcomeScreen.jsx';
 import Header from './components/Header.jsx';
 import FloorplanViewer from './components/FloorplanViewer.jsx';
 import SearchPanel from './components/SearchPanel.jsx';
 import POICard from './components/POICard.jsx';
 import NavigationPanel from './components/NavigationPanel.jsx';
+import LocationPicker from './components/LocationPicker.jsx';
 import ARView from './components/ARView.jsx';
 import StatusBar from './components/StatusBar.jsx';
 
 function AppContent() {
-  const { state } = useNavigation();
+  const { state, onboardingComplete, completeOnboarding, showLocationPicker, setShowLocationPicker } = useNavigation();
   const { activeView } = state;
+
+  // Show onboarding on first visit
+  if (!onboardingComplete) {
+    return <WelcomeScreen onComplete={completeOnboarding} />;
+  }
 
   return (
     <>
@@ -39,6 +45,12 @@ function AppContent() {
       </main>
 
       <StatusBar />
+
+      {/* Location Picker Modal */}
+      <LocationPicker
+        isOpen={showLocationPicker}
+        onClose={() => setShowLocationPicker(false)}
+      />
     </>
   );
 }
