@@ -1,0 +1,2489 @@
+{
+  "building": {
+    "coordinateSystem": {
+      "northOffsetDegrees": 0,
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "type": "local-cartesian"
+    },
+    "entrySpaceId": "g-entrance",
+    "id": "reference-medical-centre",
+    "name": "Reference Medical Centre (Synthetic Fixture)",
+    "units": "meters"
+  },
+  "compilerVersion": "0.1.0",
+  "floors": [
+    {
+      "clearHeight": 3.2,
+      "elevation": 0,
+      "id": "g",
+      "level": 0,
+      "name": "Ground Floor",
+      "outline": [
+        [
+          0,
+          0
+        ],
+        [
+          30,
+          0
+        ],
+        [
+          30,
+          18
+        ],
+        [
+          0,
+          18
+        ]
+      ]
+    },
+    {
+      "clearHeight": 3.2,
+      "elevation": 3.6,
+      "id": "l1",
+      "level": 1,
+      "name": "Level 1",
+      "outline": [
+        [
+          0,
+          0
+        ],
+        [
+          30,
+          0
+        ],
+        [
+          30,
+          18
+        ],
+        [
+          0,
+          18
+        ]
+      ]
+    }
+  ],
+  "localizationAnchors": [
+    {
+      "floorId": "g",
+      "headingDegrees": 90,
+      "id": "anchor-ground-junction",
+      "kind": "image",
+      "payload": "reference-sign-ground-junction-v1",
+      "position": [
+        6,
+        9
+      ],
+      "spaceId": "g-corridor"
+    },
+    {
+      "floorId": "g",
+      "headingDegrees": 270,
+      "id": "anchor-ground-lift",
+      "kind": "image",
+      "payload": "reference-sign-ground-lift-v1",
+      "position": [
+        25,
+        9
+      ],
+      "spaceId": "g-lift-lobby"
+    },
+    {
+      "floorId": "l1",
+      "headingDegrees": 270,
+      "id": "anchor-level-one-lift",
+      "kind": "image",
+      "payload": "reference-sign-level-one-lift-v1",
+      "position": [
+        25,
+        9
+      ],
+      "spaceId": "l1-lift-lobby"
+    },
+    {
+      "floorId": "g",
+      "headingDegrees": 90,
+      "id": "anchor-main-entry",
+      "kind": "qr",
+      "payload": "voicegis://reference-medical-centre/anchor-main-entry",
+      "position": [
+        1,
+        9
+      ],
+      "spaceId": "g-entrance"
+    }
+  ],
+  "manifest": {
+    "contentHash": "5be7c952924d796b39ca065311d662cd24da0a18ae20bee0fd6ee962636cd00b",
+    "hashAlgorithm": "sha256"
+  },
+  "packageVersion": "0.1.0",
+  "pois": [
+    {
+      "accessible": true,
+      "category": "service",
+      "floorId": "l1",
+      "id": "administration",
+      "name": "Administration",
+      "position": [
+        16,
+        14.5
+      ],
+      "public": true,
+      "spaceId": "l1-administration"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "heart clinic"
+      ],
+      "category": "medical",
+      "floorId": "l1",
+      "id": "cardiology",
+      "name": "Cardiology",
+      "position": [
+        14.5,
+        3.5
+      ],
+      "public": true,
+      "spaceId": "l1-cardiology"
+    },
+    {
+      "accessible": true,
+      "category": "medical",
+      "floorId": "l1",
+      "id": "consultation-suite",
+      "name": "Consultation Suite",
+      "position": [
+        8,
+        3.5
+      ],
+      "public": true,
+      "spaceId": "l1-consultation"
+    },
+    {
+      "accessible": true,
+      "category": "restroom",
+      "floorId": "g",
+      "id": "ground-restroom",
+      "name": "Ground Accessible Restroom",
+      "position": [
+        8.5,
+        14.5
+      ],
+      "public": true,
+      "spaceId": "g-restroom"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "radiology",
+        "x-ray"
+      ],
+      "category": "diagnostic",
+      "floorId": "g",
+      "id": "imaging",
+      "name": "Imaging",
+      "position": [
+        14.5,
+        3.5
+      ],
+      "public": true,
+      "spaceId": "g-imaging"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "lab"
+      ],
+      "category": "diagnostic",
+      "floorId": "g",
+      "id": "laboratory",
+      "name": "Laboratory",
+      "position": [
+        15.5,
+        14.5
+      ],
+      "public": true,
+      "spaceId": "g-laboratory"
+    },
+    {
+      "accessible": true,
+      "category": "restroom",
+      "floorId": "l1",
+      "id": "level-one-restroom",
+      "name": "Level 1 Accessible Restroom",
+      "position": [
+        21,
+        3.5
+      ],
+      "public": true,
+      "spaceId": "l1-restroom"
+    },
+    {
+      "accessible": true,
+      "category": "entrance",
+      "floorId": "g",
+      "id": "main-entrance",
+      "name": "Main Entrance",
+      "position": [
+        2,
+        9
+      ],
+      "public": true,
+      "spaceId": "g-entrance"
+    },
+    {
+      "accessible": true,
+      "category": "pharmacy",
+      "floorId": "g",
+      "id": "pharmacy",
+      "name": "Pharmacy",
+      "position": [
+        21,
+        3.5
+      ],
+      "public": true,
+      "spaceId": "g-pharmacy"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "front desk",
+        "information"
+      ],
+      "category": "service",
+      "floorId": "g",
+      "id": "reception",
+      "name": "Reception",
+      "position": [
+        8,
+        3.5
+      ],
+      "public": true,
+      "spaceId": "g-reception"
+    },
+    {
+      "accessible": true,
+      "category": "staff",
+      "floorId": "l1",
+      "id": "records-store",
+      "name": "Records Store",
+      "position": [
+        21.5,
+        14.5
+      ],
+      "public": false,
+      "spaceId": "l1-records"
+    },
+    {
+      "accessible": true,
+      "category": "staff",
+      "floorId": "g",
+      "id": "staff-store",
+      "name": "Staff Store",
+      "position": [
+        21.5,
+        14.5
+      ],
+      "public": false,
+      "spaceId": "g-staff-store"
+    },
+    {
+      "accessible": true,
+      "category": "service",
+      "floorId": "l1",
+      "id": "training-room",
+      "name": "Training Room",
+      "position": [
+        9,
+        14.5
+      ],
+      "public": true,
+      "spaceId": "l1-training"
+    }
+  ],
+  "portals": [
+    {
+      "accessible": true,
+      "connects": [
+        "g-entrance",
+        "g-corridor"
+      ],
+      "floorId": "g",
+      "id": "g-entry-opening",
+      "kind": "opening",
+      "position": [
+        5,
+        9
+      ],
+      "width": 3
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-imaging",
+        "g-corridor"
+      ],
+      "floorId": "g",
+      "id": "g-imaging-door",
+      "kind": "door",
+      "position": [
+        14.5,
+        7
+      ],
+      "width": 1.1
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-laboratory",
+        "g-corridor"
+      ],
+      "floorId": "g",
+      "id": "g-laboratory-door",
+      "kind": "door",
+      "position": [
+        15.5,
+        11
+      ],
+      "width": 1.1
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-corridor",
+        "g-lift-lobby"
+      ],
+      "floorId": "g",
+      "id": "g-lift-opening",
+      "kind": "opening",
+      "position": [
+        24,
+        9
+      ],
+      "width": 2.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-pharmacy",
+        "g-corridor"
+      ],
+      "floorId": "g",
+      "id": "g-pharmacy-door",
+      "kind": "door",
+      "position": [
+        21,
+        7
+      ],
+      "width": 1.1
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-reception",
+        "g-corridor"
+      ],
+      "floorId": "g",
+      "id": "g-reception-door",
+      "kind": "door",
+      "position": [
+        8,
+        7
+      ],
+      "width": 1.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-restroom",
+        "g-corridor"
+      ],
+      "floorId": "g",
+      "id": "g-restroom-door",
+      "kind": "door",
+      "position": [
+        8.5,
+        11
+      ],
+      "width": 1
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-staff-store",
+        "g-corridor"
+      ],
+      "floorId": "g",
+      "id": "g-staff-door",
+      "kind": "door",
+      "position": [
+        21.5,
+        11
+      ],
+      "restricted": true,
+      "width": 1
+    },
+    {
+      "accessible": false,
+      "connects": [
+        "g-lift-lobby",
+        "g-stair-lobby"
+      ],
+      "floorId": "g",
+      "id": "g-stair-door",
+      "kind": "door",
+      "position": [
+        27,
+        11
+      ],
+      "width": 1.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-administration",
+        "l1-corridor"
+      ],
+      "floorId": "l1",
+      "id": "l1-administration-door",
+      "kind": "door",
+      "position": [
+        16,
+        11
+      ],
+      "width": 1.1
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-cardiology",
+        "l1-corridor"
+      ],
+      "floorId": "l1",
+      "id": "l1-cardiology-door",
+      "kind": "door",
+      "position": [
+        14.5,
+        7
+      ],
+      "width": 1.1
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-consultation",
+        "l1-corridor"
+      ],
+      "floorId": "l1",
+      "id": "l1-consultation-door",
+      "kind": "door",
+      "position": [
+        8,
+        7
+      ],
+      "width": 1.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-corridor",
+        "l1-lift-lobby"
+      ],
+      "floorId": "l1",
+      "id": "l1-lift-opening",
+      "kind": "opening",
+      "position": [
+        24,
+        9
+      ],
+      "width": 2.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-records",
+        "l1-corridor"
+      ],
+      "floorId": "l1",
+      "id": "l1-records-door",
+      "kind": "door",
+      "position": [
+        21.5,
+        11
+      ],
+      "restricted": true,
+      "width": 1
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-restroom",
+        "l1-corridor"
+      ],
+      "floorId": "l1",
+      "id": "l1-restroom-door",
+      "kind": "door",
+      "position": [
+        21,
+        7
+      ],
+      "width": 1.1
+    },
+    {
+      "accessible": false,
+      "connects": [
+        "l1-lift-lobby",
+        "l1-stair-lobby"
+      ],
+      "floorId": "l1",
+      "id": "l1-stair-door",
+      "kind": "door",
+      "position": [
+        27,
+        11
+      ],
+      "width": 1.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-training",
+        "l1-corridor"
+      ],
+      "floorId": "l1",
+      "id": "l1-training-door",
+      "kind": "door",
+      "position": [
+        9,
+        11
+      ],
+      "width": 1.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-west-lobby",
+        "l1-corridor"
+      ],
+      "floorId": "l1",
+      "id": "l1-west-opening",
+      "kind": "opening",
+      "position": [
+        5,
+        9
+      ],
+      "width": 3
+    }
+  ],
+  "routing": {
+    "edges": [
+      {
+        "accessible": true,
+        "connectorKind": "elevator",
+        "distanceMeters": 3.6,
+        "floorIds": [
+          "g",
+          "l1"
+        ],
+        "from": "connector:lift-east:g",
+        "id": "edge:connector:lift-east:g--connector:lift-east:l1",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "lift-east",
+        "to": "connector:lift-east:l1"
+      },
+      {
+        "accessible": true,
+        "connectorKind": "elevator",
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-lift-lobby",
+        "id": "edge:connector:lift-east:g--space:g-lift-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "lift-east",
+        "spaceId": "g-lift-lobby",
+        "to": "connector:lift-east:g"
+      },
+      {
+        "accessible": true,
+        "connectorKind": "elevator",
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-lift-lobby",
+        "id": "edge:connector:lift-east:l1--space:l1-lift-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "lift-east",
+        "spaceId": "l1-lift-lobby",
+        "to": "connector:lift-east:l1"
+      },
+      {
+        "accessible": false,
+        "connectorKind": "stairs",
+        "distanceMeters": 3.6,
+        "floorIds": [
+          "g",
+          "l1"
+        ],
+        "from": "connector:stairs-east:g",
+        "id": "edge:connector:stairs-east:g--connector:stairs-east:l1",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "stairs-east",
+        "to": "connector:stairs-east:l1"
+      },
+      {
+        "accessible": false,
+        "connectorKind": "stairs",
+        "distanceMeters": 0.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-stair-lobby",
+        "id": "edge:connector:stairs-east:g--space:g-stair-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "stairs-east",
+        "spaceId": "g-stair-lobby",
+        "to": "connector:stairs-east:g"
+      },
+      {
+        "accessible": false,
+        "connectorKind": "stairs",
+        "distanceMeters": 0.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-stair-lobby",
+        "id": "edge:connector:stairs-east:l1--space:l1-stair-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "stairs-east",
+        "spaceId": "l1-stair-lobby",
+        "to": "connector:stairs-east:l1"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-administration",
+        "id": "edge:poi:administration--space:l1-administration",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "administration",
+        "spaceId": "l1-administration",
+        "to": "poi:administration"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-cardiology",
+        "id": "edge:poi:cardiology--space:l1-cardiology",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "cardiology",
+        "spaceId": "l1-cardiology",
+        "to": "poi:cardiology"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-consultation",
+        "id": "edge:poi:consultation-suite--space:l1-consultation",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "consultation-suite",
+        "spaceId": "l1-consultation",
+        "to": "poi:consultation-suite"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-restroom",
+        "id": "edge:poi:ground-restroom--space:g-restroom",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "ground-restroom",
+        "spaceId": "g-restroom",
+        "to": "poi:ground-restroom"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-imaging",
+        "id": "edge:poi:imaging--space:g-imaging",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "imaging",
+        "spaceId": "g-imaging",
+        "to": "poi:imaging"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-laboratory",
+        "id": "edge:poi:laboratory--space:g-laboratory",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "laboratory",
+        "spaceId": "g-laboratory",
+        "to": "poi:laboratory"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-restroom",
+        "id": "edge:poi:level-one-restroom--space:l1-restroom",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "level-one-restroom",
+        "spaceId": "l1-restroom",
+        "to": "poi:level-one-restroom"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-entrance",
+        "id": "edge:poi:main-entrance--space:g-entrance",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "main-entrance",
+        "spaceId": "g-entrance",
+        "to": "poi:main-entrance"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-pharmacy",
+        "id": "edge:poi:pharmacy--space:g-pharmacy",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "pharmacy",
+        "spaceId": "g-pharmacy",
+        "to": "poi:pharmacy"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-reception",
+        "id": "edge:poi:reception--space:g-reception",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "reception",
+        "spaceId": "g-reception",
+        "to": "poi:reception"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-records",
+        "id": "edge:poi:records-store--space:l1-records",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "records-store",
+        "spaceId": "l1-records",
+        "to": "poi:records-store"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-staff-store",
+        "id": "edge:poi:staff-store--space:g-staff-store",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "staff-store",
+        "spaceId": "g-staff-store",
+        "to": "poi:staff-store"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-training",
+        "id": "edge:poi:training-room--space:l1-training",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "training-room",
+        "spaceId": "l1-training",
+        "to": "poi:training-room"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 9.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-corridor",
+        "id": "edge:portal:g-entry-opening--space:g-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-entry-opening",
+        "spaceId": "g-corridor",
+        "to": "portal:g-entry-opening"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-entrance",
+        "id": "edge:portal:g-entry-opening--space:g-entrance",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-entry-opening",
+        "spaceId": "g-entrance",
+        "to": "portal:g-entry-opening"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-corridor",
+        "id": "edge:portal:g-imaging-door--space:g-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-imaging-door",
+        "spaceId": "g-corridor",
+        "to": "portal:g-imaging-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-imaging",
+        "id": "edge:portal:g-imaging-door--space:g-imaging",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-imaging-door",
+        "spaceId": "g-imaging",
+        "to": "portal:g-imaging-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2.236,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-corridor",
+        "id": "edge:portal:g-laboratory-door--space:g-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-laboratory-door",
+        "spaceId": "g-corridor",
+        "to": "portal:g-laboratory-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-laboratory",
+        "id": "edge:portal:g-laboratory-door--space:g-laboratory",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-laboratory-door",
+        "spaceId": "g-laboratory",
+        "to": "portal:g-laboratory-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 9.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-corridor",
+        "id": "edge:portal:g-lift-opening--space:g-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-lift-opening",
+        "spaceId": "g-corridor",
+        "to": "portal:g-lift-opening"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-lift-lobby",
+        "id": "edge:portal:g-lift-opening--space:g-lift-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-lift-opening",
+        "spaceId": "g-lift-lobby",
+        "to": "portal:g-lift-opening"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6.801,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-corridor",
+        "id": "edge:portal:g-pharmacy-door--space:g-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-pharmacy-door",
+        "spaceId": "g-corridor",
+        "to": "portal:g-pharmacy-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-pharmacy",
+        "id": "edge:portal:g-pharmacy-door--space:g-pharmacy",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-pharmacy-door",
+        "spaceId": "g-pharmacy",
+        "to": "portal:g-pharmacy-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6.801,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-corridor",
+        "id": "edge:portal:g-reception-door--space:g-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-reception-door",
+        "spaceId": "g-corridor",
+        "to": "portal:g-reception-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-reception",
+        "id": "edge:portal:g-reception-door--space:g-reception",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-reception-door",
+        "spaceId": "g-reception",
+        "to": "portal:g-reception-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6.325,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-corridor",
+        "id": "edge:portal:g-restroom-door--space:g-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-restroom-door",
+        "spaceId": "g-corridor",
+        "to": "portal:g-restroom-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-restroom",
+        "id": "edge:portal:g-restroom-door--space:g-restroom",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-restroom-door",
+        "spaceId": "g-restroom",
+        "to": "portal:g-restroom-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 7.28,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-corridor",
+        "id": "edge:portal:g-staff-door--space:g-corridor",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "g-staff-door",
+        "spaceId": "g-corridor",
+        "to": "portal:g-staff-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-staff-store",
+        "id": "edge:portal:g-staff-door--space:g-staff-store",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "g-staff-door",
+        "spaceId": "g-staff-store",
+        "to": "portal:g-staff-door"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 2,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-lift-lobby",
+        "id": "edge:portal:g-stair-door--space:g-lift-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-stair-door",
+        "spaceId": "g-lift-lobby",
+        "to": "portal:g-stair-door"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-stair-lobby",
+        "id": "edge:portal:g-stair-door--space:g-stair-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-stair-door",
+        "spaceId": "g-stair-lobby",
+        "to": "portal:g-stair-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-administration",
+        "id": "edge:portal:l1-administration-door--space:l1-administration",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-administration-door",
+        "spaceId": "l1-administration",
+        "to": "portal:l1-administration-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-corridor",
+        "id": "edge:portal:l1-administration-door--space:l1-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-administration-door",
+        "spaceId": "l1-corridor",
+        "to": "portal:l1-administration-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-cardiology",
+        "id": "edge:portal:l1-cardiology-door--space:l1-cardiology",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-cardiology-door",
+        "spaceId": "l1-cardiology",
+        "to": "portal:l1-cardiology-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-corridor",
+        "id": "edge:portal:l1-cardiology-door--space:l1-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-cardiology-door",
+        "spaceId": "l1-corridor",
+        "to": "portal:l1-cardiology-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-consultation",
+        "id": "edge:portal:l1-consultation-door--space:l1-consultation",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-consultation-door",
+        "spaceId": "l1-consultation",
+        "to": "portal:l1-consultation-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6.801,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-corridor",
+        "id": "edge:portal:l1-consultation-door--space:l1-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-consultation-door",
+        "spaceId": "l1-corridor",
+        "to": "portal:l1-consultation-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 9.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-corridor",
+        "id": "edge:portal:l1-lift-opening--space:l1-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-lift-opening",
+        "spaceId": "l1-corridor",
+        "to": "portal:l1-lift-opening"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-lift-lobby",
+        "id": "edge:portal:l1-lift-opening--space:l1-lift-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-lift-opening",
+        "spaceId": "l1-lift-lobby",
+        "to": "portal:l1-lift-opening"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 7.28,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-corridor",
+        "id": "edge:portal:l1-records-door--space:l1-corridor",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "l1-records-door",
+        "spaceId": "l1-corridor",
+        "to": "portal:l1-records-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-records",
+        "id": "edge:portal:l1-records-door--space:l1-records",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "l1-records-door",
+        "spaceId": "l1-records",
+        "to": "portal:l1-records-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6.801,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-corridor",
+        "id": "edge:portal:l1-restroom-door--space:l1-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-restroom-door",
+        "spaceId": "l1-corridor",
+        "to": "portal:l1-restroom-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-restroom",
+        "id": "edge:portal:l1-restroom-door--space:l1-restroom",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-restroom-door",
+        "spaceId": "l1-restroom",
+        "to": "portal:l1-restroom-door"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 2,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-lift-lobby",
+        "id": "edge:portal:l1-stair-door--space:l1-lift-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-stair-door",
+        "spaceId": "l1-lift-lobby",
+        "to": "portal:l1-stair-door"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-stair-lobby",
+        "id": "edge:portal:l1-stair-door--space:l1-stair-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-stair-door",
+        "spaceId": "l1-stair-lobby",
+        "to": "portal:l1-stair-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5.852,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-corridor",
+        "id": "edge:portal:l1-training-door--space:l1-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-training-door",
+        "spaceId": "l1-corridor",
+        "to": "portal:l1-training-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-training",
+        "id": "edge:portal:l1-training-door--space:l1-training",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-training-door",
+        "spaceId": "l1-training",
+        "to": "portal:l1-training-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 9.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-corridor",
+        "id": "edge:portal:l1-west-opening--space:l1-corridor",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-west-opening",
+        "spaceId": "l1-corridor",
+        "to": "portal:l1-west-opening"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-west-lobby",
+        "id": "edge:portal:l1-west-opening--space:l1-west-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-west-opening",
+        "spaceId": "l1-west-lobby",
+        "to": "portal:l1-west-opening"
+      }
+    ],
+    "nodes": [
+      {
+        "floorId": "g",
+        "id": "connector:lift-east:g",
+        "kind": "connector-stop",
+        "position": [
+          27,
+          9
+        ],
+        "sourceId": "lift-east"
+      },
+      {
+        "floorId": "l1",
+        "id": "connector:lift-east:l1",
+        "kind": "connector-stop",
+        "position": [
+          27,
+          9
+        ],
+        "sourceId": "lift-east"
+      },
+      {
+        "floorId": "g",
+        "id": "connector:stairs-east:g",
+        "kind": "connector-stop",
+        "position": [
+          27,
+          14
+        ],
+        "sourceId": "stairs-east"
+      },
+      {
+        "floorId": "l1",
+        "id": "connector:stairs-east:l1",
+        "kind": "connector-stop",
+        "position": [
+          27,
+          14
+        ],
+        "sourceId": "stairs-east"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:administration",
+        "kind": "poi",
+        "position": [
+          16,
+          14.5
+        ],
+        "sourceId": "administration"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:cardiology",
+        "kind": "poi",
+        "position": [
+          14.5,
+          3.5
+        ],
+        "sourceId": "cardiology"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:consultation-suite",
+        "kind": "poi",
+        "position": [
+          8,
+          3.5
+        ],
+        "sourceId": "consultation-suite"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:ground-restroom",
+        "kind": "poi",
+        "position": [
+          8.5,
+          14.5
+        ],
+        "sourceId": "ground-restroom"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:imaging",
+        "kind": "poi",
+        "position": [
+          14.5,
+          3.5
+        ],
+        "sourceId": "imaging"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:laboratory",
+        "kind": "poi",
+        "position": [
+          15.5,
+          14.5
+        ],
+        "sourceId": "laboratory"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:level-one-restroom",
+        "kind": "poi",
+        "position": [
+          21,
+          3.5
+        ],
+        "sourceId": "level-one-restroom"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:main-entrance",
+        "kind": "poi",
+        "position": [
+          2,
+          9
+        ],
+        "sourceId": "main-entrance"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:pharmacy",
+        "kind": "poi",
+        "position": [
+          21,
+          3.5
+        ],
+        "sourceId": "pharmacy"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:reception",
+        "kind": "poi",
+        "position": [
+          8,
+          3.5
+        ],
+        "sourceId": "reception"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:records-store",
+        "kind": "poi",
+        "position": [
+          21.5,
+          14.5
+        ],
+        "sourceId": "records-store"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:staff-store",
+        "kind": "poi",
+        "position": [
+          21.5,
+          14.5
+        ],
+        "sourceId": "staff-store"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:training-room",
+        "kind": "poi",
+        "position": [
+          9,
+          14.5
+        ],
+        "sourceId": "training-room"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:g-entry-opening",
+        "kind": "portal",
+        "position": [
+          5,
+          9
+        ],
+        "sourceId": "g-entry-opening"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:g-imaging-door",
+        "kind": "portal",
+        "position": [
+          14.5,
+          7
+        ],
+        "sourceId": "g-imaging-door"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:g-laboratory-door",
+        "kind": "portal",
+        "position": [
+          15.5,
+          11
+        ],
+        "sourceId": "g-laboratory-door"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:g-lift-opening",
+        "kind": "portal",
+        "position": [
+          24,
+          9
+        ],
+        "sourceId": "g-lift-opening"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:g-pharmacy-door",
+        "kind": "portal",
+        "position": [
+          21,
+          7
+        ],
+        "sourceId": "g-pharmacy-door"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:g-reception-door",
+        "kind": "portal",
+        "position": [
+          8,
+          7
+        ],
+        "sourceId": "g-reception-door"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:g-restroom-door",
+        "kind": "portal",
+        "position": [
+          8.5,
+          11
+        ],
+        "sourceId": "g-restroom-door"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:g-staff-door",
+        "kind": "portal",
+        "position": [
+          21.5,
+          11
+        ],
+        "sourceId": "g-staff-door"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:g-stair-door",
+        "kind": "portal",
+        "position": [
+          27,
+          11
+        ],
+        "sourceId": "g-stair-door"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:l1-administration-door",
+        "kind": "portal",
+        "position": [
+          16,
+          11
+        ],
+        "sourceId": "l1-administration-door"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:l1-cardiology-door",
+        "kind": "portal",
+        "position": [
+          14.5,
+          7
+        ],
+        "sourceId": "l1-cardiology-door"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:l1-consultation-door",
+        "kind": "portal",
+        "position": [
+          8,
+          7
+        ],
+        "sourceId": "l1-consultation-door"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:l1-lift-opening",
+        "kind": "portal",
+        "position": [
+          24,
+          9
+        ],
+        "sourceId": "l1-lift-opening"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:l1-records-door",
+        "kind": "portal",
+        "position": [
+          21.5,
+          11
+        ],
+        "sourceId": "l1-records-door"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:l1-restroom-door",
+        "kind": "portal",
+        "position": [
+          21,
+          7
+        ],
+        "sourceId": "l1-restroom-door"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:l1-stair-door",
+        "kind": "portal",
+        "position": [
+          27,
+          11
+        ],
+        "sourceId": "l1-stair-door"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:l1-training-door",
+        "kind": "portal",
+        "position": [
+          9,
+          11
+        ],
+        "sourceId": "l1-training-door"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:l1-west-opening",
+        "kind": "portal",
+        "position": [
+          5,
+          9
+        ],
+        "sourceId": "l1-west-opening"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-corridor",
+        "kind": "space",
+        "position": [
+          14.5,
+          9
+        ],
+        "sourceId": "g-corridor"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-entrance",
+        "kind": "space",
+        "position": [
+          2.5,
+          9
+        ],
+        "sourceId": "g-entrance"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-imaging",
+        "kind": "space",
+        "position": [
+          14.5,
+          3.5
+        ],
+        "sourceId": "g-imaging"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-laboratory",
+        "kind": "space",
+        "position": [
+          15.5,
+          14.5
+        ],
+        "sourceId": "g-laboratory"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-lift-lobby",
+        "kind": "space",
+        "position": [
+          27,
+          9
+        ],
+        "sourceId": "g-lift-lobby"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-pharmacy",
+        "kind": "space",
+        "position": [
+          21,
+          3.5
+        ],
+        "sourceId": "g-pharmacy"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-reception",
+        "kind": "space",
+        "position": [
+          8,
+          3.5
+        ],
+        "sourceId": "g-reception"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-restroom",
+        "kind": "space",
+        "position": [
+          8.5,
+          14.5
+        ],
+        "sourceId": "g-restroom"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-staff-store",
+        "kind": "space",
+        "position": [
+          21.5,
+          14.5
+        ],
+        "sourceId": "g-staff-store"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-stair-lobby",
+        "kind": "space",
+        "position": [
+          27,
+          14.5
+        ],
+        "sourceId": "g-stair-lobby"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-administration",
+        "kind": "space",
+        "position": [
+          16,
+          14.5
+        ],
+        "sourceId": "l1-administration"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-cardiology",
+        "kind": "space",
+        "position": [
+          14.5,
+          3.5
+        ],
+        "sourceId": "l1-cardiology"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-consultation",
+        "kind": "space",
+        "position": [
+          8,
+          3.5
+        ],
+        "sourceId": "l1-consultation"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-corridor",
+        "kind": "space",
+        "position": [
+          14.5,
+          9
+        ],
+        "sourceId": "l1-corridor"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-lift-lobby",
+        "kind": "space",
+        "position": [
+          27,
+          9
+        ],
+        "sourceId": "l1-lift-lobby"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-records",
+        "kind": "space",
+        "position": [
+          21.5,
+          14.5
+        ],
+        "sourceId": "l1-records"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-restroom",
+        "kind": "space",
+        "position": [
+          21,
+          3.5
+        ],
+        "sourceId": "l1-restroom"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-stair-lobby",
+        "kind": "space",
+        "position": [
+          27,
+          14.5
+        ],
+        "sourceId": "l1-stair-lobby"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-training",
+        "kind": "space",
+        "position": [
+          9,
+          14.5
+        ],
+        "sourceId": "l1-training"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-west-lobby",
+        "kind": "space",
+        "position": [
+          2.5,
+          9
+        ],
+        "sourceId": "l1-west-lobby"
+      }
+    ]
+  },
+  "sourceSchemaVersion": "0.1.0",
+  "spaces": [
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-corridor",
+      "name": "Ground Main Corridor",
+      "polygon": [
+        [
+          5,
+          7
+        ],
+        [
+          24,
+          7
+        ],
+        [
+          24,
+          11
+        ],
+        [
+          5,
+          11
+        ]
+      ],
+      "public": true,
+      "type": "corridor"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-entrance",
+      "name": "Main Entrance",
+      "polygon": [
+        [
+          0,
+          7
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          0,
+          11
+        ]
+      ],
+      "public": true,
+      "type": "entrance"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-imaging",
+      "name": "Imaging",
+      "polygon": [
+        [
+          11,
+          0
+        ],
+        [
+          18,
+          0
+        ],
+        [
+          18,
+          7
+        ],
+        [
+          11,
+          7
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-laboratory",
+      "name": "Laboratory",
+      "polygon": [
+        [
+          12,
+          11
+        ],
+        [
+          19,
+          11
+        ],
+        [
+          19,
+          18
+        ],
+        [
+          12,
+          18
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-lift-lobby",
+      "name": "Ground Lift Lobby",
+      "polygon": [
+        [
+          24,
+          7
+        ],
+        [
+          30,
+          7
+        ],
+        [
+          30,
+          11
+        ],
+        [
+          24,
+          11
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-pharmacy",
+      "name": "Pharmacy",
+      "polygon": [
+        [
+          18,
+          0
+        ],
+        [
+          24,
+          0
+        ],
+        [
+          24,
+          7
+        ],
+        [
+          18,
+          7
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-reception",
+      "name": "Reception",
+      "polygon": [
+        [
+          5,
+          0
+        ],
+        [
+          11,
+          0
+        ],
+        [
+          11,
+          7
+        ],
+        [
+          5,
+          7
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-restroom",
+      "name": "Accessible Restroom",
+      "polygon": [
+        [
+          5,
+          11
+        ],
+        [
+          12,
+          11
+        ],
+        [
+          12,
+          18
+        ],
+        [
+          5,
+          18
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-staff-store",
+      "name": "Staff Store",
+      "polygon": [
+        [
+          19,
+          11
+        ],
+        [
+          24,
+          11
+        ],
+        [
+          24,
+          18
+        ],
+        [
+          19,
+          18
+        ]
+      ],
+      "public": false,
+      "type": "restricted"
+    },
+    {
+      "accessible": false,
+      "floorId": "g",
+      "id": "g-stair-lobby",
+      "name": "Ground Stair Lobby",
+      "polygon": [
+        [
+          24,
+          11
+        ],
+        [
+          30,
+          11
+        ],
+        [
+          30,
+          18
+        ],
+        [
+          24,
+          18
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-administration",
+      "name": "Administration",
+      "polygon": [
+        [
+          13,
+          11
+        ],
+        [
+          19,
+          11
+        ],
+        [
+          19,
+          18
+        ],
+        [
+          13,
+          18
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-cardiology",
+      "name": "Cardiology",
+      "polygon": [
+        [
+          11,
+          0
+        ],
+        [
+          18,
+          0
+        ],
+        [
+          18,
+          7
+        ],
+        [
+          11,
+          7
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-consultation",
+      "name": "Consultation Suite",
+      "polygon": [
+        [
+          5,
+          0
+        ],
+        [
+          11,
+          0
+        ],
+        [
+          11,
+          7
+        ],
+        [
+          5,
+          7
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-corridor",
+      "name": "Level 1 Main Corridor",
+      "polygon": [
+        [
+          5,
+          7
+        ],
+        [
+          24,
+          7
+        ],
+        [
+          24,
+          11
+        ],
+        [
+          5,
+          11
+        ]
+      ],
+      "public": true,
+      "type": "corridor"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-lift-lobby",
+      "name": "Level 1 Lift Lobby",
+      "polygon": [
+        [
+          24,
+          7
+        ],
+        [
+          30,
+          7
+        ],
+        [
+          30,
+          11
+        ],
+        [
+          24,
+          11
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-records",
+      "name": "Records Store",
+      "polygon": [
+        [
+          19,
+          11
+        ],
+        [
+          24,
+          11
+        ],
+        [
+          24,
+          18
+        ],
+        [
+          19,
+          18
+        ]
+      ],
+      "public": false,
+      "type": "restricted"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-restroom",
+      "name": "Level 1 Accessible Restroom",
+      "polygon": [
+        [
+          18,
+          0
+        ],
+        [
+          24,
+          0
+        ],
+        [
+          24,
+          7
+        ],
+        [
+          18,
+          7
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": false,
+      "floorId": "l1",
+      "id": "l1-stair-lobby",
+      "name": "Level 1 Stair Lobby",
+      "polygon": [
+        [
+          24,
+          11
+        ],
+        [
+          30,
+          11
+        ],
+        [
+          30,
+          18
+        ],
+        [
+          24,
+          18
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-training",
+      "name": "Training Room",
+      "polygon": [
+        [
+          5,
+          11
+        ],
+        [
+          13,
+          11
+        ],
+        [
+          13,
+          18
+        ],
+        [
+          5,
+          18
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-west-lobby",
+      "name": "Level 1 West Lobby",
+      "polygon": [
+        [
+          0,
+          7
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          0,
+          11
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    }
+  ],
+  "verticalConnectors": [
+    {
+      "accessible": true,
+      "id": "lift-east",
+      "kind": "elevator",
+      "name": "East Lift",
+      "stops": [
+        {
+          "floorId": "g",
+          "position": [
+            27,
+            9
+          ],
+          "spaceId": "g-lift-lobby"
+        },
+        {
+          "floorId": "l1",
+          "position": [
+            27,
+            9
+          ],
+          "spaceId": "l1-lift-lobby"
+        }
+      ]
+    },
+    {
+      "accessible": false,
+      "id": "stairs-east",
+      "kind": "stairs",
+      "name": "East Stairs",
+      "stops": [
+        {
+          "floorId": "g",
+          "position": [
+            27,
+            14
+          ],
+          "spaceId": "g-stair-lobby"
+        },
+        {
+          "floorId": "l1",
+          "position": [
+            27,
+            14
+          ],
+          "spaceId": "l1-stair-lobby"
+        }
+      ]
+    }
+  ]
+}

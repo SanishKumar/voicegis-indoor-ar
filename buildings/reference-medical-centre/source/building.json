@@ -1,0 +1,686 @@
+{
+  "schemaVersion": "0.1.0",
+  "building": {
+    "id": "reference-medical-centre",
+    "name": "Reference Medical Centre (Synthetic Fixture)",
+    "units": "meters",
+    "entrySpaceId": "g-entrance",
+    "coordinateSystem": {
+      "type": "local-cartesian",
+      "origin": [0, 0, 0],
+      "northOffsetDegrees": 0
+    }
+  },
+  "floors": [
+    {
+      "id": "g",
+      "name": "Ground Floor",
+      "level": 0,
+      "elevation": 0,
+      "clearHeight": 3.2,
+      "outline": [
+        [0, 0],
+        [30, 0],
+        [30, 18],
+        [0, 18]
+      ]
+    },
+    {
+      "id": "l1",
+      "name": "Level 1",
+      "level": 1,
+      "elevation": 3.6,
+      "clearHeight": 3.2,
+      "outline": [
+        [0, 0],
+        [30, 0],
+        [30, 18],
+        [0, 18]
+      ]
+    }
+  ],
+  "spaces": [
+    {
+      "id": "g-entrance",
+      "floorId": "g",
+      "name": "Main Entrance",
+      "type": "entrance",
+      "polygon": [
+        [0, 7],
+        [5, 7],
+        [5, 11],
+        [0, 11]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-reception",
+      "floorId": "g",
+      "name": "Reception",
+      "type": "service",
+      "polygon": [
+        [5, 0],
+        [11, 0],
+        [11, 7],
+        [5, 7]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-imaging",
+      "floorId": "g",
+      "name": "Imaging",
+      "type": "room",
+      "polygon": [
+        [11, 0],
+        [18, 0],
+        [18, 7],
+        [11, 7]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-pharmacy",
+      "floorId": "g",
+      "name": "Pharmacy",
+      "type": "room",
+      "polygon": [
+        [18, 0],
+        [24, 0],
+        [24, 7],
+        [18, 7]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-corridor",
+      "floorId": "g",
+      "name": "Ground Main Corridor",
+      "type": "corridor",
+      "polygon": [
+        [5, 7],
+        [24, 7],
+        [24, 11],
+        [5, 11]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-restroom",
+      "floorId": "g",
+      "name": "Accessible Restroom",
+      "type": "service",
+      "polygon": [
+        [5, 11],
+        [12, 11],
+        [12, 18],
+        [5, 18]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-laboratory",
+      "floorId": "g",
+      "name": "Laboratory",
+      "type": "room",
+      "polygon": [
+        [12, 11],
+        [19, 11],
+        [19, 18],
+        [12, 18]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-staff-store",
+      "floorId": "g",
+      "name": "Staff Store",
+      "type": "restricted",
+      "polygon": [
+        [19, 11],
+        [24, 11],
+        [24, 18],
+        [19, 18]
+      ],
+      "public": false,
+      "accessible": true
+    },
+    {
+      "id": "g-lift-lobby",
+      "floorId": "g",
+      "name": "Ground Lift Lobby",
+      "type": "vertical-circulation",
+      "polygon": [
+        [24, 7],
+        [30, 7],
+        [30, 11],
+        [24, 11]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-stair-lobby",
+      "floorId": "g",
+      "name": "Ground Stair Lobby",
+      "type": "vertical-circulation",
+      "polygon": [
+        [24, 11],
+        [30, 11],
+        [30, 18],
+        [24, 18]
+      ],
+      "public": true,
+      "accessible": false
+    },
+    {
+      "id": "l1-west-lobby",
+      "floorId": "l1",
+      "name": "Level 1 West Lobby",
+      "type": "lobby",
+      "polygon": [
+        [0, 7],
+        [5, 7],
+        [5, 11],
+        [0, 11]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-consultation",
+      "floorId": "l1",
+      "name": "Consultation Suite",
+      "type": "room",
+      "polygon": [
+        [5, 0],
+        [11, 0],
+        [11, 7],
+        [5, 7]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-cardiology",
+      "floorId": "l1",
+      "name": "Cardiology",
+      "type": "room",
+      "polygon": [
+        [11, 0],
+        [18, 0],
+        [18, 7],
+        [11, 7]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-restroom",
+      "floorId": "l1",
+      "name": "Level 1 Accessible Restroom",
+      "type": "service",
+      "polygon": [
+        [18, 0],
+        [24, 0],
+        [24, 7],
+        [18, 7]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-corridor",
+      "floorId": "l1",
+      "name": "Level 1 Main Corridor",
+      "type": "corridor",
+      "polygon": [
+        [5, 7],
+        [24, 7],
+        [24, 11],
+        [5, 11]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-training",
+      "floorId": "l1",
+      "name": "Training Room",
+      "type": "room",
+      "polygon": [
+        [5, 11],
+        [13, 11],
+        [13, 18],
+        [5, 18]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-administration",
+      "floorId": "l1",
+      "name": "Administration",
+      "type": "service",
+      "polygon": [
+        [13, 11],
+        [19, 11],
+        [19, 18],
+        [13, 18]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-records",
+      "floorId": "l1",
+      "name": "Records Store",
+      "type": "restricted",
+      "polygon": [
+        [19, 11],
+        [24, 11],
+        [24, 18],
+        [19, 18]
+      ],
+      "public": false,
+      "accessible": true
+    },
+    {
+      "id": "l1-lift-lobby",
+      "floorId": "l1",
+      "name": "Level 1 Lift Lobby",
+      "type": "vertical-circulation",
+      "polygon": [
+        [24, 7],
+        [30, 7],
+        [30, 11],
+        [24, 11]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-stair-lobby",
+      "floorId": "l1",
+      "name": "Level 1 Stair Lobby",
+      "type": "vertical-circulation",
+      "polygon": [
+        [24, 11],
+        [30, 11],
+        [30, 18],
+        [24, 18]
+      ],
+      "public": true,
+      "accessible": false
+    }
+  ],
+  "portals": [
+    {
+      "id": "g-entry-opening",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": ["g-entrance", "g-corridor"],
+      "position": [5, 9],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "g-reception-door",
+      "floorId": "g",
+      "kind": "door",
+      "connects": ["g-reception", "g-corridor"],
+      "position": [8, 7],
+      "width": 1.2,
+      "accessible": true
+    },
+    {
+      "id": "g-imaging-door",
+      "floorId": "g",
+      "kind": "door",
+      "connects": ["g-imaging", "g-corridor"],
+      "position": [14.5, 7],
+      "width": 1.1,
+      "accessible": true
+    },
+    {
+      "id": "g-pharmacy-door",
+      "floorId": "g",
+      "kind": "door",
+      "connects": ["g-pharmacy", "g-corridor"],
+      "position": [21, 7],
+      "width": 1.1,
+      "accessible": true
+    },
+    {
+      "id": "g-restroom-door",
+      "floorId": "g",
+      "kind": "door",
+      "connects": ["g-restroom", "g-corridor"],
+      "position": [8.5, 11],
+      "width": 1,
+      "accessible": true
+    },
+    {
+      "id": "g-laboratory-door",
+      "floorId": "g",
+      "kind": "door",
+      "connects": ["g-laboratory", "g-corridor"],
+      "position": [15.5, 11],
+      "width": 1.1,
+      "accessible": true
+    },
+    {
+      "id": "g-staff-door",
+      "floorId": "g",
+      "kind": "door",
+      "connects": ["g-staff-store", "g-corridor"],
+      "position": [21.5, 11],
+      "width": 1,
+      "accessible": true,
+      "restricted": true
+    },
+    {
+      "id": "g-lift-opening",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": ["g-corridor", "g-lift-lobby"],
+      "position": [24, 9],
+      "width": 2.4,
+      "accessible": true
+    },
+    {
+      "id": "g-stair-door",
+      "floorId": "g",
+      "kind": "door",
+      "connects": ["g-lift-lobby", "g-stair-lobby"],
+      "position": [27, 11],
+      "width": 1.2,
+      "accessible": false
+    },
+    {
+      "id": "l1-west-opening",
+      "floorId": "l1",
+      "kind": "opening",
+      "connects": ["l1-west-lobby", "l1-corridor"],
+      "position": [5, 9],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "l1-consultation-door",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": ["l1-consultation", "l1-corridor"],
+      "position": [8, 7],
+      "width": 1.2,
+      "accessible": true
+    },
+    {
+      "id": "l1-cardiology-door",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": ["l1-cardiology", "l1-corridor"],
+      "position": [14.5, 7],
+      "width": 1.1,
+      "accessible": true
+    },
+    {
+      "id": "l1-restroom-door",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": ["l1-restroom", "l1-corridor"],
+      "position": [21, 7],
+      "width": 1.1,
+      "accessible": true
+    },
+    {
+      "id": "l1-training-door",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": ["l1-training", "l1-corridor"],
+      "position": [9, 11],
+      "width": 1.2,
+      "accessible": true
+    },
+    {
+      "id": "l1-administration-door",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": ["l1-administration", "l1-corridor"],
+      "position": [16, 11],
+      "width": 1.1,
+      "accessible": true
+    },
+    {
+      "id": "l1-records-door",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": ["l1-records", "l1-corridor"],
+      "position": [21.5, 11],
+      "width": 1,
+      "accessible": true,
+      "restricted": true
+    },
+    {
+      "id": "l1-lift-opening",
+      "floorId": "l1",
+      "kind": "opening",
+      "connects": ["l1-corridor", "l1-lift-lobby"],
+      "position": [24, 9],
+      "width": 2.4,
+      "accessible": true
+    },
+    {
+      "id": "l1-stair-door",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": ["l1-lift-lobby", "l1-stair-lobby"],
+      "position": [27, 11],
+      "width": 1.2,
+      "accessible": false
+    }
+  ],
+  "verticalConnectors": [
+    {
+      "id": "lift-east",
+      "name": "East Lift",
+      "kind": "elevator",
+      "accessible": true,
+      "stops": [
+        { "floorId": "g", "spaceId": "g-lift-lobby", "position": [27, 9] },
+        { "floorId": "l1", "spaceId": "l1-lift-lobby", "position": [27, 9] }
+      ]
+    },
+    {
+      "id": "stairs-east",
+      "name": "East Stairs",
+      "kind": "stairs",
+      "accessible": false,
+      "stops": [
+        { "floorId": "g", "spaceId": "g-stair-lobby", "position": [27, 14] },
+        { "floorId": "l1", "spaceId": "l1-stair-lobby", "position": [27, 14] }
+      ]
+    }
+  ],
+  "pois": [
+    {
+      "id": "main-entrance",
+      "floorId": "g",
+      "spaceId": "g-entrance",
+      "name": "Main Entrance",
+      "category": "entrance",
+      "position": [2, 9],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "reception",
+      "floorId": "g",
+      "spaceId": "g-reception",
+      "name": "Reception",
+      "category": "service",
+      "position": [8, 3.5],
+      "public": true,
+      "accessible": true,
+      "aliases": ["front desk", "information"]
+    },
+    {
+      "id": "imaging",
+      "floorId": "g",
+      "spaceId": "g-imaging",
+      "name": "Imaging",
+      "category": "diagnostic",
+      "position": [14.5, 3.5],
+      "public": true,
+      "accessible": true,
+      "aliases": ["radiology", "x-ray"]
+    },
+    {
+      "id": "pharmacy",
+      "floorId": "g",
+      "spaceId": "g-pharmacy",
+      "name": "Pharmacy",
+      "category": "pharmacy",
+      "position": [21, 3.5],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "ground-restroom",
+      "floorId": "g",
+      "spaceId": "g-restroom",
+      "name": "Ground Accessible Restroom",
+      "category": "restroom",
+      "position": [8.5, 14.5],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "laboratory",
+      "floorId": "g",
+      "spaceId": "g-laboratory",
+      "name": "Laboratory",
+      "category": "diagnostic",
+      "position": [15.5, 14.5],
+      "public": true,
+      "accessible": true,
+      "aliases": ["lab"]
+    },
+    {
+      "id": "staff-store",
+      "floorId": "g",
+      "spaceId": "g-staff-store",
+      "name": "Staff Store",
+      "category": "staff",
+      "position": [21.5, 14.5],
+      "public": false,
+      "accessible": true
+    },
+    {
+      "id": "consultation-suite",
+      "floorId": "l1",
+      "spaceId": "l1-consultation",
+      "name": "Consultation Suite",
+      "category": "medical",
+      "position": [8, 3.5],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "cardiology",
+      "floorId": "l1",
+      "spaceId": "l1-cardiology",
+      "name": "Cardiology",
+      "category": "medical",
+      "position": [14.5, 3.5],
+      "public": true,
+      "accessible": true,
+      "aliases": ["heart clinic"]
+    },
+    {
+      "id": "level-one-restroom",
+      "floorId": "l1",
+      "spaceId": "l1-restroom",
+      "name": "Level 1 Accessible Restroom",
+      "category": "restroom",
+      "position": [21, 3.5],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "training-room",
+      "floorId": "l1",
+      "spaceId": "l1-training",
+      "name": "Training Room",
+      "category": "service",
+      "position": [9, 14.5],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "administration",
+      "floorId": "l1",
+      "spaceId": "l1-administration",
+      "name": "Administration",
+      "category": "service",
+      "position": [16, 14.5],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "records-store",
+      "floorId": "l1",
+      "spaceId": "l1-records",
+      "name": "Records Store",
+      "category": "staff",
+      "position": [21.5, 14.5],
+      "public": false,
+      "accessible": true
+    }
+  ],
+  "localizationAnchors": [
+    {
+      "id": "anchor-main-entry",
+      "floorId": "g",
+      "spaceId": "g-entrance",
+      "kind": "qr",
+      "position": [1, 9],
+      "headingDegrees": 90,
+      "payload": "voicegis://reference-medical-centre/anchor-main-entry"
+    },
+    {
+      "id": "anchor-ground-junction",
+      "floorId": "g",
+      "spaceId": "g-corridor",
+      "kind": "image",
+      "position": [6, 9],
+      "headingDegrees": 90,
+      "payload": "reference-sign-ground-junction-v1"
+    },
+    {
+      "id": "anchor-ground-lift",
+      "floorId": "g",
+      "spaceId": "g-lift-lobby",
+      "kind": "image",
+      "position": [25, 9],
+      "headingDegrees": 270,
+      "payload": "reference-sign-ground-lift-v1"
+    },
+    {
+      "id": "anchor-level-one-lift",
+      "floorId": "l1",
+      "spaceId": "l1-lift-lobby",
+      "kind": "image",
+      "position": [25, 9],
+      "headingDegrees": 270,
+      "payload": "reference-sign-level-one-lift-v1"
+    }
+  ]
+}
