@@ -53,10 +53,10 @@ export default function StatusBar() {
 
       {/* View */}
       <div className="status-item">
-        {activeView === VIEW_TYPE.AR ? (
+        {activeView === VIEW_TYPE.CAMERA_PREVIEW ? (
           <>
             <Navigation size={11} />
-            <span>AR Mode</span>
+            <span>Camera Preview</span>
           </>
         ) : (
           <>

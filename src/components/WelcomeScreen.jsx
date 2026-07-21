@@ -56,8 +56,8 @@ export default function WelcomeScreen({ onComplete }) {
               Welcome to <span className="welcome-title-accent">City General</span>
             </h1>
             <p className="welcome-subtitle">
-              Voice-powered AR wayfinding for complex indoor spaces.
-              Never get lost in a hospital again.
+              Test deterministic indoor routes today. Camera guidance is a preview while spatial
+              localization is under development.
             </p>
 
             <div className="welcome-cta-group">
@@ -87,9 +87,9 @@ export default function WelcomeScreen({ onComplete }) {
             <h2 className="welcome-features-title">Where are you right now?</h2>
             <p className="welcome-features-subtitle">Set your starting point to get directions.</p>
 
-            <button className="welcome-feature-card" style={{ marginBottom: '16px', justifyContent: 'center', background: 'var(--color-accent-blue)', color: 'white', border: 'none' }} onClick={() => alert("QR Check-in coming soon!")}>
+            <button className="welcome-feature-card" style={{ marginBottom: '16px', justifyContent: 'center' }} disabled>
               <QrCode size={24} style={{ marginRight: '8px' }} />
-              <span style={{ fontSize: '16px', fontWeight: 'bold' }}>Scan QR Code on Wall</span>
+              <span style={{ fontSize: '16px', fontWeight: 'bold' }}>QR check-in · planned</span>
             </button>
 
             <div style={{ textAlign: 'left', width: '100%', marginBottom: '8px', color: 'var(--color-text-muted)', fontSize: '14px' }}>Or select a landmark:</div>

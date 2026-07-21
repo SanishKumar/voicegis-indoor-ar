@@ -1,6 +1,6 @@
 /* ==========================================================================
    Indoor Navigator — Premium Design System
-   Voice-First AR Wayfinding for Hospitals
+   VoiceGIS Indoor Spatial Twin
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -85,7 +85,7 @@
   --z-overlay: 100;
   --z-modal: 200;
   --z-toast: 300;
-  --z-ar: 400;
+  --z-camera-preview: 400;
 
   --header-height: 56px;
   --status-bar-height: 36px;
@@ -498,11 +498,11 @@ img, svg { display: block; max-width: 100%; }
 .nav-panel-dest-icon { width: 40px; height: 40px; border-radius: var(--radius-full); background: var(--color-accent-green-dim); color: var(--color-accent-green); display: flex; align-items: center; justify-content: center; }
 
 /* --------------------------------------------------------------------------
-   AR View & Status Bar
+   Camera Preview & Status Bar
    -------------------------------------------------------------------------- */
-.ar-view { position: absolute; inset: 0; z-index: var(--z-ar); background: #000; display: flex; flex-direction: column; }
-.ar-video { width: 100%; height: 100%; object-fit: cover; }
-.ar-canvas-overlay { position: absolute; inset: 0; pointer-events: none; }
+.camera-preview { position: absolute; inset: 0; z-index: var(--z-camera-preview); background: #000; display: flex; flex-direction: column; }
+.camera-preview-video { width: 100%; height: 100%; object-fit: cover; }
+.camera-preview-canvas { position: absolute; inset: 0; pointer-events: none; }
 
 .status-bar {
   height: var(--status-bar-height); display: flex; align-items: center; justify-content: space-between;
@@ -559,18 +559,20 @@ img, svg { display: block; max-width: 100%; }
 .nav-step-item.completed .nav-step-text { color: var(--color-text-muted); text-decoration: line-through; }
 
 /* --------------------------------------------------------------------------
-   AR View Internals (Restored & Upgraded)
+   Camera Preview Internals
    -------------------------------------------------------------------------- */
-.ar-fallback { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: var(--space-6); background: var(--color-bg-primary); z-index: 10; }
-.ar-fallback-icon { color: var(--color-accent-red); margin-bottom: var(--space-4); }
-.ar-instruction-card { position: absolute; top: var(--space-6); left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4); background: rgba(17, 22, 49, 0.85); backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-2xl); box-shadow: var(--shadow-xl); z-index: 10; color: white; }
-.ar-instruction-icon { width: 44px; height: 44px; border-radius: var(--radius-full); background: var(--color-accent-blue); color: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: var(--shadow-md); }
-.ar-instruction-text { font-size: var(--font-size-md); font-weight: var(--font-weight-bold); line-height: 1.2; margin-bottom: 2px; }
-.ar-instruction-distance { font-size: var(--font-size-sm); color: rgba(255, 255, 255, 0.7); }
-.ar-bottom-bar { position: absolute; bottom: var(--space-6); left: 50%; transform: translateX(-50%); display: flex; gap: var(--space-3); z-index: 10; width: 90%; max-width: 400px; justify-content: center; }
-.ar-exit-btn { display: flex; align-items: center; justify-content: center; gap: var(--space-2); padding: 12px 24px; border-radius: var(--radius-full); background: rgba(17, 22, 49, 0.85); backdrop-filter: blur(24px); color: white; font-weight: var(--font-weight-semibold); font-size: var(--font-size-sm); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: var(--shadow-lg); transition: all var(--transition-fast); flex: 1; }
-.ar-exit-btn:hover { background: rgba(30, 40, 80, 0.9); transform: translateY(-2px); }
-.ar-exit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.camera-preview-fallback { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: var(--space-6); background: var(--color-bg-primary); z-index: 10; }
+.camera-preview-fallback-icon { color: var(--color-accent-red); margin-bottom: var(--space-4); }
+.camera-preview-status { position: absolute; top: var(--space-4); left: 50%; transform: translateX(-50%); z-index: 12; display: flex; align-items: center; gap: var(--space-2); padding: 7px 12px; border-radius: var(--radius-full); background: rgba(17, 22, 49, 0.88); border: 1px solid rgba(255, 255, 255, 0.14); color: white; font-size: var(--font-size-xs); white-space: nowrap; }
+.camera-preview-status span { color: rgba(255, 255, 255, 0.65); }
+.camera-preview-instruction { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4); background: rgba(17, 22, 49, 0.85); backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-2xl); box-shadow: var(--shadow-xl); z-index: 10; color: white; }
+.camera-preview-instruction-icon { width: 44px; height: 44px; border-radius: var(--radius-full); background: var(--color-accent-blue); color: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: var(--shadow-md); }
+.camera-preview-instruction-text { font-size: var(--font-size-md); font-weight: var(--font-weight-bold); line-height: 1.2; margin-bottom: 2px; }
+.camera-preview-instruction-distance { font-size: var(--font-size-sm); color: rgba(255, 255, 255, 0.7); }
+.camera-preview-controls { position: absolute; bottom: var(--space-6); left: 50%; transform: translateX(-50%); display: flex; gap: var(--space-3); z-index: 10; width: 90%; max-width: 400px; justify-content: center; }
+.camera-preview-control { display: flex; align-items: center; justify-content: center; gap: var(--space-2); padding: 12px 24px; border-radius: var(--radius-full); background: rgba(17, 22, 49, 0.85); backdrop-filter: blur(24px); color: white; font-weight: var(--font-weight-semibold); font-size: var(--font-size-sm); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: var(--shadow-lg); transition: all var(--transition-fast); flex: 1; }
+.camera-preview-control:hover { background: rgba(30, 40, 80, 0.9); transform: translateY(-2px); }
+.camera-preview-control:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 /* --------------------------------------------------------------------------
    Header Location Button
@@ -893,7 +895,7 @@ img, svg { display: block; max-width: 100%; }
     bottom: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-  .ar-bottom-bar {
+  .camera-preview-controls {
     bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
   }
   .status-bar {

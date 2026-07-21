@@ -52,13 +52,13 @@ export default function Header() {
             Map
           </button>
           <button
-            className={`view-toggle-btn ${activeView === VIEW_TYPE.AR ? 'active' : ''}`}
-            onClick={() => actions.setView(VIEW_TYPE.AR)}
-            id="btn-ar-view"
-            aria-label="Switch to AR view"
+            className={`view-toggle-btn ${activeView === VIEW_TYPE.CAMERA_PREVIEW ? 'active' : ''}`}
+            onClick={() => actions.setView(VIEW_TYPE.CAMERA_PREVIEW)}
+            id="btn-camera-preview"
+            aria-label="Switch to camera preview"
           >
             <Camera size={14} />
-            AR
+            Preview
           </button>
         </div>
 

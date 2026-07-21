@@ -13,7 +13,7 @@ import SearchPanel from './components/SearchPanel.jsx';
 import POICard from './components/POICard.jsx';
 import NavigationPanel from './components/NavigationPanel.jsx';
 import LocationPicker from './components/LocationPicker.jsx';
-import ARView from './components/ARView.jsx';
+import CameraPreview from './components/CameraPreview.jsx';
 import StatusBar from './components/StatusBar.jsx';
 
 function AppContent() {
@@ -40,8 +40,7 @@ function AppContent() {
           </>
         )}
 
-        {/* AR View */}
-        <ARView />
+        <CameraPreview />
       </main>
 
       <StatusBar />

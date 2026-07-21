@@ -40,7 +40,7 @@ export const NAV_STATUS = {
 // ── View Types ──
 export const VIEW_TYPE = {
   MAP: 'map',
-  AR: 'ar',
+  CAMERA_PREVIEW: 'camera-preview',
 };
 
 // ── Initial State ──
