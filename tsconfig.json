@@ -16,5 +16,5 @@
     "target": "ES2022",
     "types": ["vite/client", "vitest/globals"]
   },
-  "include": ["src", "vite.config.js"]
+  "include": ["packages", "src", "vite.config.js"]
 }

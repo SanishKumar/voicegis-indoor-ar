@@ -1,0 +1,109 @@
+{
+  "schemaVersion": "0.1.0",
+  "building": {
+    "id": "reference-clinic",
+    "name": "Reference Clinic",
+    "units": "meters",
+    "entrySpaceId": "g-lobby",
+    "coordinateSystem": {
+      "type": "local-cartesian",
+      "origin": [0, 0, 0],
+      "northOffsetDegrees": 0
+    }
+  },
+  "floors": [
+    {
+      "id": "g",
+      "name": "Ground Floor",
+      "level": 0,
+      "elevation": 0,
+      "clearHeight": 3.2,
+      "outline": [
+        [0, 0],
+        [12, 0],
+        [12, 8],
+        [0, 8]
+      ]
+    },
+    {
+      "id": "l1",
+      "name": "Level 1",
+      "level": 1,
+      "elevation": 3.6,
+      "clearHeight": 3.2,
+      "outline": [
+        [0, 0],
+        [12, 0],
+        [12, 8],
+        [0, 8]
+      ]
+    }
+  ],
+  "spaces": [
+    {
+      "id": "g-lobby",
+      "floorId": "g",
+      "name": "Entrance Lobby",
+      "type": "entrance",
+      "polygon": [
+        [0, 0],
+        [12, 0],
+        [12, 8],
+        [0, 8]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-lobby",
+      "floorId": "l1",
+      "name": "Upper Lobby",
+      "type": "lobby",
+      "polygon": [
+        [0, 0],
+        [12, 0],
+        [12, 8],
+        [0, 8]
+      ],
+      "public": true,
+      "accessible": true
+    }
+  ],
+  "portals": [],
+  "verticalConnectors": [
+    {
+      "id": "lift-east",
+      "name": "East Lift",
+      "kind": "elevator",
+      "accessible": true,
+      "stops": [
+        { "floorId": "g", "spaceId": "g-lobby", "position": [10, 4] },
+        { "floorId": "l1", "spaceId": "l1-lobby", "position": [10, 4] }
+      ]
+    }
+  ],
+  "pois": [
+    {
+      "id": "reception",
+      "floorId": "g",
+      "spaceId": "g-lobby",
+      "name": "Reception",
+      "category": "service",
+      "position": [4, 4],
+      "public": true,
+      "accessible": true,
+      "aliases": ["front desk"]
+    }
+  ],
+  "localizationAnchors": [
+    {
+      "id": "anchor-main-entry",
+      "floorId": "g",
+      "spaceId": "g-lobby",
+      "kind": "qr",
+      "position": [1, 4],
+      "headingDegrees": 90,
+      "payload": "voicegis://reference-clinic/anchor-main-entry"
+    }
+  ]
+}
