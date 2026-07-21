@@ -15,6 +15,7 @@ import { findRoute } from '../engine/routingEngine';
 import { BUILDING_CONFIG } from '../data/buildingConfig.js';
 import { getNodeById } from '../data/compiledBuilding';
 import liftClosureOverlay from '../../buildings/reference-medical-centre/operations/lift-closed.overlay.json';
+import { bootstrapReferencePackageCache } from '../data/packageCacheRuntime';
 
 export const OPERATIONAL_SCENARIO = {
   NOMINAL: 'nominal',
@@ -214,6 +215,12 @@ export function NavigationProvider({ children }) {
 
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [operationalScenario, setOperationalScenarioState] = useState(OPERATIONAL_SCENARIO.NOMINAL);
+  const [packageCacheStatus, setPackageCacheStatus] = useState({
+    state: 'pending',
+    activeHash: null,
+    previousHash: null,
+    detail: 'Verifying the bundled building package.',
+  });
 
   const completeOnboarding = useCallback(() => {
     setOnboardingComplete(true);
@@ -233,6 +240,16 @@ export function NavigationProvider({ children }) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    let active = true;
+    void bootstrapReferencePackageCache().then((status) => {
+      if (active) setPackageCacheStatus(status);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (highContrast) {
@@ -355,6 +372,7 @@ export function NavigationProvider({ children }) {
         toggleAccessibleRouting,
         operationalScenario,
         setOperationalScenario,
+        packageCacheStatus,
       }}
     >
       {children}

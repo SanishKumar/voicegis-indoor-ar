@@ -59,10 +59,11 @@ Delivered:
 - Package-driven 2D visitor navigation and search
 - Immutable, versioned operational closure overlays
 - Route receipts with package, profile, closure, connector, and exclusion evidence
+- SHA-256 verified IndexedDB package registry with atomic activation and rollback
 
 Remaining:
 
-- Offline package cache
+- Runtime consumption of a non-bundled active package
 
 Exit evidence:
 

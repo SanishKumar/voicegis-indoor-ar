@@ -902,6 +902,7 @@ img, svg { display: block; max-width: 100%; }
     padding-bottom: env(safe-area-inset-bottom, 0px);
     height: calc(var(--status-bar-height) + env(safe-area-inset-bottom, 0px));
   }
+  .status-package { display: none; }
   /* Touch target adjustments */
   .category-chip {
     padding: 10px 16px;

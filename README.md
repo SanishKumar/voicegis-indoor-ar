@@ -22,6 +22,7 @@ Implemented today:
 - Explicit standard versus accessible routing and fail-closed restricted edges
 - Versioned operational overlays for deterministic corridor or connector closures
 - Route receipts with package hash, profile, closures, connector choice, and exclusion counts
+- Browser package verification with atomic active/previous cache state and rollback
 - Vertical instructions such as “take the elevator to Level 1”
 - Public-only fuzzy search with declared destination aliases
 - Automated lint, type, test, deterministic-compile, and production-build checks
@@ -31,7 +32,7 @@ Not implemented yet:
 
 - Surveyed or imported real-building geometry
 - Real user localization, movement tracking, or uncertainty estimation
-- Offline package caching, signatures, distribution, or rollback
+- Remote package download, signatures, distribution, or runtime hot-swap
 - World-anchored AR, pose alignment, occlusion, or automatic progress
 - VoiceGIS command execution
 - Session recording, deterministic replay, or physical-walk benchmarks
@@ -116,7 +117,7 @@ docs/
 
 ## Next engineering milestone
 
-The next Phase 2 slice is an offline package cache with explicit version activation and rollback. Cached content must be verified against its manifest hash before activation, and a failed update must leave the last known-good package available. The localization/replay contracts follow after package lifecycle is trustworthy.
+The next Phase 2 slice is runtime consumption of a non-bundled active package, including storage-quota and multi-tab coordination. Remote distribution and signatures remain later venue-platform work. The localization/replay contracts can now begin against stable package and policy receipts.
 
 See [the delivery roadmap](docs/roadmap.md) and [the architecture direction](docs/architecture/overview.md).
 

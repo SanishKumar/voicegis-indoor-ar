@@ -4,13 +4,13 @@
  * Bottom status bar showing navigation state and app info.
  */
 
-import { Navigation, MapPin, Wifi, WifiOff } from 'lucide-react';
+import { HardDrive, Navigation, MapPin, Wifi, WifiOff } from 'lucide-react';
 import { useNavigation, NAV_STATUS, VIEW_TYPE } from '../context/NavigationContext.jsx';
 import { useState, useEffect } from 'react';
 import { getNodeById } from '../data/compiledBuilding';
 
 export default function StatusBar() {
-  const { state } = useNavigation();
+  const { state, packageCacheStatus } = useNavigation();
   const { navStatus, activeView, startNodeId } = state;
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const startNode = getNodeById(startNodeId);
@@ -73,6 +73,18 @@ export default function StatusBar() {
             <span>Map Mode</span>
           </>
         )}
+      </div>
+
+      {/* Package cache */}
+      <div className="status-item status-package" title={packageCacheStatus.detail}>
+        <HardDrive size={11} />
+        <span>
+          {packageCacheStatus.state === 'verified'
+            ? `Package ${packageCacheStatus.activeHash.slice(0, 8)} verified`
+            : packageCacheStatus.state === 'pending'
+              ? 'Verifying package…'
+              : 'Package cache unavailable'}
+        </span>
       </div>
 
       {/* Connection */}
