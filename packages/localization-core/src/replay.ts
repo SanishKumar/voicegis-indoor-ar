@@ -1,5 +1,6 @@
 import { LocalizationFilter } from './filter';
 import { matchEstimateToRoute } from './mapMatching';
+import { LocalizationRuntimeController, type RuntimeSnapshot } from './runtimeState';
 import {
   LOCALIZATION_RECORDING_VERSION,
   type CheckpointError,
@@ -14,6 +15,7 @@ import {
 export interface ReplayResult {
   estimates: LocalizationEstimate[];
   mapMatches: MapMatchResult[];
+  runtimeSnapshots: RuntimeSnapshot[];
   report: ReplayReport;
 }
 
@@ -61,6 +63,8 @@ export function replayRecording(recording: LocalizationRecording): ReplayResult 
   validateRecording(recording);
   const filter = new LocalizationFilter();
   const estimates = recording.observations.map((observation) => filter.apply(observation));
+  const runtime = new LocalizationRuntimeController();
+  const runtimeSnapshots = estimates.map((estimate) => runtime.update(estimate));
   let previousProgressMeters: number | null = null;
   const mapMatches = estimates.map((estimate) => {
     const result = matchEstimateToRoute(estimate, recording.routeSegments ?? [], {
@@ -110,10 +114,21 @@ export function replayRecording(recording: LocalizationRecording): ReplayResult 
   mapMatches.forEach((match) => {
     reasonCounts[match.reason] += 1;
   });
+  const runtimeStateCounts = {
+    initializing: 0,
+    tracking: 0,
+    degraded: 0,
+    lost: 0,
+    relocalizing: 0,
+  };
+  runtimeSnapshots.forEach((snapshot) => {
+    runtimeStateCounts[snapshot.localizationState] += 1;
+  });
 
   return {
     estimates,
     mapMatches,
+    runtimeSnapshots,
     report: {
       recordingVersion: LOCALIZATION_RECORDING_VERSION,
       sessionId: recording.sessionId,
@@ -132,6 +147,12 @@ export function replayRecording(recording: LocalizationRecording): ReplayResult 
         acceptedCount: mapMatches.filter((match) => match.accepted).length,
         rejectedCount: mapMatches.filter((match) => !match.accepted).length,
         reasonCounts,
+      },
+      runtime: {
+        stateCounts: runtimeStateCounts,
+        guidanceFrozenFrames: runtimeSnapshots.filter(
+          (snapshot) => snapshot.guidanceState === 'frozen',
+        ).length,
       },
       checkpointErrors,
     },

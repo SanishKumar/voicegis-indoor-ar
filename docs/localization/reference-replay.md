@@ -30,6 +30,8 @@ The report is regenerated from the observation stream and compared byte-for-byte
 - Floor accuracy: 1.0
 - Route matches accepted: 7
 - Route matches rejected: 0
+- Runtime frames: 4 tracking, 3 degraded, 0 lost/relocalizing
+- Guidance-frozen frames: 0
 
 These small errors are expected because both the simulated observations and checkpoints follow the same constructed straight path. They must not be quoted as device, venue, or real-world accuracy.
 
@@ -44,6 +46,8 @@ The current core publishes:
 - explicit `high`, `degraded`, or `lost` quality.
 
 The matcher retains each raw estimate and projects it only to a same-floor route segment inside an uncertainty-aware gate. Lost quality, wrong floors, excessive distance, and implausible backward progress produce explicit rejection reasons; a nearby route never upgrades localization quality.
+
+Runtime state is distinct from filter quality. Lost quality freezes guidance, and a later plausible estimate enters `relocalizing` rather than silently resuming. A recent trusted visual or manual anchor must explicitly confirm recovery; that transition records anchor identity and recovery duration.
 
 The filter rejects a stream that does not begin with an initial fix or moves backward in time. Quality becomes lost when uncertainty or correction age crosses configured limits.
 

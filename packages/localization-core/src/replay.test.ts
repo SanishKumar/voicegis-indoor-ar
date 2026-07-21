@@ -20,6 +20,9 @@ describe('localization replay', () => {
         acceptedCount: 7,
         rejectedCount: 0,
       },
+      runtime: {
+        guidanceFrozenFrames: 0,
+      },
     });
     expect(first.report.p95HorizontalErrorMeters).toBeLessThan(0.25);
   });

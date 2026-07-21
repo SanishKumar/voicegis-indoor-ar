@@ -85,12 +85,14 @@ Delivered:
 - Synthetic checkpoint report with byte-for-byte replay verification
 - Same-floor, uncertainty-gated, progress-aware route matching
 - Raw and matched replay positions with explicit rejection reasons
+- Tracking, degraded, lost, and relocalizing runtime states
+- Guidance freeze until a recent trusted anchor confirms recovery
 
 Remaining:
 
 - Real sensor ingestion and timestamp characterization
 - Surveyed physical traces and ground-truth checkpoint tooling
-- Relocalization and recovery evidence
+- Live relocalization and recovery evidence
 
 Deliver:
 

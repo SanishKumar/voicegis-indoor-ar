@@ -139,5 +139,9 @@ export interface ReplayReport {
     rejectedCount: number;
     reasonCounts: Record<MapMatchReason, number>;
   };
+  runtime: {
+    stateCounts: Record<'initializing' | 'tracking' | 'degraded' | 'lost' | 'relocalizing', number>;
+    guidanceFrozenFrames: number;
+  };
   checkpointErrors: CheckpointError[];
 }

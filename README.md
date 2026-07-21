@@ -26,6 +26,7 @@ Implemented today:
 - Typed localization observations, covariance-aware estimates, and deterministic replay
 - Synthetic checkpoint evaluation with explicit high/degraded/lost quality states
 - Same-floor, uncertainty-gated route matching with explicit rejection reasons
+- Localization runtime states that freeze guidance until trusted-anchor recovery
 - Vertical instructions such as “take the elevator to Level 1”
 - Public-only fuzzy search with declared destination aliases
 - Automated lint, type, test, deterministic-compile, and production-build checks
@@ -120,7 +121,7 @@ docs/
 
 ## Next engineering milestone
 
-Phase 2 still needs runtime consumption of a non-bundled active package, including storage-quota and multi-tab coordination. Phase 3 now has deterministic replay and gated route matching; the next slice is a real-walk ingestion contract plus relocalization and recovery state transitions. Remote distribution and signatures remain later venue-platform work.
+Phase 2 still needs runtime consumption of a non-bundled active package, including storage-quota and multi-tab coordination. Phase 3 now has deterministic replay, gated route matching, and explicit recovery state transitions; the next slice is a privacy-preserving real-walk ingestion contract and benchmark metadata. Remote distribution and signatures remain later venue-platform work.
 
 See [the delivery roadmap](docs/roadmap.md) and [the architecture direction](docs/architecture/overview.md).
 

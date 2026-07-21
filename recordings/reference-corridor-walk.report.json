@@ -25,6 +25,16 @@
       "backward-progress": 0
     }
   },
+  "runtime": {
+    "stateCounts": {
+      "initializing": 0,
+      "tracking": 4,
+      "degraded": 3,
+      "lost": 0,
+      "relocalizing": 0
+    },
+    "guidanceFrozenFrames": 0
+  },
   "checkpointErrors": [
     {
       "checkpointId": "entry",
