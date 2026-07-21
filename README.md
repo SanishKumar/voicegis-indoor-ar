@@ -2,35 +2,38 @@
 
 [![Quality](https://github.com/SanishKumar/voicegis-indoor-ar/actions/workflows/quality.yml/badge.svg)](https://github.com/SanishKumar/voicegis-indoor-ar/actions/workflows/quality.yml)
 
-An offline-first indoor spatial-intelligence project for compiling building data, calculating constraint-aware routes, and eventually delivering uncertainty-aware localization, voice control, and world-anchored guidance.
+An offline-oriented indoor spatial-intelligence project for compiling building data, calculating constraint-aware routes, inspecting spatial topology, and eventually delivering uncertainty-aware localization, voice control, and world-anchored guidance.
 
 This repository is being rebuilt in public from an earlier hospital-navigation prototype. The original state is preserved at [`prototype-v0`](https://github.com/SanishKumar/voicegis-indoor-ar/tree/prototype-v0).
 
 ## Current status
 
-The web application is a working, single-floor prototype—not yet a production indoor-localization system.
+The web application navigates a **synthetic two-floor reference building**. It is an engineering fixture, not surveyed venue data and not safe for real-world deployment.
 
 Implemented today:
 
-- A searchable hospital floor model with fuzzy POI lookup
-- A typed, deterministic A* routing core
-- A persistent Web Worker for route calculation
-- Bearing-derived turn instructions
-- Accessibility-aware edge filtering
-- Structural graph validation and route invariants
-- A pan-and-zoom 2D/2.5D floor-plan view
-- A camera-overlay **preview** for exercising instructions
-- Automated lint, type, test, build, and dependency checks
+- A versioned TypeScript source model and strict JSON Schema
+- A deterministic building compiler with a content-addressed package manifest
+- Semantic validation for geometry, portals, connectors, accessibility, and reachability
+- A two-floor reference package with public and restricted spaces, lift, stairs, POIs, and localization anchors
+- A package-driven 2D visitor map and React Three Fiber engineering inspector
+- Floor isolation, exploded view, semantic selection, graph overlays, and anchor overlays
+- Multi-floor A* routing in a persistent Web Worker
+- Explicit standard versus accessible routing and fail-closed restricted edges
+- Vertical instructions such as “take the elevator to Level 1”
+- Public-only fuzzy search with declared destination aliases
+- Automated lint, type, test, deterministic-compile, and production-build checks
+- A camera-overlay **preview** for instruction experiments
 
 Not implemented yet:
 
-- Real user localization or movement tracking
-- Multi-floor routing and vertical connectors
-- A spatial map compiler or imported building data
-- A real 3D digital twin
-- World-anchored AR, pose alignment, or occlusion
+- Surveyed or imported real-building geometry
+- Real user localization, movement tracking, or uncertainty estimation
+- Dynamic closure overlays and route explanation receipts
+- Offline package caching, signatures, distribution, or rollback
+- World-anchored AR, pose alignment, occlusion, or automatic progress
 - VoiceGIS command execution
-- Session recording, replay, or physical-walk benchmarks
+- Session recording, deterministic replay, or physical-walk benchmarks
 
 The camera view is deliberately labeled **Camera Preview** because its graphics are screen-aligned. It does not know the device pose or the user's position and should not be described as AR.
 
@@ -49,15 +52,17 @@ An LLM may interpret a request, but it must not decide whether a corridor is acc
 
 ```mermaid
 flowchart LR
-  UI["React visitor UI"] --> State["Navigation state"]
-  State --> Facade["Routing facade"]
-  Facade --> Worker["Persistent Web Worker"]
-  Worker --> Core["Pure TypeScript A* core"]
-  Core --> Graph["Prototype building graph"]
-  Graph --> Validation["Graph validation tests"]
+  Source["Versioned building source"] --> Compiler["Deterministic compiler"]
+  Compiler --> Package["Content-addressed package"]
+  Package --> Map["2D visitor map"]
+  Package --> Twin["3D engineering inspector"]
+  Package --> Adapter["Visitor routing adapter"]
+  Adapter --> Search["Public POI search"]
+  Adapter --> Worker["Persistent route worker"]
+  Worker --> Core["Policy-aware A* core"]
 ```
 
-The route algorithm is isolated from the worker transport, so it can be run deterministically in unit tests and later reused by replay and server-side tooling.
+The source JSON is authored data. The compiled package is the only runtime authority for geometry, semantics, search, and routing. Clients do not repair malformed topology.
 
 ## Run locally
 
@@ -77,41 +82,42 @@ Run the same quality gate used by CI:
 npm run check
 ```
 
-Individual commands:
+Compile or verify the reference package directly:
 
 ```bash
-npm run lint
-npm run typecheck
-npm test
-npm run build
+npm run compile:reference
+npm run compile:check
 ```
 
 ## Repository map
 
 ```text
+buildings/reference-medical-centre/
+├── source/                    authored synthetic building source
+└── compiled/                  deterministic package and validation report
+
+packages/
+├── spatial-schema/            versioned types, JSON Schema, and shape validation
+└── map-compiler/              semantic validation and deterministic graph compiler
+
 src/
-├── components/               visitor UI and camera preview
-├── context/                  navigation state and user preferences
-├── data/                     preserved prototype geometry and graph
-└── engine/
-    ├── routingCore.ts        pure A* and turn generation
-    ├── routingEngine.ts      persistent-worker request facade
-    ├── routing.worker.ts     worker transport boundary
-    ├── graphValidation.ts    structural graph checks
-    └── searchIndex.js        fuzzy POI lookup
+├── components/                visitor map, 3D inspector, navigation, and camera preview
+├── context/                   navigation state and user preferences
+├── data/compiledBuilding.ts   runtime adapter over the compiled package
+└── engine/                    routing, search, graph checks, and view models
 
 docs/
-├── adr/                      architecture decision records
-├── architecture/             target system boundaries
-├── build-in-public.md        public progress-post drafts
-└── roadmap.md                evidence-based delivery phases
+├── adr/                       architecture decision records
+├── architecture/              system boundaries
+├── build-in-public.md         public progress-post drafts
+└── roadmap.md                 evidence-based delivery phases
 ```
 
-## Roadmap
+## Next engineering milestone
 
-The next major milestone is a versioned multi-floor spatial schema and compiler—not a prettier fictional map. It will introduce spaces, portals, vertical connectors, accessibility properties, coordinate transforms, and machine-readable validation reports before the 3D viewer is rebuilt.
+The next routing slice is an immutable operational overlay for corridor/lift closures plus a route explanation receipt. A route should identify the package hash, profile, selected vertical connectors, avoided constraints, and active closures. Closing the lift must deterministically invalidate an accessible cross-floor route without editing building source.
 
-See [the delivery roadmap](docs/roadmap.md) and [the target architecture](docs/architecture/overview.md).
+See [the delivery roadmap](docs/roadmap.md) and [the architecture direction](docs/architecture/overview.md).
 
 ## Review wanted
 
@@ -123,7 +129,7 @@ Useful review is especially welcome from people working with:
 - Graph routing and dynamic path planning
 - ARCore, ARKit, AR Foundation, or WebXR
 
-If you review the project, please challenge the data model and failure handling before the visuals. The most useful question is not “Does the arrow look good?” but “What evidence would make this safe to trust during a real walk?”
+Please challenge the data model and failure handling before the visuals. The most useful question is not “Does the arrow look good?” but “What evidence would make this safe to trust during a real walk?”
 
 ## License
 

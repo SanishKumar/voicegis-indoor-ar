@@ -95,14 +95,12 @@ The runtime owns progress gates, instruction advancement, wrong-way hysteresis, 
 
 ## Immediate next slice
 
-The first compiler slice will use a small, reviewable JSON source format before adding complex IFC or CAD importers. It should prove:
+The schema, compiler, two-floor synthetic fixture, package-driven viewers, and multi-floor routing path are implemented. The next slice introduces operational state without mutating the immutable building package:
 
-- Two floors with aligned vertical connectors
-- Rooms connected through explicit door portals
-- Coordinate transforms and units
-- Public and restricted POIs
-- Wheelchair-accessible versus stair-only routes
-- Deterministic compilation output
-- Validation failures for disconnected spaces and invalid connectors
+- Versioned closure overlays targeting compiled edge or connector source IDs
+- Fail-closed validation for unknown targets and expired overlays
+- Deterministic route changes when a corridor, lift, or stair is closed
+- A route explanation receipt containing package hash, routing profile, closures, selected connectors, distance, and rejected constraints
+- Tests proving that a closed lift invalidates accessible cross-floor routing while a standard profile can still use stairs
 
-Once this package exists, the React Three Fiber viewer can consume compiled data rather than creating a second hardcoded representation.
+Offline cache design follows after the receipt defines exactly which package and operational overlay produced a route.

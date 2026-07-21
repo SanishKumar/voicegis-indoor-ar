@@ -4,7 +4,7 @@ This roadmap uses proof and exit criteria rather than feature percentages.
 
 ## Phase 0: trustworthy prototype baseline
 
-Status: in progress
+Status: baseline exit criteria met; JavaScript-to-TypeScript cleanup continues as technical debt
 
 Delivered:
 
@@ -18,7 +18,6 @@ Delivered:
 Remaining:
 
 - Finish migrating shared data and state modules to TypeScript
-- Add a real multi-floor source fixture before replacing the viewer
 
 Exit evidence:
 
@@ -29,14 +28,16 @@ Exit evidence:
 
 ## Phase 1: spatial schema and compiler
 
-Deliver:
+Status: compiler and synthetic-fixture evidence complete; surveyed pilot data still required
+
+Delivered:
 
 - Versioned TypeScript schema and JSON Schema
 - Buildings, floors, spaces, portals, POIs, and vertical connectors
 - Units and coordinate transforms
 - Deterministic package compiler
 - Connectivity, reachability, and accessibility validation report
-- A real two-floor pilot fixture
+- A two-floor synthetic engineering fixture
 
 Exit evidence:
 
@@ -47,13 +48,20 @@ Exit evidence:
 
 ## Phase 2: 3D inspection and routing policy
 
-Deliver:
+Status: in progress
 
-- React Three Fiber viewer driven only by compiled packages
-- Floor isolation and exploded view
-- Semantic object inspection
-- Multi-profile, multi-floor A*
-- Dynamic closures and route explanation receipts
+Delivered:
+
+- Package-driven React Three Fiber engineering viewer
+- Floor isolation, exploded view, semantic selection, graph and anchor overlays
+- Standard and wheelchair profiles across two floors
+- Fail-closed restricted edges and explicit vertical instructions
+- Package-driven 2D visitor navigation and search
+
+Remaining:
+
+- Immutable dynamic closure overlays
+- Route explanation receipts
 - Offline package cache
 
 Exit evidence:
@@ -64,6 +72,8 @@ Exit evidence:
 - A selected 3D object exposes its source ID and routing attributes
 
 ## Phase 3: localization and replay
+
+Status: not started
 
 Deliver:
 

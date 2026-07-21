@@ -56,7 +56,29 @@ Do not wait until the compiler succeeds. The first useful compiler post should s
 
 Attach the invalid source fragment and its machine-readable validation result.
 
-## Post 4: localization evidence
+## Post 4: one package, no parallel graph
+
+Before localization, publish the package-integration milestone:
+
+> The hardest part of replacing my old indoor-navigation demo was not drawing two floors. It was deleting the second source of truth.
+>
+> The app used to have handwritten room geometry, a separate graph, and UI-specific POI data. They could disagree while the screen still looked plausible. The rebuilt path is now: versioned source → validating compiler → content-addressed package → 2D map, 3D inspector, search, and route worker.
+>
+> The synthetic reference package currently compiles to 20 semantic spaces, 55 routing nodes, and 55 edges. Visitor search excludes staff-only POIs; restricted edges fail closed; and an accessible ground-to-Level-1 route is asserted to use the lift rather than stairs. Recompilation must reproduce the same SHA-256 package hash.
+>
+> This is still reference data, not a surveyed hospital and not a localization claim. The next review target is the operational-overlay design: how should closures be versioned, expired, and explained in a route receipt?
+
+Attach:
+
+- A 15–25 second clip switching floors, selecting a 3D semantic space, and showing an accessible cross-floor route
+- The package hash and deterministic compile check
+- A small diagram showing one package feeding the 2D map, 3D inspector, search, and worker
+
+Suggested short version:
+
+> Deleted the parallel mock graph from my indoor-navigation project. One compiled package now drives the 2D map, 3D inspector, public POI search, and multi-floor route worker. Accessible routes use the lift; restricted edges fail closed; builds reproduce the same package hash. Still synthetic data—next up: versioned closures + route receipts.
+
+## Post 5: localization evidence
 
 Only publish accuracy numbers with the trace, device, route length, checkpoints, and method.
 
