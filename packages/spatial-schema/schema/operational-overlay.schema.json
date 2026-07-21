@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://voicegis.dev/schema/operational-overlay-0.1.0.json",
+  "title": "VoiceGIS Operational Overlay",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "buildingId",
+    "packageHash",
+    "validFrom",
+    "validUntil",
+    "closures"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "0.1.0" },
+    "id": { "type": "string", "minLength": 1 },
+    "buildingId": { "type": "string", "minLength": 1 },
+    "packageHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "validFrom": { "type": "string", "minLength": 1 },
+    "validUntil": { "type": "string", "minLength": 1 },
+    "closures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "target", "reason"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "id"],
+            "properties": {
+              "type": { "enum": ["edge", "source"] },
+              "id": { "type": "string", "minLength": 1 }
+            }
+          },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

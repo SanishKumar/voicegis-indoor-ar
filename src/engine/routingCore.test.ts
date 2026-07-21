@@ -101,4 +101,23 @@ describe('A* routing core', () => {
       error: 'No route satisfies the selected constraints.',
     });
   });
+
+  it('excludes explicitly closed edge IDs without mutating the graph', () => {
+    const nodes: GraphNode[] = [
+      { id: 'a', x: 0, y: 0, floor: 'g', type: 'junction' },
+      { id: 'b', x: 1, y: 0, floor: 'g', type: 'junction' },
+      { id: 'c', x: 0, y: 2, floor: 'g', type: 'junction' },
+      { id: 'd', x: 2, y: 0, floor: 'g', type: 'junction' },
+    ];
+    const edges: GraphEdge[] = [
+      { id: 'short-a', from: 'a', to: 'b', distance: 1 },
+      { id: 'short-b', from: 'b', to: 'd', distance: 1 },
+      { id: 'detour-a', from: 'a', to: 'c', distance: 2 },
+      { id: 'detour-b', from: 'c', to: 'd', distance: 2 },
+    ];
+
+    const result = calculateRoute('a', 'd', nodes, edges, { closedEdgeIds: ['short-a'] });
+    expect(result.found && result.pathIds).toEqual(['a', 'c', 'd']);
+    expect(edges).toHaveLength(4);
+  });
 });

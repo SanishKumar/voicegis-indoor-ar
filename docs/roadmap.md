@@ -57,11 +57,11 @@ Delivered:
 - Standard and wheelchair profiles across two floors
 - Fail-closed restricted edges and explicit vertical instructions
 - Package-driven 2D visitor navigation and search
+- Immutable, versioned operational closure overlays
+- Route receipts with package, profile, closure, connector, and exclusion evidence
 
 Remaining:
 
-- Immutable dynamic closure overlays
-- Route explanation receipts
 - Offline package cache
 
 Exit evidence:

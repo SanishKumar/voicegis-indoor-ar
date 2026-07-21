@@ -1,15 +1,13 @@
-import { ROUTING_EDGES, ROUTING_NODES } from '../data/compiledBuilding';
-import {
-  STEP_TYPE,
-  calculateRoute,
-  type GraphEdge,
-  type GraphNode,
-  type RouteOptions,
-  type RouteResult,
-} from './routingCore';
+import { calculateCompiledRoute, type CompiledRouteOptions } from './compiledRoutePolicy';
+import { STEP_TYPE, type RouteResult } from './routingCore';
 
 export { STEP_TYPE };
-export type { RouteOptions, RouteResult, RouteStep } from './routingCore';
+export type { RouteResult, RouteStep } from './routingCore';
+export type {
+  CompiledRouteOptions as RouteOptions,
+  ExplainedRouteResult,
+  RouteReceipt,
+} from './compiledRoutePolicy';
 
 interface WorkerResponse {
   requestId: number;
@@ -62,18 +60,10 @@ function getRoutingWorker() {
 export function findRoute(
   startId: string,
   endId: string,
-  options: RouteOptions = {},
+  options: CompiledRouteOptions = {},
 ): Promise<RouteResult> {
   if (typeof Worker === 'undefined') {
-    return Promise.resolve(
-      calculateRoute(
-        startId,
-        endId,
-        ROUTING_NODES as GraphNode[],
-        ROUTING_EDGES as GraphEdge[],
-        options,
-      ),
-    );
+    return Promise.resolve(calculateCompiledRoute(startId, endId, options));
   }
 
   const worker = getRoutingWorker();

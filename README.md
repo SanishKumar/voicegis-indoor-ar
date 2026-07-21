@@ -20,6 +20,8 @@ Implemented today:
 - Floor isolation, exploded view, semantic selection, graph overlays, and anchor overlays
 - Multi-floor A* routing in a persistent Web Worker
 - Explicit standard versus accessible routing and fail-closed restricted edges
+- Versioned operational overlays for deterministic corridor or connector closures
+- Route receipts with package hash, profile, closures, connector choice, and exclusion counts
 - Vertical instructions such as “take the elevator to Level 1”
 - Public-only fuzzy search with declared destination aliases
 - Automated lint, type, test, deterministic-compile, and production-build checks
@@ -29,7 +31,6 @@ Not implemented yet:
 
 - Surveyed or imported real-building geometry
 - Real user localization, movement tracking, or uncertainty estimation
-- Dynamic closure overlays and route explanation receipts
 - Offline package caching, signatures, distribution, or rollback
 - World-anchored AR, pose alignment, occlusion, or automatic progress
 - VoiceGIS command execution
@@ -115,7 +116,7 @@ docs/
 
 ## Next engineering milestone
 
-The next routing slice is an immutable operational overlay for corridor/lift closures plus a route explanation receipt. A route should identify the package hash, profile, selected vertical connectors, avoided constraints, and active closures. Closing the lift must deterministically invalidate an accessible cross-floor route without editing building source.
+The next Phase 2 slice is an offline package cache with explicit version activation and rollback. Cached content must be verified against its manifest hash before activation, and a failed update must leave the last known-good package available. The localization/replay contracts follow after package lifecycle is trustworthy.
 
 See [the delivery roadmap](docs/roadmap.md) and [the architecture direction](docs/architecture/overview.md).
 

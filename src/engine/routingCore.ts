@@ -34,6 +34,7 @@ export interface GraphNode {
 }
 
 export interface GraphEdge {
+  id?: string;
   from: string;
   to: string;
   distance: number;
@@ -48,6 +49,7 @@ export interface GraphEdge {
 export interface RouteOptions {
   accessibleOnly?: boolean;
   allowRestricted?: boolean;
+  closedEdgeIds?: readonly string[];
 }
 
 export interface RouteStep {
@@ -76,6 +78,7 @@ export interface RouteFailure {
 export type RouteResult = RouteSuccess | RouteFailure;
 
 interface Neighbor {
+  edgeId?: string;
   to: string;
   distance: number;
   corridor?: string;
@@ -176,6 +179,7 @@ export function buildGraphIndex(nodes: GraphNode[], edges: GraphEdge[]): GraphIn
     if (!from || !to || edge.distance <= 0) continue;
 
     const neighbor = {
+      edgeId: edge.id,
       distance: edge.distance,
       corridor: edge.corridor,
       accessible: edge.accessible !== false,
@@ -427,6 +431,7 @@ export function calculateRoute(
   options: RouteOptions = {},
 ): RouteResult {
   const graph = buildGraphIndex(nodes, edges);
+  const closedEdgeIds = new Set(options.closedEdgeIds ?? []);
   const start = graph.nodeById.get(startId);
   const destination = graph.nodeById.get(endId);
 
@@ -476,6 +481,7 @@ export function calculateRoute(
     }
 
     for (const neighbor of graph.adjacency.get(current.id) ?? []) {
+      if (neighbor.edgeId && closedEdgeIds.has(neighbor.edgeId)) continue;
       if (options.accessibleOnly && !neighbor.accessible) continue;
       if (!options.allowRestricted && neighbor.restricted) continue;
 

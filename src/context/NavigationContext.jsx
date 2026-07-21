@@ -14,6 +14,14 @@ import { createContext, useContext, useReducer, useCallback, useState, useEffect
 import { findRoute } from '../engine/routingEngine';
 import { BUILDING_CONFIG } from '../data/buildingConfig.js';
 import { getNodeById } from '../data/compiledBuilding';
+import liftClosureOverlay from '../../buildings/reference-medical-centre/operations/lift-closed.overlay.json';
+
+export const OPERATIONAL_SCENARIO = {
+  NOMINAL: 'nominal',
+  LIFT_CLOSED_REPLAY: 'lift-closed-replay',
+};
+
+const LIFT_CLOSURE_REPLAY_TIME = '2026-07-22T12:00:00.000Z';
 
 // ── Action Types ──
 const ACTION = {
@@ -205,6 +213,7 @@ export function NavigationProvider({ children }) {
   });
 
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [operationalScenario, setOperationalScenarioState] = useState(OPERATIONAL_SCENARIO.NOMINAL);
 
   const completeOnboarding = useCallback(() => {
     setOnboardingComplete(true);
@@ -250,6 +259,11 @@ export function NavigationProvider({ children }) {
     });
   }, []);
 
+  const setOperationalScenario = useCallback((scenario) => {
+    setOperationalScenarioState(scenario);
+    dispatch({ type: ACTION.CLEAR_ROUTE });
+  }, []);
+
   const actions = {
     setStart: useCallback((nodeId) => {
       const node = getNodeById(nodeId);
@@ -275,7 +289,15 @@ export function NavigationProvider({ children }) {
         },
       });
       try {
-        const route = await findRoute(startId, destNodeId, { accessibleOnly: accessibleRouting });
+        const route = await findRoute(startId, destNodeId, {
+          profile: accessibleRouting ? 'wheelchair' : 'standard',
+          ...(operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY
+            ? {
+                operationalOverlay: liftClosureOverlay,
+                evaluatedAt: LIFT_CLOSURE_REPLAY_TIME,
+              }
+            : {}),
+        });
         dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: route });
       } catch (err) {
         console.error('Routing error:', err);
@@ -331,6 +353,8 @@ export function NavigationProvider({ children }) {
         toggleHighContrast,
         accessibleRouting,
         toggleAccessibleRouting,
+        operationalScenario,
+        setOperationalScenario,
       }}
     >
       {children}

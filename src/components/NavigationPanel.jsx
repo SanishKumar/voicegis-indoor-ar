@@ -19,6 +19,8 @@ import {
   Navigation,
   Building2,
   Footprints,
+  FileCheck2,
+  AlertTriangle,
 } from 'lucide-react';
 import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { getFloorById, getNodeById } from '../data/compiledBuilding';
@@ -57,13 +59,82 @@ function StepIcon({ type, size = 20 }) {
   }
 }
 
+function RouteReceiptDetails({ receipt }) {
+  if (!receipt) return null;
+  const connectorLabel =
+    receipt.selectedConnectors.length > 0
+      ? receipt.selectedConnectors
+          .map(
+            (connector) => `${connector.kind}: ${connector.fromFloorId} → ${connector.toFloorId}`,
+          )
+          .join(', ')
+      : 'No vertical connector';
+  const closureLabel =
+    receipt.appliedClosureIds.length > 0 ? receipt.appliedClosureIds.join(', ') : 'None';
+
+  return (
+    <details className="route-receipt">
+      <summary>
+        <FileCheck2 size={14} />
+        Route receipt
+        <code>{receipt.packageHash.slice(0, 8)}</code>
+      </summary>
+      <dl>
+        <div>
+          <dt>Profile</dt>
+          <dd>{receipt.profile}</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>{receipt.status}</dd>
+        </div>
+        <div>
+          <dt>Connector</dt>
+          <dd>{connectorLabel}</dd>
+        </div>
+        <div>
+          <dt>Closures</dt>
+          <dd>{closureLabel}</dd>
+        </div>
+        <div>
+          <dt>Excluded edges</dt>
+          <dd>
+            {receipt.excludedEdges.restricted} restricted · {receipt.excludedEdges.inaccessible}{' '}
+            inaccessible · {receipt.excludedEdges.closed} closed
+          </dd>
+        </div>
+      </dl>
+    </details>
+  );
+}
+
 export default function NavigationPanel() {
   const { state, actions } = useNavigation();
   const { route, navStatus, currentStepIndex, destinationNodeId } = state;
 
-  // Only show when navigating
-  if (navStatus === NAV_STATUS.IDLE || !route?.found) {
+  if (!route) {
     return null;
+  }
+
+  if (!route.found) {
+    return (
+      <div className="nav-panel route-failure-panel open" id="route-failure-panel" role="alert">
+        <div className="nav-panel-handle" />
+        <div className="route-failure-message">
+          <div className="route-failure-icon">
+            <AlertTriangle size={20} />
+          </div>
+          <div>
+            <strong>No compliant route</strong>
+            <p>{route.error}</p>
+          </div>
+          <button className="nav-panel-close-btn" onClick={() => actions.clearRoute()}>
+            <X size={12} /> Dismiss
+          </button>
+        </div>
+        <RouteReceiptDetails receipt={route.receipt} />
+      </div>
+    );
   }
 
   const destNode = getNodeById(destinationNodeId);
@@ -111,6 +182,8 @@ export default function NavigationPanel() {
       <div className="nav-progress-bar">
         <div className="nav-progress-fill" style={{ width: `${progress}%` }} />
       </div>
+
+      <RouteReceiptDetails receipt={route.receipt} />
 
       {/* Current Step (Hero) */}
       {currentStep && !isArrived && (

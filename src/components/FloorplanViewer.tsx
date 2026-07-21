@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Circle, Group, Layer, Line, Rect, Stage, Text } from 'react-konva';
 import type Konva from 'konva';
-import { Accessibility, Database, Layers, LockKeyhole } from 'lucide-react';
-import { useNavigation } from '../context/NavigationContext.jsx';
+import { Accessibility, Database, Layers, LockKeyhole, Wrench } from 'lucide-react';
+import { OPERATIONAL_SCENARIO, useNavigation } from '../context/NavigationContext.jsx';
 import {
   BUILDING_PACKAGE,
   CATEGORIES,
@@ -30,6 +30,8 @@ interface NavigatorContextValue {
     selectPOI: (node: VisitorPoiNode) => void;
   };
   theme: 'light' | 'dark';
+  operationalScenario: string;
+  setOperationalScenario: (scenario: string) => void;
 }
 
 const SPACE_COLORS = {
@@ -53,7 +55,8 @@ const LIGHT_SPACE_COLORS = {
 } as const;
 
 export default function FloorplanViewer() {
-  const { state, actions, theme } = useNavigation() as unknown as NavigatorContextValue;
+  const { state, actions, theme, operationalScenario, setOperationalScenario } =
+    useNavigation() as unknown as NavigatorContextValue;
   const { activeFloorId } = state;
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -359,9 +362,31 @@ export default function FloorplanViewer() {
             </button>
           ))}
         </div>
-        <div className="compiled-map-proof" title={BUILDING_PACKAGE.manifest.contentHash}>
-          <Database size={14} />
-          <span>Package {BUILDING_PACKAGE.manifest.contentHash.slice(0, 8)}</span>
+        <div className="compiled-map-operations">
+          <button
+            type="button"
+            className={
+              operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY ? 'active' : ''
+            }
+            aria-pressed={operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY}
+            title="Deterministic replay at 22 July 2026; clears the current route"
+            onClick={() =>
+              setOperationalScenario(
+                operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY
+                  ? OPERATIONAL_SCENARIO.NOMINAL
+                  : OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY,
+              )
+            }
+          >
+            <Wrench size={14} />
+            {operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY
+              ? 'Lift closure replay on'
+              : 'Replay lift closure'}
+          </button>
+          <div className="compiled-map-proof" title={BUILDING_PACKAGE.manifest.contentHash}>
+            <Database size={14} />
+            <span>Package {BUILDING_PACKAGE.manifest.contentHash.slice(0, 8)}</span>
+          </div>
         </div>
       </div>
 

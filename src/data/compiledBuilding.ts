@@ -119,6 +119,7 @@ export const ROUTING_NODES: GraphNode[] = BUILDING_PACKAGE.routing.nodes.map((no
 });
 
 export const ROUTING_EDGES: GraphEdge[] = BUILDING_PACKAGE.routing.edges.map((edge) => ({
+  id: edge.id,
   from: edge.from,
   to: edge.to,
   distance: edge.distanceMeters,
