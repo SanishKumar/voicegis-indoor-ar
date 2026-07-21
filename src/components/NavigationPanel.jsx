@@ -12,7 +12,7 @@ import {
 import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { getNodeById } from '../data/buildingGraph.js';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
-import { STEP_TYPE } from '../engine/routingEngine.js';
+import { STEP_TYPE } from '../engine/routingEngine';
 
 /**
  * Get the Lucide icon component for a step type.

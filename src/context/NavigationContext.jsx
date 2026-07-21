@@ -11,7 +11,7 @@
  */
 
 import { createContext, useContext, useReducer, useCallback, useState, useEffect } from 'react';
-import { findRoute } from '../engine/routingEngine.js';
+import { findRoute } from '../engine/routingEngine';
 import { BUILDING_CONFIG } from '../data/buildingConfig.js';
 
 // ── Action Types ──

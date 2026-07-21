@@ -13,7 +13,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { Map, CameraOff, Navigation, ArrowUp, CornerUpLeft, CornerUpRight } from 'lucide-react';
 import { useNavigation, VIEW_TYPE, NAV_STATUS } from '../context/NavigationContext.jsx';
-import { STEP_TYPE } from '../engine/routingEngine.js';
+import { STEP_TYPE } from '../engine/routingEngine';
 import { formatDistance } from '../data/buildingConfig.js';
 
 export default function ARView() {
