@@ -22,8 +22,10 @@ export interface GraphNode {
   id: string;
   x: number;
   y: number;
-  floor: number;
+  floor: string | number;
+  floorName?: string;
   type: string;
+  sourceId?: string;
   poi?: PoiMetadata;
 }
 
@@ -33,6 +35,10 @@ export interface GraphEdge {
   distance: number;
   corridor?: string;
   accessible?: boolean;
+  restricted?: boolean;
+  kind?: 'within-space' | 'vertical-connector';
+  connectorKind?: string;
+  sourceId?: string;
 }
 
 export interface RouteOptions {
