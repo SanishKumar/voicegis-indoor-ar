@@ -63,4 +63,10 @@ export default [
       globals: globals.node,
     },
   },
+  {
+    files: ['packages/map-compiler/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ];

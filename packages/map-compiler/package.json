@@ -1,0 +1,10 @@
+{
+  "name": "@voicegis/map-compiler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@voicegis/spatial-schema": "0.1.0"
+  }
+}
