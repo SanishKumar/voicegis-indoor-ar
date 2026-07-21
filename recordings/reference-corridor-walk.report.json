@@ -1,0 +1,36 @@
+{
+  "recordingVersion": "0.1.0",
+  "sessionId": "synthetic-reference-corridor-001",
+  "buildingId": "reference-medical-centre",
+  "packageHash": "5be7c952924d796b39ca065311d662cd24da0a18ae20bee0fd6ee962636cd00b",
+  "observationCount": 7,
+  "checkpointCount": 3,
+  "qualityFrameCounts": {
+    "high": 4,
+    "degraded": 3,
+    "lost": 0
+  },
+  "medianHorizontalErrorMeters": 0.053,
+  "p95HorizontalErrorMeters": 0.056,
+  "floorAccuracy": 1,
+  "checkpointErrors": [
+    {
+      "checkpointId": "entry",
+      "timeMs": 0,
+      "floorCorrect": true,
+      "horizontalErrorMeters": 0
+    },
+    {
+      "checkpointId": "anchor-correction",
+      "timeMs": 3000,
+      "floorCorrect": true,
+      "horizontalErrorMeters": 0.053
+    },
+    {
+      "checkpointId": "corridor-end",
+      "timeMs": 5000,
+      "floorCorrect": true,
+      "horizontalErrorMeters": 0.056
+    }
+  ]
+}

@@ -18,7 +18,9 @@
     "format": "prettier --write .",
     "compile:reference": "tsx packages/map-compiler/src/cli.ts buildings/reference-medical-centre/source/building.json buildings/reference-medical-centre/compiled",
     "compile:check": "tsx packages/map-compiler/src/cli.ts buildings/reference-medical-centre/source/building.json buildings/reference-medical-centre/compiled --check",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run compile:check && npm run build"
+    "replay:reference": "tsx packages/localization-core/src/cli.ts recordings/reference-corridor-walk.json recordings/reference-corridor-walk.report.json",
+    "replay:check": "tsx packages/localization-core/src/cli.ts recordings/reference-corridor-walk.json recordings/reference-corridor-walk.report.json --check",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run compile:check && npm run replay:check && npm run build"
   },
   "dependencies": {
     "ajv": "^8.18.0",

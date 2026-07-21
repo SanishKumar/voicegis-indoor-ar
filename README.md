@@ -23,6 +23,8 @@ Implemented today:
 - Versioned operational overlays for deterministic corridor or connector closures
 - Route receipts with package hash, profile, closures, connector choice, and exclusion counts
 - Browser package verification with atomic active/previous cache state and rollback
+- Typed localization observations, covariance-aware estimates, and deterministic replay
+- Synthetic checkpoint evaluation with explicit high/degraded/lost quality states
 - Vertical instructions such as “take the elevator to Level 1”
 - Public-only fuzzy search with declared destination aliases
 - Automated lint, type, test, deterministic-compile, and production-build checks
@@ -31,11 +33,11 @@ Implemented today:
 Not implemented yet:
 
 - Surveyed or imported real-building geometry
-- Real user localization, movement tracking, or uncertainty estimation
+- Real sensor ingestion, surveyed localization traces, or physical accuracy evidence
 - Remote package download, signatures, distribution, or runtime hot-swap
 - World-anchored AR, pose alignment, occlusion, or automatic progress
 - VoiceGIS command execution
-- Session recording, deterministic replay, or physical-walk benchmarks
+- Route-constrained map matching, relocalization, or physical-walk benchmarks
 
 The camera view is deliberately labeled **Camera Preview** because its graphics are screen-aligned. It does not know the device pose or the user's position and should not be described as AR.
 
@@ -117,7 +119,7 @@ docs/
 
 ## Next engineering milestone
 
-The next Phase 2 slice is runtime consumption of a non-bundled active package, including storage-quota and multi-tab coordination. Remote distribution and signatures remain later venue-platform work. The localization/replay contracts can now begin against stable package and policy receipts.
+Phase 2 still needs runtime consumption of a non-bundled active package, including storage-quota and multi-tab coordination. Phase 3 has started with a deterministic localization replay core; the next slice is gated route-constrained map matching and a recorded-walk ingestion contract. Remote distribution and signatures remain later venue-platform work.
 
 See [the delivery roadmap](docs/roadmap.md) and [the architecture direction](docs/architecture/overview.md).
 

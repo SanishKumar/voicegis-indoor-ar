@@ -74,7 +74,22 @@ Exit evidence:
 
 ## Phase 3: localization and replay
 
-Status: not started
+Status: in progress with synthetic evidence only
+
+Delivered:
+
+- Typed initial-fix, position, heading, step, and floor observations
+- Covariance-aware horizontal position, velocity, and heading estimates
+- Explicit high, degraded, and lost quality states
+- Privacy-default recording and deterministic replay contract
+- Synthetic checkpoint report with byte-for-byte replay verification
+
+Remaining:
+
+- Real sensor ingestion and timestamp characterization
+- Route-constrained map matching
+- Surveyed physical traces and ground-truth checkpoint tooling
+- Relocalization and recovery evidence
 
 Deliver:
 

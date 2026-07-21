@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "0.1.0",
+  "sessionId": "synthetic-reference-corridor-001",
+  "buildingId": "reference-medical-centre",
+  "packageHash": "5be7c952924d796b39ca065311d662cd24da0a18ae20bee0fd6ee962636cd00b",
+  "device": {
+    "label": "deterministic synthetic device",
+    "platform": "simulation"
+  },
+  "privacy": {
+    "cameraFramesStored": false
+  },
+  "observations": [
+    {
+      "kind": "initial-fix",
+      "sequence": 0,
+      "timeMs": 0,
+      "source": "manual-anchor",
+      "position": [1, 9],
+      "floorId": "g",
+      "elevationMeters": 0,
+      "headingDegrees": 90,
+      "accuracyMeters": 0.25,
+      "headingAccuracyDegrees": 5
+    },
+    {
+      "kind": "step",
+      "sequence": 1,
+      "timeMs": 1000,
+      "source": "pedometer",
+      "distanceMeters": 1,
+      "durationMs": 1000,
+      "varianceMeters2": 0.04
+    },
+    {
+      "kind": "step",
+      "sequence": 2,
+      "timeMs": 2000,
+      "source": "pedometer",
+      "distanceMeters": 1,
+      "durationMs": 1000,
+      "varianceMeters2": 0.04
+    },
+    {
+      "kind": "position-fix",
+      "sequence": 3,
+      "timeMs": 3000,
+      "source": "visual-anchor",
+      "position": [4.05, 9.02],
+      "accuracyMeters": 0.35
+    },
+    {
+      "kind": "heading",
+      "sequence": 4,
+      "timeMs": 3000,
+      "source": "inertial",
+      "headingDegrees": 90,
+      "accuracyDegrees": 6
+    },
+    {
+      "kind": "step",
+      "sequence": 5,
+      "timeMs": 4000,
+      "source": "pedometer",
+      "distanceMeters": 1,
+      "durationMs": 1000,
+      "varianceMeters2": 0.04
+    },
+    {
+      "kind": "step",
+      "sequence": 6,
+      "timeMs": 5000,
+      "source": "pedometer",
+      "distanceMeters": 1,
+      "durationMs": 1000,
+      "varianceMeters2": 0.04
+    }
+  ],
+  "checkpoints": [
+    { "id": "entry", "timeMs": 0, "position": [1, 9], "floorId": "g" },
+    { "id": "anchor-correction", "timeMs": 3000, "position": [4, 9], "floorId": "g" },
+    { "id": "corridor-end", "timeMs": 5000, "position": [6, 9], "floorId": "g" }
+  ]
+}

@@ -95,12 +95,12 @@ The runtime owns progress gates, instruction advancement, wrong-way hysteresis, 
 
 ## Immediate next slice
 
-The schema, compiler, two-floor synthetic fixture, package-driven viewers, and multi-floor routing path are implemented. The next slice introduces operational state without mutating the immutable building package:
+Package verification, operational overlays, route receipts, and the first deterministic localization replay core are implemented. The next localization slice will add route-constrained map matching without allowing the matcher to hide a lost estimate:
 
-- Versioned closure overlays targeting compiled edge or connector source IDs
-- Fail-closed validation for unknown targets and expired overlays
-- Deterministic route changes when a corridor, lift, or stair is closed
-- A route explanation receipt containing package hash, routing profile, closures, selected connectors, distance, and rejected constraints
-- Tests proving that a closed lift invalidates accessible cross-floor routing while a standard profile can still use stairs
+- Project estimates to same-floor route segments only inside an uncertainty-aware gate
+- Record raw and matched positions together for replay inspection
+- Reject implausible jumps and backward progress with explicit reasons
+- Preserve lost quality even when a geometric snap candidate exists
+- Add a real-walk import contract without storing camera frames by default
 
-Offline cache design follows after the receipt defines exactly which package and operational overlay produced a route.
+The parallel package-lifecycle task is runtime consumption of a non-bundled active package with multi-tab coordination and quota handling.
