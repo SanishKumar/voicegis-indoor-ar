@@ -7,11 +7,13 @@
 import { Navigation, MapPin, Wifi, WifiOff } from 'lucide-react';
 import { useNavigation, NAV_STATUS, VIEW_TYPE } from '../context/NavigationContext.jsx';
 import { useState, useEffect } from 'react';
+import { getNodeById } from '../data/compiledBuilding';
 
 export default function StatusBar() {
   const { state } = useNavigation();
   const { navStatus, activeView, startNodeId } = state;
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const startNode = getNodeById(startNodeId);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -50,7 +52,7 @@ export default function StatusBar() {
       {/* Start Location */}
       <div className="status-item">
         <MapPin size={11} />
-        <span>Start: {startNodeId?.replace(/-/g, ' ') || 'Not set'}</span>
+        <span>Start: {startNode?.poi?.name || 'Not set'}</span>
       </div>
 
       {/* View */}

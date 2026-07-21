@@ -7,7 +7,7 @@
 import { Box, Map, Camera, Sun, Moon, MapPin, Home, Eye, Settings } from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
 import { BUILDING_CONFIG } from '../data/buildingConfig.js';
-import { getNodeById } from '../data/buildingGraph.js';
+import { getNodeById } from '../data/compiledBuilding';
 
 export default function Header() {
   const {
@@ -25,7 +25,9 @@ export default function Header() {
   const { activeView, startNodeId } = state;
 
   const startNode = getNodeById(startNodeId);
-  const locationLabel = startNode?.poi?.name || 'Set Location';
+  const locationLabel = startNode?.poi
+    ? `${startNode.poi.name} · ${startNode.poi.floorName}`
+    : 'Set Location';
 
   return (
     <header className="app-header" id="app-header">

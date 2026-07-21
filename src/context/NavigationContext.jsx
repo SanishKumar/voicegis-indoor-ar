@@ -13,6 +13,7 @@
 import { createContext, useContext, useReducer, useCallback, useState, useEffect } from 'react';
 import { findRoute } from '../engine/routingEngine';
 import { BUILDING_CONFIG } from '../data/buildingConfig.js';
+import { getNodeById } from '../data/compiledBuilding';
 
 // ── Action Types ──
 const ACTION = {
@@ -22,6 +23,7 @@ const ACTION = {
   SET_ROUTE_RESULT: 'SET_ROUTE_RESULT',
   CLEAR_ROUTE: 'CLEAR_ROUTE',
   SET_VIEW: 'SET_VIEW',
+  SET_FLOOR: 'SET_FLOOR',
   SET_SELECTED_POI: 'SET_SELECTED_POI',
   CLEAR_SELECTED_POI: 'CLEAR_SELECTED_POI',
   NEXT_STEP: 'NEXT_STEP',
@@ -50,6 +52,7 @@ const initialState = {
   destinationNodeId: null,
   route: null, // { path, pathIds, totalDistance, steps, found }
   activeView: VIEW_TYPE.MAP,
+  activeFloorId: BUILDING_CONFIG.defaultFloorId,
   selectedPOI: null, // node object for POI card
   currentStepIndex: 0,
   navStatus: NAV_STATUS.IDLE,
@@ -61,7 +64,8 @@ function navigationReducer(state, action) {
     case ACTION.SET_START:
       return {
         ...state,
-        startNodeId: action.payload,
+        startNodeId: action.payload.nodeId,
+        activeFloorId: action.payload.floorId ?? state.activeFloorId,
         route: null,
         currentStepIndex: 0,
         navStatus: NAV_STATUS.IDLE,
@@ -74,11 +78,12 @@ function navigationReducer(state, action) {
       };
 
     case ACTION.SET_ROUTE_START: {
-      const { startId, endId } = action.payload;
+      const { startId, endId, startFloorId } = action.payload;
       return {
         ...state,
         startNodeId: startId,
         destinationNodeId: endId,
+        activeFloorId: startFloorId ?? state.activeFloorId,
         route: null,
         navStatus: NAV_STATUS.ROUTING,
         selectedPOI: null,
@@ -110,10 +115,17 @@ function navigationReducer(state, action) {
         activeView: action.payload,
       };
 
+    case ACTION.SET_FLOOR:
+      return {
+        ...state,
+        activeFloorId: action.payload,
+      };
+
     case ACTION.SET_SELECTED_POI:
       return {
         ...state,
         selectedPOI: action.payload,
+        activeFloorId: action.payload?.poi?.floorId ?? state.activeFloorId,
       };
 
     case ACTION.CLEAR_SELECTED_POI:
@@ -130,6 +142,7 @@ function navigationReducer(state, action) {
         ...state,
         currentStepIndex: nextIndex,
         navStatus: isArrived ? NAV_STATUS.ARRIVED : NAV_STATUS.NAVIGATING,
+        activeFloorId: state.route.steps[nextIndex]?.floorId ?? state.activeFloorId,
       };
     }
 
@@ -139,6 +152,7 @@ function navigationReducer(state, action) {
         ...state,
         currentStepIndex: prevIndex,
         navStatus: NAV_STATUS.NAVIGATING,
+        activeFloorId: state.route?.steps[prevIndex]?.floorId ?? state.activeFloorId,
       };
     }
 
@@ -238,7 +252,11 @@ export function NavigationProvider({ children }) {
 
   const actions = {
     setStart: useCallback((nodeId) => {
-      dispatch({ type: ACTION.SET_START, payload: nodeId });
+      const node = getNodeById(nodeId);
+      dispatch({
+        type: ACTION.SET_START,
+        payload: { nodeId, floorId: node ? String(node.floor) : undefined },
+      });
     }, []),
 
     setDestination: useCallback((nodeId) => {
@@ -247,7 +265,15 @@ export function NavigationProvider({ children }) {
 
     navigateTo: async (destNodeId, startNodeId) => {
       const startId = startNodeId || state.startNodeId;
-      dispatch({ type: ACTION.SET_ROUTE_START, payload: { startId, endId: destNodeId } });
+      const startNode = getNodeById(startId);
+      dispatch({
+        type: ACTION.SET_ROUTE_START,
+        payload: {
+          startId,
+          endId: destNodeId,
+          startFloorId: startNode ? String(startNode.floor) : undefined,
+        },
+      });
       try {
         const route = await findRoute(startId, destNodeId, { accessibleOnly: accessibleRouting });
         dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: route });
@@ -266,6 +292,10 @@ export function NavigationProvider({ children }) {
 
     setView: useCallback((view) => {
       dispatch({ type: ACTION.SET_VIEW, payload: view });
+    }, []),
+
+    setFloor: useCallback((floorId) => {
+      dispatch({ type: ACTION.SET_FLOOR, payload: floorId });
     }, []),
 
     selectPOI: useCallback((node) => {

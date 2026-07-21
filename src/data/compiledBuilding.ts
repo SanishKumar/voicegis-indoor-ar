@@ -92,6 +92,7 @@ function poiMetadata(poi: PoiSource): VisitorPoiMetadata | undefined {
     sourceId: poi.id,
     name: poi.name,
     category: poi.category,
+    icon: CATEGORIES[poi.category as CategoryId]?.icon ?? 'P',
     description: describePoi(poi, space),
     floorId: floor.id,
     floorName: floor.name,

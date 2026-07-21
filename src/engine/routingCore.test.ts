@@ -1,24 +1,46 @@
 import { describe, expect, it } from 'vitest';
-import { EDGES, NODES } from '../data/buildingGraph.js';
 import { STEP_TYPE, calculateRoute, type GraphEdge, type GraphNode } from './routingCore';
 
 describe('A* routing core', () => {
   it('finds the known shortest route and emits turn-aware instructions', () => {
-    const result = calculateRoute('lobby', 'pharmacy', NODES as GraphNode[], EDGES as GraphEdge[]);
+    const nodes: GraphNode[] = [
+      {
+        id: 'start',
+        x: 0,
+        y: 2,
+        floor: 'g',
+        type: 'poi',
+        poi: { name: 'Start', category: 'test' },
+      },
+      { id: 'north', x: 0, y: 1, floor: 'g', type: 'junction' },
+      { id: 'east', x: 1, y: 1, floor: 'g', type: 'junction' },
+      {
+        id: 'destination',
+        x: 1,
+        y: 0,
+        floor: 'g',
+        type: 'poi',
+        poi: { name: 'Destination', category: 'test' },
+      },
+    ];
+    const edges: GraphEdge[] = [
+      { from: 'start', to: 'north', distance: 1, corridor: 'North hall' },
+      { from: 'north', to: 'east', distance: 1, corridor: 'East hall' },
+      { from: 'east', to: 'destination', distance: 1, corridor: 'North hall' },
+    ];
+    const result = calculateRoute('start', 'destination', nodes, edges);
 
     expect(result.found).toBe(true);
     if (!result.found) return;
 
     expect(result.algorithm).toBe('a-star');
-    expect(result.pathIds[0]).toBe('lobby');
-    expect(result.pathIds.at(-1)).toBe('pharmacy');
-    expect(result.totalDistance).toBe(129);
+    expect(result.pathIds[0]).toBe('start');
+    expect(result.pathIds.at(-1)).toBe('destination');
+    expect(result.totalDistance).toBe(3);
     expect(result.steps.map((step) => step.type)).toEqual([
       STEP_TYPE.START,
-      STEP_TYPE.TURN_LEFT,
       STEP_TYPE.TURN_RIGHT,
       STEP_TYPE.TURN_LEFT,
-      STEP_TYPE.TURN_RIGHT,
       STEP_TYPE.ARRIVE,
     ]);
     expect(result.steps.reduce((total, step) => total + step.distance, 0)).toBe(

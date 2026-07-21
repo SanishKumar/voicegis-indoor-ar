@@ -6,6 +6,10 @@ export const STEP_TYPE = {
   SLIGHT_LEFT: 'slight_left',
   SLIGHT_RIGHT: 'slight_right',
   U_TURN: 'u_turn',
+  ELEVATOR: 'elevator',
+  STAIRS: 'stairs',
+  RAMP: 'ramp',
+  ESCALATOR: 'escalator',
   ARRIVE: 'arrive',
 } as const;
 
@@ -43,6 +47,7 @@ export interface GraphEdge {
 
 export interface RouteOptions {
   accessibleOnly?: boolean;
+  allowRestricted?: boolean;
 }
 
 export interface RouteStep {
@@ -51,6 +56,7 @@ export interface RouteStep {
   distance: number;
   nodeId: string;
   bearing: number;
+  floorId?: string | number;
 }
 
 export interface RouteSuccess {
@@ -74,6 +80,9 @@ interface Neighbor {
   distance: number;
   corridor?: string;
   accessible: boolean;
+  restricted: boolean;
+  kind?: GraphEdge['kind'];
+  connectorKind?: string;
 }
 
 interface GraphIndex {
@@ -170,6 +179,9 @@ export function buildGraphIndex(nodes: GraphNode[], edges: GraphEdge[]): GraphIn
       distance: edge.distance,
       corridor: edge.corridor,
       accessible: edge.accessible !== false,
+      restricted: edge.restricted === true,
+      kind: edge.kind,
+      connectorKind: edge.connectorKind,
     };
     adjacency.get(edge.from)?.push({ ...neighbor, to: edge.to });
     adjacency.get(edge.to)?.push({ ...neighbor, to: edge.from });
@@ -217,7 +229,7 @@ function getTurnType(previousBearing: number, nextBearing: number): StepType {
 }
 
 function turnInstruction(type: StepType, corridor?: string) {
-  const action = {
+  const actions: Record<StepType, string> = {
     [STEP_TYPE.TURN_LEFT]: 'Turn left',
     [STEP_TYPE.TURN_RIGHT]: 'Turn right',
     [STEP_TYPE.SLIGHT_LEFT]: 'Bear left',
@@ -225,8 +237,13 @@ function turnInstruction(type: StepType, corridor?: string) {
     [STEP_TYPE.U_TURN]: 'Turn around',
     [STEP_TYPE.STRAIGHT]: 'Continue straight',
     [STEP_TYPE.START]: 'Start',
+    [STEP_TYPE.ELEVATOR]: 'Take the elevator',
+    [STEP_TYPE.STAIRS]: 'Take the stairs',
+    [STEP_TYPE.RAMP]: 'Take the ramp',
+    [STEP_TYPE.ESCALATOR]: 'Take the escalator',
     [STEP_TYPE.ARRIVE]: 'Arrive',
-  }[type];
+  };
+  const action = actions[type];
 
   return corridor ? `${action} onto ${corridor}` : action;
 }
@@ -244,6 +261,7 @@ export function generateRouteSteps(
         distance: 0,
         nodeId: path[0].id,
         bearing: 0,
+        floorId: path[0].floor,
       },
     ];
   }
@@ -257,6 +275,7 @@ export function generateRouteSteps(
       bearing: getBearing(from, to),
       corridor: edge?.corridor,
       distance: edge?.distance ?? 0,
+      edge,
     };
   });
 
@@ -271,14 +290,76 @@ export function generateRouteSteps(
       distance: 0,
       nodeId: path[0].id,
       bearing: segments[0].bearing,
+      floorId: path[0].floor,
     },
   ];
 
-  let activeStepDistance = segments[0].distance;
-  let previousBearing = segments[0].bearing;
+  const verticalStepType = (connectorKind?: string): StepType => {
+    if (connectorKind === 'elevator') return STEP_TYPE.ELEVATOR;
+    if (connectorKind === 'stairs') return STEP_TYPE.STAIRS;
+    if (connectorKind === 'ramp') return STEP_TYPE.RAMP;
+    if (connectorKind === 'escalator') return STEP_TYPE.ESCALATOR;
+    return STEP_TYPE.STRAIGHT;
+  };
+  const verticalInstruction = (
+    connectorKind: string | undefined,
+    floorName: string | undefined,
+  ) => {
+    const connector = connectorKind ?? 'vertical connector';
+    return `Take the ${connector} to ${floorName ?? 'the destination floor'}`;
+  };
+
+  const firstIsVertical = segments[0].edge?.kind === 'vertical-connector';
+  let activeStepIndex = firstIsVertical ? -1 : 0;
+  let activeStepDistance = firstIsVertical ? 0 : segments[0].distance;
+  let previousBearing: number | null = firstIsVertical ? null : segments[0].bearing;
+
+  if (firstIsVertical) {
+    steps.push({
+      type: verticalStepType(segments[0].edge?.connectorKind),
+      instruction: verticalInstruction(segments[0].edge?.connectorKind, segments[0].to.floorName),
+      distance: segments[0].distance,
+      nodeId: segments[0].from.id,
+      bearing: 0,
+      floorId: segments[0].to.floor,
+    });
+  }
 
   for (let index = 1; index < segments.length; index += 1) {
     const segment = segments[index];
+    if (segment.edge?.kind === 'vertical-connector') {
+      if (activeStepIndex >= 0) steps[activeStepIndex].distance = activeStepDistance;
+      steps.push({
+        type: verticalStepType(segment.edge.connectorKind),
+        instruction: verticalInstruction(segment.edge.connectorKind, segment.to.floorName),
+        distance: segment.distance,
+        nodeId: segment.from.id,
+        bearing: 0,
+        floorId: segment.to.floor,
+      });
+      activeStepIndex = -1;
+      activeStepDistance = 0;
+      previousBearing = null;
+      continue;
+    }
+
+    if (previousBearing === null) {
+      steps.push({
+        type: STEP_TYPE.STRAIGHT,
+        instruction: segment.corridor
+          ? `Continue on ${segment.corridor}`
+          : `Continue on ${segment.to.floorName ?? 'this floor'}`,
+        distance: segment.distance,
+        nodeId: segment.from.id,
+        bearing: segment.bearing,
+        floorId: segment.from.floor,
+      });
+      activeStepIndex = steps.length - 1;
+      activeStepDistance = segment.distance;
+      previousBearing = segment.bearing;
+      continue;
+    }
+
     const turnType = getTurnType(previousBearing, segment.bearing);
 
     if (turnType === STEP_TYPE.STRAIGHT) {
@@ -287,19 +368,21 @@ export function generateRouteSteps(
       continue;
     }
 
-    steps[steps.length - 1].distance = activeStepDistance;
+    if (activeStepIndex >= 0) steps[activeStepIndex].distance = activeStepDistance;
     steps.push({
       type: turnType,
       instruction: turnInstruction(turnType, segment.corridor),
       distance: segment.distance,
       nodeId: segment.from.id,
       bearing: segment.bearing,
+      floorId: segment.from.floor,
     });
+    activeStepIndex = steps.length - 1;
     activeStepDistance = segment.distance;
     previousBearing = segment.bearing;
   }
 
-  steps[steps.length - 1].distance = activeStepDistance;
+  if (activeStepIndex >= 0) steps[activeStepIndex].distance = activeStepDistance;
   const destination = path[path.length - 1];
   steps.push({
     type: STEP_TYPE.ARRIVE,
@@ -307,6 +390,7 @@ export function generateRouteSteps(
     distance: 0,
     nodeId: destination.id,
     bearing: segments[segments.length - 1].bearing,
+    floorId: destination.floor,
   });
 
   return steps;
@@ -393,6 +477,7 @@ export function calculateRoute(
 
     for (const neighbor of graph.adjacency.get(current.id) ?? []) {
       if (options.accessibleOnly && !neighbor.accessible) continue;
+      if (!options.allowRestricted && neighbor.restricted) continue;
 
       const candidateCost = bestKnownCost + neighbor.distance;
       if (candidateCost >= (costFromStart.get(neighbor.to) ?? Number.POSITIVE_INFINITY)) continue;

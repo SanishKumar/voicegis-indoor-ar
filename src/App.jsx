@@ -9,7 +9,6 @@ import { lazy, Suspense } from 'react';
 import { NavigationProvider, useNavigation, VIEW_TYPE } from './context/NavigationContext.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import Header from './components/Header.jsx';
-import FloorplanViewer from './components/FloorplanViewer.jsx';
 import SearchPanel from './components/SearchPanel.jsx';
 import POICard from './components/POICard.jsx';
 import NavigationPanel from './components/NavigationPanel.jsx';
@@ -18,6 +17,7 @@ import CameraPreview from './components/CameraPreview.jsx';
 import StatusBar from './components/StatusBar.jsx';
 
 const SpatialTwinViewer = lazy(() => import('./components/SpatialTwinViewer.tsx'));
+const FloorplanViewer = lazy(() => import('./components/FloorplanViewer.tsx'));
 
 function AppContent() {
   const {
@@ -42,7 +42,15 @@ function AppContent() {
         {/* Map View */}
         {activeView === VIEW_TYPE.MAP && (
           <>
-            <FloorplanViewer />
+            <Suspense
+              fallback={
+                <div className="map-loading" role="status">
+                  Loading compiled floor map…
+                </div>
+              }
+            >
+              <FloorplanViewer />
+            </Suspense>
             <SearchPanel />
             <POICard />
             <NavigationPanel />

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { EDGES, NODES } from '../data/buildingGraph.js';
+import { ROUTING_EDGES, ROUTING_NODES } from '../data/compiledBuilding';
 import type { GraphEdge, GraphNode } from './routingCore';
 import { validateGraph } from './graphValidation';
 
 describe('graph validation', () => {
-  it('accepts the preserved prototype graph', () => {
-    expect(validateGraph(NODES as GraphNode[], EDGES as GraphEdge[])).toEqual([]);
+  it('accepts the graph emitted by the building compiler', () => {
+    expect(validateGraph(ROUTING_NODES, ROUTING_EDGES)).toEqual([]);
   });
 
   it('reports structural defects with stable issue codes', () => {

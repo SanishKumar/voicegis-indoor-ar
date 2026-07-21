@@ -1,16 +1,27 @@
 /**
  * NavigationPanel.jsx
- * 
+ *
  * Active navigation bottom sheet with turn-by-turn directions,
  * progress indicator, and step controls.
  */
 
-import { 
-  ArrowUp, CornerUpLeft, CornerUpRight, ArrowUpLeft, ArrowUpRight,
-  MapPin, CircleDot, X, ChevronLeft, ChevronRight, Navigation
+import {
+  ArrowUp,
+  CornerUpLeft,
+  CornerUpRight,
+  ArrowUpLeft,
+  ArrowUpRight,
+  MapPin,
+  CircleDot,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Navigation,
+  Building2,
+  Footprints,
 } from 'lucide-react';
 import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
-import { getNodeById } from '../data/buildingGraph.js';
+import { getFloorById, getNodeById } from '../data/compiledBuilding';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
 import { STEP_TYPE } from '../engine/routingEngine';
 
@@ -19,15 +30,30 @@ import { STEP_TYPE } from '../engine/routingEngine';
  */
 function StepIcon({ type, size = 20 }) {
   switch (type) {
-    case STEP_TYPE.START: return <CircleDot size={size} />;
-    case STEP_TYPE.STRAIGHT: return <ArrowUp size={size} />;
-    case STEP_TYPE.TURN_LEFT: return <CornerUpLeft size={size} />;
-    case STEP_TYPE.TURN_RIGHT: return <CornerUpRight size={size} />;
-    case STEP_TYPE.SLIGHT_LEFT: return <ArrowUpLeft size={size} />;
-    case STEP_TYPE.SLIGHT_RIGHT: return <ArrowUpRight size={size} />;
-    case STEP_TYPE.U_TURN: return <CornerUpLeft size={size} />;
-    case STEP_TYPE.ARRIVE: return <MapPin size={size} />;
-    default: return <ArrowUp size={size} />;
+    case STEP_TYPE.START:
+      return <CircleDot size={size} />;
+    case STEP_TYPE.STRAIGHT:
+      return <ArrowUp size={size} />;
+    case STEP_TYPE.TURN_LEFT:
+      return <CornerUpLeft size={size} />;
+    case STEP_TYPE.TURN_RIGHT:
+      return <CornerUpRight size={size} />;
+    case STEP_TYPE.SLIGHT_LEFT:
+      return <ArrowUpLeft size={size} />;
+    case STEP_TYPE.SLIGHT_RIGHT:
+      return <ArrowUpRight size={size} />;
+    case STEP_TYPE.U_TURN:
+      return <CornerUpLeft size={size} />;
+    case STEP_TYPE.ELEVATOR:
+      return <Building2 size={size} />;
+    case STEP_TYPE.STAIRS:
+    case STEP_TYPE.RAMP:
+    case STEP_TYPE.ESCALATOR:
+      return <Footprints size={size} />;
+    case STEP_TYPE.ARRIVE:
+      return <MapPin size={size} />;
+    default:
+      return <ArrowUp size={size} />;
   }
 }
 
@@ -43,6 +69,7 @@ export default function NavigationPanel() {
   const destNode = getNodeById(destinationNodeId);
   const steps = route.steps;
   const currentStep = steps[currentStepIndex];
+  const currentFloor = currentStep?.floorId ? getFloorById(String(currentStep.floorId)) : null;
   const progress = steps.length > 1 ? (currentStepIndex / (steps.length - 1)) * 100 : 0;
   const isArrived = navStatus === NAV_STATUS.ARRIVED;
 
@@ -63,14 +90,11 @@ export default function NavigationPanel() {
             <Navigation size={18} />
           </div>
           <div>
-            <div className="nav-panel-dest-name">
-              {destNode?.poi?.name || 'Destination'}
-            </div>
+            <div className="nav-panel-dest-name">{destNode?.poi?.name || 'Destination'}</div>
             <div className="nav-panel-dest-eta">
               {isArrived
                 ? '✅ You have arrived!'
-                : `${formatDistance(remainingDistance)} · ~${estimateWalkTime(remainingDistance)}`
-              }
+                : `${formatDistance(remainingDistance)} · ~${estimateWalkTime(remainingDistance)}`}
             </div>
           </div>
         </div>
@@ -96,10 +120,9 @@ export default function NavigationPanel() {
           </div>
           <div style={{ flex: 1 }}>
             <div className="nav-step-instruction">{currentStep.instruction}</div>
+            {currentFloor && <div className="nav-step-floor">{currentFloor.name}</div>}
             {currentStep.distance > 0 && (
-              <div className="nav-step-distance">
-                {formatDistance(currentStep.distance)}
-              </div>
+              <div className="nav-step-distance">{formatDistance(currentStep.distance)}</div>
             )}
           </div>
           {/* Step navigation */}
@@ -117,7 +140,11 @@ export default function NavigationPanel() {
               className="btn btn-icon btn-ghost"
               onClick={() => actions.nextStep()}
               disabled={currentStepIndex >= steps.length - 1}
-              style={{ width: '32px', height: '32px', opacity: currentStepIndex >= steps.length - 1 ? 0.3 : 1 }}
+              style={{
+                width: '32px',
+                height: '32px',
+                opacity: currentStepIndex >= steps.length - 1 ? 0.3 : 1,
+              }}
               id="btn-next-step"
             >
               <ChevronRight size={16} />
@@ -128,11 +155,19 @@ export default function NavigationPanel() {
 
       {/* Arrived State */}
       {isArrived && (
-        <div className="nav-current-step" style={{ 
-          background: 'var(--color-accent-green-dim)', 
-          borderColor: 'rgba(16, 185, 129, 0.2)' 
-        }} aria-live="assertive">
-          <div className="nav-step-direction-icon" style={{ background: 'var(--color-accent-green)' }} aria-hidden="true">
+        <div
+          className="nav-current-step"
+          style={{
+            background: 'var(--color-accent-green-dim)',
+            borderColor: 'rgba(16, 185, 129, 0.2)',
+          }}
+          aria-live="assertive"
+        >
+          <div
+            className="nav-step-direction-icon"
+            style={{ background: 'var(--color-accent-green)' }}
+            aria-hidden="true"
+          >
             <MapPin size={24} />
           </div>
           <div>

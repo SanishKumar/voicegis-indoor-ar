@@ -1,6 +1,6 @@
 /**
  * SearchPanel.jsx
- * 
+ *
  * Slide-up search panel with fuzzy POI search, category filtering,
  * and navigation start.
  */
@@ -9,8 +9,8 @@ import { useState, useRef, useMemo, useCallback } from 'react';
 import { Search, X, Navigation, MapPin } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs, getAvailableCategories } from '../engine/searchIndex.js';
-import { CATEGORIES, getNodeById } from '../data/buildingGraph.js';
-import { formatDistance } from '../data/buildingConfig.js';
+import { CATEGORIES, getNodeById } from '../data/compiledBuilding';
+import { BUILDING_CONFIG, formatDistance } from '../data/buildingConfig.js';
 
 export default function SearchPanel() {
   const { state, actions } = useNavigation();
@@ -35,32 +35,46 @@ export default function SearchPanel() {
     setActiveCategory(null);
   }, []);
 
-  const handleResultClick = useCallback((node) => {
-    actions.selectPOI(node);
-    closePanel();
-  }, [actions, closePanel]);
+  const handleResultClick = useCallback(
+    (node) => {
+      actions.selectPOI(node);
+      closePanel();
+    },
+    [actions, closePanel],
+  );
 
-  const handleNavigate = useCallback((node, e) => {
-    e.stopPropagation();
-    actions.navigateTo(node.id);
-    closePanel();
-  }, [actions, closePanel]);
+  const handleNavigate = useCallback(
+    (node, e) => {
+      e.stopPropagation();
+      actions.navigateTo(node.id);
+      closePanel();
+    },
+    [actions, closePanel],
+  );
 
   const toggleCategory = useCallback((cat) => {
-    setActiveCategory(prev => prev === cat ? null : cat);
+    setActiveCategory((prev) => (prev === cat ? null : cat));
   }, []);
 
   // Estimate distance from current position
-  const getDistanceEstimate = useCallback((node) => {
-    if (!state.startNodeId || state.startNodeId === node.id) return null;
-    const startNode = getNodeById(state.startNodeId);
-    if (startNode && node) {
-      const dx = startNode.x - node.x;
-      const dy = startNode.y - node.y;
-      return Math.sqrt(dx * dx + dy * dy) * 0.15;
-    }
-    return null;
-  }, [state.startNodeId]);
+  const getDistanceEstimate = useCallback(
+    (node) => {
+      if (!state.startNodeId || state.startNodeId === node.id) return null;
+      const startNode = getNodeById(state.startNodeId);
+      if (startNode && node) {
+        const dx = startNode.x - node.x;
+        const dy = startNode.y - node.y;
+        const startFloor = BUILDING_CONFIG.floors.find(
+          (floor) => floor.id === String(startNode.floor),
+        );
+        const endFloor = BUILDING_CONFIG.floors.find((floor) => floor.id === String(node.floor));
+        const floorDelta = Math.abs((endFloor?.level ?? 0) - (startFloor?.level ?? 0)) * 3.6;
+        return Math.hypot(dx, dy, floorDelta);
+      }
+      return null;
+    },
+    [state.startNodeId],
+  );
 
   // Don't show search trigger when navigating
   if (state.navStatus === 'navigating' || state.navStatus === 'arrived') {
@@ -109,11 +123,7 @@ export default function SearchPanel() {
             id="search-input"
           />
           {query && (
-            <button
-              className="search-clear-btn"
-              onClick={() => setQuery('')}
-              id="btn-search-clear"
-            >
+            <button className="search-clear-btn" onClick={() => setQuery('')} id="btn-search-clear">
               <X size={14} />
             </button>
           )}
@@ -121,7 +131,7 @@ export default function SearchPanel() {
 
         {/* Category Chips */}
         <div className="category-chips" id="category-chips">
-          {categories.map(catId => {
+          {categories.map((catId) => {
             const cat = CATEGORIES[catId];
             if (!cat) return null;
             return (
@@ -158,13 +168,21 @@ export default function SearchPanel() {
                   </div>
                   <div className="search-result-info">
                     <div className="search-result-name">{node.poi.name}</div>
-                    <div className="search-result-desc">{node.poi.description}</div>
+                    <div className="search-result-desc">
+                      {node.poi.description} ·{' '}
+                      {node.poi.accessible ? 'Accessible' : 'Not accessible'}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-end',
+                      gap: '4px',
+                    }}
+                  >
                     {dist !== null && (
-                      <span className="search-result-distance">
-                        {formatDistance(dist)}
-                      </span>
+                      <span className="search-result-distance">{formatDistance(dist)}</span>
                     )}
                     <button
                       className="btn btn-sm btn-success"

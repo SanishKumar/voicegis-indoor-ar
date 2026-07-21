@@ -1,4 +1,4 @@
-import { EDGES, NODES } from '../data/buildingGraph.js';
+import { ROUTING_EDGES, ROUTING_NODES } from '../data/compiledBuilding';
 import {
   STEP_TYPE,
   calculateRoute,
@@ -66,7 +66,13 @@ export function findRoute(
 ): Promise<RouteResult> {
   if (typeof Worker === 'undefined') {
     return Promise.resolve(
-      calculateRoute(startId, endId, NODES as GraphNode[], EDGES as GraphEdge[], options),
+      calculateRoute(
+        startId,
+        endId,
+        ROUTING_NODES as GraphNode[],
+        ROUTING_EDGES as GraphEdge[],
+        options,
+      ),
     );
   }
 

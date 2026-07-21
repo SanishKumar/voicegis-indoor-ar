@@ -1,13 +1,13 @@
 /**
  * POICard.jsx
- * 
+ *
  * Detail popup when a user taps a POI on the floorplan.
  * Shows room info and a "Navigate Here" CTA.
  */
 
 import { X, Navigation, MapPin, Clock } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
-import { CATEGORIES, getNodeById } from '../data/buildingGraph.js';
+import { CATEGORIES, getFloorById, getNodeById } from '../data/compiledBuilding';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
 
 export default function POICard() {
@@ -27,7 +27,9 @@ export default function POICard() {
     if (startNode && endNode) {
       const dx = startNode.x - endNode.x;
       const dy = startNode.y - endNode.y;
-      const approxDist = Math.sqrt(dx * dx + dy * dy) * 0.15;
+      const startElevation = getFloorById(String(startNode.floor))?.elevation ?? 0;
+      const endElevation = getFloorById(String(endNode.floor))?.elevation ?? 0;
+      const approxDist = Math.hypot(dx, dy, endElevation - startElevation);
       distanceInfo = {
         distance: approxDist,
         walkTime: estimateWalkTime(approxDist),
@@ -58,17 +60,19 @@ export default function POICard() {
           className="poi-card-close"
           onClick={() => actions.clearSelectedPOI()}
           id="btn-poi-close"
-          style={{ position: 'relative', marginLeft: 'auto', display: 'block', marginBottom: '-24px' }}
+          style={{
+            position: 'relative',
+            marginLeft: 'auto',
+            display: 'block',
+            marginBottom: '-24px',
+          }}
         >
           <X size={16} />
         </button>
 
         {/* Header */}
         <div className="poi-card-header">
-          <div
-            className="poi-card-icon"
-            style={{ background: cat?.bgColor, color: cat?.color }}
-          >
+          <div className="poi-card-icon" style={{ background: cat?.bgColor, color: cat?.color }}>
             {poi.icon}
           </div>
           <div>
@@ -83,18 +87,18 @@ export default function POICard() {
         </div>
 
         {/* Description */}
-        <p className="poi-card-desc">{poi.description}</p>
+        <p className="poi-card-desc">
+          {poi.description} · {poi.accessible ? 'Accessible' : 'Not accessible'}
+        </p>
 
         {/* Meta Info */}
         {distanceInfo && (
           <div className="poi-card-meta">
             <div className="poi-card-meta-item">
-              <MapPin size={14} />
-              ~{formatDistance(distanceInfo.distance)} away
+              <MapPin size={14} />~{formatDistance(distanceInfo.distance)} away
             </div>
             <div className="poi-card-meta-item">
-              <Clock size={14} />
-              ~{distanceInfo.walkTime} walk
+              <Clock size={14} />~{distanceInfo.walkTime} walk
             </div>
           </div>
         )}

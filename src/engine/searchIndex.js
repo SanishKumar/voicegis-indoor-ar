@@ -1,13 +1,13 @@
 /**
  * searchIndex.js
- * 
+ *
  * Fuzzy search over POI names for the search panel.
  * Uses trigram similarity for typo tolerance.
- * 
+ *
  * @module engine/searchIndex
  */
 
-import { getPOIs } from '../data/buildingGraph.js';
+import { getPOIs } from '../data/compiledBuilding';
 
 /**
  * Generate trigrams from a string.
@@ -37,7 +37,7 @@ function trigramSimilarity(a, b) {
 
 /**
  * Search POIs by query string with fuzzy matching.
- * 
+ *
  * @param {string} query - Search query
  * @param {object} [options]
  * @param {string} [options.category] - Filter by category ID
@@ -47,62 +47,71 @@ function trigramSimilarity(a, b) {
  */
 export function searchPOIs(query, options = {}) {
   const { category, limit = 10, threshold = 0.15 } = options;
-  
+
   let pois = getPOIs();
-  
+
   // Category filter
   if (category) {
-    pois = pois.filter(p => p.poi.category === category);
+    pois = pois.filter((p) => p.poi.category === category);
   }
-  
+
   if (!query || query.trim().length === 0) {
     // Return all POIs sorted by category importance when no query
     return pois
       .sort((a, b) => categoryPriority(a.poi.category) - categoryPriority(b.poi.category))
       .slice(0, limit)
-      .map(node => ({ node, score: 1 }));
+      .map((node) => ({ node, score: 1 }));
   }
-  
+
   const q = query.toLowerCase().trim();
-  
+
   const results = pois
-    .map(node => {
+    .map((node) => {
       const name = node.poi.name.toLowerCase();
       const desc = (node.poi.description || '').toLowerCase();
       const cat = node.poi.category.toLowerCase();
-      
+      const aliases = (node.poi.aliases || []).map((alias) => alias.toLowerCase());
+
       // Exact prefix match gets highest score
       if (name.startsWith(q)) {
         return { node, score: 1.0 };
       }
-      
+
       // Contains match
       if (name.includes(q)) {
         return { node, score: 0.85 };
       }
-      
+
+      if (aliases.some((alias) => alias === q)) {
+        return { node, score: 0.95 };
+      }
+
+      if (aliases.some((alias) => alias.includes(q))) {
+        return { node, score: 0.8 };
+      }
+
       // Description match
       if (desc.includes(q)) {
         return { node, score: 0.6 };
       }
-      
+
       // Category match
       if (cat.includes(q)) {
         return { node, score: 0.5 };
       }
-      
+
       // Fuzzy trigram match on name
       const similarity = trigramSimilarity(q, name);
       if (similarity >= threshold) {
         return { node, score: similarity * 0.8 };
       }
-      
+
       return null;
     })
     .filter(Boolean)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
-  
+
   return results;
 }
 
@@ -111,7 +120,7 @@ export function searchPOIs(query, options = {}) {
  */
 export function getAvailableCategories() {
   const pois = getPOIs();
-  const catSet = new Set(pois.map(p => p.poi.category));
+  const catSet = new Set(pois.map((p) => p.poi.category));
   return Array.from(catSet).sort((a, b) => categoryPriority(a) - categoryPriority(b));
 }
 

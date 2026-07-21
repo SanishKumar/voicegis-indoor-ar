@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { EDGES, NODES } from '../data/buildingGraph.js';
+import { ROUTING_EDGES, ROUTING_NODES } from '../data/compiledBuilding';
 import { calculateRoute, type GraphEdge, type GraphNode, type RouteOptions } from './routingCore';
 
 interface RouteRequest {
@@ -20,8 +20,8 @@ workerScope.onmessage = ({ data }: MessageEvent<RouteRequest>) => {
     const result = calculateRoute(
       data.startId,
       data.endId,
-      NODES as GraphNode[],
-      EDGES as GraphEdge[],
+      ROUTING_NODES as GraphNode[],
+      ROUTING_EDGES as GraphEdge[],
       data.options,
     );
     workerScope.postMessage({ type: 'ROUTE_RESULT', requestId: data.requestId, result });
