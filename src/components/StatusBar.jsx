@@ -1,6 +1,6 @@
 /**
  * StatusBar.jsx
- * 
+ *
  * Bottom status bar showing navigation state and app info.
  */
 
@@ -24,18 +24,20 @@ export default function StatusBar() {
     };
   }, []);
 
-  const statusLabel = {
-    [NAV_STATUS.IDLE]: 'Ready',
-    [NAV_STATUS.ROUTING]: 'Computing route...',
-    [NAV_STATUS.NAVIGATING]: 'Navigating',
-    [NAV_STATUS.ARRIVED]: 'Arrived',
-  }[navStatus] || 'Ready';
+  const statusLabel =
+    {
+      [NAV_STATUS.IDLE]: 'Ready',
+      [NAV_STATUS.ROUTING]: 'Computing route...',
+      [NAV_STATUS.NAVIGATING]: 'Navigating',
+      [NAV_STATUS.ARRIVED]: 'Arrived',
+    }[navStatus] || 'Ready';
 
-  const statusDotClass = navStatus === NAV_STATUS.NAVIGATING
-    ? 'status-dot navigating'
-    : navStatus === NAV_STATUS.ARRIVED
-      ? 'status-dot active'
-      : 'status-dot';
+  const statusDotClass =
+    navStatus === NAV_STATUS.NAVIGATING
+      ? 'status-dot navigating'
+      : navStatus === NAV_STATUS.ARRIVED
+        ? 'status-dot active'
+        : 'status-dot';
 
   return (
     <div className="status-bar" id="status-bar">
@@ -57,6 +59,11 @@ export default function StatusBar() {
           <>
             <Navigation size={11} />
             <span>Camera Preview</span>
+          </>
+        ) : activeView === VIEW_TYPE.SPATIAL_TWIN ? (
+          <>
+            <Navigation size={11} />
+            <span>3D Twin</span>
           </>
         ) : (
           <>

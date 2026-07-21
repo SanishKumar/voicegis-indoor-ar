@@ -1,12 +1,12 @@
 /**
  * NavigationContext.jsx
- * 
+ *
  * Global state management for the indoor navigation app.
  * Uses useReducer for predictable state transitions.
- * 
+ *
  * Performance note: Volatile state (compass heading, camera frames) is kept
  * OUTSIDE this context to avoid unnecessary re-renders. Use refs for those.
- * 
+ *
  * @module context/NavigationContext
  */
 
@@ -40,6 +40,7 @@ export const NAV_STATUS = {
 // ── View Types ──
 export const VIEW_TYPE = {
   MAP: 'map',
+  SPATIAL_TWIN: 'spatial-twin',
   CAMERA_PREVIEW: 'camera-preview',
 };
 
@@ -47,9 +48,9 @@ export const VIEW_TYPE = {
 const initialState = {
   startNodeId: BUILDING_CONFIG.defaultStartNode,
   destinationNodeId: null,
-  route: null,           // { path, pathIds, totalDistance, steps, found }
+  route: null, // { path, pathIds, totalDistance, steps, found }
   activeView: VIEW_TYPE.MAP,
-  selectedPOI: null,     // node object for POI card
+  selectedPOI: null, // node object for POI card
   currentStepIndex: 0,
   navStatus: NAV_STATUS.IDLE,
 };
@@ -220,15 +221,15 @@ export function NavigationProvider({ children }) {
   }, [highContrast]);
 
   const toggleTheme = useCallback(() => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   }, []);
 
   const toggleHighContrast = useCallback(() => {
-    setHighContrast(prev => !prev);
+    setHighContrast((prev) => !prev);
   }, []);
 
   const toggleAccessibleRouting = useCallback(() => {
-    setAccessibleRouting(prev => {
+    setAccessibleRouting((prev) => {
       const next = !prev;
       localStorage.setItem('accessible_routing', String(next));
       return next;
@@ -251,8 +252,11 @@ export function NavigationProvider({ children }) {
         const route = await findRoute(startId, destNodeId, { accessibleOnly: accessibleRouting });
         dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: route });
       } catch (err) {
-        console.error("Routing error:", err);
-        dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: { found: false, error: 'Routing failed' } });
+        console.error('Routing error:', err);
+        dispatch({
+          type: ACTION.SET_ROUTE_RESULT,
+          payload: { found: false, error: 'Routing failed' },
+        });
       }
     },
 
@@ -282,11 +286,23 @@ export function NavigationProvider({ children }) {
   };
 
   return (
-    <NavigationContext.Provider value={{ 
-      state, actions, theme, toggleTheme, onboardingComplete, completeOnboarding, resetOnboarding, 
-      showLocationPicker, setShowLocationPicker, 
-      highContrast, toggleHighContrast, accessibleRouting, toggleAccessibleRouting 
-    }}>
+    <NavigationContext.Provider
+      value={{
+        state,
+        actions,
+        theme,
+        toggleTheme,
+        onboardingComplete,
+        completeOnboarding,
+        resetOnboarding,
+        showLocationPicker,
+        setShowLocationPicker,
+        highContrast,
+        toggleHighContrast,
+        accessibleRouting,
+        toggleAccessibleRouting,
+      }}
+    >
       {children}
     </NavigationContext.Provider>
   );

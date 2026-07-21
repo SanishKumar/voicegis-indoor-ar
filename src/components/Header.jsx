@@ -1,16 +1,27 @@
 /**
  * Header.jsx
- * 
+ *
  * Top navigation bar with brand, view toggle, location setter, and floor selector.
  */
 
-import { Map, Camera, Sun, Moon, MapPin, Home, Eye, Settings } from 'lucide-react';
+import { Box, Map, Camera, Sun, Moon, MapPin, Home, Eye, Settings } from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
 import { BUILDING_CONFIG } from '../data/buildingConfig.js';
 import { getNodeById } from '../data/buildingGraph.js';
 
 export default function Header() {
-  const { state, actions, theme, toggleTheme, setShowLocationPicker, resetOnboarding, highContrast, toggleHighContrast, accessibleRouting, toggleAccessibleRouting } = useNavigation();
+  const {
+    state,
+    actions,
+    theme,
+    toggleTheme,
+    setShowLocationPicker,
+    resetOnboarding,
+    highContrast,
+    toggleHighContrast,
+    accessibleRouting,
+    toggleAccessibleRouting,
+  } = useNavigation();
   const { activeView, startNodeId } = state;
 
   const startNode = getNodeById(startNodeId);
@@ -52,6 +63,15 @@ export default function Header() {
             Map
           </button>
           <button
+            className={`view-toggle-btn ${activeView === VIEW_TYPE.SPATIAL_TWIN ? 'active' : ''}`}
+            onClick={() => actions.setView(VIEW_TYPE.SPATIAL_TWIN)}
+            id="btn-spatial-twin"
+            aria-label="Switch to compiled 3D spatial twin"
+          >
+            <Box size={14} />
+            Twin
+          </button>
+          <button
             className={`view-toggle-btn ${activeView === VIEW_TYPE.CAMERA_PREVIEW ? 'active' : ''}`}
             onClick={() => actions.setView(VIEW_TYPE.CAMERA_PREVIEW)}
             id="btn-camera-preview"
@@ -63,30 +83,30 @@ export default function Header() {
         </div>
 
         {/* Home / Welcome Button */}
-        <button 
-          className="header-btn" 
-          onClick={resetOnboarding} 
-          aria-label="Go to Welcome Screen" 
+        <button
+          className="header-btn"
+          onClick={resetOnboarding}
+          aria-label="Go to Welcome Screen"
           title="Welcome Screen"
         >
           <Home size={18} />
         </button>
 
         {/* Theme Toggle */}
-        <button 
-          className="header-btn" 
-          onClick={toggleTheme} 
-          aria-label="Toggle theme" 
+        <button
+          className="header-btn"
+          onClick={toggleTheme}
+          aria-label="Toggle theme"
           title="Toggle theme"
         >
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
 
         {/* High Contrast Toggle */}
-        <button 
-          className="header-btn" 
-          onClick={toggleHighContrast} 
-          aria-label="Toggle high contrast mode" 
+        <button
+          className="header-btn"
+          onClick={toggleHighContrast}
+          aria-label="Toggle high contrast mode"
           title="Toggle high contrast mode"
           style={{ color: highContrast ? 'var(--color-accent-blue)' : 'inherit' }}
         >
@@ -94,10 +114,10 @@ export default function Header() {
         </button>
 
         {/* Accessible Routing Toggle */}
-        <button 
-          className="header-btn" 
-          onClick={toggleAccessibleRouting} 
-          aria-label="Toggle accessible routing" 
+        <button
+          className="header-btn"
+          onClick={toggleAccessibleRouting}
+          aria-label="Toggle accessible routing"
           title="Toggle wheelchair accessible routing"
           style={{ color: accessibleRouting ? 'var(--color-accent-green)' : 'inherit' }}
         >

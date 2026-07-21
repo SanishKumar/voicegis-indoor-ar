@@ -1,10 +1,11 @@
 /**
  * App.jsx
- * 
+ *
  * Root application component.
  * Shows the WelcomeScreen on first visit, then the main navigation app.
  */
 
+import { lazy, Suspense } from 'react';
 import { NavigationProvider, useNavigation, VIEW_TYPE } from './context/NavigationContext.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import Header from './components/Header.jsx';
@@ -16,8 +17,16 @@ import LocationPicker from './components/LocationPicker.jsx';
 import CameraPreview from './components/CameraPreview.jsx';
 import StatusBar from './components/StatusBar.jsx';
 
+const SpatialTwinViewer = lazy(() => import('./components/SpatialTwinViewer.tsx'));
+
 function AppContent() {
-  const { state, onboardingComplete, completeOnboarding, showLocationPicker, setShowLocationPicker } = useNavigation();
+  const {
+    state,
+    onboardingComplete,
+    completeOnboarding,
+    showLocationPicker,
+    setShowLocationPicker,
+  } = useNavigation();
   const { activeView } = state;
 
   // Show onboarding on first visit
@@ -40,16 +49,26 @@ function AppContent() {
           </>
         )}
 
+        {activeView === VIEW_TYPE.SPATIAL_TWIN && (
+          <Suspense
+            fallback={
+              <div className="twin-loading" role="status">
+                <span />
+                Loading compiled spatial package…
+              </div>
+            }
+          >
+            <SpatialTwinViewer />
+          </Suspense>
+        )}
+
         <CameraPreview />
       </main>
 
       <StatusBar />
 
       {/* Location Picker Modal */}
-      <LocationPicker
-        isOpen={showLocationPicker}
-        onClose={() => setShowLocationPicker(false)}
-      />
+      <LocationPicker isOpen={showLocationPicker} onClose={() => setShowLocationPicker(false)} />
     </>
   );
 }
