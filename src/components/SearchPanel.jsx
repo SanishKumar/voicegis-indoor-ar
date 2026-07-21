@@ -5,7 +5,7 @@
  * and navigation start.
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { Search, X, Navigation, MapPin } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs, getAvailableCategories } from '../engine/searchIndex.js';
@@ -17,15 +17,12 @@ export default function SearchPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
-  const [results, setResults] = useState([]);
   const inputRef = useRef(null);
   const categories = getAvailableCategories();
-
-  // Update search results
-  useEffect(() => {
-    const searchResults = searchPOIs(query, { category: activeCategory });
-    setResults(searchResults);
-  }, [query, activeCategory]);
+  const results = useMemo(
+    () => searchPOIs(query, { category: activeCategory }),
+    [query, activeCategory],
+  );
 
   const openPanel = useCallback(() => {
     setIsOpen(true);
@@ -143,7 +140,7 @@ export default function SearchPanel() {
         {/* Results */}
         <div className="search-results" id="search-results">
           {results.length > 0 ? (
-            results.map(({ node, score }) => {
+            results.map(({ node }) => {
               const cat = CATEGORIES[node.poi.category];
               const dist = getDistanceEstimate(node);
               return (

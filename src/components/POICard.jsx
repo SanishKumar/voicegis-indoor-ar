@@ -5,7 +5,6 @@
  * Shows room info and a "Navigate Here" CTA.
  */
 
-import { useState, useEffect } from 'react';
 import { X, Navigation, MapPin, Clock } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { CATEGORIES, getNodeById } from '../data/buildingGraph.js';

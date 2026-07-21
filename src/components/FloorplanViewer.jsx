@@ -9,10 +9,10 @@
  *   - Professional dashed wayfinding route
  */
 
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { Stage, Layer, Path, Text, Circle, Line, Rect, Group } from 'react-konva';
 import { useNavigation } from '../context/NavigationContext.jsx';
-import { BUILDING_OUTLINE, ROOMS, CORRIDOR_LABELS, ENTRANCE } from '../data/buildingGeometry.js';
+import { BUILDING_OUTLINE, ROOMS, CORRIDOR_LABELS } from '../data/buildingGeometry.js';
 import { getNodeById } from '../data/buildingGraph.js';
 
 // ── DUAL THEME PALETTES ──
@@ -104,7 +104,7 @@ export default function FloorplanViewer() {
       resizeObserver.observe(containerRef.current);
       return () => resizeObserver.disconnect();
     }
-  }, []);
+  }, [scale]);
 
   useEffect(() => {
     if (staticLayerRef.current) {

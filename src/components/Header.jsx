@@ -4,7 +4,7 @@
  * Top navigation bar with brand, view toggle, location setter, and floor selector.
  */
 
-import { Map, Camera, Layers, Sun, Moon, MapPin, Home, Eye, Settings } from 'lucide-react';
+import { Map, Camera, Sun, Moon, MapPin, Home, Eye, Settings } from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
 import { BUILDING_CONFIG } from '../data/buildingConfig.js';
 import { getNodeById } from '../data/buildingGraph.js';

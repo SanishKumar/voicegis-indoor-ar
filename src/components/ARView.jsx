@@ -10,12 +10,11 @@
  * Designed for future scaling to WebXR when browser support matures.
  */
 
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { Map, CameraOff, Navigation, ArrowUp, CornerUpLeft, CornerUpRight } from 'lucide-react';
 import { useNavigation, VIEW_TYPE, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { STEP_TYPE } from '../engine/routingEngine.js';
 import { formatDistance } from '../data/buildingConfig.js';
-import { getNodeById } from '../data/buildingGraph.js';
 
 export default function ARView() {
   const { state, actions } = useNavigation();
@@ -48,9 +47,7 @@ export default function ARView() {
       isNavigating={isNavigating}
       route={route}
       currentStepIndex={currentStepIndex}
-      navStatus={navStatus}
       actions={actions}
-      state={state}
     />
   );
 }
@@ -58,7 +55,7 @@ export default function ARView() {
 function ARViewInner({
   videoRef, canvasRef, streamRef, animFrameRef,
   cameraError, setCameraError, isVideoReady, setIsVideoReady,
-  currentStep, isNavigating, route, currentStepIndex, navStatus, actions, state
+  currentStep, isNavigating, route, currentStepIndex, actions
 }) {
   // ── Camera Setup ──
   useEffect(() => {
@@ -109,7 +106,7 @@ function ARViewInner({
       }
       setIsVideoReady(false);
     };
-  }, []);
+  }, [animFrameRef, setCameraError, setIsVideoReady, streamRef, videoRef]);
 
   // ── Canvas Drawing Loop ──
   useEffect(() => {
@@ -142,7 +139,7 @@ function ARViewInner({
         cancelAnimationFrame(animFrameRef.current);
       }
     };
-  }, [isVideoReady, isNavigating, currentStep]);
+  }, [animFrameRef, canvasRef, isVideoReady, isNavigating, currentStep]);
 
   return (
     <div className="ar-view animate-fade-in" id="ar-view">

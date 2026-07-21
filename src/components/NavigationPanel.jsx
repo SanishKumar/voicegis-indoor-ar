@@ -10,7 +10,7 @@ import {
   MapPin, CircleDot, X, ChevronLeft, ChevronRight, Navigation
 } from 'lucide-react';
 import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
-import { getNodeById, CATEGORIES } from '../data/buildingGraph.js';
+import { getNodeById } from '../data/buildingGraph.js';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
 import { STEP_TYPE } from '../engine/routingEngine.js';
 
@@ -33,7 +33,7 @@ function StepIcon({ type, size = 20 }) {
 
 export default function NavigationPanel() {
   const { state, actions } = useNavigation();
-  const { route, navStatus, currentStepIndex, destinationNodeId, startNodeId } = state;
+  const { route, navStatus, currentStepIndex, destinationNodeId } = state;
 
   // Only show when navigating
   if (navStatus === NAV_STATUS.IDLE || !route?.found) {
@@ -41,7 +41,6 @@ export default function NavigationPanel() {
   }
 
   const destNode = getNodeById(destinationNodeId);
-  const cat = destNode?.poi ? CATEGORIES[destNode.poi.category] : null;
   const steps = route.steps;
   const currentStep = steps[currentStepIndex];
   const progress = steps.length > 1 ? (currentStepIndex / (steps.length - 1)) * 100 : 0;

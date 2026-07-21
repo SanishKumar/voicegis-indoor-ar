@@ -9,7 +9,7 @@
  * @module engine/routingEngine
  */
 
-import { NODES, EDGES, buildAdjacencyList, getNodeById } from '../data/buildingGraph.js';
+import { NODES, EDGES, buildAdjacencyList } from '../data/buildingGraph.js';
 
 /** Direction/step types */
 export const STEP_TYPE = {
@@ -82,7 +82,7 @@ function getTurnType(prevBearing, newBearing) {
  * }}
  */
 export function findRoute(startId, endId, options = {}) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     if (!startId || !endId || startId === endId) {
       resolve({ found: false, error: 'Invalid start or end node.' });
       return;
@@ -131,10 +131,9 @@ export function findRoute(startId, endId, options = {}) {
  * Generate human-readable turn-by-turn steps from a path.
  * 
  * @param {Array<object>} path - Array of node objects
- * @param {number} totalDistance - Total route distance
  * @returns {Array<{ type: string, instruction: string, distance: number, nodeId: string, bearing: number }>}
  */
-function generateSteps(path, totalDistance) {
+export function generateRouteSteps(path) {
   if (path.length < 2) {
     return [{ type: STEP_TYPE.ARRIVE, instruction: 'You have arrived', distance: 0, nodeId: path[0]?.id }];
   }
