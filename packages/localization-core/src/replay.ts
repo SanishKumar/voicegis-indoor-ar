@@ -1,15 +1,19 @@
 import { LocalizationFilter } from './filter';
+import { matchEstimateToRoute } from './mapMatching';
 import {
   LOCALIZATION_RECORDING_VERSION,
   type CheckpointError,
   type LocalizationEstimate,
   type LocalizationQuality,
+  type MapMatchReason,
+  type MapMatchResult,
   type LocalizationRecording,
   type ReplayReport,
 } from './types';
 
 export interface ReplayResult {
   estimates: LocalizationEstimate[];
+  mapMatches: MapMatchResult[];
   report: ReplayReport;
 }
 
@@ -57,6 +61,14 @@ export function replayRecording(recording: LocalizationRecording): ReplayResult 
   validateRecording(recording);
   const filter = new LocalizationFilter();
   const estimates = recording.observations.map((observation) => filter.apply(observation));
+  let previousProgressMeters: number | null = null;
+  const mapMatches = estimates.map((estimate) => {
+    const result = matchEstimateToRoute(estimate, recording.routeSegments ?? [], {
+      previousProgressMeters,
+    });
+    if (result.accepted) previousProgressMeters = result.progressMeters;
+    return result;
+  });
   const estimatesByTime = new Map(estimates.map((estimate) => [estimate.timeMs, estimate]));
 
   const checkpointErrors: CheckpointError[] = recording.checkpoints.map((checkpoint) => {
@@ -87,9 +99,21 @@ export function replayRecording(recording: LocalizationRecording): ReplayResult 
   estimates.forEach((estimate) => {
     qualityFrameCounts[estimate.quality] += 1;
   });
+  const reasonCounts: Record<MapMatchReason, number> = {
+    matched: 0,
+    'no-route': 0,
+    'quality-lost': 0,
+    'wrong-floor': 0,
+    'outside-gate': 0,
+    'backward-progress': 0,
+  };
+  mapMatches.forEach((match) => {
+    reasonCounts[match.reason] += 1;
+  });
 
   return {
     estimates,
+    mapMatches,
     report: {
       recordingVersion: LOCALIZATION_RECORDING_VERSION,
       sessionId: recording.sessionId,
@@ -104,6 +128,11 @@ export function replayRecording(recording: LocalizationRecording): ReplayResult 
         checkpointErrors.filter((checkpoint) => checkpoint.floorCorrect).length /
           Math.max(1, checkpointErrors.length),
       ),
+      mapMatching: {
+        acceptedCount: mapMatches.filter((match) => match.accepted).length,
+        rejectedCount: mapMatches.filter((match) => !match.accepted).length,
+        reasonCounts,
+      },
       checkpointErrors,
     },
   };

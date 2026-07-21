@@ -16,6 +16,10 @@ describe('localization replay', () => {
       observationCount: 7,
       checkpointCount: 3,
       floorAccuracy: 1,
+      mapMatching: {
+        acceptedCount: 7,
+        rejectedCount: 0,
+      },
     });
     expect(first.report.p95HorizontalErrorMeters).toBeLessThan(0.25);
   });

@@ -83,11 +83,12 @@ Delivered:
 - Explicit high, degraded, and lost quality states
 - Privacy-default recording and deterministic replay contract
 - Synthetic checkpoint report with byte-for-byte replay verification
+- Same-floor, uncertainty-gated, progress-aware route matching
+- Raw and matched replay positions with explicit rejection reasons
 
 Remaining:
 
 - Real sensor ingestion and timestamp characterization
-- Route-constrained map matching
 - Surveyed physical traces and ground-truth checkpoint tooling
 - Relocalization and recovery evidence
 

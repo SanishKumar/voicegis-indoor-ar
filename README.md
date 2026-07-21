@@ -25,6 +25,7 @@ Implemented today:
 - Browser package verification with atomic active/previous cache state and rollback
 - Typed localization observations, covariance-aware estimates, and deterministic replay
 - Synthetic checkpoint evaluation with explicit high/degraded/lost quality states
+- Same-floor, uncertainty-gated route matching with explicit rejection reasons
 - Vertical instructions such as “take the elevator to Level 1”
 - Public-only fuzzy search with declared destination aliases
 - Automated lint, type, test, deterministic-compile, and production-build checks
@@ -37,7 +38,7 @@ Not implemented yet:
 - Remote package download, signatures, distribution, or runtime hot-swap
 - World-anchored AR, pose alignment, occlusion, or automatic progress
 - VoiceGIS command execution
-- Route-constrained map matching, relocalization, or physical-walk benchmarks
+- Relocalization, live progress gates, or physical-walk benchmarks
 
 The camera view is deliberately labeled **Camera Preview** because its graphics are screen-aligned. It does not know the device pose or the user's position and should not be described as AR.
 
@@ -119,7 +120,7 @@ docs/
 
 ## Next engineering milestone
 
-Phase 2 still needs runtime consumption of a non-bundled active package, including storage-quota and multi-tab coordination. Phase 3 has started with a deterministic localization replay core; the next slice is gated route-constrained map matching and a recorded-walk ingestion contract. Remote distribution and signatures remain later venue-platform work.
+Phase 2 still needs runtime consumption of a non-bundled active package, including storage-quota and multi-tab coordination. Phase 3 now has deterministic replay and gated route matching; the next slice is a real-walk ingestion contract plus relocalization and recovery state transitions. Remote distribution and signatures remain later venue-platform work.
 
 See [the delivery roadmap](docs/roadmap.md) and [the architecture direction](docs/architecture/overview.md).
 

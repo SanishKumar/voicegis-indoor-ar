@@ -28,6 +28,8 @@ The report is regenerated from the observation stream and compared byte-for-byte
 - Median horizontal checkpoint error: 0.053 m
 - p95 horizontal checkpoint error: 0.056 m
 - Floor accuracy: 1.0
+- Route matches accepted: 7
+- Route matches rejected: 0
 
 These small errors are expected because both the simulated observations and checkpoints follow the same constructed straight path. They must not be quoted as device, venue, or real-world accuracy.
 
@@ -41,6 +43,8 @@ The current core publishes:
 - contributing observation sources and last correction time;
 - explicit `high`, `degraded`, or `lost` quality.
 
+The matcher retains each raw estimate and projects it only to a same-floor route segment inside an uncertainty-aware gate. Lost quality, wrong floors, excessive distance, and implausible backward progress produce explicit rejection reasons; a nearby route never upgrades localization quality.
+
 The filter rejects a stream that does not begin with an initial fix or moves backward in time. Quality becomes lost when uncertainty or correction age crosses configured limits.
 
 ## Evidence still required
@@ -48,6 +52,5 @@ The filter rejects a stream that does not begin with an initial fix or moves bac
 - Real sensor adapters and timestamp characterization
 - Surveyed ground-truth checkpoints
 - Multiple devices, routes, floors, walking speeds, and carrying positions
-- Route-constrained map matching with gated snap distances
 - Relocalization recovery timing
 - Median and p95 reports from physical walks

@@ -13,6 +13,18 @@
   "medianHorizontalErrorMeters": 0.053,
   "p95HorizontalErrorMeters": 0.056,
   "floorAccuracy": 1,
+  "mapMatching": {
+    "acceptedCount": 7,
+    "rejectedCount": 0,
+    "reasonCounts": {
+      "matched": 7,
+      "no-route": 0,
+      "quality-lost": 0,
+      "wrong-floor": 0,
+      "outside-gate": 0,
+      "backward-progress": 0
+    }
+  },
   "checkpointErrors": [
     {
       "checkpointId": "entry",

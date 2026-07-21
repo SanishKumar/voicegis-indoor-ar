@@ -95,12 +95,12 @@ The runtime owns progress gates, instruction advancement, wrong-way hysteresis, 
 
 ## Immediate next slice
 
-Package verification, operational overlays, route receipts, and the first deterministic localization replay core are implemented. The next localization slice will add route-constrained map matching without allowing the matcher to hide a lost estimate:
+Package verification, operational overlays, route receipts, deterministic localization replay, and gated route matching are implemented. The next localization slice will define recovery behavior and a real-walk import boundary:
 
-- Project estimates to same-floor route segments only inside an uncertainty-aware gate
-- Record raw and matched positions together for replay inspection
-- Reject implausible jumps and backward progress with explicit reasons
-- Preserve lost quality even when a geometric snap candidate exists
+- Model initializing, tracking, degraded, lost, and relocalizing runtime states
+- Freeze guidance on lost quality and require an explicit recovery observation
+- Measure recovery time from a known anchor in replay
 - Add a real-walk import contract without storing camera frames by default
+- Preserve device, route, carrying-position, and checkpoint metadata for benchmark reports
 
 The parallel package-lifecycle task is runtime consumption of a non-bundled active package with multi-tab coordination and quota handling.

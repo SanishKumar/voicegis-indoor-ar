@@ -75,6 +75,30 @@ export interface GroundTruthCheckpoint {
   floorId: string;
 }
 
+export interface RouteMatchSegment {
+  id: string;
+  floorId: string;
+  from: [number, number];
+  to: [number, number];
+  startProgressMeters: number;
+  lengthMeters: number;
+}
+
+export type MapMatchReason =
+  'matched' | 'no-route' | 'quality-lost' | 'wrong-floor' | 'outside-gate' | 'backward-progress';
+
+export interface MapMatchResult {
+  timeMs: number;
+  accepted: boolean;
+  reason: MapMatchReason;
+  rawPosition: [number, number];
+  matchedPosition: [number, number] | null;
+  segmentId: string | null;
+  distanceFromRouteMeters: number | null;
+  progressMeters: number | null;
+  gateMeters: number;
+}
+
 export interface LocalizationRecording {
   schemaVersion: typeof LOCALIZATION_RECORDING_VERSION;
   sessionId: string;
@@ -87,6 +111,7 @@ export interface LocalizationRecording {
   privacy: {
     cameraFramesStored: false;
   };
+  routeSegments?: RouteMatchSegment[];
   observations: LocalizationObservation[];
   checkpoints: GroundTruthCheckpoint[];
 }
@@ -109,5 +134,10 @@ export interface ReplayReport {
   medianHorizontalErrorMeters: number;
   p95HorizontalErrorMeters: number;
   floorAccuracy: number;
+  mapMatching: {
+    acceptedCount: number;
+    rejectedCount: number;
+    reasonCounts: Record<MapMatchReason, number>;
+  };
   checkpointErrors: CheckpointError[];
 }

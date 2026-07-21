@@ -10,6 +10,16 @@
   "privacy": {
     "cameraFramesStored": false
   },
+  "routeSegments": [
+    {
+      "id": "ground-corridor-eastbound",
+      "floorId": "g",
+      "from": [1, 9],
+      "to": [6, 9],
+      "startProgressMeters": 0,
+      "lengthMeters": 5
+    }
+  ],
   "observations": [
     {
       "kind": "initial-fix",
