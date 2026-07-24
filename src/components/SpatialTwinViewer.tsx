@@ -20,14 +20,13 @@ import {
   Route,
   ScanLine,
 } from 'lucide-react';
-import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import type {
   FloorSource,
   PortalSource,
   SpaceSource,
   VerticalConnectorSource,
 } from '@voicegis/spatial-schema';
-import referencePackageJson from '../../buildings/reference-medical-centre/compiled/building.package.json';
+import { BUILDING_PACKAGE as buildingPackage } from '../data/compiledBuilding';
 import {
   buildSpaceWallSegments,
   getNearestBoundaryAngle,
@@ -43,8 +42,6 @@ import {
   type BuildingBounds,
   type FloorSelection,
 } from '../engine/spatialTwinModel';
-
-const buildingPackage = referencePackageJson as unknown as CompiledBuildingPackage;
 
 const SPACE_COLORS: Record<SpaceSource['type'], string> = {
   entrance: '#dbeafe',
@@ -690,12 +687,15 @@ function TwinScene({
     () => new Map(buildingPackage.floors.map((floor) => [floor.id, floor])),
     [],
   );
+  const orbitTargetY =
+    visibleFloors.reduce((total, floor) => total + visualFloorElevation(floor, exploded) + 1.2, 0) /
+    Math.max(1, visibleFloors.length);
 
   return (
     <>
       <color attach="background" args={['#07101d']} />
-      <fog attach="fog" args={['#07101d', 38, 74]} />
-      <ambientLight intensity={0.72} />
+      <fog attach="fog" args={['#07101d', 90, 180]} />
+      <ambientLight intensity={0.86} />
       <hemisphereLight args={['#e0f2fe', '#0f172a', 1.35]} />
       <directionalLight
         position={[18, 28, 13]}
@@ -705,14 +705,14 @@ function TwinScene({
       />
       <directionalLight position={[-12, 14, -16]} intensity={0.65} color="#67e8f9" />
 
-      <gridHelper args={[64, 64, '#35506a', '#142438']} position={[0, -0.18, 0]} />
+      <gridHelper args={[104, 104, '#35506a', '#142438']} position={[0, -0.18, 0]} />
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.19, 0]}
         onClick={onClearSelection}
         receiveShadow
       >
-        <planeGeometry args={[64, 64]} />
+        <planeGeometry args={[104, 104]} />
         <meshStandardMaterial color="#081321" roughness={0.86} />
       </mesh>
 
@@ -787,15 +787,15 @@ function TwinScene({
         makeDefault
         enableDamping
         dampingFactor={0.08}
-        target={[0, 1.8, 0]}
-        minDistance={7}
-        maxDistance={64}
+        target={[0, orbitTargetY, 0]}
+        minDistance={9}
+        maxDistance={128}
         maxPolarAngle={Math.PI / 2.05}
       />
       <ContactShadows
         position={[0, -0.17, 0]}
         opacity={0.45}
-        scale={48}
+        scale={84}
         blur={2.6}
         far={24}
         frames={1}
@@ -846,6 +846,15 @@ export default function SpatialTwinViewer() {
   );
   const selectedSpace = visibleSpaces.find((space) => space.id === selectedSpaceId);
   const graphSummary = useMemo(() => getGraphSummary(buildingPackage), []);
+  const buildingBounds = useMemo(() => computeBuildingBounds(buildingPackage), []);
+  const explodedHeight = Math.max(
+    ...buildingPackage.floors.map((floor) => visualFloorElevation(floor, true) + floor.clearHeight),
+  );
+  const cameraPosition: [number, number, number] = [
+    buildingBounds.width * 0.92,
+    Math.max(40, explodedHeight + 20),
+    buildingBounds.depth * 1.85,
+  ];
 
   const selectedPortals = selectedSpace
     ? buildingPackage.portals.filter((portal) => portal.connects.includes(selectedSpace.id))
@@ -864,7 +873,7 @@ export default function SpatialTwinViewer() {
           <span className="twin-eyebrow">Compiled package inspector</span>
           <div className="twin-title-row">
             <h1>{buildingPackage.building.name}</h1>
-            <span className="twin-fixture-badge">Synthetic fixture</span>
+            <span className="twin-fixture-badge">Fictional benchmark</span>
           </div>
           <p>Semantic geometry, policy metadata, graph topology, and localization anchors.</p>
         </div>
@@ -936,7 +945,7 @@ export default function SpatialTwinViewer() {
             </span>
           </div>
           <Canvas
-            camera={{ position: [25, 21, 28], fov: 39, near: 0.1, far: 140 }}
+            camera={{ position: cameraPosition, fov: 42, near: 0.1, far: 220 }}
             dpr={[1, 1.5]}
             frameloop="demand"
             shadows
@@ -1054,7 +1063,7 @@ export default function SpatialTwinViewer() {
         <span>
           <i className="legend-anchor" /> Localization anchor
         </span>
-        <strong>Reference data only — not surveyed or deployment-safe</strong>
+        <strong>Fictional benchmark — not surveyed or deployment-safe</strong>
       </div>
     </section>
   );

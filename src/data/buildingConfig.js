@@ -6,14 +6,21 @@ import { BUILDING_PACKAGE, getDefaultStartNodeId } from './compiledBuilding';
 
 export const BUILDING_CONFIG = {
   name: BUILDING_PACKAGE.building.name,
-  subtitle: 'Two-floor compiled reference package',
+  subtitle: 'Four-level academic medical center benchmark',
   floors: BUILDING_PACKAGE.floors.map((floor) => ({
     id: floor.id,
     label: floor.name,
     level: floor.level,
     isDefault: floor.level === 0,
   })),
-  viewBox: { width: 30, height: 18 },
+  viewBox: {
+    width:
+      Math.max(...BUILDING_PACKAGE.floors.flatMap((floor) => floor.outline.map(([x]) => x))) -
+      Math.min(...BUILDING_PACKAGE.floors.flatMap((floor) => floor.outline.map(([x]) => x))),
+    height:
+      Math.max(...BUILDING_PACKAGE.floors.flatMap((floor) => floor.outline.map(([, y]) => y))) -
+      Math.min(...BUILDING_PACKAGE.floors.flatMap((floor) => floor.outline.map(([, y]) => y))),
+  },
   defaultStartNode: getDefaultStartNodeId(),
   defaultFloorId: BUILDING_PACKAGE.floors.find((floor) => floor.level === 0)?.id ?? 'g',
   walkSpeedMps: 1.2,

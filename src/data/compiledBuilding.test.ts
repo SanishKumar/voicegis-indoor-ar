@@ -10,6 +10,8 @@ import {
 
 describe('compiled building visitor adapter', () => {
   it('preserves the compiler graph without generating parallel IDs', () => {
+    expect(BUILDING_PACKAGE.floors).toHaveLength(4);
+    expect(BUILDING_PACKAGE.spaces).toHaveLength(60);
     expect(ROUTING_NODES).toHaveLength(BUILDING_PACKAGE.routing.nodes.length);
     expect(ROUTING_EDGES).toHaveLength(BUILDING_PACKAGE.routing.edges.length);
     expect(new Set(ROUTING_NODES.map((node) => node.id)).size).toBe(ROUTING_NODES.length);
@@ -29,21 +31,21 @@ describe('compiled building visitor adapter', () => {
     const allPois = getPOIs({ includeRestricted: true });
 
     expect(publicPois.every((node) => node.poi.public)).toBe(true);
-    expect(publicPois.some((node) => node.poi.sourceId === 'records-store')).toBe(false);
-    expect(allPois.some((node) => node.poi.sourceId === 'records-store')).toBe(true);
+    expect(publicPois.some((node) => node.poi.sourceId === 'poi-data-center')).toBe(false);
+    expect(allPois.some((node) => node.poi.sourceId === 'poi-data-center')).toBe(true);
   });
 
   it('derives the default check-in point from the declared entry space', () => {
     const startId = getDefaultStartNodeId();
     const start = getNodeById(startId);
 
-    expect(start?.poi?.name).toBe('Main Entrance');
+    expect(start?.poi?.name).toBe('Civic Plaza Entrance');
     expect(start?.floor).toBe('g');
   });
 
   it('retains accessibility and restriction policy on graph edges', () => {
     expect(ROUTING_EDGES.some((edge) => edge.accessible === false)).toBe(true);
     expect(ROUTING_EDGES.some((edge) => edge.restricted === true)).toBe(true);
-    expect(ROUTING_EDGES.filter((edge) => edge.kind === 'vertical-connector')).toHaveLength(2);
+    expect(ROUTING_EDGES.filter((edge) => edge.kind === 'vertical-connector')).toHaveLength(12);
   });
 });

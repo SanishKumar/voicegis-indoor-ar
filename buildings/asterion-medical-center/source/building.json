@@ -256,7 +256,11 @@
     {"id":"poi-conference","floorId":"l3","spaceId":"l3-conference","name":"Clinical Conference Center","category":"education","position":[53,14],"public":true,"accessible":true},
     {"id":"poi-library","floorId":"l3","spaceId":"l3-library","name":"Health Sciences Library","category":"education","position":[61,14],"public":true,"accessible":true},
     {"id":"poi-admin","floorId":"l3","spaceId":"l3-admin-reception","name":"Administration Reception","category":"service","position":[13,34],"public":true,"accessible":true},
-    {"id":"poi-training","floorId":"l3","spaceId":"l3-training","name":"Staff Learning Studio","category":"education","position":[23,34],"public":true,"accessible":true}
+    {"id":"poi-training","floorId":"l3","spaceId":"l3-training","name":"Staff Learning Studio","category":"education","position":[23,34],"public":true,"accessible":true},
+    {"id":"poi-pathology-operations","floorId":"g","spaceId":"g-pathology","name":"Pathology Operations","category":"staff","position":[43,14],"public":false,"accessible":true},
+    {"id":"poi-birth-center","floorId":"l2","spaceId":"l2-birth-center","name":"Birth Center","category":"staff","position":[46,34],"public":false,"accessible":true},
+    {"id":"poi-neonatal-unit","floorId":"l2","spaceId":"l2-neonatal-unit","name":"Neonatal Care Unit","category":"staff","position":[58,34],"public":false,"accessible":true},
+    {"id":"poi-data-center","floorId":"l3","spaceId":"l3-data-center","name":"Clinical Data Center","category":"staff","position":[58,34],"public":false,"accessible":true}
   ],
   "localizationAnchors": [
     {"id":"anchor-g-entry","floorId":"g","spaceId":"g-arrival","kind":"apriltag","position":[6,24],"headingDegrees":90,"payload":"voicegis://asterion/g/entry"},

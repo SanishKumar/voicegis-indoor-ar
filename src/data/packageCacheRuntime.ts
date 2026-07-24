@@ -9,7 +9,7 @@ export interface PackageCacheStatus {
   detail: string;
 }
 
-export async function bootstrapReferencePackageCache(): Promise<PackageCacheStatus> {
+export async function bootstrapBundledPackageCache(): Promise<PackageCacheStatus> {
   if (typeof indexedDB === 'undefined') {
     return {
       state: 'unavailable',

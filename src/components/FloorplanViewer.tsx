@@ -369,7 +369,7 @@ export default function FloorplanViewer() {
               operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY ? 'active' : ''
             }
             aria-pressed={operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY}
-            title="Deterministic replay at 22 July 2026; clears the current route"
+            title="Deterministic public-lift outage replay at 22 July 2026; clears the current route"
             onClick={() =>
               setOperationalScenario(
                 operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY
@@ -380,8 +380,8 @@ export default function FloorplanViewer() {
           >
             <Wrench size={14} />
             {operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY
-              ? 'Lift closure replay on'
-              : 'Replay lift closure'}
+              ? 'Public lift outage on'
+              : 'Replay lift outage'}
           </button>
           <div className="compiled-map-proof" title={BUILDING_PACKAGE.manifest.contentHash}>
             <Database size={14} />
@@ -406,7 +406,7 @@ export default function FloorplanViewer() {
         <span>
           <LockKeyhole size={12} /> Restricted areas shown
         </span>
-        <strong>Synthetic reference data</strong>
+        <strong>Fictional benchmark · not surveyed</strong>
       </div>
 
       <div className="compiled-map-zoom">

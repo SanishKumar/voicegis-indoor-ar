@@ -14,8 +14,8 @@ import { createContext, useContext, useReducer, useCallback, useState, useEffect
 import { findRoute } from '../engine/routingEngine';
 import { BUILDING_CONFIG } from '../data/buildingConfig.js';
 import { getNodeById } from '../data/compiledBuilding';
-import liftClosureOverlay from '../../buildings/reference-medical-centre/operations/lift-closed.overlay.json';
-import { bootstrapReferencePackageCache } from '../data/packageCacheRuntime';
+import liftClosureOverlay from '../../buildings/asterion-medical-center/operations/all-public-lifts-closed.overlay.json';
+import { bootstrapBundledPackageCache } from '../data/packageCacheRuntime';
 
 export const OPERATIONAL_SCENARIO = {
   NOMINAL: 'nominal',
@@ -243,7 +243,7 @@ export function NavigationProvider({ children }) {
 
   useEffect(() => {
     let active = true;
-    void bootstrapReferencePackageCache().then((status) => {
+    void bootstrapBundledPackageCache().then((status) => {
       if (active) setPackageCacheStatus(status);
     });
     return () => {

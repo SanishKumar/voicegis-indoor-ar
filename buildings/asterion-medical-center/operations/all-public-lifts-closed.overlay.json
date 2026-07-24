@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "asterion-all-public-lifts-closed-2026-07-22",
+  "buildingId": "asterion-medical-center",
+  "packageHash": "62ff881f415028123bd85a85f52e221d37a27ddc0441febf9e9bf6a5b9d46b5d",
+  "validFrom": "2026-07-22T08:00:00.000Z",
+  "validUntil": "2026-07-23T00:00:00.000Z",
+  "closures": [
+    {
+      "id": "close-atrium-lift",
+      "target": {
+        "type": "source",
+        "id": "lift-atrium"
+      },
+      "reason": "Deterministic demo outage for the panoramic atrium lift."
+    },
+    {
+      "id": "close-south-lift",
+      "target": {
+        "type": "source",
+        "id": "lift-south"
+      },
+      "reason": "Deterministic demo outage for the south lift bank."
+    }
+  ]
+}

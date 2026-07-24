@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import liftClosureJson from '../../buildings/reference-medical-centre/operations/lift-closed.overlay.json';
+import liftClosureJson from '../../buildings/asterion-medical-center/operations/all-public-lifts-closed.overlay.json';
 import { BUILDING_PACKAGE } from '../data/compiledBuilding';
 import { resolveOperationalOverlay, type OperationalOverlay } from './operationalOverlay';
 
@@ -10,12 +10,12 @@ describe('operational overlay resolution', () => {
   it('resolves a connector-source closure to every compiled edge from that source', () => {
     const result = resolveOperationalOverlay(liftClosure, BUILDING_PACKAGE, evaluatedAt);
     const expectedEdgeIds = BUILDING_PACKAGE.routing.edges
-      .filter((edge) => edge.sourceId === 'lift-east')
+      .filter((edge) => ['lift-atrium', 'lift-south'].includes(edge.sourceId))
       .map((edge) => edge.id)
       .sort();
 
     expect(result.valid).toBe(true);
-    expect(result.activeClosureIds).toEqual(['close-east-lift']);
+    expect(result.activeClosureIds).toEqual(['close-atrium-lift', 'close-south-lift']);
     expect(result.closedEdgeIds).toEqual(expectedEdgeIds);
   });
 

@@ -228,7 +228,7 @@
     }
   ],
   "manifest": {
-    "contentHash": "07055f944e26c554987996fe340642c34f45ccd7e8aec229f0d9a45fa6776b3c",
+    "contentHash": "62ff881f415028123bd85a85f52e221d37a27ddc0441febf9e9bf6a5b9d46b5d",
     "hashAlgorithm": "sha256"
   },
   "packageVersion": "0.1.0",
@@ -258,6 +258,19 @@
       ],
       "public": true,
       "spaceId": "g-atrium"
+    },
+    {
+      "accessible": true,
+      "category": "staff",
+      "floorId": "l2",
+      "id": "poi-birth-center",
+      "name": "Birth Center",
+      "position": [
+        46,
+        34
+      ],
+      "public": false,
+      "spaceId": "l2-birth-center"
     },
     {
       "accessible": true,
@@ -344,6 +357,19 @@
       ],
       "public": true,
       "spaceId": "l1-consultation"
+    },
+    {
+      "accessible": true,
+      "category": "staff",
+      "floorId": "l3",
+      "id": "poi-data-center",
+      "name": "Clinical Data Center",
+      "position": [
+        58,
+        34
+      ],
+      "public": false,
+      "spaceId": "l3-data-center"
     },
     {
       "accessible": true,
@@ -477,6 +503,19 @@
     },
     {
       "accessible": true,
+      "category": "staff",
+      "floorId": "l2",
+      "id": "poi-neonatal-unit",
+      "name": "Neonatal Care Unit",
+      "position": [
+        58,
+        34
+      ],
+      "public": false,
+      "spaceId": "l2-neonatal-unit"
+    },
+    {
+      "accessible": true,
       "aliases": [
         "brain clinic",
         "neurology"
@@ -537,6 +576,19 @@
       ],
       "public": true,
       "spaceId": "g-orthopedics"
+    },
+    {
+      "accessible": true,
+      "category": "staff",
+      "floorId": "g",
+      "id": "poi-pathology-operations",
+      "name": "Pathology Operations",
+      "position": [
+        43,
+        14
+      ],
+      "public": false,
+      "spaceId": "g-pathology"
     },
     {
       "accessible": true,
@@ -2006,6 +2058,20 @@
         "accessible": true,
         "distanceMeters": 0.01,
         "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-birth-center",
+        "id": "edge:poi:poi-birth-center--space:l2-birth-center",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "poi-birth-center",
+        "spaceId": "l2-birth-center",
+        "to": "poi:poi-birth-center"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
           "g"
         ],
         "from": "space:g-cafe",
@@ -2085,6 +2151,20 @@
         "sourceId": "poi-consultation",
         "spaceId": "l1-consultation",
         "to": "poi:poi-consultation"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-data-center",
+        "id": "edge:poi:poi-data-center--space:l3-data-center",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "poi-data-center",
+        "spaceId": "l3-data-center",
+        "to": "poi:poi-data-center"
       },
       {
         "accessible": true,
@@ -2216,6 +2296,20 @@
         "accessible": true,
         "distanceMeters": 0.01,
         "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-neonatal-unit",
+        "id": "edge:poi:poi-neonatal-unit--space:l2-neonatal-unit",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "poi-neonatal-unit",
+        "spaceId": "l2-neonatal-unit",
+        "to": "poi:poi-neonatal-unit"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
           "l1"
         ],
         "from": "space:l1-neuroscience",
@@ -2267,6 +2361,20 @@
         "sourceId": "poi-orthopedics",
         "spaceId": "g-orthopedics",
         "to": "poi:poi-orthopedics"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-pathology",
+        "id": "edge:poi:poi-pathology-operations--space:g-pathology",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "poi-pathology-operations",
+        "spaceId": "g-pathology",
+        "to": "poi:poi-pathology-operations"
       },
       {
         "accessible": true,
@@ -4173,6 +4281,16 @@
         "sourceId": "poi-atrium"
       },
       {
+        "floorId": "l2",
+        "id": "poi:poi-birth-center",
+        "kind": "poi",
+        "position": [
+          46,
+          34
+        ],
+        "sourceId": "poi-birth-center"
+      },
+      {
         "floorId": "g",
         "id": "poi:poi-cafe",
         "kind": "poi",
@@ -4231,6 +4349,16 @@
           34
         ],
         "sourceId": "poi-consultation"
+      },
+      {
+        "floorId": "l3",
+        "id": "poi:poi-data-center",
+        "kind": "poi",
+        "position": [
+          58,
+          34
+        ],
+        "sourceId": "poi-data-center"
       },
       {
         "floorId": "l1",
@@ -4323,6 +4451,16 @@
         "sourceId": "poi-maternity"
       },
       {
+        "floorId": "l2",
+        "id": "poi:poi-neonatal-unit",
+        "kind": "poi",
+        "position": [
+          58,
+          34
+        ],
+        "sourceId": "poi-neonatal-unit"
+      },
+      {
         "floorId": "l1",
         "id": "poi:poi-neuroscience",
         "kind": "poi",
@@ -4361,6 +4499,16 @@
           34
         ],
         "sourceId": "poi-orthopedics"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-pathology-operations",
+        "kind": "poi",
+        "position": [
+          43,
+          14
+        ],
+        "sourceId": "poi-pathology-operations"
       },
       {
         "floorId": "l2",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import liftClosureJson from '../../buildings/reference-medical-centre/operations/lift-closed.overlay.json';
+import liftClosureJson from '../../buildings/asterion-medical-center/operations/all-public-lifts-closed.overlay.json';
 import { BUILDING_PACKAGE } from '../data/compiledBuilding';
 import { calculateCompiledRoute } from './compiledRoutePolicy';
 import type { OperationalOverlay } from './operationalOverlay';
@@ -9,7 +9,7 @@ const evaluatedAt = '2026-07-22T12:00:00.000Z';
 
 describe('compiled route policy and receipts', () => {
   it('attaches package, profile, and connector evidence to a route', () => {
-    const result = calculateCompiledRoute('poi:main-entrance', 'poi:cardiology', {
+    const result = calculateCompiledRoute('poi:poi-main-entrance', 'poi:poi-cardiology', {
       profile: 'wheelchair',
     });
 
@@ -22,7 +22,7 @@ describe('compiled route policy and receipts', () => {
     });
     expect(result.receipt.selectedConnectors).toEqual([
       {
-        sourceId: 'lift-east',
+        sourceId: 'lift-south',
         kind: 'elevator',
         fromFloorId: 'g',
         toFloorId: 'l1',
@@ -31,22 +31,22 @@ describe('compiled route policy and receipts', () => {
   });
 
   it('reroutes a standard profile to stairs when the lift closes', () => {
-    const result = calculateCompiledRoute('poi:main-entrance', 'poi:cardiology', {
+    const result = calculateCompiledRoute('poi:poi-main-entrance', 'poi:poi-cardiology', {
       profile: 'standard',
       operationalOverlay: liftClosure,
       evaluatedAt,
     });
 
     expect(result.found).toBe(true);
-    expect(result.receipt.appliedClosureIds).toEqual(['close-east-lift']);
+    expect(result.receipt.appliedClosureIds).toEqual(['close-atrium-lift', 'close-south-lift']);
     expect(result.receipt.excludedEdges.closed).toBeGreaterThan(0);
     expect(result.receipt.selectedConnectors.map((connector) => connector.sourceId)).toEqual([
-      'stairs-east',
+      'stairs-south',
     ]);
   });
 
   it('reports no compliant cross-floor route when the accessible lift closes', () => {
-    const result = calculateCompiledRoute('poi:main-entrance', 'poi:cardiology', {
+    const result = calculateCompiledRoute('poi:poi-main-entrance', 'poi:poi-cardiology', {
       profile: 'wheelchair',
       operationalOverlay: liftClosure,
       evaluatedAt,
@@ -58,7 +58,7 @@ describe('compiled route policy and receipts', () => {
   });
 
   it('rejects an overlay without an explicit deterministic evaluation time', () => {
-    const result = calculateCompiledRoute('poi:main-entrance', 'poi:cardiology', {
+    const result = calculateCompiledRoute('poi:poi-main-entrance', 'poi:poi-cardiology', {
       operationalOverlay: liftClosure,
     });
 

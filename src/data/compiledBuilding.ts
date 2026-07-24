@@ -1,9 +1,9 @@
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import type { PoiSource, SpaceSource } from '@voicegis/spatial-schema';
-import referencePackageJson from '../../buildings/reference-medical-centre/compiled/building.package.json';
+import asterionPackageJson from '../../buildings/asterion-medical-center/compiled/building.package.json';
 import type { GraphEdge, GraphNode, PoiMetadata } from '../engine/routingCore';
 
-export const BUILDING_PACKAGE = referencePackageJson as unknown as CompiledBuildingPackage;
+export const BUILDING_PACKAGE = asterionPackageJson as unknown as CompiledBuildingPackage;
 
 export const CATEGORIES = {
   medical: {
@@ -54,6 +54,48 @@ export const CATEGORIES = {
     color: '#e11d48',
     bgColor: 'rgba(225, 29, 72, 0.15)',
     icon: 'ID',
+  },
+  emergency: {
+    id: 'emergency',
+    label: 'Emergency',
+    color: '#ef4444',
+    bgColor: 'rgba(239, 68, 68, 0.15)',
+    icon: 'ER',
+  },
+  landmark: {
+    id: 'landmark',
+    label: 'Landmarks',
+    color: '#0ea5e9',
+    bgColor: 'rgba(14, 165, 233, 0.15)',
+    icon: 'A',
+  },
+  food: {
+    id: 'food',
+    label: 'Food',
+    color: '#ea580c',
+    bgColor: 'rgba(234, 88, 12, 0.15)',
+    icon: 'F',
+  },
+  family: {
+    id: 'family',
+    label: 'Family',
+    color: '#db2777',
+    bgColor: 'rgba(219, 39, 119, 0.15)',
+    icon: '♥',
+  },
+  research: {
+    id: 'research',
+    label: 'Research',
+    color: '#7c3aed',
+    bgColor: 'rgba(124, 58, 237, 0.15)',
+    icon: 'R',
+  },
+  education: {
+    id: 'education',
+    label: 'Education',
+    color: '#4f46e5',
+    bgColor: 'rgba(79, 70, 229, 0.15)',
+    icon: 'ED',
   },
 } as const;
 

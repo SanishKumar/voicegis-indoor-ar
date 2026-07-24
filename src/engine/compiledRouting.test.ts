@@ -13,8 +13,8 @@ const edgesByPair = new Map(
 describe('compiled package routing', () => {
   it('routes between floors through the accessible lift when requested', () => {
     const result = calculateRoute(
-      'poi:main-entrance',
-      'poi:cardiology',
+      'poi:poi-main-entrance',
+      'poi:poi-cardiology',
       ROUTING_NODES,
       ROUTING_EDGES,
       { accessibleOnly: true },
@@ -34,8 +34,8 @@ describe('compiled package routing', () => {
 
   it('does not traverse restricted edges for public navigation', () => {
     const result = calculateRoute(
-      'poi:main-entrance',
-      'poi:training-room',
+      'poi:poi-main-entrance',
+      'poi:poi-training',
       ROUTING_NODES,
       ROUTING_EDGES,
     );
@@ -50,14 +50,14 @@ describe('compiled package routing', () => {
 
   it('requires an explicit policy override for a staff-only destination', () => {
     const denied = calculateRoute(
-      'poi:main-entrance',
-      'poi:records-store',
+      'poi:poi-main-entrance',
+      'poi:poi-data-center',
       ROUTING_NODES,
       ROUTING_EDGES,
     );
     const allowed = calculateRoute(
-      'poi:main-entrance',
-      'poi:records-store',
+      'poi:poi-main-entrance',
+      'poi:poi-data-center',
       ROUTING_NODES,
       ROUTING_EDGES,
       { allowRestricted: true },
