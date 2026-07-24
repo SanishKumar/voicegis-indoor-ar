@@ -8,20 +8,30 @@ This repository is being rebuilt in public from an earlier hospital-navigation p
 
 ## Current status
 
-The web application navigates a **synthetic two-floor reference building**. It is an engineering fixture, not surveyed venue data and not safe for real-world deployment.
+The web application now navigates **Asterion University Medical Center**, an original
+four-level academic-hospital benchmark. It is deliberately fictional—not surveyed venue
+data, not a reconstruction of a real hospital, and not safe for physical navigation.
+
+The smaller two-floor reference building remains in the repository as a stable compiler
+and localization regression fixture.
 
 Implemented today:
 
 - A versioned TypeScript source model and strict JSON Schema
 - A deterministic building compiler with a content-addressed package manifest
 - Semantic validation for geometry, portals, connectors, accessibility, and reachability
-- A two-floor reference package with public and restricted spaces, lift, stairs, POIs, and localization anchors
-- A package-driven 2D visitor map and React Three Fiber engineering inspector
+- A four-level benchmark package with 60 semantic spaces, 36 POIs, 56 portals, four
+  vertical-circulation systems, and 9 localization anchors
+- A package-driven 2D visitor map and architectural React Three Fiber spatial twin
+- Full-height walls with portal openings, door and gate assemblies, lift shafts, stairs,
+  clinical equipment cues, labels, lighting, and shadows
 - Floor isolation, exploded view, semantic selection, graph overlays, and anchor overlays
 - Multi-floor A* routing in a persistent Web Worker
 - Explicit standard versus accessible routing and fail-closed restricted edges
 - Versioned operational overlays for deterministic corridor or connector closures
 - Route receipts with package hash, profile, closures, connector choice, and exclusion counts
+- Deterministic all-public-lifts-outage replay: standard routing uses stairs while
+  wheelchair routing reports no compliant route
 - Browser package verification with atomic active/previous cache state and rollback
 - Typed localization observations, covariance-aware estimates, and deterministic replay
 - Synthetic checkpoint evaluation with explicit high/degraded/lost quality states
@@ -39,7 +49,7 @@ Not implemented yet:
 - Remote package download, signatures, distribution, or runtime hot-swap
 - World-anchored AR, pose alignment, occlusion, or automatic progress
 - VoiceGIS command execution
-- Relocalization, live progress gates, or physical-walk benchmarks
+- Live device relocalization, automatic progress, or physical-walk benchmarks
 
 The camera view is deliberately labeled **Camera Preview** because its graphics are screen-aligned. It does not know the device pose or the user's position and should not be described as AR.
 
@@ -93,11 +103,18 @@ Compile or verify the reference package directly:
 ```bash
 npm run compile:reference
 npm run compile:check
+npm run compile:asterion
+npm run compile:asterion:check
 ```
 
 ## Repository map
 
 ```text
+buildings/asterion-medical-center/
+├── source/                    authored fictional benchmark
+├── compiled/                  deterministic package and validation report
+└── operations/                reproducible public-lift outage scenario
+
 buildings/reference-medical-centre/
 ├── source/                    authored synthetic building source
 └── compiled/                  deterministic package and validation report

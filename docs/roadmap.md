@@ -37,7 +37,9 @@ Delivered:
 - Units and coordinate transforms
 - Deterministic package compiler
 - Connectivity, reachability, and accessibility validation report
-- A two-floor synthetic engineering fixture
+- A compact two-floor regression fixture
+- A four-level fictional academic-medical-center benchmark with 60 semantic spaces,
+  56 portals, 36 POIs, and four public vertical-circulation systems
 
 Exit evidence:
 
@@ -48,22 +50,27 @@ Exit evidence:
 
 ## Phase 2: 3D inspection and routing policy
 
-Status: in progress
+Status: fictional-benchmark baseline complete; surveyed-pilot evidence remains
 
 Delivered:
 
-- Package-driven React Three Fiber engineering viewer
+- Package-driven React Three Fiber architectural spatial twin
+- Full-height cutaway walls with portal gaps, doors, gates, lift shafts, stairs,
+  semantic props, labels, lighting, and shadows
 - Floor isolation, exploded view, semantic selection, graph and anchor overlays
-- Standard and wheelchair profiles across two floors
+- Standard and wheelchair profiles across four floors
 - Fail-closed restricted edges and explicit vertical instructions
 - Package-driven 2D visitor navigation and search
 - Immutable, versioned operational closure overlays
 - Route receipts with package, profile, closure, connector, and exclusion evidence
 - SHA-256 verified IndexedDB package registry with atomic activation and rollback
+- Deterministic dual-lift outage where standard routing falls back to stairs and
+  wheelchair routing reports no compliant path
 
 Remaining:
 
 - Runtime consumption of a non-bundled active package
+- Surveyed pilot geometry and route validation
 
 Exit evidence:
 

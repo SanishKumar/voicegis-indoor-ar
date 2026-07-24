@@ -20,3 +20,18 @@ restricted clinical zones, accessible routes, and visitor services.
 
 The small `reference-medical-centre` fixture remains the deterministic
 regression package. Asterion is the product demonstration benchmark.
+
+## Design research
+
+The benchmark uses broad patterns visible in public visitor-wayfinding material:
+large central concourses, memorable atria, multiple lift/stair choices,
+departmental zoning, family waiting areas, and explicit accessibility.
+
+References used for design research:
+
+- [Cleveland Clinic main-campus visitor wayfinding](https://my.clevelandclinic.org/patients/visitor-information/campus)
+- [Cambridge University Hospitals public floor maps](https://www.cuh.nhs.uk/visiting-our-hospitals/finding-your-way-around/)
+- [NHS England healthcare wayfinding guidance](https://www.england.nhs.uk/publication/wayfinding-effective-wayfinding-and-signing-systems-guidance-for-healthcare-facilities/)
+
+No floor geometry, room arrangement, restricted-area detail, name, logo, or brand
+was copied from those venues.

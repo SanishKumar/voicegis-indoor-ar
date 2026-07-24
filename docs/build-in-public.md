@@ -88,6 +88,55 @@ Only publish accuracy numbers with the trace, device, route length, checkpoints,
 
 Never post a lone “95% accurate” number.
 
+## Post 6: replacing the toy demo without pretending it is real
+
+Suggested LinkedIn post:
+
+> The 3D view in my indoor-navigation project used to be “3D” in the least useful
+> sense: room polygons extruded by a few centimeters. It exposed topology, but it
+> still looked like a stack of floor plans.
+>
+> I rebuilt that slice in three reviewable commits.
+>
+> First, the renderer now derives full-height walls from semantic polygons, cuts
+> openings from compiled portal widths, and adds doors, restricted gates, lift
+> shafts, stairs, equipment cues, lighting, shadows, labels, floor isolation, and
+> an exploded cutaway.
+>
+> Second, I compiled Asterion University Medical Center: an original fictional
+> four-level benchmark with 60 semantic spaces, 56 portals, 36 POIs, 9 localization
+> anchors, 168 routing nodes, and 176 edges.
+>
+> Third, I moved the live app onto that package and tested a dual-lift outage. A
+> standard route to cardiology falls back to the public stairs. The wheelchair
+> profile returns “No compliant route” instead of drawing a route it cannot defend.
+> The route receipt records the package hash, policy profile, applied closures, and
+> selected connector.
+>
+> Important limitation: Asterion is not a real hospital and is not a copy of one.
+> Public hospital maps and healthcare-wayfinding guidance informed the design
+> patterns, but the geometry and names are invented. This is a more demanding
+> software benchmark while I work toward permissioned surveyed data—not a physical
+> navigation claim.
+>
+> I would value review from hospital wayfinding, indoor GIS, accessibility, or
+> digital-twin engineers: what should the next benchmark scenario try to break?
+
+Suggested short version:
+
+> Replaced the “extruded floor plan” in my indoor-navigation project with a
+> four-level architectural cutaway driven by one compiled package: 60 spaces, 56
+> portals, 168 nodes, deterministic closures, and auditable route receipts. A
+> dual-lift outage reroutes standard users to stairs and fails closed for wheelchair
+> routing. Fictional benchmark, not surveyed data. Review welcome.
+
+Attach:
+
+- A 15–25 second clip: 2D floor switch → 3D exploded view → isolate Level 1
+- A second clip: enable lift outage → standard stair reroute → wheelchair failure
+- The three commit links, so reviewers can inspect the progression rather than one
+  opaque code dump
+
 ## Where to share
 
 - LinkedIn: decisions, pilot context, and calls for domain reviewers
