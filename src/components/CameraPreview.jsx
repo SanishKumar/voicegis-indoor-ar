@@ -10,8 +10,11 @@ import {
   ArrowUp,
   Camera,
   CameraOff,
+  Compass,
   CornerUpLeft,
   CornerUpRight,
+  Crosshair,
+  LocateFixed,
   Map,
   Navigation,
 } from 'lucide-react';
@@ -68,6 +71,56 @@ function CameraPreviewInner({
   currentStepIndex,
   actions,
 }) {
+  const [headingState, setHeadingState] = useState('idle');
+  const [headingDegrees, setHeadingDegrees] = useState(null);
+
+  const routeBearing = Number.isFinite(currentStep?.bearing) ? currentStep.bearing : null;
+  const headingDelta =
+    headingDegrees !== null && routeBearing !== null
+      ? normalizeDegrees(routeBearing - headingDegrees)
+      : null;
+  const stepCount = route?.steps?.length ?? 0;
+  const routeProgress = stepCount > 0 ? ((currentStepIndex + 1) / stepCount) * 100 : 0;
+
+  const enableHeading = async () => {
+    if (typeof window.DeviceOrientationEvent === 'undefined') {
+      setHeadingState('unavailable');
+      return;
+    }
+
+    try {
+      const OrientationEvent = window.DeviceOrientationEvent;
+      if (typeof OrientationEvent.requestPermission === 'function') {
+        const permission = await OrientationEvent.requestPermission();
+        if (permission !== 'granted') {
+          setHeadingState('denied');
+          return;
+        }
+      }
+      setHeadingState('listening');
+    } catch {
+      setHeadingState('denied');
+    }
+  };
+
+  useEffect(() => {
+    if (headingState !== 'listening' && headingState !== 'active') return undefined;
+
+    const handleOrientation = (event) => {
+      const compassHeading = Number.isFinite(event.webkitCompassHeading)
+        ? event.webkitCompassHeading
+        : Number.isFinite(event.alpha)
+          ? (360 - event.alpha + 360) % 360
+          : null;
+      if (compassHeading === null) return;
+      setHeadingDegrees(compassHeading);
+      setHeadingState('active');
+    };
+
+    window.addEventListener('deviceorientation', handleOrientation, true);
+    return () => window.removeEventListener('deviceorientation', handleOrientation, true);
+  }, [headingState]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -141,7 +194,7 @@ function CameraPreviewInner({
   }, [canvasRef]);
 
   useEffect(() => {
-    if (!isVideoReady || !canvasRef.current) return undefined;
+    if (!canvasRef.current) return undefined;
 
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
@@ -156,7 +209,7 @@ function CameraPreviewInner({
       context.clearRect(0, 0, width, height);
 
       if (isNavigating && currentStep) {
-        drawPreviewOverlay(context, { width, height }, currentStep);
+        drawPreviewOverlay(context, { width, height }, currentStep, headingDelta);
       }
 
       animationFrameRef.current = requestAnimationFrame(draw);
@@ -166,7 +219,7 @@ function CameraPreviewInner({
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [animationFrameRef, canvasRef, currentStep, isNavigating, isVideoReady]);
+  }, [animationFrameRef, canvasRef, currentStep, headingDelta, isNavigating, isVideoReady]);
 
   return (
     <div className="camera-preview animate-fade-in" id="camera-preview">
@@ -178,8 +231,8 @@ function CameraPreviewInner({
 
       <div className="camera-preview-status" role="status">
         <Camera size={14} />
-        <strong>Camera preview</strong>
-        <span>Screen-aligned · not spatially anchored</span>
+        <strong>Guidance preview</strong>
+        <span>Not world-anchored</span>
       </div>
 
       {cameraError && (
@@ -206,6 +259,41 @@ function CameraPreviewInner({
         </div>
       )}
 
+      {!cameraError && (
+        <aside className="camera-preview-telemetry" aria-label="Guidance readiness">
+          <div>
+            <Camera size={13} />
+            <span>Video</span>
+            <strong>{isVideoReady ? 'Live' : 'Starting'}</strong>
+          </div>
+          <div>
+            <Compass size={13} />
+            <span>Heading</span>
+            <strong>
+              {headingDegrees !== null
+                ? `${Math.round(headingDegrees)}°`
+                : headingState === 'denied'
+                  ? 'Denied'
+                  : headingState === 'unavailable'
+                    ? 'Unavailable'
+                    : headingState === 'listening'
+                      ? 'Waiting'
+                    : 'Not enabled'}
+            </strong>
+          </div>
+          <div>
+            <LocateFixed size={13} />
+            <span>Position</span>
+            <strong>Manual start</strong>
+          </div>
+          <div className="not-ready">
+            <Crosshair size={13} />
+            <span>World anchor</span>
+            <strong>Required</strong>
+          </div>
+        </aside>
+      )}
+
       {!cameraError && isNavigating && currentStep && (
         <div className="camera-preview-instruction animate-slide-down">
           <div className="camera-preview-instruction-icon">
@@ -218,13 +306,26 @@ function CameraPreviewInner({
             {currentStep.type === STEP_TYPE.SLIGHT_LEFT && <CornerUpLeft size={22} />}
             {currentStep.type === STEP_TYPE.SLIGHT_RIGHT && <CornerUpRight size={22} />}
           </div>
-          <div>
+          <div className="camera-preview-instruction-copy">
+            <div className="camera-preview-step-kicker">
+              Decision {currentStepIndex + 1} / {stepCount}
+              {headingDelta !== null && (
+                <span>
+                  {Math.abs(headingDelta) < 12
+                    ? 'Aligned'
+                    : `${Math.round(Math.abs(headingDelta))}° ${headingDelta < 0 ? 'left' : 'right'}`}
+                </span>
+              )}
+            </div>
             <div className="camera-preview-instruction-text">{currentStep.instruction}</div>
             {currentStep.distance > 0 && (
               <div className="camera-preview-instruction-distance">
                 {formatDistance(currentStep.distance)}
               </div>
             )}
+            <div className="camera-preview-progress" aria-hidden="true">
+              <span style={{ width: `${routeProgress}%` }} />
+            </div>
           </div>
         </div>
       )}
@@ -256,8 +357,14 @@ function CameraPreviewInner({
           id="btn-exit-camera-preview"
         >
           <Map size={16} />
-          Map View
+          Exit to plan
         </button>
+        {!cameraError && headingDegrees === null && (
+          <button className="camera-preview-control heading" onClick={enableHeading}>
+            <Compass size={16} />
+            {headingState === 'listening' ? 'Move device' : 'Enable heading'}
+          </button>
+        )}
         {isNavigating && (
           <>
             <button
@@ -281,142 +388,150 @@ function CameraPreviewInner({
   );
 }
 
-function drawPreviewOverlay(context, viewport, step) {
+function normalizeDegrees(value) {
+  return ((value + 540) % 360) - 180;
+}
+
+function drawPreviewOverlay(context, viewport, step, headingDelta) {
   const centerX = viewport.width / 2;
-  const centerY = viewport.height / 2;
+  const directionOffset =
+    step.type === STEP_TYPE.TURN_LEFT || step.type === STEP_TYPE.SLIGHT_LEFT
+      ? -viewport.width * 0.16
+      : step.type === STEP_TYPE.TURN_RIGHT || step.type === STEP_TYPE.SLIGHT_RIGHT
+        ? viewport.width * 0.16
+        : 0;
+  const headingOffset =
+    headingDelta === null
+      ? 0
+      : Math.max(-1, Math.min(1, headingDelta / 90)) * viewport.width * 0.24;
+  const targetX = centerX + headingOffset + directionOffset;
+  const start = [centerX, viewport.height * 0.82];
+  const decision = [centerX, viewport.height * 0.61];
+  const target = [targetX, viewport.height * 0.43];
 
-  context.fillStyle = 'rgba(0, 0, 0, 0.1)';
+  context.fillStyle = 'rgba(9, 10, 12, 0.12)';
   context.fillRect(0, 0, viewport.width, viewport.height);
-  context.save();
-  context.translate(centerX, centerY - 30);
+  drawHeadingRuler(context, viewport, headingDelta);
 
-  switch (step.type) {
-    case STEP_TYPE.STRAIGHT:
-    case STEP_TYPE.START:
-      drawStraightArrow(context);
-      break;
-    case STEP_TYPE.TURN_LEFT:
-    case STEP_TYPE.SLIGHT_LEFT:
-      drawTurnArrow(context, 'left');
-      break;
-    case STEP_TYPE.TURN_RIGHT:
-    case STEP_TYPE.SLIGHT_RIGHT:
-      drawTurnArrow(context, 'right');
-      break;
-    case STEP_TYPE.ARRIVE:
-      drawArrivalMarker(context);
-      break;
-    default:
-      drawStraightArrow(context);
+  if (step.type === STEP_TYPE.ARRIVE) {
+    drawArrivalMarker(context, target);
+  } else {
+    drawRouteRibbon(context, [start, decision, target]);
+    drawArrowHead(context, decision, target);
   }
 
-  context.restore();
+  drawReticle(context, viewport);
   if (step.distance > 0) drawDistanceIndicator(context, viewport, step.distance);
 }
 
-function applyFloatingEffect(context) {
-  const floatY = Math.sin((Date.now() / 1000) * 3) * 12;
-  context.translate(0, floatY);
-}
-
-function drawStraightArrow(context) {
-  const size = 70;
-  applyFloatingEffect(context);
-
-  const gradient = context.createLinearGradient(0, -size, 0, size);
-  gradient.addColorStop(0, '#60a5fa');
-  gradient.addColorStop(1, '#2563eb');
-  context.shadowColor = 'rgba(37, 99, 235, 0.8)';
-  context.shadowBlur = 40;
-  context.shadowOffsetY = 15;
-  context.beginPath();
-  context.moveTo(0, -size);
-  context.lineTo(-size * 0.5, size * 0.2);
-  context.lineTo(-size * 0.2, size * 0.1);
-  context.lineTo(-size * 0.2, size);
-  context.lineTo(size * 0.2, size);
-  context.lineTo(size * 0.2, size * 0.1);
-  context.lineTo(size * 0.5, size * 0.2);
-  context.closePath();
-  context.fillStyle = gradient;
-  context.fill();
-  context.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-  context.lineWidth = 3;
-  context.lineJoin = 'round';
-  context.stroke();
-  context.shadowBlur = 0;
-  context.shadowOffsetY = 0;
-}
-
-function drawTurnArrow(context, direction) {
-  const flip = direction === 'left' ? -1 : 1;
-  const size = 60;
-  applyFloatingEffect(context);
-
-  const gradient = context.createLinearGradient(0, -size, 0, size);
-  gradient.addColorStop(0, '#60a5fa');
-  gradient.addColorStop(1, '#2563eb');
-  context.shadowColor = 'rgba(37, 99, 235, 0.8)';
-  context.shadowBlur = 40;
-  context.shadowOffsetY = 15;
-  context.beginPath();
-  context.moveTo(0, size);
-  context.lineTo(0, 0);
-  context.quadraticCurveTo(0, -size * 0.8, flip * size * 0.8, -size * 0.8);
-  context.strokeStyle = gradient;
-  context.lineWidth = 18;
-  context.lineCap = 'round';
-  context.stroke();
+function drawHeadingRuler(context, viewport, headingDelta) {
+  const y = viewport.height * 0.34;
+  const centerX = viewport.width / 2;
+  context.save();
   context.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(centerX - 100, y);
+  context.lineTo(centerX + 100, y);
+  context.stroke();
+
+  for (let index = -4; index <= 4; index += 1) {
+    const x = centerX + index * 25;
+    context.beginPath();
+    context.moveTo(x, y - (index === 0 ? 8 : 4));
+    context.lineTo(x, y + (index === 0 ? 8 : 4));
+    context.stroke();
+  }
+
+  context.fillStyle = 'rgba(255, 255, 255, 0.82)';
+  context.font = '600 10px ui-monospace, Consolas, monospace';
+  context.textAlign = 'center';
+  const label =
+    headingDelta === null
+      ? 'SCREEN-ALIGNED'
+      : Math.abs(headingDelta) < 12
+        ? 'ROUTE ALIGNED'
+        : `ROUTE ${Math.round(Math.abs(headingDelta))}° ${headingDelta < 0 ? 'LEFT' : 'RIGHT'}`;
+  context.fillText(label, centerX, y - 15);
+  context.restore();
+}
+
+function drawRouteRibbon(context, points) {
+  context.save();
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+  context.beginPath();
+  context.moveTo(...points[0]);
+  points.slice(1).forEach((point) => context.lineTo(...point));
+  context.strokeStyle = 'rgba(18, 19, 22, 0.9)';
+  context.lineWidth = 30;
+  context.stroke();
+  context.strokeStyle = '#ff5c39';
+  context.lineWidth = 13;
+  context.stroke();
+  context.restore();
+}
+
+function drawArrowHead(context, from, to) {
+  const angle = Math.atan2(to[1] - from[1], to[0] - from[0]);
+  const size = 24;
+  context.save();
+  context.translate(to[0], to[1]);
+  context.rotate(angle);
+  context.beginPath();
+  context.moveTo(size, 0);
+  context.lineTo(-size * 0.7, -size * 0.65);
+  context.lineTo(-size * 0.7, size * 0.65);
+  context.closePath();
+  context.fillStyle = '#ff5c39';
+  context.fill();
+  context.strokeStyle = '#151619';
+  context.lineWidth = 6;
+  context.stroke();
+  context.restore();
+}
+
+function drawReticle(context, viewport) {
+  const centerX = viewport.width / 2;
+  const centerY = viewport.height * 0.51;
+  context.save();
+  context.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(centerX - 18, centerY);
+  context.lineTo(centerX + 18, centerY);
+  context.moveTo(centerX, centerY - 18);
+  context.lineTo(centerX, centerY + 18);
+  context.stroke();
+  context.restore();
+}
+
+function drawArrivalMarker(context, target) {
+  const pulse = 1 + Math.sin((Date.now() / 1000) * 3) * 0.08;
+  context.save();
+  context.translate(target[0], target[1]);
+  context.beginPath();
+  context.arc(0, 0, 34 * pulse, 0, Math.PI * 2);
+  context.strokeStyle = '#f7f3eb';
   context.lineWidth = 4;
   context.stroke();
-
-  const headX = flip * size * 0.8;
-  const headY = -size * 0.8;
   context.beginPath();
-  context.moveTo(headX + flip * 10, headY);
-  context.lineTo(headX - flip * 25, headY - 25);
-  context.lineTo(headX - flip * 15, headY + 25);
-  context.closePath();
-  context.fillStyle = gradient;
+  context.arc(0, 0, 16, 0, Math.PI * 2);
+  context.fillStyle = '#16825d';
   context.fill();
-  context.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-  context.lineWidth = 3;
-  context.lineJoin = 'round';
-  context.stroke();
-  context.shadowBlur = 0;
-  context.shadowOffsetY = 0;
-}
-
-function drawArrivalMarker(context) {
-  const pulse = 0.8 + Math.sin((Date.now() / 1000) * 3) * 0.2;
-  context.shadowColor = 'rgba(16, 185, 129, 0.6)';
-  context.shadowBlur = 30;
-  context.beginPath();
-  context.arc(0, 0, 40 * pulse, 0, Math.PI * 2);
-  context.strokeStyle = 'rgba(16, 185, 129, 0.5)';
-  context.lineWidth = 3;
-  context.stroke();
-  context.beginPath();
-  context.arc(0, 0, 20, 0, Math.PI * 2);
-  context.fillStyle = 'rgba(16, 185, 129, 0.7)';
-  context.fill();
-  context.fillStyle = 'white';
-  context.font = '24px serif';
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText('📍', 0, 0);
-  context.shadowBlur = 0;
+  context.restore();
 }
 
 function drawDistanceIndicator(context, viewport, distance) {
-  const y = viewport.height - 100;
-  context.fillStyle = 'rgba(17, 22, 49, 0.7)';
-  context.beginPath();
-  context.roundRect(viewport.width / 2 - 50, y - 15, 100, 30, 15);
-  context.fill();
-  context.fillStyle = 'rgba(96, 165, 250, 0.9)';
-  context.font = '600 14px Inter, sans-serif';
+  const y = viewport.height - 116;
+  const width = 104;
+  context.fillStyle = 'rgba(24, 25, 28, 0.9)';
+  context.fillRect(viewport.width / 2 - width / 2, y - 17, width, 34);
+  context.strokeStyle = 'rgba(255, 255, 255, 0.38)';
+  context.lineWidth = 1;
+  context.strokeRect(viewport.width / 2 - width / 2, y - 17, width, 34);
+  context.fillStyle = '#fff3ed';
+  context.font = '700 13px Inter, sans-serif';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   context.fillText(formatDistance(distance), viewport.width / 2, y);

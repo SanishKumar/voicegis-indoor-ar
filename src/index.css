@@ -2199,3 +2199,224 @@ body {
   border: 1px solid #111214;
   background: #ff5c39;
 }
+
+/* Route-aware camera guidance. This remains a preview until pose + anchors exist. */
+.camera-preview {
+  background: #111214;
+}
+
+.camera-preview-status {
+  top: 14px;
+  left: 14px;
+  transform: none;
+  padding: 7px 9px;
+  border-color: rgba(255, 255, 255, 0.24);
+  border-radius: 4px;
+  background: rgba(24, 25, 28, 0.92);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.03em;
+}
+
+.camera-preview-status strong {
+  text-transform: uppercase;
+}
+
+.camera-preview-status span {
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffb3a2;
+}
+
+.camera-preview-telemetry {
+  position: absolute;
+  top: 57px;
+  left: 14px;
+  z-index: 12;
+  width: 220px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 4px;
+  color: #f2f0ea;
+  background: rgba(24, 25, 28, 0.9);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.camera-preview-telemetry > div {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 9px;
+}
+
+.camera-preview-telemetry > div + div {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.camera-preview-telemetry svg {
+  color: #9b93f4;
+}
+
+.camera-preview-telemetry span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.5625rem;
+  text-transform: uppercase;
+}
+
+.camera-preview-telemetry strong {
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+.camera-preview-telemetry .not-ready svg,
+.camera-preview-telemetry .not-ready strong {
+  color: #ff8b70;
+}
+
+.camera-preview-instruction {
+  top: 14px;
+  right: 14px;
+  left: auto;
+  width: min(460px, calc(100% - 270px));
+  max-width: none;
+  transform: none;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.24);
+  border-radius: 4px;
+  background: rgba(24, 25, 28, 0.92);
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.camera-preview-instruction-icon {
+  width: 58px;
+  height: auto;
+  min-height: 84px;
+  border-radius: 0;
+  color: #fff;
+  background: #ff5c39;
+  box-shadow: none;
+}
+
+.camera-preview-instruction-copy {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 13px;
+}
+
+.camera-preview-step-kicker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+  color: #aaa8a2;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.5625rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.camera-preview-step-kicker span {
+  color: #ffb3a2;
+}
+
+.camera-preview-instruction-text {
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.camera-preview-instruction-distance {
+  color: #bdbbb5;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.625rem;
+}
+
+.camera-preview-progress {
+  height: 2px;
+  margin-top: 9px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.camera-preview-progress span {
+  display: block;
+  height: 100%;
+  background: #ff5c39;
+}
+
+.camera-preview-controls {
+  bottom: 14px;
+  width: min(720px, calc(100% - 28px));
+  max-width: none;
+  gap: 6px;
+}
+
+.camera-preview-control {
+  min-height: 42px;
+  padding: 0 15px;
+  border-color: rgba(255, 255, 255, 0.24);
+  border-radius: 4px;
+  background: rgba(24, 25, 28, 0.92);
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.camera-preview-control:hover {
+  background: rgba(35, 36, 40, 0.96);
+  transform: translateY(-1px);
+}
+
+.camera-preview-control.heading {
+  color: #d7d3ff;
+  border-color: rgba(155, 147, 244, 0.5);
+}
+
+.camera-preview-fallback {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    #18191c;
+  background-size: 42px 42px;
+}
+
+@media (max-width: 680px) {
+  .camera-preview-status span {
+    display: none;
+  }
+
+  .camera-preview-telemetry {
+    top: auto;
+    bottom: 66px;
+    width: calc(100% - 28px);
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .camera-preview-telemetry > div + div {
+    border-top: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.14);
+  }
+
+  .camera-preview-telemetry > div:nth-child(n + 3) {
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+  }
+
+  .camera-preview-instruction {
+    top: 56px;
+    left: 14px;
+    right: 14px;
+    width: auto;
+  }
+
+  .camera-preview-controls {
+    overflow-x: auto;
+  }
+
+  .camera-preview-control {
+    min-width: max-content;
+  }
+}
