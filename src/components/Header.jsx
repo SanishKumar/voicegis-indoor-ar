@@ -4,7 +4,18 @@
  * Top navigation bar with brand, view toggle, location setter, and floor selector.
  */
 
-import { Box, Map, Camera, Sun, Moon, MapPin, Home, Eye, Settings } from 'lucide-react';
+import {
+  Box,
+  Map,
+  Camera,
+  Sun,
+  Moon,
+  MapPin,
+  Home,
+  Eye,
+  Settings,
+  Building2,
+} from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
 import { BUILDING_CONFIG } from '../data/buildingConfig.js';
 import { getNodeById } from '../data/compiledBuilding';
@@ -33,10 +44,12 @@ export default function Header() {
     <header className="app-header" id="app-header">
       {/* Brand */}
       <div className="header-brand">
-        <div className="header-logo">🏥</div>
+        <div className="header-logo" aria-hidden="true">
+          <Building2 size={17} strokeWidth={1.8} />
+        </div>
         <div>
           <div className="header-title">{BUILDING_CONFIG.name}</div>
-          <div className="header-subtitle">{BUILDING_CONFIG.subtitle}</div>
+          <div className="header-subtitle">Indoor navigation / simulation package</div>
         </div>
       </div>
 
@@ -62,7 +75,7 @@ export default function Header() {
             aria-label="Switch to map view"
           >
             <Map size={14} />
-            Map
+            Plan
           </button>
           <button
             className={`view-toggle-btn ${activeView === VIEW_TYPE.SPATIAL_TWIN ? 'active' : ''}`}
@@ -71,7 +84,7 @@ export default function Header() {
             aria-label="Switch to compiled 3D spatial twin"
           >
             <Box size={14} />
-            Twin
+            Spatial
           </button>
           <button
             className={`view-toggle-btn ${activeView === VIEW_TYPE.CAMERA_PREVIEW ? 'active' : ''}`}
@@ -80,7 +93,7 @@ export default function Header() {
             aria-label="Switch to camera preview"
           >
             <Camera size={14} />
-            Preview
+            Guide
           </button>
         </div>
 

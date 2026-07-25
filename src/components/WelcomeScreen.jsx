@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { Navigation, MapPin, ArrowRight, QrCode, Search, ChevronRight } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { getPOIs, CATEGORIES } from '../data/compiledBuilding';
-import { BUILDING_CONFIG } from '../data/buildingConfig.js';
 import { searchPOIs } from '../engine/searchIndex.js';
 
 export default function WelcomeScreen({ onComplete }) {
@@ -42,51 +41,50 @@ export default function WelcomeScreen({ onComplete }) {
   return (
     <div className="welcome-screen">
       <div className="welcome-bg" />
-      <div className="welcome-orb welcome-orb-1" />
-      <div className="welcome-orb welcome-orb-2" />
-      <div className="welcome-orb welcome-orb-3" />
 
       <div className="welcome-content">
         {step === 0 && (
           <div className="welcome-hero animate-fade-in">
+            <div className="welcome-eyebrow">Asterion navigation benchmark / v0.4</div>
             <div className="welcome-logo-container">
               <div className="welcome-logo">
-                <MapPin size={40} strokeWidth={2.5} />
+                <MapPin size={30} strokeWidth={1.8} />
               </div>
             </div>
 
             <h1 className="welcome-title">
-              Welcome to <span className="welcome-title-accent">{BUILDING_CONFIG.name}</span>
+              Find a clinical service without learning the building first.
             </h1>
             <p className="welcome-subtitle">
-              Test deterministic indoor routes today. Camera guidance is a preview while spatial
-              localization is under development.
+              A deterministic four-level hospital routing benchmark with accessible paths,
+              operational closures, and an inspectable spatial model.
             </p>
 
             <div className="welcome-cta-group">
               <button className="welcome-cta" onClick={handleStart} id="btn-welcome-start">
-                Get Started
+                Plan a route
                 <ArrowRight size={18} />
               </button>
             </div>
 
-            <button
-              onClick={skipToMap}
-              style={{
-                marginTop: '24px',
-                color: 'var(--color-text-muted)',
-                fontSize: '14px',
-                textDecoration: 'underline',
-              }}
-            >
-              Skip to Map
-            </button>
-
-            <div className="welcome-dots">
-              <span className="welcome-dot active" />
-              <span className="welcome-dot" />
-              <span className="welcome-dot" />
+            <div className="welcome-proof-grid" aria-label="Benchmark facts">
+              <div>
+                <strong>04</strong>
+                <span>connected levels</span>
+              </div>
+              <div>
+                <strong>176</strong>
+                <span>routing edges</span>
+              </div>
+              <div>
+                <strong>09</strong>
+                <span>localization anchors</span>
+              </div>
             </div>
+
+            <button className="welcome-text-action" onClick={skipToMap}>
+              Open the plan directly
+            </button>
           </div>
         )}
 
