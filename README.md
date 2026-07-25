@@ -22,7 +22,10 @@ Implemented today:
 - Semantic validation for geometry, portals, connectors, accessibility, and reachability
 - A four-level benchmark package with 60 semantic spaces, 36 POIs, 56 portals, four
   vertical-circulation systems, and 9 localization anchors
-- A package-driven 2D visitor map and architectural React Three Fiber spatial twin
+- A package-driven architectural visitor plan with wall openings, door swings,
+  structural references, circulation cores, and high-contrast route casing
+- An architectural React Three Fiber spatial twin with the selected route projected
+  through its actual floors and vertical connector
 - Full-height walls with portal openings, door and gate assemblies, lift shafts, stairs,
   clinical equipment cues, labels, lighting, and shadows
 - Floor isolation, exploded view, semantic selection, graph overlays, and anchor overlays
@@ -40,7 +43,10 @@ Implemented today:
 - Vertical instructions such as “take the elevator to Level 1”
 - Public-only fuzzy search with declared destination aliases
 - Automated lint, type, test, deterministic-compile, and production-build checks
-- A camera-overlay **preview** for instruction experiments
+- A route-aware camera-guidance **preview** with explicit camera, heading, position,
+  and world-anchor readiness states
+- Optional device-heading permission and route-bearing comparison while keeping
+  screen-aligned guidance clearly separate from world-anchored AR
 
 Not implemented yet:
 
@@ -51,7 +57,10 @@ Not implemented yet:
 - VoiceGIS command execution
 - Live device relocalization, automatic progress, or physical-walk benchmarks
 
-The camera view is deliberately labeled **Camera Preview** because its graphics are screen-aligned. It does not know the device pose or the user's position and should not be described as AR.
+The camera view is deliberately labeled **Guidance Preview** because its route ribbon
+is screen-aligned. On supported devices it can compare compass heading with the route
+bearing, but it still does not know the camera pose, a surveyed building-to-world
+transform, or the user's live position. It should not be described as AR.
 
 ## Why this exists
 

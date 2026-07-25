@@ -137,6 +137,54 @@ Attach:
 - The three commit links, so reviewers can inspect the progression rather than one
   opaque code dump
 
+## Post 7: the visual rewrite had to expose more truth, not just look newer
+
+Suggested LinkedIn post:
+
+> I was unhappy with the interface of my indoor-navigation project. It had the
+> familiar dark gradients, glowing controls, rounded glass cards, and a map made
+> from saturated rectangles. It looked generated before it looked trustworthy.
+>
+> I rebuilt the presentation in four independently tested commits.
+>
+> 1. A restrained interface system: neutral surfaces, thin dividers, compact
+>    controls, one interaction color, and typography closer to an operations tool.
+> 2. An architectural 2D renderer: room codes, modeled openings, door swings,
+>    circulation hatching, structural references, and an orange/black route that
+>    stays readable over the plan.
+> 3. A selected-route overlay in the 3D twin. Orange is horizontal travel; violet
+>    is movement between floors. It is deliberately separate from the full graph
+>    debug overlay.
+> 4. A route-aware camera-guidance preview with camera, heading, position, and
+>    world-anchor readiness shown explicitly.
+>
+> The last point matters: this is still not world-anchored AR. A supported device
+> can compare compass heading with route bearing, but there is no surveyed
+> building-to-world transform or live user localization yet. The UI now makes
+> those missing capabilities visible instead of hiding them behind a floating
+> arrow.
+>
+> Every commit passed the same gate: lint, TypeScript, 70 tests, deterministic
+> package compilation, localization replay verification, and production build.
+>
+> I would value a hard review from indoor GIS, wayfinding, BIM, or AR engineers:
+> which visual element still suggests more confidence than the underlying system
+> has earned?
+
+Suggested short version:
+
+> Reworked my indoor-navigation prototype in four tested commits: restrained UI,
+> architectural 2D plan, selected route through the 3D twin, and route-aware camera
+> guidance with explicit readiness states. It can use device heading, but it is
+> still not world-anchored AR—and the interface says so. Review welcome.
+
+Attach:
+
+- A split-screen before/after of the Ground floor
+- A 10–15 second clip of one route in 2D, then the same route across floors in 3D
+- A mobile clip showing the guidance-readiness panel before and after enabling heading
+- Links to the four commits instead of one large diff
+
 ## Where to share
 
 - LinkedIn: decisions, pilot context, and calls for domain reviewers

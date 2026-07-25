@@ -57,10 +57,14 @@ Delivered:
 - Package-driven React Three Fiber architectural spatial twin
 - Full-height cutaway walls with portal gaps, doors, gates, lift shafts, stairs,
   semantic props, labels, lighting, and shadows
+- Selected-route projection across the 3D floors and vertical connector, visually
+  separate from the optional full routing-graph overlay
 - Floor isolation, exploded view, semantic selection, graph and anchor overlays
 - Standard and wheelchair profiles across four floors
 - Fail-closed restricted edges and explicit vertical instructions
 - Package-driven 2D visitor navigation and search
+- Architectural 2D plan rendering with modeled openings, door swings, room codes,
+  circulation hatching, route casing, and decision markers
 - Immutable, versioned operational closure overlays
 - Route receipts with package, profile, closure, connector, and exclusion evidence
 - SHA-256 verified IndexedDB package registry with atomic activation and rollback
