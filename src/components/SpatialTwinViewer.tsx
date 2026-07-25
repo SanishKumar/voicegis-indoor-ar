@@ -27,6 +27,8 @@ import type {
   VerticalConnectorSource,
 } from '@voicegis/spatial-schema';
 import { BUILDING_PACKAGE as buildingPackage } from '../data/compiledBuilding';
+import { useNavigation } from '../context/NavigationContext.jsx';
+import type { GraphNode, RouteResult } from '../engine/routingCore';
 import {
   buildSpaceWallSegments,
   getNearestBoundaryAngle,
@@ -53,8 +55,8 @@ const SPACE_COLORS: Record<SpaceSource['type'], string> = {
   'vertical-circulation': '#fef3c7',
 };
 
-const WALL_COLOR = '#dbe4ee';
-const RESTRICTED_WALL_COLOR = '#8f3348';
+const WALL_COLOR = '#d8d6cf';
+const RESTRICTED_WALL_COLOR = '#735061';
 const GLASS_COLOR = '#7dd3fc';
 const WALL_THICKNESS_METERS = 0.12;
 
@@ -94,9 +96,9 @@ function FloorGeometry({ floor, bounds, exploded }: FloorGeometryProps) {
     <group>
       <mesh position={[0, elevation - 0.16, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <extrudeGeometry args={[shape, { depth: 0.16, bevelEnabled: false }]} />
-        <meshStandardMaterial color="#1e293b" metalness={0.12} roughness={0.78} />
+        <meshStandardMaterial color="#34363a" metalness={0.08} roughness={0.8} />
       </mesh>
-      <Line points={outline} color="#dbeafe" lineWidth={1.3} transparent opacity={0.55} />
+      <Line points={outline} color="#e6e2d9" lineWidth={1.3} transparent opacity={0.62} />
     </group>
   );
 }
@@ -609,6 +611,124 @@ function RoutingOverlay({ bounds, exploded, floorSelection, visibleSpaceIds }: O
   );
 }
 
+interface ActiveRouteOverlayProps {
+  bounds: BuildingBounds;
+  exploded: boolean;
+  floorSelection: FloorSelection;
+  route: RouteResult | null;
+  currentNodeId?: string;
+}
+
+function ActiveRouteOverlay({
+  bounds,
+  exploded,
+  floorSelection,
+  route,
+  currentNodeId,
+}: ActiveRouteOverlayProps) {
+  const floorsById = useMemo(
+    () => new Map(buildingPackage.floors.map((floor) => [floor.id, floor])),
+    [],
+  );
+
+  if (!route?.found || route.path.length === 0) return null;
+
+  const pointForNode = (node: GraphNode) => {
+    const floor = floorsById.get(String(node.floor));
+    if (!floor) return null;
+    return mapCoordinateToWorld(
+      [node.x, node.y],
+      visualFloorElevation(floor, exploded) + Math.min(floor.clearHeight * 0.78, 2.9),
+      bounds,
+    );
+  };
+  const visible = (node: GraphNode) =>
+    floorSelection === 'all' || String(node.floor) === floorSelection;
+  const segments = route.path.slice(1).flatMap((node, index) => {
+    const previous = route.path[index];
+    if (!visible(previous) || !visible(node)) return [];
+    const from = pointForNode(previous);
+    const to = pointForNode(node);
+    if (!from || !to) return [];
+    return [{ from, to, vertical: String(previous.floor) !== String(node.floor), node }];
+  });
+  const visibleNodes = route.path.filter(visible);
+  const startPoint = visibleNodes[0] ? pointForNode(visibleNodes[0]) : null;
+  const destinationPoint = visibleNodes.at(-1) ? pointForNode(visibleNodes.at(-1)!) : null;
+  const destinationIsVisible = route.path.at(-1)
+    ? visible(route.path.at(-1)!)
+    : false;
+
+  return (
+    <group>
+      {segments.map((segment, index) => (
+        <group key={`${segment.node.id}-${index}`}>
+          <Line
+            points={[segment.from, segment.to]}
+            color="#151619"
+            lineWidth={11}
+            depthTest={false}
+            renderOrder={20}
+          />
+          <Line
+            points={[segment.from, segment.to]}
+            color={segment.vertical ? '#8d80ff' : '#ff4f2a'}
+            lineWidth={6.5}
+            depthTest={false}
+            renderOrder={21}
+          />
+        </group>
+      ))}
+      {visibleNodes.map((node, index) => {
+        const point = pointForNode(node);
+        if (!point || index === 0 || index === route.path.length - 1) return null;
+        return (
+          <mesh key={`decision-${node.id}-${index}`} position={point} renderOrder={22}>
+            <sphereGeometry args={[0.13, 12, 12]} />
+            <meshBasicMaterial
+              color={node.id === currentNodeId ? '#ffffff' : '#ffb5a4'}
+              depthTest={false}
+            />
+          </mesh>
+        );
+      })}
+      {visibleNodes.map((node) => {
+        const point = pointForNode(node);
+        if (!point || node.id !== currentNodeId) return null;
+        return (
+          <group key={`current-${node.id}`} position={point}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[0.32, 0.1, 12, 28]} />
+            <meshBasicMaterial color="#fffaf4" />
+            </mesh>
+            <mesh position={[0, 0.14, 0]}>
+              <sphereGeometry args={[0.18, 16, 16]} />
+              <meshBasicMaterial color="#5b4ee6" depthTest={false} />
+            </mesh>
+          </group>
+        );
+      })}
+      {startPoint && (
+        <mesh position={startPoint} rotation={[-Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.26, 0.09, 12, 28]} />
+          <meshBasicMaterial color="#f8fafc" depthTest={false} />
+        </mesh>
+      )}
+      {destinationPoint && destinationIsVisible && (
+        <group position={destinationPoint}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.34, 0.11, 12, 28]} />
+            <meshBasicMaterial color="#ff4f2a" depthTest={false} />
+          </mesh>
+          <Html position={[0, 0.75, 0]} center distanceFactor={18}>
+            <div className="twin-route-label">Destination</div>
+          </Html>
+        </group>
+      )}
+    </group>
+  );
+}
+
 function AnchorOverlay({ bounds, exploded, floorSelection, visibleSpaceIds }: OverlayProps) {
   const floorsById = useMemo(
     () => new Map(buildingPackage.floors.map((floor) => [floor.id, floor])),
@@ -650,6 +770,8 @@ interface TwinSceneProps {
   showLabels: boolean;
   showRouting: boolean;
   showAnchors: boolean;
+  activeRoute: RouteResult | null;
+  currentNodeId?: string;
   selectedSpaceId: string | null;
   onSelectSpace: (spaceId: string) => void;
   onClearSelection: () => void;
@@ -663,6 +785,8 @@ function TwinScene({
   showLabels,
   showRouting,
   showAnchors,
+  activeRoute,
+  currentNodeId,
   selectedSpaceId,
   onSelectSpace,
   onClearSelection,
@@ -693,19 +817,19 @@ function TwinScene({
 
   return (
     <>
-      <color attach="background" args={['#07101d']} />
-      <fog attach="fog" args={['#07101d', 90, 180]} />
-      <ambientLight intensity={0.86} />
-      <hemisphereLight args={['#e0f2fe', '#0f172a', 1.35]} />
+      <color attach="background" args={['#18191c']} />
+      <fog attach="fog" args={['#18191c', 90, 180]} />
+      <ambientLight intensity={0.92} />
+      <hemisphereLight args={['#f5f1e7', '#292a2e', 1.35]} />
       <directionalLight
         position={[18, 28, 13]}
         intensity={2.2}
         castShadow
         shadow-mapSize={[2048, 2048]}
       />
-      <directionalLight position={[-12, 14, -16]} intensity={0.65} color="#67e8f9" />
+      <directionalLight position={[-12, 14, -16]} intensity={0.48} color="#bdb7ff" />
 
-      <gridHelper args={[104, 104, '#35506a', '#142438']} position={[0, -0.18, 0]} />
+      <gridHelper args={[104, 104, '#414247', '#28292d']} position={[0, -0.18, 0]} />
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.19, 0]}
@@ -713,7 +837,7 @@ function TwinScene({
         receiveShadow
       >
         <planeGeometry args={[104, 104]} />
-        <meshStandardMaterial color="#081321" roughness={0.86} />
+        <meshStandardMaterial color="#1d1e21" roughness={0.86} />
       </mesh>
 
       {visibleFloors.map((floor) => (
@@ -774,6 +898,13 @@ function TwinScene({
           visibleSpaceIds={visibleSpaceIds}
         />
       )}
+      <ActiveRouteOverlay
+        bounds={bounds}
+        exploded={exploded}
+        floorSelection={floorSelection}
+        route={activeRoute}
+        currentNodeId={currentNodeId}
+      />
       {showAnchors && (
         <AnchorOverlay
           bounds={bounds}
@@ -813,6 +944,13 @@ interface ToggleButtonProps {
   onClick: () => void;
 }
 
+interface SpatialNavigatorContextValue {
+  state: {
+    route: RouteResult | null;
+    currentStepIndex: number;
+  };
+}
+
 function ToggleButton({ active, label, onClick }: ToggleButtonProps) {
   return (
     <button
@@ -827,6 +965,7 @@ function ToggleButton({ active, label, onClick }: ToggleButtonProps) {
 }
 
 export default function SpatialTwinViewer() {
+  const { state } = useNavigation() as unknown as SpatialNavigatorContextValue;
   const [floorSelection, setFloorSelection] = useState<FloorSelection>('all');
   const [exploded, setExploded] = useState(true);
   const [showRestricted, setShowRestricted] = useState(true);
@@ -835,6 +974,10 @@ export default function SpatialTwinViewer() {
   const [showRouting, setShowRouting] = useState(false);
   const [showAnchors, setShowAnchors] = useState(false);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
+  const activeRoute = state.route as RouteResult | null;
+  const currentNodeId = activeRoute?.found
+    ? activeRoute.steps[state.currentStepIndex]?.nodeId
+    : undefined;
 
   const visibleSpaces = useMemo(
     () =>
@@ -939,6 +1082,12 @@ export default function SpatialTwinViewer() {
               <Building2 size={13} />
               Architectural cutaway
             </span>
+            {activeRoute?.found && (
+              <span className="active-route">
+                <Route size={13} />
+                Active route · {Math.round(activeRoute.totalDistance)} m
+              </span>
+            )}
             <span>
               <DoorOpen size={13} />
               {buildingPackage.portals.length} modeled portals
@@ -958,6 +1107,8 @@ export default function SpatialTwinViewer() {
               showLabels={showLabels}
               showRouting={showRouting}
               showAnchors={showAnchors}
+              activeRoute={activeRoute}
+              currentNodeId={currentNodeId}
               selectedSpaceId={selectedSpaceId}
               onSelectSpace={setSelectedSpaceId}
               onClearSelection={() => setSelectedSpaceId(null)}
@@ -1010,6 +1161,30 @@ export default function SpatialTwinViewer() {
                 </div>
               )}
             </>
+          ) : activeRoute?.found ? (
+            <div className="twin-route-inspector">
+              <span className="twin-space-type">Active route</span>
+              <h2>
+                {activeRoute.steps[state.currentStepIndex]?.instruction ?? 'Route ready'}
+              </h2>
+              <p>
+                Decision {Math.min(state.currentStepIndex + 1, activeRoute.steps.length)} of{' '}
+                {activeRoute.steps.length}
+              </p>
+              <dl className="twin-property-grid">
+                <div>
+                  <dt>Distance</dt>
+                  <dd>{Math.round(activeRoute.totalDistance)} m</dd>
+                </div>
+                <div>
+                  <dt>Path nodes</dt>
+                  <dd>{activeRoute.path.length}</dd>
+                </div>
+              </dl>
+              <p className="twin-route-note">
+                Orange marks horizontal travel. Violet marks movement between floors.
+              </p>
+            </div>
           ) : (
             <div className="twin-empty-inspector">
               <ScanLine size={24} />
@@ -1062,6 +1237,9 @@ export default function SpatialTwinViewer() {
         </span>
         <span>
           <i className="legend-anchor" /> Localization anchor
+        </span>
+        <span>
+          <i className="legend-line active-route" /> Active route
         </span>
         <strong>Fictional benchmark — not surveyed or deployment-safe</strong>
       </div>
