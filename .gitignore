@@ -12,3 +12,8 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Personal notes and publishing drafts
+.private/
+docs/private/
+docs/drafts/
+*.draft.md

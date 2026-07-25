@@ -92,15 +92,3 @@ The runtime owns progress gates, instruction advancement, wrong-way hysteresis, 
 5. LLM output cannot directly mutate safety-relevant navigation state.
 6. Physical-walk traces must be replayable without camera footage by default.
 7. Every marketing claim should map to a reproducible test or labeled prototype behavior.
-
-## Immediate next slice
-
-Package verification, operational overlays, route receipts, deterministic localization replay, and gated route matching are implemented. The next localization slice will define recovery behavior and a real-walk import boundary:
-
-- Model initializing, tracking, degraded, lost, and relocalizing runtime states
-- Freeze guidance on lost quality and require an explicit recovery observation
-- Measure recovery time from a known anchor in replay
-- Add a real-walk import contract without storing camera frames by default
-- Preserve device, route, carrying-position, and checkpoint metadata for benchmark reports
-
-The parallel package-lifecycle task is runtime consumption of a non-bundled active package with multi-tab coordination and quota handling.

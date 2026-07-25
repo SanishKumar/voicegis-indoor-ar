@@ -2,167 +2,160 @@
 
 [![Quality](https://github.com/SanishKumar/voicegis-indoor-ar/actions/workflows/quality.yml/badge.svg)](https://github.com/SanishKumar/voicegis-indoor-ar/actions/workflows/quality.yml)
 
-An offline-oriented indoor spatial-intelligence project for compiling building data, calculating constraint-aware routes, inspecting spatial topology, and eventually delivering uncertainty-aware localization, voice control, and world-anchored guidance.
+An indoor-navigation platform built around versioned spatial data, deterministic routing, operational constraints, and shared 2D/3D presentation.
 
-This repository is being rebuilt in public from an earlier hospital-navigation prototype. The original state is preserved at [`prototype-v0`](https://github.com/SanishKumar/voicegis-indoor-ar/tree/prototype-v0).
+The repository includes a compiler, routing engine, browser application, offline package registry, localization replay core, and a four-level hospital benchmark.
 
-## Current status
+## Product preview
 
-The web application now navigates **Asterion University Medical Center**, an original
-four-level academic-hospital benchmark. It is deliberately fictional—not surveyed venue
-data, not a reconstruction of a real hospital, and not safe for physical navigation.
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/assets/readme/01-overview.jpg" alt="Asterion benchmark overview" width="100%">
+      <br><sub>Navigation benchmark overview</sub>
+    </td>
+    <td width="50%">
+      <img src="docs/assets/readme/02-route-plan.jpg" alt="Architectural floor plan with an active route" width="100%">
+      <br><sub>Architectural plan and turn-by-turn route</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/assets/readme/03-spatial-route.jpg" alt="Exploded 3D spatial twin with a route between floors" width="100%">
+      <br><sub>Route projected through the 3D spatial twin</sub>
+    </td>
+    <td width="50%">
+      <img src="docs/assets/readme/04-accessible-fail-closed.jpg" alt="Accessible route rejected during a public lift outage" width="100%">
+      <br><sub>Fail-closed accessible routing during a lift outage</sub>
+    </td>
+  </tr>
+</table>
 
-The smaller two-floor reference building remains in the repository as a stable compiler
-and localization regression fixture.
+## Core capabilities
 
-Implemented today:
+### Spatial package compiler
 
-- A versioned TypeScript source model and strict JSON Schema
-- A deterministic building compiler with a content-addressed package manifest
-- Semantic validation for geometry, portals, connectors, accessibility, and reachability
-- A four-level benchmark package with 60 semantic spaces, 36 POIs, 56 portals, four
-  vertical-circulation systems, and 9 localization anchors
-- A package-driven architectural visitor plan with wall openings, door swings,
-  structural references, circulation cores, and high-contrast route casing
-- An architectural React Three Fiber spatial twin with the selected route projected
-  through its actual floors and vertical connector
-- Full-height walls with portal openings, door and gate assemblies, lift shafts, stairs,
-  clinical equipment cues, labels, lighting, and shadows
-- Floor isolation, exploded view, semantic selection, graph overlays, and anchor overlays
+- Versioned TypeScript model and JSON Schema for floors, spaces, portals, POIs, connectors, and localization anchors
+- Semantic validation for geometry, connectivity, accessibility, restrictions, and reachability
+- Deterministic compilation with a content-addressed package manifest
+- One compiled package shared by routing, search, the 2D plan, and the 3D viewer
+
+### Routing and operations
+
 - Multi-floor A* routing in a persistent Web Worker
-- Explicit standard versus accessible routing and fail-closed restricted edges
-- Versioned operational overlays for deterministic corridor or connector closures
-- Route receipts with package hash, profile, closures, connector choice, and exclusion counts
-- Deterministic all-public-lifts-outage replay: standard routing uses stairs while
-  wheelchair routing reports no compliant route
-- Browser package verification with atomic active/previous cache state and rollback
-- Typed localization observations, covariance-aware estimates, and deterministic replay
-- Synthetic checkpoint evaluation with explicit high/degraded/lost quality states
-- Same-floor, uncertainty-gated route matching with explicit rejection reasons
-- Localization runtime states that freeze guidance until trusted-anchor recovery
-- Vertical instructions such as “take the elevator to Level 1”
-- Public-only fuzzy search with declared destination aliases
-- Automated lint, type, test, deterministic-compile, and production-build checks
-- A route-aware camera-guidance **preview** with explicit camera, heading, position,
-  and world-anchor readiness states
-- Optional device-heading permission and route-bearing comparison while keeping
-  screen-aligned guidance clearly separate from world-anchored AR
+- Standard and wheelchair routing profiles
+- Fail-closed restricted and inaccessible edges
+- Versioned closures for corridors and vertical connectors
+- Route receipts containing the package hash, routing profile, applied closures, connector selection, and exclusion counts
 
-Not implemented yet:
+### Navigation clients
 
-- Surveyed or imported real-building geometry
-- Real sensor ingestion, surveyed localization traces, or physical accuracy evidence
-- Remote package download, signatures, distribution, or runtime hot-swap
-- World-anchored AR, pose alignment, occlusion, or automatic progress
-- VoiceGIS command execution
-- Live device relocalization, automatic progress, or physical-walk benchmarks
+- Architectural 2D plan with modeled openings, door swings, room codes, circulation cores, and route decision points
+- React Three Fiber spatial twin with floor isolation, exploded view, semantic inspection, graph overlays, anchors, and active routes
+- Camera guidance view with route progress, optional device-heading alignment, and readiness diagnostics
+- Public POI search with aliases and floor-aware results
 
-The camera view is deliberately labeled **Guidance Preview** because its route ribbon
-is screen-aligned. On supported devices it can compare compass heading with the route
-bearing, but it still does not know the camera pose, a surveyed building-to-world
-transform, or the user's live position. It should not be described as AR.
+### Package and localization runtime
 
-## Why this exists
+- SHA-256 package verification
+- Atomic active/previous package state in IndexedDB
+- Deterministic localization observation replay
+- Covariance-aware estimates and explicit quality states
+- Route matching with uncertainty gates and relocalization recovery rules
 
-Indoor navigation becomes difficult where GPS stops being useful and mistakes are stressful: hospitals, transit hubs, campuses, and public facilities. The long-term system is intended to make four hard problems work together:
-
-1. Compile source floor plans into validated, versioned building packages.
-2. Fuse visual, inertial, and explicit anchor observations while exposing uncertainty.
-3. Calculate explainable routes under accessibility and operational constraints.
-4. Present the same route through a 3D map, mobile AR, and deterministic voice operations.
-
-An LLM may interpret a request, but it must not decide whether a corridor is accessible or an emergency route is safe. Those decisions belong to typed data, routing policy, and auditable execution receipts.
-
-## Current architecture
+## Architecture
 
 ```mermaid
 flowchart LR
-  Source["Versioned building source"] --> Compiler["Deterministic compiler"]
+  Source["Building source"] --> Compiler["Schema validation + compiler"]
   Compiler --> Package["Content-addressed package"]
-  Package --> Map["2D visitor map"]
-  Package --> Twin["3D engineering inspector"]
-  Package --> Adapter["Visitor routing adapter"]
-  Adapter --> Search["Public POI search"]
-  Adapter --> Worker["Persistent route worker"]
-  Worker --> Core["Policy-aware A* core"]
+  Package --> Plan["2D visitor plan"]
+  Package --> Twin["3D spatial twin"]
+  Package --> Search["POI search"]
+  Package --> Worker["Routing worker"]
+  Package --> Registry["Verified offline registry"]
+  Worker --> Policy["Constraint-aware A*"]
+  Replay["Observation recording"] --> Localization["Localization + route matching"]
 ```
 
-The source JSON is authored data. The compiled package is the only runtime authority for geometry, semantics, search, and routing. Clients do not repair malformed topology.
+The authored building source is compiled before runtime. Clients consume the compiled package and do not repair malformed topology independently.
+
+## Included benchmark
+
+`buildings/asterion-medical-center` contains the Asterion University Medical Center benchmark:
+
+- 4 floors
+- 60 semantic spaces
+- 56 modeled portals
+- 36 public POIs
+- 4 vertical-circulation systems
+- 9 localization anchors
+- 168 routing nodes and 176 edges
+
+The package includes a reproducible public-lift outage used to exercise standard and wheelchair routing behavior. A smaller two-floor building is retained as a stable compiler and localization regression fixture.
 
 ## Run locally
 
 Requirements:
 
-- Node.js 22 or newer
+- Node.js 22+
 - npm
 
 ```bash
+git clone https://github.com/SanishKumar/voicegis-indoor-ar.git
+cd voicegis-indoor-ar
 npm ci
 npm run dev
 ```
 
-Run the same quality gate used by CI:
+The development server prints the local URL after startup.
 
-```bash
-npm run check
-```
+## Useful commands
 
-Compile or verify the reference package directly:
+| Command | Purpose |
+| --- | --- |
+| `npm run check` | Run lint, type checking, tests, deterministic package checks, replay verification, and the production build |
+| `npm test` | Run the Vitest suite |
+| `npm run compile:asterion` | Recompile the Asterion building package |
+| `npm run compile:asterion:check` | Verify that the committed Asterion package is reproducible |
+| `npm run replay:reference` | Regenerate the reference localization replay report |
+| `npm run replay:check` | Verify the committed replay report byte-for-byte |
+| `npm run build` | Create a production build in `dist/` |
 
-```bash
-npm run compile:reference
-npm run compile:check
-npm run compile:asterion
-npm run compile:asterion:check
-```
-
-## Repository map
+## Repository structure
 
 ```text
-buildings/asterion-medical-center/
-├── source/                    authored fictional benchmark
-├── compiled/                  deterministic package and validation report
-└── operations/                reproducible public-lift outage scenario
-
-buildings/reference-medical-centre/
-├── source/                    authored synthetic building source
-└── compiled/                  deterministic package and validation report
+buildings/
+├── asterion-medical-center/     four-level application benchmark
+└── reference-medical-centre/    compact compiler regression fixture
 
 packages/
-├── spatial-schema/            versioned types, JSON Schema, and shape validation
-└── map-compiler/              semantic validation and deterministic graph compiler
+├── spatial-schema/              shared spatial types and JSON Schema
+├── map-compiler/                validation and deterministic graph compiler
+└── localization-core/           observation replay and estimate pipeline
 
 src/
-├── components/                visitor map, 3D inspector, navigation, and camera preview
-├── context/                   navigation state and user preferences
-├── data/compiledBuilding.ts   runtime adapter over the compiled package
-└── engine/                    routing, search, graph checks, and view models
+├── components/                  plan, spatial twin, search, and guidance UI
+├── context/                     navigation state and user preferences
+├── data/                        compiled-package runtime adapter
+└── engine/                      routing, topology, search, and view models
 
-docs/
-├── adr/                       architecture decision records
-├── architecture/              system boundaries
-├── build-in-public.md         public progress-post drafts
-└── roadmap.md                 evidence-based delivery phases
+recordings/                      deterministic localization fixtures
+docs/                            architecture decisions and technical reports
 ```
 
-## Next engineering milestone
+## Integration scope
 
-Phase 2 still needs runtime consumption of a non-bundled active package, including storage-quota and multi-tab coordination. Phase 3 now has deterministic replay, gated route matching, and explicit recovery state transitions; the next slice is a privacy-preserving real-walk ingestion contract and benchmark metadata. Remote distribution and signatures remain later venue-platform work.
+Asterion is a synthetic benchmark bundled for development and testing. Deploying the system for a venue requires authorized building data, calibrated coordinate transforms, validated accessibility attributes, and physical route testing.
 
-See [the delivery roadmap](docs/roadmap.md) and [the architecture direction](docs/architecture/overview.md).
+The camera guidance view is screen-aligned and can optionally compare device heading with route bearing. World-anchored guidance requires live localization and a surveyed building-to-device transform.
 
-## Review wanted
+## Technical documentation
 
-Useful review is especially welcome from people working with:
-
-- Indoor GIS, IndoorGML, BIM, IFC, CAD, or floor-plan conversion
-- Accessibility and hospital wayfinding
-- SLAM, visual localization, sensor fusion, or map matching
-- Graph routing and dynamic path planning
-- ARCore, ARKit, AR Foundation, or WebXR
-
-Please challenge the data model and failure handling before the visuals. The most useful question is not “Does the arrow look good?” but “What evidence would make this safe to trust during a real walk?”
+- [Architecture overview](docs/architecture/overview.md)
+- [Architecture decision records](docs/adr/)
+- [Reference localization replay](docs/localization/reference-replay.md)
 
 ## License
 
-No open-source license has been selected yet. Until one is added, the repository remains all-rights-reserved by default.
+No open-source license has been selected. The repository is all-rights-reserved by default.
