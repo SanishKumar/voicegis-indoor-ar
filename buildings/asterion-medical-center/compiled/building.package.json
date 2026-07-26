@@ -14,7 +14,7 @@
     "name": "Asterion University Medical Center",
     "units": "meters"
   },
-  "compilerVersion": "0.1.0",
+  "compilerVersion": "0.2.0",
   "floors": [
     {
       "clearHeight": 4.2,
@@ -228,10 +228,10 @@
     }
   ],
   "manifest": {
-    "contentHash": "62ff881f415028123bd85a85f52e221d37a27ddc0441febf9e9bf6a5b9d46b5d",
+    "contentHash": "9a9c9d37907c78ec1b72bed95658ec248c43d96a891ae4109ac8eebfad144a13",
     "hashAlgorithm": "sha256"
   },
-  "packageVersion": "0.1.0",
+  "packageVersion": "0.2.0",
   "pois": [
     {
       "accessible": true,
@@ -1623,7 +1623,6 @@
       },
       {
         "accessible": true,
-        "connectorKind": "elevator",
         "distanceMeters": 2,
         "floorIds": [
           "g"
@@ -1653,7 +1652,6 @@
       },
       {
         "accessible": true,
-        "connectorKind": "elevator",
         "distanceMeters": 2,
         "floorIds": [
           "l1"
@@ -1683,7 +1681,6 @@
       },
       {
         "accessible": true,
-        "connectorKind": "elevator",
         "distanceMeters": 2,
         "floorIds": [
           "l2"
@@ -1698,7 +1695,6 @@
       },
       {
         "accessible": true,
-        "connectorKind": "elevator",
         "distanceMeters": 2,
         "floorIds": [
           "l3"
@@ -1728,7 +1724,6 @@
       },
       {
         "accessible": true,
-        "connectorKind": "elevator",
         "distanceMeters": 0.01,
         "floorIds": [
           "g"
@@ -1758,7 +1753,6 @@
       },
       {
         "accessible": true,
-        "connectorKind": "elevator",
         "distanceMeters": 0.01,
         "floorIds": [
           "l1"
@@ -1788,7 +1782,6 @@
       },
       {
         "accessible": true,
-        "connectorKind": "elevator",
         "distanceMeters": 0.01,
         "floorIds": [
           "l2"
@@ -1803,7 +1796,6 @@
       },
       {
         "accessible": true,
-        "connectorKind": "elevator",
         "distanceMeters": 0.01,
         "floorIds": [
           "l3"
@@ -1833,7 +1825,6 @@
       },
       {
         "accessible": false,
-        "connectorKind": "stairs",
         "distanceMeters": 3,
         "floorIds": [
           "g"
@@ -1863,7 +1854,6 @@
       },
       {
         "accessible": false,
-        "connectorKind": "stairs",
         "distanceMeters": 3,
         "floorIds": [
           "l1"
@@ -1893,7 +1883,6 @@
       },
       {
         "accessible": false,
-        "connectorKind": "stairs",
         "distanceMeters": 3,
         "floorIds": [
           "l2"
@@ -1908,7 +1897,6 @@
       },
       {
         "accessible": false,
-        "connectorKind": "stairs",
         "distanceMeters": 3,
         "floorIds": [
           "l3"
@@ -1938,7 +1926,6 @@
       },
       {
         "accessible": false,
-        "connectorKind": "stairs",
         "distanceMeters": 0.01,
         "floorIds": [
           "g"
@@ -1968,7 +1955,6 @@
       },
       {
         "accessible": false,
-        "connectorKind": "stairs",
         "distanceMeters": 0.01,
         "floorIds": [
           "l1"
@@ -1998,7 +1984,6 @@
       },
       {
         "accessible": false,
-        "connectorKind": "stairs",
         "distanceMeters": 0.01,
         "floorIds": [
           "l2"
@@ -2013,7 +1998,6 @@
       },
       {
         "accessible": false,
-        "connectorKind": "stairs",
         "distanceMeters": 0.01,
         "floorIds": [
           "l3"
@@ -2546,17 +2530,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 28,
+        "distanceMeters": 0.01,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-arrival--space:g-concourse",
+        "from": "portal:p-g-arrival",
+        "id": "edge:portal:p-g-arrival--waypoint:g-concourse:01",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "p-g-arrival",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-arrival"
+        "to": "waypoint:g-concourse:01"
       },
       {
         "accessible": true,
@@ -2574,17 +2558,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 5,
+        "distanceMeters": 4,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-atrium--space:g-concourse",
+        "from": "portal:p-g-atrium",
+        "id": "edge:portal:p-g-atrium--waypoint:g-concourse:05",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "p-g-atrium",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-atrium"
+        "to": "waypoint:g-concourse:05"
       },
       {
         "accessible": true,
@@ -2602,31 +2586,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 10.77,
+        "distanceMeters": 4,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-cafe--space:g-concourse",
+        "from": "portal:p-g-cafe",
+        "id": "edge:portal:p-g-cafe--waypoint:g-concourse:08",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "p-g-cafe",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-cafe"
-      },
-      {
-        "accessible": true,
-        "distanceMeters": 28,
-        "floorIds": [
-          "g"
-        ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-courtyard--space:g-concourse",
-        "kind": "within-space",
-        "restricted": false,
-        "sourceId": "p-g-courtyard",
-        "spaceId": "g-concourse",
-        "to": "portal:p-g-courtyard"
+        "to": "waypoint:g-concourse:08"
       },
       {
         "accessible": true,
@@ -2644,17 +2614,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 23.345,
+        "distanceMeters": 0.01,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-emergency--space:g-concourse",
+        "from": "portal:p-g-courtyard",
+        "id": "edge:portal:p-g-courtyard--waypoint:g-concourse:12",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-g-emergency",
+        "sourceId": "p-g-courtyard",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-emergency"
+        "to": "waypoint:g-concourse:12"
       },
       {
         "accessible": true,
@@ -2672,17 +2642,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 13.601,
+        "distanceMeters": 4,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-imaging--space:g-concourse",
+        "from": "portal:p-g-emergency",
+        "id": "edge:portal:p-g-emergency--waypoint:g-concourse:02",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-g-imaging",
+        "sourceId": "p-g-emergency",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-imaging"
+        "to": "waypoint:g-concourse:02"
       },
       {
         "accessible": true,
@@ -2700,17 +2670,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 6.403,
+        "distanceMeters": 4,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-lifts--space:g-concourse",
+        "from": "portal:p-g-imaging",
+        "id": "edge:portal:p-g-imaging--waypoint:g-concourse:03",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-g-lifts",
+        "sourceId": "p-g-imaging",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-lifts"
+        "to": "waypoint:g-concourse:03"
       },
       {
         "accessible": true,
@@ -2728,17 +2698,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 13.601,
+        "distanceMeters": 4,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-orthopedics--space:g-concourse",
+        "from": "portal:p-g-lifts",
+        "id": "edge:portal:p-g-lifts--waypoint:g-concourse:04",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-g-orthopedics",
+        "sourceId": "p-g-lifts",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-orthopedics"
+        "to": "waypoint:g-concourse:04"
       },
       {
         "accessible": true,
@@ -2756,17 +2726,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 8.062,
+        "distanceMeters": 4,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-pathology--space:g-concourse",
+        "from": "portal:p-g-orthopedics",
+        "id": "edge:portal:p-g-orthopedics--waypoint:g-concourse:03",
         "kind": "within-space",
-        "restricted": true,
-        "sourceId": "p-g-pathology",
+        "restricted": false,
+        "sourceId": "p-g-orthopedics",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-pathology"
+        "to": "waypoint:g-concourse:03"
       },
       {
         "accessible": true,
@@ -2784,17 +2754,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 17.464,
+        "distanceMeters": 4,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-pharmacy--space:g-concourse",
+        "from": "portal:p-g-pathology",
+        "id": "edge:portal:p-g-pathology--waypoint:g-concourse:07",
         "kind": "within-space",
-        "restricted": false,
-        "sourceId": "p-g-pharmacy",
+        "restricted": true,
+        "sourceId": "p-g-pathology",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-pharmacy"
+        "to": "waypoint:g-concourse:07"
       },
       {
         "accessible": true,
@@ -2812,17 +2782,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 23.345,
+        "distanceMeters": 4,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-registration--space:g-concourse",
+        "from": "portal:p-g-pharmacy",
+        "id": "edge:portal:p-g-pharmacy--waypoint:g-concourse:09",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-g-registration",
+        "sourceId": "p-g-pharmacy",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-registration"
+        "to": "waypoint:g-concourse:09"
       },
       {
         "accessible": true,
@@ -2840,17 +2810,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 25.318,
+        "distanceMeters": 4,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-retail--space:g-concourse",
+        "from": "portal:p-g-registration",
+        "id": "edge:portal:p-g-registration--waypoint:g-concourse:02",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-g-retail",
+        "sourceId": "p-g-registration",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-retail"
+        "to": "waypoint:g-concourse:02"
       },
       {
         "accessible": true,
@@ -2868,17 +2838,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 22.361,
+        "distanceMeters": 4,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-services--space:g-concourse",
+        "from": "portal:p-g-retail",
+        "id": "edge:portal:p-g-retail--waypoint:g-concourse:11",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-g-services",
+        "sourceId": "p-g-retail",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-services"
+        "to": "waypoint:g-concourse:11"
       },
       {
         "accessible": true,
@@ -2895,18 +2865,18 @@
         "to": "portal:p-g-services"
       },
       {
-        "accessible": false,
-        "distanceMeters": 4.123,
+        "accessible": true,
+        "distanceMeters": 4,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-concourse",
-        "id": "edge:portal:p-g-stairs--space:g-concourse",
+        "from": "portal:p-g-services",
+        "id": "edge:portal:p-g-services--waypoint:g-concourse:10",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-g-stairs",
+        "sourceId": "p-g-services",
         "spaceId": "g-concourse",
-        "to": "portal:p-g-stairs"
+        "to": "waypoint:g-concourse:10"
       },
       {
         "accessible": false,
@@ -2921,6 +2891,20 @@
         "sourceId": "p-g-stairs",
         "spaceId": "g-stair-hall",
         "to": "portal:p-g-stairs"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-stairs",
+        "id": "edge:portal:p-g-stairs--waypoint:g-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-stairs",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:06"
       },
       {
         "accessible": true,
@@ -2938,17 +2922,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 5,
+        "distanceMeters": 4,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-atrium--space:l1-concourse",
+        "from": "portal:p-l1-atrium",
+        "id": "edge:portal:p-l1-atrium--waypoint:l1-concourse:05",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "p-l1-atrium",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-atrium"
+        "to": "waypoint:l1-concourse:05"
       },
       {
         "accessible": true,
@@ -2966,17 +2950,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 23.345,
+        "distanceMeters": 4,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-cardiac--space:l1-concourse",
+        "from": "portal:p-l1-cardiac",
+        "id": "edge:portal:p-l1-cardiac--waypoint:l1-concourse:02",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "p-l1-cardiac",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-cardiac"
+        "to": "waypoint:l1-concourse:02"
       },
       {
         "accessible": true,
@@ -2994,31 +2978,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 13.601,
+        "distanceMeters": 4,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-cardiology--space:l1-concourse",
+        "from": "portal:p-l1-cardiology",
+        "id": "edge:portal:p-l1-cardiology--waypoint:l1-concourse:03",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "p-l1-cardiology",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-cardiology"
-      },
-      {
-        "accessible": true,
-        "distanceMeters": 22.361,
-        "floorIds": [
-          "l1"
-        ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-consultation--space:l1-concourse",
-        "kind": "within-space",
-        "restricted": false,
-        "sourceId": "p-l1-consultation",
-        "spaceId": "l1-concourse",
-        "to": "portal:p-l1-consultation"
+        "to": "waypoint:l1-concourse:03"
       },
       {
         "accessible": true,
@@ -3036,17 +3006,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 28,
+        "distanceMeters": 4,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-east--space:l1-concourse",
+        "from": "portal:p-l1-consultation",
+        "id": "edge:portal:p-l1-consultation--waypoint:l1-concourse:10",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l1-east",
+        "sourceId": "p-l1-consultation",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-east"
+        "to": "waypoint:l1-concourse:10"
       },
       {
         "accessible": true,
@@ -3064,17 +3034,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 25.318,
+        "distanceMeters": 0.01,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-infusion--space:l1-concourse",
+        "from": "portal:p-l1-east",
+        "id": "edge:portal:p-l1-east--waypoint:l1-concourse:12",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l1-infusion",
+        "sourceId": "p-l1-east",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-infusion"
+        "to": "waypoint:l1-concourse:12"
       },
       {
         "accessible": true,
@@ -3092,17 +3062,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 6.403,
+        "distanceMeters": 4,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-lifts--space:l1-concourse",
+        "from": "portal:p-l1-infusion",
+        "id": "edge:portal:p-l1-infusion--waypoint:l1-concourse:11",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l1-lifts",
+        "sourceId": "p-l1-infusion",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-lifts"
+        "to": "waypoint:l1-concourse:11"
       },
       {
         "accessible": true,
@@ -3120,17 +3090,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 8.062,
+        "distanceMeters": 4,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-neuroscience--space:l1-concourse",
+        "from": "portal:p-l1-lifts",
+        "id": "edge:portal:p-l1-lifts--waypoint:l1-concourse:04",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l1-neuroscience",
+        "sourceId": "p-l1-lifts",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-neuroscience"
+        "to": "waypoint:l1-concourse:04"
       },
       {
         "accessible": true,
@@ -3148,17 +3118,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 17.464,
+        "distanceMeters": 4,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-oncology--space:l1-concourse",
+        "from": "portal:p-l1-neuroscience",
+        "id": "edge:portal:p-l1-neuroscience--waypoint:l1-concourse:07",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l1-oncology",
+        "sourceId": "p-l1-neuroscience",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-oncology"
+        "to": "waypoint:l1-concourse:07"
       },
       {
         "accessible": true,
@@ -3176,17 +3146,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 13.601,
+        "distanceMeters": 4,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-preop--space:l1-concourse",
+        "from": "portal:p-l1-oncology",
+        "id": "edge:portal:p-l1-oncology--waypoint:l1-concourse:09",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l1-preop",
+        "sourceId": "p-l1-oncology",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-preop"
+        "to": "waypoint:l1-concourse:09"
       },
       {
         "accessible": true,
@@ -3204,17 +3174,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 10.77,
+        "distanceMeters": 4,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-rehab--space:l1-concourse",
+        "from": "portal:p-l1-preop",
+        "id": "edge:portal:p-l1-preop--waypoint:l1-concourse:03",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l1-rehab",
+        "sourceId": "p-l1-preop",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-rehab"
+        "to": "waypoint:l1-concourse:03"
       },
       {
         "accessible": true,
@@ -3231,18 +3201,18 @@
         "to": "portal:p-l1-rehab"
       },
       {
-        "accessible": false,
-        "distanceMeters": 4.123,
+        "accessible": true,
+        "distanceMeters": 4,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-stairs--space:l1-concourse",
+        "from": "portal:p-l1-rehab",
+        "id": "edge:portal:p-l1-rehab--waypoint:l1-concourse:08",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l1-stairs",
+        "sourceId": "p-l1-rehab",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-stairs"
+        "to": "waypoint:l1-concourse:08"
       },
       {
         "accessible": false,
@@ -3259,18 +3229,18 @@
         "to": "portal:p-l1-stairs"
       },
       {
-        "accessible": true,
-        "distanceMeters": 23.345,
+        "accessible": false,
+        "distanceMeters": 4,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-surgery--space:l1-concourse",
+        "from": "portal:p-l1-stairs",
+        "id": "edge:portal:p-l1-stairs--waypoint:l1-concourse:06",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l1-surgery",
+        "sourceId": "p-l1-stairs",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-surgery"
+        "to": "waypoint:l1-concourse:06"
       },
       {
         "accessible": true,
@@ -3288,17 +3258,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 28,
+        "distanceMeters": 4,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-concourse",
-        "id": "edge:portal:p-l1-west--space:l1-concourse",
+        "from": "portal:p-l1-surgery",
+        "id": "edge:portal:p-l1-surgery--waypoint:l1-concourse:02",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l1-west",
+        "sourceId": "p-l1-surgery",
         "spaceId": "l1-concourse",
-        "to": "portal:p-l1-west"
+        "to": "waypoint:l1-concourse:02"
       },
       {
         "accessible": true,
@@ -3316,6 +3286,20 @@
       },
       {
         "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-west",
+        "id": "edge:portal:p-l1-west--waypoint:l1-concourse:01",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-west",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:01"
+      },
+      {
+        "accessible": true,
         "distanceMeters": 6,
         "floorIds": [
           "l2"
@@ -3330,17 +3314,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 5,
+        "distanceMeters": 4,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-atrium--space:l2-concourse",
+        "from": "portal:p-l2-atrium",
+        "id": "edge:portal:p-l2-atrium--waypoint:l2-concourse:05",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "p-l2-atrium",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-atrium"
+        "to": "waypoint:l2-concourse:05"
       },
       {
         "accessible": true,
@@ -3358,17 +3342,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 10.77,
+        "distanceMeters": 4,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-birth-center--space:l2-concourse",
+        "from": "portal:p-l2-birth-center",
+        "id": "edge:portal:p-l2-birth-center--waypoint:l2-concourse:08",
         "kind": "within-space",
         "restricted": true,
         "sourceId": "p-l2-birth-center",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-birth-center"
+        "to": "waypoint:l2-concourse:08"
       },
       {
         "accessible": true,
@@ -3386,31 +3370,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 23.345,
+        "distanceMeters": 4,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-child-development--space:l2-concourse",
+        "from": "portal:p-l2-child-development",
+        "id": "edge:portal:p-l2-child-development--waypoint:l2-concourse:02",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "p-l2-child-development",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-child-development"
-      },
-      {
-        "accessible": true,
-        "distanceMeters": 28,
-        "floorIds": [
-          "l2"
-        ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-east--space:l2-concourse",
-        "kind": "within-space",
-        "restricted": false,
-        "sourceId": "p-l2-east",
-        "spaceId": "l2-concourse",
-        "to": "portal:p-l2-east"
+        "to": "waypoint:l2-concourse:02"
       },
       {
         "accessible": true,
@@ -3428,17 +3398,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 25.318,
+        "distanceMeters": 0.01,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-family-services--space:l2-concourse",
+        "from": "portal:p-l2-east",
+        "id": "edge:portal:p-l2-east--waypoint:l2-concourse:12",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l2-family-services",
+        "sourceId": "p-l2-east",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-family-services"
+        "to": "waypoint:l2-concourse:12"
       },
       {
         "accessible": true,
@@ -3456,17 +3426,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 6.403,
+        "distanceMeters": 4,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-lifts--space:l2-concourse",
+        "from": "portal:p-l2-family-services",
+        "id": "edge:portal:p-l2-family-services--waypoint:l2-concourse:11",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l2-lifts",
+        "sourceId": "p-l2-family-services",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-lifts"
+        "to": "waypoint:l2-concourse:11"
       },
       {
         "accessible": true,
@@ -3484,17 +3454,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 8.062,
+        "distanceMeters": 4,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-maternity--space:l2-concourse",
+        "from": "portal:p-l2-lifts",
+        "id": "edge:portal:p-l2-lifts--waypoint:l2-concourse:04",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l2-maternity",
+        "sourceId": "p-l2-lifts",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-maternity"
+        "to": "waypoint:l2-concourse:04"
       },
       {
         "accessible": true,
@@ -3512,17 +3482,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 22.361,
+        "distanceMeters": 4,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-neonatal--space:l2-concourse",
+        "from": "portal:p-l2-maternity",
+        "id": "edge:portal:p-l2-maternity--waypoint:l2-concourse:07",
         "kind": "within-space",
-        "restricted": true,
-        "sourceId": "p-l2-neonatal",
+        "restricted": false,
+        "sourceId": "p-l2-maternity",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-neonatal"
+        "to": "waypoint:l2-concourse:07"
       },
       {
         "accessible": true,
@@ -3540,17 +3510,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 13.601,
+        "distanceMeters": 4,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-nicu-family--space:l2-concourse",
+        "from": "portal:p-l2-neonatal",
+        "id": "edge:portal:p-l2-neonatal--waypoint:l2-concourse:10",
         "kind": "within-space",
-        "restricted": false,
-        "sourceId": "p-l2-nicu-family",
+        "restricted": true,
+        "sourceId": "p-l2-neonatal",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-nicu-family"
+        "to": "waypoint:l2-concourse:10"
       },
       {
         "accessible": true,
@@ -3568,17 +3538,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 23.345,
+        "distanceMeters": 4,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-pediatrics--space:l2-concourse",
+        "from": "portal:p-l2-nicu-family",
+        "id": "edge:portal:p-l2-nicu-family--waypoint:l2-concourse:03",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l2-pediatrics",
+        "sourceId": "p-l2-nicu-family",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-pediatrics"
+        "to": "waypoint:l2-concourse:03"
       },
       {
         "accessible": true,
@@ -3596,17 +3566,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 13.601,
+        "distanceMeters": 4,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-play-therapy--space:l2-concourse",
+        "from": "portal:p-l2-pediatrics",
+        "id": "edge:portal:p-l2-pediatrics--waypoint:l2-concourse:02",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l2-play-therapy",
+        "sourceId": "p-l2-pediatrics",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-play-therapy"
+        "to": "waypoint:l2-concourse:02"
       },
       {
         "accessible": true,
@@ -3623,18 +3593,18 @@
         "to": "portal:p-l2-play-therapy"
       },
       {
-        "accessible": false,
-        "distanceMeters": 4.123,
+        "accessible": true,
+        "distanceMeters": 4,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-stairs--space:l2-concourse",
+        "from": "portal:p-l2-play-therapy",
+        "id": "edge:portal:p-l2-play-therapy--waypoint:l2-concourse:03",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l2-stairs",
+        "sourceId": "p-l2-play-therapy",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-stairs"
+        "to": "waypoint:l2-concourse:03"
       },
       {
         "accessible": false,
@@ -3651,18 +3621,18 @@
         "to": "portal:p-l2-stairs"
       },
       {
-        "accessible": true,
-        "distanceMeters": 28,
+        "accessible": false,
+        "distanceMeters": 4,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-west--space:l2-concourse",
+        "from": "portal:p-l2-stairs",
+        "id": "edge:portal:p-l2-stairs--waypoint:l2-concourse:06",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l2-west",
+        "sourceId": "p-l2-stairs",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-west"
+        "to": "waypoint:l2-concourse:06"
       },
       {
         "accessible": true,
@@ -3680,17 +3650,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 17.464,
+        "distanceMeters": 0.01,
         "floorIds": [
           "l2"
         ],
-        "from": "space:l2-concourse",
-        "id": "edge:portal:p-l2-womens-imaging--space:l2-concourse",
+        "from": "portal:p-l2-west",
+        "id": "edge:portal:p-l2-west--waypoint:l2-concourse:01",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l2-womens-imaging",
+        "sourceId": "p-l2-west",
         "spaceId": "l2-concourse",
-        "to": "portal:p-l2-womens-imaging"
+        "to": "waypoint:l2-concourse:01"
       },
       {
         "accessible": true,
@@ -3708,6 +3678,20 @@
       },
       {
         "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-womens-imaging",
+        "id": "edge:portal:p-l2-womens-imaging--waypoint:l2-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-womens-imaging",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:09"
+      },
+      {
+        "accessible": true,
         "distanceMeters": 6,
         "floorIds": [
           "l3"
@@ -3722,17 +3706,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 23.345,
+        "distanceMeters": 4,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-admin--space:l3-concourse",
+        "from": "portal:p-l3-admin",
+        "id": "edge:portal:p-l3-admin--waypoint:l3-concourse:02",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "p-l3-admin",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-admin"
+        "to": "waypoint:l3-concourse:02"
       },
       {
         "accessible": true,
@@ -3750,31 +3734,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 5,
+        "distanceMeters": 4,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-atrium--space:l3-concourse",
+        "from": "portal:p-l3-atrium",
+        "id": "edge:portal:p-l3-atrium--waypoint:l3-concourse:05",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "p-l3-atrium",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-atrium"
-      },
-      {
-        "accessible": true,
-        "distanceMeters": 17.464,
-        "floorIds": [
-          "l3"
-        ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-conference--space:l3-concourse",
-        "kind": "within-space",
-        "restricted": false,
-        "sourceId": "p-l3-conference",
-        "spaceId": "l3-concourse",
-        "to": "portal:p-l3-conference"
+        "to": "waypoint:l3-concourse:05"
       },
       {
         "accessible": true,
@@ -3792,17 +3762,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 22.361,
+        "distanceMeters": 4,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-data--space:l3-concourse",
+        "from": "portal:p-l3-conference",
+        "id": "edge:portal:p-l3-conference--waypoint:l3-concourse:09",
         "kind": "within-space",
-        "restricted": true,
-        "sourceId": "p-l3-data",
+        "restricted": false,
+        "sourceId": "p-l3-conference",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-data"
+        "to": "waypoint:l3-concourse:09"
       },
       {
         "accessible": true,
@@ -3820,17 +3790,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 28,
+        "distanceMeters": 4,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-east--space:l3-concourse",
+        "from": "portal:p-l3-data",
+        "id": "edge:portal:p-l3-data--waypoint:l3-concourse:10",
         "kind": "within-space",
-        "restricted": false,
-        "sourceId": "p-l3-east",
+        "restricted": true,
+        "sourceId": "p-l3-data",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-east"
+        "to": "waypoint:l3-concourse:10"
       },
       {
         "accessible": true,
@@ -3848,17 +3818,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 13.601,
+        "distanceMeters": 0.01,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-education--space:l3-concourse",
+        "from": "portal:p-l3-east",
+        "id": "edge:portal:p-l3-east--waypoint:l3-concourse:12",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l3-education",
+        "sourceId": "p-l3-east",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-education"
+        "to": "waypoint:l3-concourse:12"
       },
       {
         "accessible": true,
@@ -3876,17 +3846,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 10.77,
+        "distanceMeters": 4,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-executive--space:l3-concourse",
+        "from": "portal:p-l3-education",
+        "id": "edge:portal:p-l3-education--waypoint:l3-concourse:03",
         "kind": "within-space",
-        "restricted": true,
-        "sourceId": "p-l3-executive",
+        "restricted": false,
+        "sourceId": "p-l3-education",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-executive"
+        "to": "waypoint:l3-concourse:03"
       },
       {
         "accessible": true,
@@ -3904,17 +3874,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 25.318,
+        "distanceMeters": 4,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-library--space:l3-concourse",
+        "from": "portal:p-l3-executive",
+        "id": "edge:portal:p-l3-executive--waypoint:l3-concourse:08",
         "kind": "within-space",
-        "restricted": false,
-        "sourceId": "p-l3-library",
+        "restricted": true,
+        "sourceId": "p-l3-executive",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-library"
+        "to": "waypoint:l3-concourse:08"
       },
       {
         "accessible": true,
@@ -3932,17 +3902,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 6.403,
+        "distanceMeters": 4,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-lifts--space:l3-concourse",
+        "from": "portal:p-l3-library",
+        "id": "edge:portal:p-l3-library--waypoint:l3-concourse:11",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l3-lifts",
+        "sourceId": "p-l3-library",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-lifts"
+        "to": "waypoint:l3-concourse:11"
       },
       {
         "accessible": true,
@@ -3960,17 +3930,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 23.345,
+        "distanceMeters": 4,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-research--space:l3-concourse",
+        "from": "portal:p-l3-lifts",
+        "id": "edge:portal:p-l3-lifts--waypoint:l3-concourse:04",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l3-research",
+        "sourceId": "p-l3-lifts",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-research"
+        "to": "waypoint:l3-concourse:04"
       },
       {
         "accessible": true,
@@ -3988,17 +3958,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 8.062,
+        "distanceMeters": 4,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-simulation--space:l3-concourse",
+        "from": "portal:p-l3-research",
+        "id": "edge:portal:p-l3-research--waypoint:l3-concourse:02",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l3-simulation",
+        "sourceId": "p-l3-research",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-simulation"
+        "to": "waypoint:l3-concourse:02"
       },
       {
         "accessible": true,
@@ -4015,18 +3985,18 @@
         "to": "portal:p-l3-simulation"
       },
       {
-        "accessible": false,
-        "distanceMeters": 4.123,
+        "accessible": true,
+        "distanceMeters": 4,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-stairs--space:l3-concourse",
+        "from": "portal:p-l3-simulation",
+        "id": "edge:portal:p-l3-simulation--waypoint:l3-concourse:07",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l3-stairs",
+        "sourceId": "p-l3-simulation",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-stairs"
+        "to": "waypoint:l3-concourse:07"
       },
       {
         "accessible": false,
@@ -4043,18 +4013,18 @@
         "to": "portal:p-l3-stairs"
       },
       {
-        "accessible": true,
-        "distanceMeters": 13.601,
+        "accessible": false,
+        "distanceMeters": 4,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-training--space:l3-concourse",
+        "from": "portal:p-l3-stairs",
+        "id": "edge:portal:p-l3-stairs--waypoint:l3-concourse:06",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l3-training",
+        "sourceId": "p-l3-stairs",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-training"
+        "to": "waypoint:l3-concourse:06"
       },
       {
         "accessible": true,
@@ -4072,17 +4042,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 28,
+        "distanceMeters": 4,
         "floorIds": [
           "l3"
         ],
-        "from": "space:l3-concourse",
-        "id": "edge:portal:p-l3-west--space:l3-concourse",
+        "from": "portal:p-l3-training",
+        "id": "edge:portal:p-l3-training--waypoint:l3-concourse:03",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "p-l3-west",
+        "sourceId": "p-l3-training",
         "spaceId": "l3-concourse",
-        "to": "portal:p-l3-west"
+        "to": "waypoint:l3-concourse:03"
       },
       {
         "accessible": true,
@@ -4097,6 +4067,692 @@
         "sourceId": "p-l3-west",
         "spaceId": "l3-west-lobby",
         "to": "portal:p-l3-west"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-west",
+        "id": "edge:portal:p-l3-west--waypoint:l3-concourse:01",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-west",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:01"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:05",
+        "id": "edge:space:g-concourse--waypoint:g-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "space:g-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-concourse",
+        "id": "edge:space:g-concourse--waypoint:g-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:05",
+        "id": "edge:space:l1-concourse--waypoint:l1-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "space:l1-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-concourse",
+        "id": "edge:space:l1-concourse--waypoint:l1-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:05",
+        "id": "edge:space:l2-concourse--waypoint:l2-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "space:l2-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-concourse",
+        "id": "edge:space:l2-concourse--waypoint:l2-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:05",
+        "id": "edge:space:l3-concourse--waypoint:l3-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "space:l3-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-concourse",
+        "id": "edge:space:l3-concourse--waypoint:l3-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:01",
+        "id": "edge:waypoint:g-concourse:01--waypoint:g-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 10,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:02",
+        "id": "edge:waypoint:g-concourse:02--waypoint:g-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 8,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:03",
+        "id": "edge:waypoint:g-concourse:03--waypoint:g-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:04",
+        "id": "edge:waypoint:g-concourse:04--waypoint:g-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:06",
+        "id": "edge:waypoint:g-concourse:06--waypoint:g-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:07",
+        "id": "edge:waypoint:g-concourse:07--waypoint:g-concourse:08",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 7,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:08",
+        "id": "edge:waypoint:g-concourse:08--waypoint:g-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:09"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:09",
+        "id": "edge:waypoint:g-concourse:09--waypoint:g-concourse:10",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:10"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:10",
+        "id": "edge:waypoint:g-concourse:10--waypoint:g-concourse:11",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:11"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:11",
+        "id": "edge:waypoint:g-concourse:11--waypoint:g-concourse:12",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:12"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:01",
+        "id": "edge:waypoint:l1-concourse:01--waypoint:l1-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 10,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:02",
+        "id": "edge:waypoint:l1-concourse:02--waypoint:l1-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 8,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:03",
+        "id": "edge:waypoint:l1-concourse:03--waypoint:l1-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:04",
+        "id": "edge:waypoint:l1-concourse:04--waypoint:l1-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:06",
+        "id": "edge:waypoint:l1-concourse:06--waypoint:l1-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:07",
+        "id": "edge:waypoint:l1-concourse:07--waypoint:l1-concourse:08",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 7,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:08",
+        "id": "edge:waypoint:l1-concourse:08--waypoint:l1-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:09"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:09",
+        "id": "edge:waypoint:l1-concourse:09--waypoint:l1-concourse:10",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:10"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:10",
+        "id": "edge:waypoint:l1-concourse:10--waypoint:l1-concourse:11",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:11"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:11",
+        "id": "edge:waypoint:l1-concourse:11--waypoint:l1-concourse:12",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:12"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:01",
+        "id": "edge:waypoint:l2-concourse:01--waypoint:l2-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 10,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:02",
+        "id": "edge:waypoint:l2-concourse:02--waypoint:l2-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 8,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:03",
+        "id": "edge:waypoint:l2-concourse:03--waypoint:l2-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:04",
+        "id": "edge:waypoint:l2-concourse:04--waypoint:l2-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:06",
+        "id": "edge:waypoint:l2-concourse:06--waypoint:l2-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:07",
+        "id": "edge:waypoint:l2-concourse:07--waypoint:l2-concourse:08",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 7,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:08",
+        "id": "edge:waypoint:l2-concourse:08--waypoint:l2-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:09"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:09",
+        "id": "edge:waypoint:l2-concourse:09--waypoint:l2-concourse:10",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:10"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:10",
+        "id": "edge:waypoint:l2-concourse:10--waypoint:l2-concourse:11",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:11"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:11",
+        "id": "edge:waypoint:l2-concourse:11--waypoint:l2-concourse:12",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:12"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:01",
+        "id": "edge:waypoint:l3-concourse:01--waypoint:l3-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 10,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:02",
+        "id": "edge:waypoint:l3-concourse:02--waypoint:l3-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 8,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:03",
+        "id": "edge:waypoint:l3-concourse:03--waypoint:l3-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:04",
+        "id": "edge:waypoint:l3-concourse:04--waypoint:l3-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:06",
+        "id": "edge:waypoint:l3-concourse:06--waypoint:l3-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:07",
+        "id": "edge:waypoint:l3-concourse:07--waypoint:l3-concourse:08",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 7,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:08",
+        "id": "edge:waypoint:l3-concourse:08--waypoint:l3-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:09"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:09",
+        "id": "edge:waypoint:l3-concourse:09--waypoint:l3-concourse:10",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:10"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:10",
+        "id": "edge:waypoint:l3-concourse:10--waypoint:l3-concourse:11",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:11"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:11",
+        "id": "edge:waypoint:l3-concourse:11--waypoint:l3-concourse:12",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:12"
       }
     ],
     "nodes": [
@@ -5779,6 +6435,486 @@
           24
         ],
         "sourceId": "l3-west-lobby"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:01",
+        "kind": "waypoint",
+        "position": [
+          8,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:02",
+        "kind": "waypoint",
+        "position": [
+          13,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:03",
+        "kind": "waypoint",
+        "position": [
+          23,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:04",
+        "kind": "waypoint",
+        "position": [
+          31,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:05",
+        "kind": "waypoint",
+        "position": [
+          33,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:06",
+        "kind": "waypoint",
+        "position": [
+          37,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:07",
+        "kind": "waypoint",
+        "position": [
+          43,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:08",
+        "kind": "waypoint",
+        "position": [
+          46,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:09",
+        "kind": "waypoint",
+        "position": [
+          53,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:10",
+        "kind": "waypoint",
+        "position": [
+          58,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:11",
+        "kind": "waypoint",
+        "position": [
+          61,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:12",
+        "kind": "waypoint",
+        "position": [
+          64,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:01",
+        "kind": "waypoint",
+        "position": [
+          8,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:02",
+        "kind": "waypoint",
+        "position": [
+          13,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:03",
+        "kind": "waypoint",
+        "position": [
+          23,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:04",
+        "kind": "waypoint",
+        "position": [
+          31,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:05",
+        "kind": "waypoint",
+        "position": [
+          33,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:06",
+        "kind": "waypoint",
+        "position": [
+          37,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:07",
+        "kind": "waypoint",
+        "position": [
+          43,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:08",
+        "kind": "waypoint",
+        "position": [
+          46,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:09",
+        "kind": "waypoint",
+        "position": [
+          53,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:10",
+        "kind": "waypoint",
+        "position": [
+          58,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:11",
+        "kind": "waypoint",
+        "position": [
+          61,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:12",
+        "kind": "waypoint",
+        "position": [
+          64,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:01",
+        "kind": "waypoint",
+        "position": [
+          8,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:02",
+        "kind": "waypoint",
+        "position": [
+          13,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:03",
+        "kind": "waypoint",
+        "position": [
+          23,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:04",
+        "kind": "waypoint",
+        "position": [
+          31,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:05",
+        "kind": "waypoint",
+        "position": [
+          33,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:06",
+        "kind": "waypoint",
+        "position": [
+          37,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:07",
+        "kind": "waypoint",
+        "position": [
+          43,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:08",
+        "kind": "waypoint",
+        "position": [
+          46,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:09",
+        "kind": "waypoint",
+        "position": [
+          53,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:10",
+        "kind": "waypoint",
+        "position": [
+          58,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:11",
+        "kind": "waypoint",
+        "position": [
+          61,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:12",
+        "kind": "waypoint",
+        "position": [
+          64,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:01",
+        "kind": "waypoint",
+        "position": [
+          8,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:02",
+        "kind": "waypoint",
+        "position": [
+          13,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:03",
+        "kind": "waypoint",
+        "position": [
+          23,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:04",
+        "kind": "waypoint",
+        "position": [
+          31,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:05",
+        "kind": "waypoint",
+        "position": [
+          33,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:06",
+        "kind": "waypoint",
+        "position": [
+          37,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:07",
+        "kind": "waypoint",
+        "position": [
+          43,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:08",
+        "kind": "waypoint",
+        "position": [
+          46,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:09",
+        "kind": "waypoint",
+        "position": [
+          53,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:10",
+        "kind": "waypoint",
+        "position": [
+          58,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:11",
+        "kind": "waypoint",
+        "position": [
+          61,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:12",
+        "kind": "waypoint",
+        "position": [
+          64,
+          24
+        ],
+        "sourceId": "l3-concourse"
       }
     ]
   },

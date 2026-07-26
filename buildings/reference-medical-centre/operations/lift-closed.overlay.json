@@ -2,7 +2,7 @@
   "schemaVersion": "0.1.0",
   "id": "reference-lift-maintenance",
   "buildingId": "reference-medical-centre",
-  "packageHash": "5be7c952924d796b39ca065311d662cd24da0a18ae20bee0fd6ee962636cd00b",
+  "packageHash": "386a43f4b6094d9608b8a5ab822bd2a918c01098d7d78d672744d5767b0c41a4",
   "validFrom": "2026-07-01T00:00:00.000Z",
   "validUntil": "2026-08-01T00:00:00.000Z",
   "closures": [

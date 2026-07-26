@@ -90,7 +90,7 @@ The authored building source is compiled before runtime. Clients consume the com
 - 36 public POIs
 - 4 vertical-circulation systems
 - 9 localization anchors
-- 168 routing nodes and 176 edges
+- 216 routing nodes and 224 edges
 
 The package includes a reproducible public-lift outage used to exercise standard and wheelchair routing behavior. A smaller two-floor building is retained as a stable compiler and localization regression fixture.
 

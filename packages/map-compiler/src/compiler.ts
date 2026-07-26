@@ -6,7 +6,7 @@ import {
   type BuildingSource,
   type Coordinate2D,
 } from '@voicegis/spatial-schema';
-import { distanceBetween, polygonCentroid } from './geometry';
+import { distanceBetween, polygonCentroid, segmentInsidePolygon } from './geometry';
 import {
   createValidationReport,
   validateBuildingSemantics,
@@ -14,12 +14,12 @@ import {
   type ValidationReport,
 } from './validation';
 
-export const COMPILER_VERSION = '0.1.0' as const;
-export const BUILDING_PACKAGE_VERSION = '0.1.0' as const;
+export const COMPILER_VERSION = '0.2.0' as const;
+export const BUILDING_PACKAGE_VERSION = '0.2.0' as const;
 
 export interface CompiledNavigationNode {
   id: string;
-  kind: 'space' | 'portal' | 'connector-stop' | 'poi';
+  kind: 'space' | 'waypoint' | 'portal' | 'connector-stop' | 'poi';
   floorId: string;
   position: Coordinate2D;
   sourceId: string;
@@ -77,12 +77,25 @@ function edgeId(from: string, to: string) {
   return from < to ? `edge:${from}--${to}` : `edge:${to}--${from}`;
 }
 
+interface SpaceAccess {
+  nodeId: string;
+  position: Coordinate2D;
+  accessible: boolean;
+  restricted: boolean;
+  sourceId: string;
+}
+
+function coordinateKey([x, y]: Coordinate2D) {
+  return `${x.toFixed(6)},${y.toFixed(6)}`;
+}
+
 function generateNavigationGraph(source: BuildingSource) {
   const nodes: CompiledNavigationNode[] = [];
   const edges: CompiledNavigationEdge[] = [];
   const spaceById = new Map(source.spaces.map((space) => [space.id, space]));
   const floorById = new Map(source.floors.map((floor) => [floor.id, floor]));
   const spaceCentroidById = new Map<string, Coordinate2D>();
+  const accessBySpaceId = new Map(source.spaces.map((space) => [space.id, [] as SpaceAccess[]]));
 
   for (const space of source.spaces) {
     const position = polygonCentroid(space.polygon);
@@ -107,20 +120,13 @@ function generateNavigationGraph(source: BuildingSource) {
     });
     for (const spaceId of portal.connects) {
       const space = spaceById.get(spaceId);
-      const centroid = spaceCentroidById.get(spaceId);
-      if (!space || !centroid) continue;
-      const spaceNodeId = `space:${space.id}`;
-      edges.push({
-        id: edgeId(spaceNodeId, portalNodeId),
-        from: spaceNodeId,
-        to: portalNodeId,
-        kind: 'within-space',
-        distanceMeters: roundedDistance(centroid, portal.position),
+      if (!space) continue;
+      accessBySpaceId.get(spaceId)?.push({
+        nodeId: portalNodeId,
+        position: portal.position,
         accessible: portal.accessible && space.accessible,
         restricted: portal.restricted === true || !space.public,
-        floorIds: [portal.floorId],
         sourceId: portal.id,
-        spaceId: space.id,
       });
     }
   }
@@ -137,18 +143,12 @@ function generateNavigationGraph(source: BuildingSource) {
       sourceId: poi.id,
     });
     if (!space || !centroid) continue;
-    const spaceNodeId = `space:${space.id}`;
-    edges.push({
-      id: edgeId(spaceNodeId, poiNodeId),
-      from: spaceNodeId,
-      to: poiNodeId,
-      kind: 'within-space',
-      distanceMeters: roundedDistance(centroid, poi.position),
+    accessBySpaceId.get(space.id)?.push({
+      nodeId: poiNodeId,
+      position: poi.position,
       accessible: poi.accessible && space.accessible,
       restricted: !poi.public || !space.public,
-      floorIds: [poi.floorId],
       sourceId: poi.id,
-      spaceId: space.id,
     });
   }
 
@@ -168,19 +168,12 @@ function generateNavigationGraph(source: BuildingSource) {
         sourceId: connector.id,
       });
       if (!space || !centroid) continue;
-      const spaceNodeId = `space:${space.id}`;
-      edges.push({
-        id: edgeId(spaceNodeId, stopNodeId),
-        from: spaceNodeId,
-        to: stopNodeId,
-        kind: 'within-space',
-        distanceMeters: roundedDistance(centroid, stop.position),
+      accessBySpaceId.get(space.id)?.push({
+        nodeId: stopNodeId,
+        position: stop.position,
         accessible: connector.accessible && space.accessible,
         restricted: connector.restricted === true || !space.public,
-        floorIds: [stop.floorId],
         sourceId: connector.id,
-        spaceId: space.id,
-        connectorKind: connector.kind,
       });
     }
 
@@ -207,6 +200,104 @@ function generateNavigationGraph(source: BuildingSource) {
         connectorKind: connector.kind,
       });
     }
+  }
+
+  const addWithinSpaceEdge = (
+    space: BuildingSource['spaces'][number],
+    from: { nodeId: string; position: Coordinate2D },
+    to: { nodeId: string; position: Coordinate2D },
+    policy: Pick<SpaceAccess, 'accessible' | 'restricted' | 'sourceId'>,
+  ) => {
+    edges.push({
+      id: edgeId(from.nodeId, to.nodeId),
+      from: from.nodeId,
+      to: to.nodeId,
+      kind: 'within-space',
+      distanceMeters: roundedDistance(from.position, to.position),
+      accessible: policy.accessible,
+      restricted: policy.restricted,
+      floorIds: [space.floorId],
+      sourceId: policy.sourceId,
+      spaceId: space.id,
+    });
+  };
+
+  for (const space of source.spaces) {
+    const centroid = spaceCentroidById.get(space.id);
+    const access = accessBySpaceId.get(space.id) ?? [];
+    if (!centroid || access.length === 0) continue;
+
+    if (space.type === 'corridor') {
+      const xValues = space.polygon.map(([x]) => x);
+      const yValues = space.polygon.map(([, y]) => y);
+      const horizontal =
+        Math.max(...xValues) - Math.min(...xValues) >= Math.max(...yValues) - Math.min(...yValues);
+      const projectionFor = (position: Coordinate2D): Coordinate2D =>
+        horizontal ? [position[0], centroid[1]] : [centroid[0], position[1]];
+      const projectedAccess = access.map((item) => ({
+        access: item,
+        projection: projectionFor(item.position),
+      }));
+      const uniqueProjections = new Map<string, Coordinate2D>([
+        [coordinateKey(centroid), centroid],
+      ]);
+      projectedAccess.forEach(({ projection }) =>
+        uniqueProjections.set(coordinateKey(projection), projection),
+      );
+      const orderedProjections = [...uniqueProjections.values()].sort((a, b) =>
+        horizontal ? a[0] - b[0] || a[1] - b[1] : a[1] - b[1] || a[0] - b[0],
+      );
+      const corridorTopologyIsValid =
+        projectedAccess.every(({ access: item, projection }) =>
+          segmentInsidePolygon(item.position, projection, space.polygon),
+        ) &&
+        orderedProjections.slice(1).every((projection, index) =>
+          segmentInsidePolygon(orderedProjections[index], projection, space.polygon),
+        );
+
+      if (corridorTopologyIsValid) {
+        const projectionNodes = new Map<
+          string,
+          { nodeId: string; position: Coordinate2D }
+        >();
+        let waypointIndex = 0;
+        for (const projection of orderedProjections) {
+          const isCentroid = coordinateKey(projection) === coordinateKey(centroid);
+          const nodeId = isCentroid
+            ? `space:${space.id}`
+            : `waypoint:${space.id}:${String((waypointIndex += 1)).padStart(2, '0')}`;
+          projectionNodes.set(coordinateKey(projection), { nodeId, position: projection });
+          if (!isCentroid) {
+            nodes.push({
+              id: nodeId,
+              kind: 'waypoint',
+              floorId: space.floorId,
+              position: projection,
+              sourceId: space.id,
+            });
+          }
+        }
+
+        for (const { access: item, projection } of projectedAccess) {
+          const projectionNode = projectionNodes.get(coordinateKey(projection));
+          if (projectionNode) addWithinSpaceEdge(space, item, projectionNode, item);
+        }
+        for (let index = 1; index < orderedProjections.length; index += 1) {
+          const from = projectionNodes.get(coordinateKey(orderedProjections[index - 1]));
+          const to = projectionNodes.get(coordinateKey(orderedProjections[index]));
+          if (!from || !to) continue;
+          addWithinSpaceEdge(space, from, to, {
+            accessible: space.accessible,
+            restricted: !space.public,
+            sourceId: space.id,
+          });
+        }
+        continue;
+      }
+    }
+
+    const spaceNode = { nodeId: `space:${space.id}`, position: centroid };
+    for (const item of access) addWithinSpaceEdge(space, spaceNode, item, item);
   }
 
   return {

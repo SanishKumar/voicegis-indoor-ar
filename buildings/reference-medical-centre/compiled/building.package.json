@@ -14,7 +14,7 @@
     "name": "Reference Medical Centre (Synthetic Fixture)",
     "units": "meters"
   },
-  "compilerVersion": "0.1.0",
+  "compilerVersion": "0.2.0",
   "floors": [
     {
       "clearHeight": 3.2,
@@ -118,10 +118,10 @@
     }
   ],
   "manifest": {
-    "contentHash": "5be7c952924d796b39ca065311d662cd24da0a18ae20bee0fd6ee962636cd00b",
+    "contentHash": "386a43f4b6094d9608b8a5ab822bd2a918c01098d7d78d672744d5767b0c41a4",
     "hashAlgorithm": "sha256"
   },
-  "packageVersion": "0.1.0",
+  "packageVersion": "0.2.0",
   "pois": [
     {
       "accessible": true,
@@ -600,7 +600,6 @@
       },
       {
         "accessible": true,
-        "connectorKind": "elevator",
         "distanceMeters": 0.01,
         "floorIds": [
           "g"
@@ -615,7 +614,6 @@
       },
       {
         "accessible": true,
-        "connectorKind": "elevator",
         "distanceMeters": 0.01,
         "floorIds": [
           "l1"
@@ -645,7 +643,6 @@
       },
       {
         "accessible": false,
-        "connectorKind": "stairs",
         "distanceMeters": 0.5,
         "floorIds": [
           "g"
@@ -660,7 +657,6 @@
       },
       {
         "accessible": false,
-        "connectorKind": "stairs",
         "distanceMeters": 0.5,
         "floorIds": [
           "l1"
@@ -857,20 +853,6 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 9.5,
-        "floorIds": [
-          "g"
-        ],
-        "from": "space:g-corridor",
-        "id": "edge:portal:g-entry-opening--space:g-corridor",
-        "kind": "within-space",
-        "restricted": false,
-        "sourceId": "g-entry-opening",
-        "spaceId": "g-corridor",
-        "to": "portal:g-entry-opening"
-      },
-      {
-        "accessible": true,
         "distanceMeters": 2.5,
         "floorIds": [
           "g"
@@ -885,17 +867,31 @@
       },
       {
         "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:g-entry-opening",
+        "id": "edge:portal:g-entry-opening--waypoint:g-corridor:01",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-entry-opening",
+        "spaceId": "g-corridor",
+        "to": "waypoint:g-corridor:01"
+      },
+      {
+        "accessible": true,
         "distanceMeters": 2,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-corridor",
+        "from": "portal:g-imaging-door",
         "id": "edge:portal:g-imaging-door--space:g-corridor",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "g-imaging-door",
         "spaceId": "g-corridor",
-        "to": "portal:g-imaging-door"
+        "to": "space:g-corridor"
       },
       {
         "accessible": true,
@@ -913,20 +909,6 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 2.236,
-        "floorIds": [
-          "g"
-        ],
-        "from": "space:g-corridor",
-        "id": "edge:portal:g-laboratory-door--space:g-corridor",
-        "kind": "within-space",
-        "restricted": false,
-        "sourceId": "g-laboratory-door",
-        "spaceId": "g-corridor",
-        "to": "portal:g-laboratory-door"
-      },
-      {
-        "accessible": true,
         "distanceMeters": 3.5,
         "floorIds": [
           "g"
@@ -941,17 +923,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 9.5,
+        "distanceMeters": 2,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-corridor",
-        "id": "edge:portal:g-lift-opening--space:g-corridor",
+        "from": "portal:g-laboratory-door",
+        "id": "edge:portal:g-laboratory-door--waypoint:g-corridor:04",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "g-lift-opening",
+        "sourceId": "g-laboratory-door",
         "spaceId": "g-corridor",
-        "to": "portal:g-lift-opening"
+        "to": "waypoint:g-corridor:04"
       },
       {
         "accessible": true,
@@ -969,17 +951,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 6.801,
+        "distanceMeters": 0.01,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-corridor",
-        "id": "edge:portal:g-pharmacy-door--space:g-corridor",
+        "from": "portal:g-lift-opening",
+        "id": "edge:portal:g-lift-opening--waypoint:g-corridor:07",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "g-pharmacy-door",
+        "sourceId": "g-lift-opening",
         "spaceId": "g-corridor",
-        "to": "portal:g-pharmacy-door"
+        "to": "waypoint:g-corridor:07"
       },
       {
         "accessible": true,
@@ -997,17 +979,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 6.801,
+        "distanceMeters": 2,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-corridor",
-        "id": "edge:portal:g-reception-door--space:g-corridor",
+        "from": "portal:g-pharmacy-door",
+        "id": "edge:portal:g-pharmacy-door--waypoint:g-corridor:05",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "g-reception-door",
+        "sourceId": "g-pharmacy-door",
         "spaceId": "g-corridor",
-        "to": "portal:g-reception-door"
+        "to": "waypoint:g-corridor:05"
       },
       {
         "accessible": true,
@@ -1025,17 +1007,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 6.325,
+        "distanceMeters": 2,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-corridor",
-        "id": "edge:portal:g-restroom-door--space:g-corridor",
+        "from": "portal:g-reception-door",
+        "id": "edge:portal:g-reception-door--waypoint:g-corridor:02",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "g-restroom-door",
+        "sourceId": "g-reception-door",
         "spaceId": "g-corridor",
-        "to": "portal:g-restroom-door"
+        "to": "waypoint:g-corridor:02"
       },
       {
         "accessible": true,
@@ -1053,17 +1035,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 7.28,
+        "distanceMeters": 2,
         "floorIds": [
           "g"
         ],
-        "from": "space:g-corridor",
-        "id": "edge:portal:g-staff-door--space:g-corridor",
+        "from": "portal:g-restroom-door",
+        "id": "edge:portal:g-restroom-door--waypoint:g-corridor:03",
         "kind": "within-space",
-        "restricted": true,
-        "sourceId": "g-staff-door",
+        "restricted": false,
+        "sourceId": "g-restroom-door",
         "spaceId": "g-corridor",
-        "to": "portal:g-staff-door"
+        "to": "waypoint:g-corridor:03"
       },
       {
         "accessible": true,
@@ -1078,6 +1060,20 @@
         "sourceId": "g-staff-door",
         "spaceId": "g-staff-store",
         "to": "portal:g-staff-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:g-staff-door",
+        "id": "edge:portal:g-staff-door--waypoint:g-corridor:06",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "g-staff-door",
+        "spaceId": "g-corridor",
+        "to": "waypoint:g-corridor:06"
       },
       {
         "accessible": false,
@@ -1123,17 +1119,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 2.5,
+        "distanceMeters": 2,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-corridor",
-        "id": "edge:portal:l1-administration-door--space:l1-corridor",
+        "from": "portal:l1-administration-door",
+        "id": "edge:portal:l1-administration-door--waypoint:l1-corridor:04",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "l1-administration-door",
         "spaceId": "l1-corridor",
-        "to": "portal:l1-administration-door"
+        "to": "waypoint:l1-corridor:04"
       },
       {
         "accessible": true,
@@ -1155,13 +1151,13 @@
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-corridor",
+        "from": "portal:l1-cardiology-door",
         "id": "edge:portal:l1-cardiology-door--space:l1-corridor",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "l1-cardiology-door",
         "spaceId": "l1-corridor",
-        "to": "portal:l1-cardiology-door"
+        "to": "space:l1-corridor"
       },
       {
         "accessible": true,
@@ -1179,31 +1175,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 6.801,
+        "distanceMeters": 2,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-corridor",
-        "id": "edge:portal:l1-consultation-door--space:l1-corridor",
+        "from": "portal:l1-consultation-door",
+        "id": "edge:portal:l1-consultation-door--waypoint:l1-corridor:02",
         "kind": "within-space",
         "restricted": false,
         "sourceId": "l1-consultation-door",
         "spaceId": "l1-corridor",
-        "to": "portal:l1-consultation-door"
-      },
-      {
-        "accessible": true,
-        "distanceMeters": 9.5,
-        "floorIds": [
-          "l1"
-        ],
-        "from": "space:l1-corridor",
-        "id": "edge:portal:l1-lift-opening--space:l1-corridor",
-        "kind": "within-space",
-        "restricted": false,
-        "sourceId": "l1-lift-opening",
-        "spaceId": "l1-corridor",
-        "to": "portal:l1-lift-opening"
+        "to": "waypoint:l1-corridor:02"
       },
       {
         "accessible": true,
@@ -1221,17 +1203,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 7.28,
+        "distanceMeters": 0.01,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-corridor",
-        "id": "edge:portal:l1-records-door--space:l1-corridor",
+        "from": "portal:l1-lift-opening",
+        "id": "edge:portal:l1-lift-opening--waypoint:l1-corridor:07",
         "kind": "within-space",
-        "restricted": true,
-        "sourceId": "l1-records-door",
+        "restricted": false,
+        "sourceId": "l1-lift-opening",
         "spaceId": "l1-corridor",
-        "to": "portal:l1-records-door"
+        "to": "waypoint:l1-corridor:07"
       },
       {
         "accessible": true,
@@ -1249,17 +1231,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 6.801,
+        "distanceMeters": 2,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-corridor",
-        "id": "edge:portal:l1-restroom-door--space:l1-corridor",
+        "from": "portal:l1-records-door",
+        "id": "edge:portal:l1-records-door--waypoint:l1-corridor:06",
         "kind": "within-space",
-        "restricted": false,
-        "sourceId": "l1-restroom-door",
+        "restricted": true,
+        "sourceId": "l1-records-door",
         "spaceId": "l1-corridor",
-        "to": "portal:l1-restroom-door"
+        "to": "waypoint:l1-corridor:06"
       },
       {
         "accessible": true,
@@ -1274,6 +1256,20 @@
         "sourceId": "l1-restroom-door",
         "spaceId": "l1-restroom",
         "to": "portal:l1-restroom-door"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:l1-restroom-door",
+        "id": "edge:portal:l1-restroom-door--waypoint:l1-corridor:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-restroom-door",
+        "spaceId": "l1-corridor",
+        "to": "waypoint:l1-corridor:05"
       },
       {
         "accessible": false,
@@ -1305,20 +1301,6 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 5.852,
-        "floorIds": [
-          "l1"
-        ],
-        "from": "space:l1-corridor",
-        "id": "edge:portal:l1-training-door--space:l1-corridor",
-        "kind": "within-space",
-        "restricted": false,
-        "sourceId": "l1-training-door",
-        "spaceId": "l1-corridor",
-        "to": "portal:l1-training-door"
-      },
-      {
-        "accessible": true,
         "distanceMeters": 3.5,
         "floorIds": [
           "l1"
@@ -1333,17 +1315,17 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 9.5,
+        "distanceMeters": 2,
         "floorIds": [
           "l1"
         ],
-        "from": "space:l1-corridor",
-        "id": "edge:portal:l1-west-opening--space:l1-corridor",
+        "from": "portal:l1-training-door",
+        "id": "edge:portal:l1-training-door--waypoint:l1-corridor:03",
         "kind": "within-space",
         "restricted": false,
-        "sourceId": "l1-west-opening",
+        "sourceId": "l1-training-door",
         "spaceId": "l1-corridor",
-        "to": "portal:l1-west-opening"
+        "to": "waypoint:l1-corridor:03"
       },
       {
         "accessible": true,
@@ -1358,6 +1340,216 @@
         "sourceId": "l1-west-opening",
         "spaceId": "l1-west-lobby",
         "to": "portal:l1-west-opening"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:l1-west-opening",
+        "id": "edge:portal:l1-west-opening--waypoint:l1-corridor:01",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-west-opening",
+        "spaceId": "l1-corridor",
+        "to": "waypoint:l1-corridor:01"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-corridor:03",
+        "id": "edge:space:g-corridor--waypoint:g-corridor:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-corridor",
+        "spaceId": "g-corridor",
+        "to": "space:g-corridor"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-corridor",
+        "id": "edge:space:g-corridor--waypoint:g-corridor:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-corridor",
+        "spaceId": "g-corridor",
+        "to": "waypoint:g-corridor:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-corridor:03",
+        "id": "edge:space:l1-corridor--waypoint:l1-corridor:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-corridor",
+        "spaceId": "l1-corridor",
+        "to": "space:l1-corridor"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-corridor",
+        "id": "edge:space:l1-corridor--waypoint:l1-corridor:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-corridor",
+        "spaceId": "l1-corridor",
+        "to": "waypoint:l1-corridor:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-corridor:01",
+        "id": "edge:waypoint:g-corridor:01--waypoint:g-corridor:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-corridor",
+        "spaceId": "g-corridor",
+        "to": "waypoint:g-corridor:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-corridor:02",
+        "id": "edge:waypoint:g-corridor:02--waypoint:g-corridor:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-corridor",
+        "spaceId": "g-corridor",
+        "to": "waypoint:g-corridor:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-corridor:04",
+        "id": "edge:waypoint:g-corridor:04--waypoint:g-corridor:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-corridor",
+        "spaceId": "g-corridor",
+        "to": "waypoint:g-corridor:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-corridor:05",
+        "id": "edge:waypoint:g-corridor:05--waypoint:g-corridor:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-corridor",
+        "spaceId": "g-corridor",
+        "to": "waypoint:g-corridor:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2.5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-corridor:06",
+        "id": "edge:waypoint:g-corridor:06--waypoint:g-corridor:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-corridor",
+        "spaceId": "g-corridor",
+        "to": "waypoint:g-corridor:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-corridor:01",
+        "id": "edge:waypoint:l1-corridor:01--waypoint:l1-corridor:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-corridor",
+        "spaceId": "l1-corridor",
+        "to": "waypoint:l1-corridor:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-corridor:02",
+        "id": "edge:waypoint:l1-corridor:02--waypoint:l1-corridor:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-corridor",
+        "spaceId": "l1-corridor",
+        "to": "waypoint:l1-corridor:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-corridor:04",
+        "id": "edge:waypoint:l1-corridor:04--waypoint:l1-corridor:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-corridor",
+        "spaceId": "l1-corridor",
+        "to": "waypoint:l1-corridor:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-corridor:05",
+        "id": "edge:waypoint:l1-corridor:05--waypoint:l1-corridor:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-corridor",
+        "spaceId": "l1-corridor",
+        "to": "waypoint:l1-corridor:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2.5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-corridor:06",
+        "id": "edge:waypoint:l1-corridor:06--waypoint:l1-corridor:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-corridor",
+        "spaceId": "l1-corridor",
+        "to": "waypoint:l1-corridor:07"
       }
     ],
     "nodes": [
@@ -1910,6 +2102,146 @@
           9
         ],
         "sourceId": "l1-west-lobby"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-corridor:01",
+        "kind": "waypoint",
+        "position": [
+          5,
+          9
+        ],
+        "sourceId": "g-corridor"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-corridor:02",
+        "kind": "waypoint",
+        "position": [
+          8,
+          9
+        ],
+        "sourceId": "g-corridor"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-corridor:03",
+        "kind": "waypoint",
+        "position": [
+          8.5,
+          9
+        ],
+        "sourceId": "g-corridor"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-corridor:04",
+        "kind": "waypoint",
+        "position": [
+          15.5,
+          9
+        ],
+        "sourceId": "g-corridor"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-corridor:05",
+        "kind": "waypoint",
+        "position": [
+          21,
+          9
+        ],
+        "sourceId": "g-corridor"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-corridor:06",
+        "kind": "waypoint",
+        "position": [
+          21.5,
+          9
+        ],
+        "sourceId": "g-corridor"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-corridor:07",
+        "kind": "waypoint",
+        "position": [
+          24,
+          9
+        ],
+        "sourceId": "g-corridor"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-corridor:01",
+        "kind": "waypoint",
+        "position": [
+          5,
+          9
+        ],
+        "sourceId": "l1-corridor"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-corridor:02",
+        "kind": "waypoint",
+        "position": [
+          8,
+          9
+        ],
+        "sourceId": "l1-corridor"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-corridor:03",
+        "kind": "waypoint",
+        "position": [
+          9,
+          9
+        ],
+        "sourceId": "l1-corridor"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-corridor:04",
+        "kind": "waypoint",
+        "position": [
+          16,
+          9
+        ],
+        "sourceId": "l1-corridor"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-corridor:05",
+        "kind": "waypoint",
+        "position": [
+          21,
+          9
+        ],
+        "sourceId": "l1-corridor"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-corridor:06",
+        "kind": "waypoint",
+        "position": [
+          21.5,
+          9
+        ],
+        "sourceId": "l1-corridor"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-corridor:07",
+        "kind": "waypoint",
+        "position": [
+          24,
+          9
+        ],
+        "sourceId": "l1-corridor"
       }
     ]
   },

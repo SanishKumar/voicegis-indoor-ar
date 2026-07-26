@@ -41,7 +41,7 @@ describe('compiled route policy and receipts', () => {
     expect(result.receipt.appliedClosureIds).toEqual(['close-atrium-lift', 'close-south-lift']);
     expect(result.receipt.excludedEdges.closed).toBeGreaterThan(0);
     expect(result.receipt.selectedConnectors.map((connector) => connector.sourceId)).toEqual([
-      'stairs-south',
+      'stairs-atrium',
     ]);
   });
 

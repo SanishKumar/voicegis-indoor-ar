@@ -11,6 +11,21 @@ const edgesByPair = new Map(
 );
 
 describe('compiled package routing', () => {
+  it('routes adjacent destinations along the corridor instead of through its centroid', () => {
+    const result = calculateRoute(
+      'poi:poi-main-entrance',
+      'poi:poi-emergency',
+      ROUTING_NODES,
+      ROUTING_EDGES,
+    );
+
+    expect(result.found).toBe(true);
+    if (!result.found) return;
+    expect(result.totalDistance).toBeCloseTo(20.02, 6);
+    expect(result.pathIds).not.toContain('space:g-concourse');
+    expect(Math.max(...result.path.map((node) => node.x))).toBe(13);
+  });
+
   it('routes between floors through the accessible lift when requested', () => {
     const result = calculateRoute(
       'poi:poi-main-entrance',
