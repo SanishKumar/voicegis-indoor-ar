@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Navigation, MapPin, ArrowRight, QrCode, Search, ChevronRight } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
-import { getPOIs, CATEGORIES } from '../data/compiledBuilding';
+import { BUILDING_PACKAGE, getPOIs, CATEGORIES } from '../data/compiledBuilding';
 import { searchPOIs } from '../engine/searchIndex.js';
 
 export default function WelcomeScreen({ onComplete }) {
@@ -73,7 +73,7 @@ export default function WelcomeScreen({ onComplete }) {
                 <span>connected levels</span>
               </div>
               <div>
-                <strong>176</strong>
+                <strong>{BUILDING_PACKAGE.routing.edges.length}</strong>
                 <span>routing edges</span>
               </div>
               <div>

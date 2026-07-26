@@ -260,6 +260,38 @@ export function NavigationProvider({ children }) {
     localStorage.setItem('high_contrast', String(highContrast));
   }, [highContrast]);
 
+  const requestRoute = useCallback(
+    async (destNodeId, startId, stepFree, startFloorId) => {
+      dispatch({
+        type: ACTION.SET_ROUTE_START,
+        payload: {
+          startId,
+          endId: destNodeId,
+          startFloorId,
+        },
+      });
+      try {
+        const route = await findRoute(startId, destNodeId, {
+          profile: stepFree ? 'wheelchair' : 'standard',
+          ...(operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY
+            ? {
+                operationalOverlay: liftClosureOverlay,
+                evaluatedAt: LIFT_CLOSURE_REPLAY_TIME,
+              }
+            : {}),
+        });
+        dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: route });
+      } catch (err) {
+        console.error('Routing error:', err);
+        dispatch({
+          type: ACTION.SET_ROUTE_RESULT,
+          payload: { found: false, error: 'Routing failed' },
+        });
+      }
+    },
+    [operationalScenario],
+  );
+
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   }, []);
@@ -269,12 +301,19 @@ export function NavigationProvider({ children }) {
   }, []);
 
   const toggleAccessibleRouting = useCallback(() => {
-    setAccessibleRouting((prev) => {
-      const next = !prev;
-      localStorage.setItem('accessible_routing', String(next));
-      return next;
-    });
-  }, []);
+    const next = !accessibleRouting;
+    setAccessibleRouting(next);
+    localStorage.setItem('accessible_routing', String(next));
+    if (state.route && state.startNodeId && state.destinationNodeId) {
+      void requestRoute(state.destinationNodeId, state.startNodeId, next, undefined);
+    }
+  }, [
+    accessibleRouting,
+    requestRoute,
+    state.destinationNodeId,
+    state.route,
+    state.startNodeId,
+  ]);
 
   const setOperationalScenario = useCallback((scenario) => {
     setOperationalScenarioState(scenario);
@@ -297,32 +336,12 @@ export function NavigationProvider({ children }) {
     navigateTo: async (destNodeId, startNodeId) => {
       const startId = startNodeId || state.startNodeId;
       const startNode = getNodeById(startId);
-      dispatch({
-        type: ACTION.SET_ROUTE_START,
-        payload: {
-          startId,
-          endId: destNodeId,
-          startFloorId: startNode ? String(startNode.floor) : undefined,
-        },
-      });
-      try {
-        const route = await findRoute(startId, destNodeId, {
-          profile: accessibleRouting ? 'wheelchair' : 'standard',
-          ...(operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY
-            ? {
-                operationalOverlay: liftClosureOverlay,
-                evaluatedAt: LIFT_CLOSURE_REPLAY_TIME,
-              }
-            : {}),
-        });
-        dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: route });
-      } catch (err) {
-        console.error('Routing error:', err);
-        dispatch({
-          type: ACTION.SET_ROUTE_RESULT,
-          payload: { found: false, error: 'Routing failed' },
-        });
-      }
+      return requestRoute(
+        destNodeId,
+        startId,
+        accessibleRouting,
+        startNode ? String(startNode.floor) : undefined,
+      );
     },
 
     clearRoute: useCallback(() => {

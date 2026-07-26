@@ -47,6 +47,57 @@ export interface FloorTransition {
   targetFloorId: string;
 }
 
+export interface RouteConnectorRun {
+  connectorId: string;
+  fromFloorId: string;
+  toFloorId: string;
+  floorIds: string[];
+  nodes: GraphNode[];
+}
+
+export function routeFloorIds(path: GraphNode[]) {
+  const floorIds: string[] = [];
+  for (const node of path) {
+    const floorId = String(node.floor);
+    if (floorIds.at(-1) !== floorId) floorIds.push(floorId);
+  }
+  return floorIds;
+}
+
+export function routeConnectorRuns(path: GraphNode[]): RouteConnectorRun[] {
+  const runs: RouteConnectorRun[] = [];
+
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const from = path[index];
+    const to = path[index + 1];
+    const fromFloorId = String(from.floor);
+    const toFloorId = String(to.floor);
+    if (fromFloorId === toFloorId) continue;
+
+    const connectorId =
+      from.sourceId && from.sourceId === to.sourceId
+        ? from.sourceId
+        : `transition:${from.id}:${to.id}`;
+    const previous = runs.at(-1);
+    if (previous?.connectorId === connectorId && previous.toFloorId === fromFloorId) {
+      previous.toFloorId = toFloorId;
+      previous.floorIds.push(toFloorId);
+      previous.nodes.push(to);
+      continue;
+    }
+
+    runs.push({
+      connectorId,
+      fromFloorId,
+      toFloorId,
+      floorIds: [fromFloorId, toFloorId],
+      nodes: [from, to],
+    });
+  }
+
+  return runs;
+}
+
 export function floorTransitions(path: GraphNode[], floorId: string): FloorTransition[] {
   const transitions: FloorTransition[] = [];
   for (let index = 0; index < path.length - 1; index += 1) {

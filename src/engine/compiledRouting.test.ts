@@ -24,6 +24,14 @@ describe('compiled package routing', () => {
     expect(result.totalDistance).toBeCloseTo(20.02, 6);
     expect(result.pathIds).not.toContain('space:g-concourse');
     expect(Math.max(...result.path.map((node) => node.x))).toBe(13);
+    expect(
+      result.steps.filter(
+        (step) =>
+          step.distance < 0.02 &&
+          step.type !== STEP_TYPE.START &&
+          step.type !== STEP_TYPE.ARRIVE,
+      ),
+    ).toEqual([]);
   });
 
   it('routes between floors through the accessible lift when requested', () => {
@@ -41,6 +49,10 @@ describe('compiled package routing', () => {
     expect(result.path.map((node) => node.floor)).toContain('l1');
     expect(result.steps.some((step) => step.type === STEP_TYPE.ELEVATOR)).toBe(true);
     expect(result.steps.some((step) => step.type === STEP_TYPE.STAIRS)).toBe(false);
+    expect(result.steps[0].distance).toBeLessThan(10);
+    expect(result.steps.some((step) => step.instruction === 'Continue on Central Concourse')).toBe(
+      true,
+    );
     expect(result.steps.reduce((total, step) => total + step.distance, 0)).toBeCloseTo(
       result.totalDistance,
       6,

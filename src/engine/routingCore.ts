@@ -270,7 +270,7 @@ export function generateRouteSteps(
     ];
   }
 
-  const segments = path.slice(0, -1).map((from, index) => {
+  const rawSegments = path.slice(0, -1).map((from, index) => {
     const to = path[index + 1];
     const edge = edgeByPair.get(pairKey(from.id, to.id));
     return {
@@ -282,6 +282,43 @@ export function generateRouteSteps(
       edge,
     };
   });
+  const segments: typeof rawSegments = [];
+  let pendingDistance = 0;
+  for (const segment of rawSegments) {
+    const hasNoPlanarMovement =
+      String(segment.from.floor) === String(segment.to.floor) &&
+      Math.hypot(segment.to.x - segment.from.x, segment.to.y - segment.from.y) < 1e-7;
+    if (hasNoPlanarMovement) {
+      pendingDistance += segment.distance;
+      continue;
+    }
+    segments.push({ ...segment, distance: segment.distance + pendingDistance });
+    pendingDistance = 0;
+  }
+  if (pendingDistance > 0 && segments.length > 0) {
+    segments[segments.length - 1].distance += pendingDistance;
+  }
+  if (segments.length === 0) {
+    const destination = path[path.length - 1];
+    return [
+      {
+        type: STEP_TYPE.START,
+        instruction: `Start at ${path[0].poi?.name ?? 'your location'}`,
+        distance: pendingDistance,
+        nodeId: path[0].id,
+        bearing: 0,
+        floorId: path[0].floor,
+      },
+      {
+        type: STEP_TYPE.ARRIVE,
+        instruction: `Arrive at ${destination.poi?.name ?? 'the destination'}`,
+        distance: 0,
+        nodeId: destination.id,
+        bearing: 0,
+        floorId: destination.floor,
+      },
+    ];
+  }
 
   const firstCorridor = segments[0].corridor;
   const startName = path[0].poi?.name ?? 'your location';
@@ -308,20 +345,29 @@ export function generateRouteSteps(
   const verticalInstruction = (
     connectorKind: string | undefined,
     floorName: string | undefined,
+    connectorName: string | undefined,
   ) => {
-    const connector = connectorKind ?? 'vertical connector';
-    return `Take the ${connector} to ${floorName ?? 'the destination floor'}`;
+    const connector = connectorName ?? connectorKind ?? 'vertical connector';
+    return `Take ${connectorName ? connector : `the ${connector}`} to ${
+      floorName ?? 'the destination floor'
+    }`;
   };
 
   const firstIsVertical = segments[0].edge?.kind === 'vertical-connector';
   let activeStepIndex = firstIsVertical ? -1 : 0;
   let activeStepDistance = firstIsVertical ? 0 : segments[0].distance;
   let previousBearing: number | null = firstIsVertical ? null : segments[0].bearing;
+  let activeVerticalSourceId = firstIsVertical ? segments[0].edge?.sourceId : undefined;
+  let activeCorridor = firstIsVertical ? undefined : segments[0].corridor;
 
   if (firstIsVertical) {
     steps.push({
       type: verticalStepType(segments[0].edge?.connectorKind),
-      instruction: verticalInstruction(segments[0].edge?.connectorKind, segments[0].to.floorName),
+      instruction: verticalInstruction(
+        segments[0].edge?.connectorKind,
+        segments[0].to.floorName,
+        segments[0].corridor,
+      ),
       distance: segments[0].distance,
       nodeId: segments[0].from.id,
       bearing: 0,
@@ -333,9 +379,28 @@ export function generateRouteSteps(
     const segment = segments[index];
     if (segment.edge?.kind === 'vertical-connector') {
       if (activeStepIndex >= 0) steps[activeStepIndex].distance = activeStepDistance;
+      const previousStep = steps.at(-1);
+      if (
+        activeVerticalSourceId &&
+        activeVerticalSourceId === segment.edge.sourceId &&
+        previousStep?.type === verticalStepType(segment.edge.connectorKind)
+      ) {
+        previousStep.instruction = verticalInstruction(
+          segment.edge.connectorKind,
+          segment.to.floorName,
+          segment.corridor,
+        );
+        previousStep.distance += segment.distance;
+        previousStep.floorId = segment.to.floor;
+        continue;
+      }
       steps.push({
         type: verticalStepType(segment.edge.connectorKind),
-        instruction: verticalInstruction(segment.edge.connectorKind, segment.to.floorName),
+        instruction: verticalInstruction(
+          segment.edge.connectorKind,
+          segment.to.floorName,
+          segment.corridor,
+        ),
         distance: segment.distance,
         nodeId: segment.from.id,
         bearing: 0,
@@ -344,9 +409,12 @@ export function generateRouteSteps(
       activeStepIndex = -1;
       activeStepDistance = 0;
       previousBearing = null;
+      activeVerticalSourceId = segment.edge.sourceId;
+      activeCorridor = undefined;
       continue;
     }
 
+    activeVerticalSourceId = undefined;
     if (previousBearing === null) {
       steps.push({
         type: STEP_TYPE.STRAIGHT,
@@ -361,12 +429,29 @@ export function generateRouteSteps(
       activeStepIndex = steps.length - 1;
       activeStepDistance = segment.distance;
       previousBearing = segment.bearing;
+      activeCorridor = segment.corridor;
       continue;
     }
 
     const turnType = getTurnType(previousBearing, segment.bearing);
 
     if (turnType === STEP_TYPE.STRAIGHT) {
+      if (segment.corridor && segment.corridor !== activeCorridor) {
+        if (activeStepIndex >= 0) steps[activeStepIndex].distance = activeStepDistance;
+        steps.push({
+          type: STEP_TYPE.STRAIGHT,
+          instruction: `Continue on ${segment.corridor}`,
+          distance: segment.distance,
+          nodeId: segment.from.id,
+          bearing: segment.bearing,
+          floorId: segment.from.floor,
+        });
+        activeStepIndex = steps.length - 1;
+        activeStepDistance = segment.distance;
+        previousBearing = segment.bearing;
+        activeCorridor = segment.corridor;
+        continue;
+      }
       activeStepDistance += segment.distance;
       previousBearing = segment.bearing;
       continue;
@@ -384,6 +469,7 @@ export function generateRouteSteps(
     activeStepIndex = steps.length - 1;
     activeStepDistance = segment.distance;
     previousBearing = segment.bearing;
+    activeCorridor = segment.corridor;
   }
 
   if (activeStepIndex >= 0) steps[activeStepIndex].distance = activeStepDistance;

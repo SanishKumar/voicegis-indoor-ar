@@ -28,6 +28,7 @@ import type {
 } from '@voicegis/spatial-schema';
 import { BUILDING_PACKAGE as buildingPackage } from '../data/compiledBuilding';
 import { useNavigation } from '../context/NavigationContext.jsx';
+import { routeConnectorRuns, routeFloorIds } from '../engine/floorplanModel';
 import type { GraphNode, RouteResult } from '../engine/routingCore';
 import {
   buildSpaceWallSegments,
@@ -59,6 +60,25 @@ const WALL_COLOR = '#d8d6cf';
 const RESTRICTED_WALL_COLOR = '#735061';
 const GLASS_COLOR = '#7dd3fc';
 const WALL_THICKNESS_METERS = 0.12;
+const CONNECTORS_BY_ID = new Map(
+  buildingPackage.verticalConnectors.map((connector) => [connector.id, connector]),
+);
+
+function stairRoutePoints(
+  from: [number, number, number],
+  to: [number, number, number],
+): [number, number, number][] {
+  return Array.from({ length: 9 }, (_, index) => {
+    const progress = index / 8;
+    const endpoint = index === 0 || index === 8;
+    const switchback = endpoint ? 0 : index % 2 === 0 ? -0.34 : 0.34;
+    return [
+      from[0] + (to[0] - from[0]) * progress + switchback,
+      from[1] + (to[1] - from[1]) * progress,
+      from[2] + (to[2] - from[2]) * progress,
+    ];
+  });
+}
 
 interface FloorGeometryProps {
   floor: FloorSource;
@@ -638,7 +658,7 @@ function ActiveRouteOverlay({
     if (!floor) return null;
     return mapCoordinateToWorld(
       [node.x, node.y],
-      visualFloorElevation(floor, exploded) + Math.min(floor.clearHeight * 0.78, 2.9),
+      visualFloorElevation(floor, exploded) + 0.28,
       bounds,
     );
   };
@@ -650,8 +670,25 @@ function ActiveRouteOverlay({
     const from = pointForNode(previous);
     const to = pointForNode(node);
     if (!from || !to) return [];
-    return [{ from, to, vertical: String(previous.floor) !== String(node.floor), node }];
+    const vertical = String(previous.floor) !== String(node.floor);
+    const connectorId =
+      vertical && previous.sourceId === node.sourceId ? previous.sourceId : undefined;
+    const connector = connectorId ? CONNECTORS_BY_ID.get(connectorId) : undefined;
+    return [
+      {
+        from,
+        to,
+        vertical,
+        connector,
+        points:
+          vertical && connector?.kind === 'stairs'
+            ? stairRoutePoints(from, to)
+            : [from, to],
+        node,
+      },
+    ];
   });
+  const connectorRuns = routeConnectorRuns(route.path);
   const visibleNodes = route.path.filter(visible);
   const startPoint = visibleNodes[0] ? pointForNode(visibleNodes[0]) : null;
   const destinationPoint = visibleNodes.at(-1) ? pointForNode(visibleNodes.at(-1)!) : null;
@@ -664,14 +701,14 @@ function ActiveRouteOverlay({
       {segments.map((segment, index) => (
         <group key={`${segment.node.id}-${index}`}>
           <Line
-            points={[segment.from, segment.to]}
+            points={segment.points}
             color="#151619"
             lineWidth={11}
             depthTest={false}
             renderOrder={20}
           />
           <Line
-            points={[segment.from, segment.to]}
+            points={segment.points}
             color={segment.vertical ? '#8d80ff' : '#ff4f2a'}
             lineWidth={6.5}
             depthTest={false}
@@ -679,6 +716,34 @@ function ActiveRouteOverlay({
           />
         </group>
       ))}
+      {floorSelection === 'all' &&
+        connectorRuns.map((run) => {
+          const connector = CONNECTORS_BY_ID.get(run.connectorId);
+          const firstPoint = pointForNode(run.nodes[0]);
+          const lastPoint = pointForNode(run.nodes.at(-1)!);
+          if (!firstPoint || !lastPoint) return null;
+          const labelPosition: [number, number, number] = [
+            (firstPoint[0] + lastPoint[0]) / 2,
+            (firstPoint[1] + lastPoint[1]) / 2,
+            (firstPoint[2] + lastPoint[2]) / 2,
+          ];
+          return (
+            <Html
+              key={`connector-label-${run.connectorId}`}
+              position={labelPosition}
+              center
+              distanceFactor={17}
+            >
+              <div className="twin-connector-label">
+                <strong>{connector?.name ?? run.connectorId}</strong>
+                <span>
+                  {connector?.kind ?? 'connector'} · {run.fromFloorId.toUpperCase()} →{' '}
+                  {run.toFloorId.toUpperCase()}
+                </span>
+              </div>
+            </Html>
+          );
+        })}
       {visibleNodes.map((node, index) => {
         const point = pointForNode(node);
         if (!point || index === 0 || index === route.path.length - 1) return null;
@@ -978,6 +1043,16 @@ export default function SpatialTwinViewer() {
   const currentNodeId = activeRoute?.found
     ? activeRoute.steps[state.currentStepIndex]?.nodeId
     : undefined;
+  const activeRouteFloors = activeRoute?.found ? routeFloorIds(activeRoute.path) : [];
+  const activeConnectorRuns = activeRoute?.found ? routeConnectorRuns(activeRoute.path) : [];
+  const destinationName =
+    activeRoute?.found && activeRoute.path.at(-1)?.poi?.name
+      ? activeRoute.path.at(-1)!.poi!.name
+      : 'Active route';
+  const floorLabel = (floorId: string) => {
+    const floor = buildingPackage.floors.find((candidate) => candidate.id === floorId);
+    return floor?.level === 0 ? 'G' : `L${floor?.level ?? floorId}`;
+  };
 
   const visibleSpaces = useMemo(
     () =>
@@ -1164,25 +1239,35 @@ export default function SpatialTwinViewer() {
           ) : activeRoute?.found ? (
             <div className="twin-route-inspector">
               <span className="twin-space-type">Active route</span>
-              <h2>
-                {activeRoute.steps[state.currentStepIndex]?.instruction ?? 'Route ready'}
-              </h2>
-              <p>
-                Decision {Math.min(state.currentStepIndex + 1, activeRoute.steps.length)} of{' '}
-                {activeRoute.steps.length}
+              <h2>{destinationName}</h2>
+              <p className="twin-route-journey-copy">
+                {activeRouteFloors.map(floorLabel).join(' → ')}
+                {activeConnectorRuns.map((run) => {
+                  const connector = CONNECTORS_BY_ID.get(run.connectorId);
+                  return ` via ${connector?.name ?? run.connectorId}`;
+                })}
               </p>
+              <div className="twin-route-current">
+                <span>
+                  Decision {Math.min(state.currentStepIndex + 1, activeRoute.steps.length)} of{' '}
+                  {activeRoute.steps.length}
+                </span>
+                <strong>
+                  {activeRoute.steps[state.currentStepIndex]?.instruction ?? 'Route ready'}
+                </strong>
+              </div>
               <dl className="twin-property-grid">
                 <div>
                   <dt>Distance</dt>
                   <dd>{Math.round(activeRoute.totalDistance)} m</dd>
                 </div>
                 <div>
-                  <dt>Path nodes</dt>
-                  <dd>{activeRoute.path.length}</dd>
+                  <dt>Floors</dt>
+                  <dd>{activeRouteFloors.length}</dd>
                 </div>
               </dl>
               <p className="twin-route-note">
-                Orange marks horizontal travel. Violet marks movement between floors.
+                Orange marks walking segments. Violet is anchored to the selected lift or stair.
               </p>
             </div>
           ) : (

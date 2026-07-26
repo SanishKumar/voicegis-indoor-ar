@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Arc, Circle, Group, Layer, Line, Rect, Stage, Text } from 'react-konva';
 import type Konva from 'konva';
-import { Accessibility, Compass, Database, DoorOpen, Layers, LockKeyhole, Wrench } from 'lucide-react';
+import {
+  Accessibility,
+  ArrowUpDown,
+  Compass,
+  Database,
+  DoorOpen,
+  Footprints,
+  Layers,
+  LockKeyhole,
+  Route,
+  Wrench,
+} from 'lucide-react';
 import { OPERATIONAL_SCENARIO, useNavigation } from '../context/NavigationContext.jsx';
 import {
   BUILDING_PACKAGE,
@@ -11,12 +22,20 @@ import {
   getPOIs,
   type VisitorPoiNode,
 } from '../data/compiledBuilding';
-import { floorTransitions, polygonCentroid, routeSegmentsForFloor } from '../engine/floorplanModel';
+import {
+  polygonCentroid,
+  routeConnectorRuns,
+  routeFloorIds,
+  routeSegmentsForFloor,
+} from '../engine/floorplanModel';
 import type { RouteResult } from '../engine/routingCore';
 import { getNearestBoundaryAngle, getPolygonBounds } from '../engine/spatialTwinArchitecture';
 
 const WORLD_SCALE = 44;
 const MAP_PADDING = 50;
+const CONNECTORS_BY_ID = new Map(
+  BUILDING_PACKAGE.verticalConnectors.map((connector) => [connector.id, connector]),
+);
 
 interface NavigatorContextValue {
   state: {
@@ -136,7 +155,23 @@ export default function FloorplanViewer() {
 
   const routePath = state.route?.found ? state.route.path : [];
   const floorRouteSegments = routeSegmentsForFloor(routePath, activeFloor.id);
-  const transitions = floorTransitions(routePath, activeFloor.id);
+  const routeFloors = routeFloorIds(routePath);
+  const connectorRuns = routeConnectorRuns(routePath);
+  const multiFloorRoute = routeFloors.length > 1;
+  const connectorMarkers = connectorRuns.flatMap((run) => {
+    const floorIndex = run.floorIds.indexOf(activeFloor.id);
+    if (floorIndex < 0) return [];
+    const node = run.nodes.find((candidate) => String(candidate.floor) === activeFloor.id);
+    if (!node) return [];
+    const connector = CONNECTORS_BY_ID.get(run.connectorId);
+    const movement =
+      floorIndex === 0
+        ? `to ${run.toFloorId.toUpperCase()}`
+        : floorIndex === run.floorIds.length - 1
+          ? `from ${run.fromFloorId.toUpperCase()}`
+          : `continue to ${run.toFloorId.toUpperCase()}`;
+    return [{ run, node, connector, movement }];
+  });
   const startNode = getNodeById(state.startNodeId);
   const destinationNode = getNodeById(state.destinationNodeId);
   const destinationSpaceId = (destinationNode as VisitorPoiNode | null)?.poi?.spaceId;
@@ -178,7 +213,11 @@ export default function FloorplanViewer() {
   };
 
   return (
-    <div className="compiled-map" ref={containerRef} style={{ background: colors.background }}>
+    <div
+      className={`compiled-map${multiFloorRoute ? ' route-multifloor' : ''}`}
+      ref={containerRef}
+      style={{ background: colors.background }}
+    >
       <Stage
         ref={stageRef}
         width={dimensions.width}
@@ -441,24 +480,6 @@ export default function FloorplanViewer() {
             );
           })}
 
-          {transitions.map(({ node, targetFloorId }) => {
-            const point = toCanvas([node.x, node.y]);
-            const targetFloor = getFloorById(targetFloorId);
-            return (
-              <Group key={`${node.id}-${targetFloorId}`} x={point[0]} y={point[1]}>
-                <Circle radius={15} fill="#5b4ee6" stroke="#202226" strokeWidth={3} />
-                <Text
-                  x={20}
-                  y={-12}
-                  text={`To ${targetFloor?.name ?? targetFloorId}`}
-                  fontSize={12}
-                  fontStyle="bold"
-                  fill={colors.text}
-                />
-              </Group>
-            );
-          })}
-
           {floorConnectorStops.map(({ connector, stop }) => {
             const point = toCanvas(stop.position);
             return (
@@ -482,6 +503,32 @@ export default function FloorplanViewer() {
                   fontSize={10}
                   fontStyle="bold"
                   fill="#3e403d"
+                />
+              </Group>
+            );
+          })}
+
+          {connectorMarkers.map(({ run, node, connector, movement }) => {
+            const point = toCanvas([node.x, node.y]);
+            return (
+              <Group key={`${run.connectorId}-${activeFloor.id}`} x={point[0]} y={point[1]}>
+                <Circle
+                  radius={23}
+                  fill="rgba(91, 78, 230, 0.08)"
+                  stroke="#5b4ee6"
+                  strokeWidth={3}
+                  dash={[5, 4]}
+                />
+                <Circle radius={4} fill="#5b4ee6" />
+                <Text
+                  x={29}
+                  y={-17}
+                  width={180}
+                  text={`${connector?.name ?? 'Vertical connector'}\n${movement}`}
+                  fontSize={11}
+                  lineHeight={1.35}
+                  fontStyle="bold"
+                  fill={colors.text}
                 />
               </Group>
             );
@@ -540,6 +587,7 @@ export default function FloorplanViewer() {
               key={floor.id}
               type="button"
               className={floor.id === activeFloor.id ? 'active' : ''}
+              data-route-floor={routeFloors.includes(floor.id) || undefined}
               aria-pressed={floor.id === activeFloor.id}
               onClick={() => resetView(floor.id)}
             >
@@ -575,6 +623,49 @@ export default function FloorplanViewer() {
           </div>
         </div>
       </div>
+
+      {multiFloorRoute && (
+        <div className="compiled-route-journey" aria-label="Multi-floor route">
+          <span className="compiled-route-journey-label">
+            <Route size={13} />
+            Multi-floor
+          </span>
+          <div className="compiled-route-floor-chain">
+            {routeFloors.map((floorId, index) => {
+              const floor = getFloorById(floorId);
+              return (
+                <span key={floorId}>
+                  {index > 0 && <i aria-hidden="true">→</i>}
+                  <button
+                    type="button"
+                    className={floorId === activeFloor.id ? 'active' : ''}
+                    onClick={() => resetView(floorId)}
+                    title={floor?.name}
+                  >
+                    {floor?.level === 0 ? 'G' : `L${floor?.level ?? floorId}`}
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+          {connectorRuns.map((run) => {
+            const connector = CONNECTORS_BY_ID.get(run.connectorId);
+            const ConnectorIcon = connector?.kind === 'elevator' ? ArrowUpDown : Footprints;
+            return (
+              <span className="compiled-route-connector" key={run.connectorId}>
+                <ConnectorIcon size={13} />
+                {connector?.name ?? run.connectorId}
+                <small>
+                  {run.fromFloorId.toUpperCase()} → {run.toFloorId.toUpperCase()}
+                </small>
+              </span>
+            );
+          })}
+          <span className="compiled-route-viewing">
+            Viewing {activeFloor.level === 0 ? 'G' : `L${activeFloor.level}`} segment
+          </span>
+        </div>
+      )}
 
       <div className="compiled-map-floor-meta">
         <strong>{activeFloor.name}</strong>

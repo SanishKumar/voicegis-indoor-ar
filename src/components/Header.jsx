@@ -5,6 +5,7 @@
  */
 
 import {
+  Accessibility,
   Box,
   Map,
   Camera,
@@ -13,7 +14,6 @@ import {
   MapPin,
   Home,
   Eye,
-  Settings,
   Building2,
 } from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
@@ -130,13 +130,18 @@ export default function Header() {
 
         {/* Accessible Routing Toggle */}
         <button
-          className="header-btn"
+          className={`header-route-profile ${accessibleRouting ? 'active' : ''}`}
           onClick={toggleAccessibleRouting}
-          aria-label="Toggle accessible routing"
-          title="Toggle wheelchair accessible routing"
-          style={{ color: accessibleRouting ? 'var(--color-accent-green)' : 'inherit' }}
+          aria-label={
+            accessibleRouting
+              ? 'Use fastest available routing'
+              : 'Use step-free accessible routing'
+          }
+          aria-pressed={accessibleRouting}
+          title="Switch between fastest and step-free routing"
         >
-          <Settings size={18} />
+          <Accessibility size={16} />
+          <span>{accessibleRouting ? 'Step-free' : 'Fastest'}</span>
         </button>
       </div>
     </header>

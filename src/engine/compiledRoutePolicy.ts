@@ -70,10 +70,11 @@ function selectedConnectors(pathIds: string[]): SelectedConnectorReceipt[] {
     const from = ROUTING_NODES.find((node) => node.id === pathIds[index]);
     const to = ROUTING_NODES.find((node) => node.id === pathIds[index + 1]);
     if (!from || !to) continue;
+    const existing = connectors.get(edge.sourceId);
     connectors.set(edge.sourceId, {
       sourceId: edge.sourceId,
       kind: edge.connectorKind ?? 'vertical-connector',
-      fromFloorId: String(from.floor),
+      fromFloorId: existing?.fromFloorId ?? String(from.floor),
       toFloorId: String(to.floor),
     });
   }

@@ -120,6 +120,9 @@ export interface VisitorPoiNode extends GraphNode {
 const floorsById = new Map(BUILDING_PACKAGE.floors.map((floor) => [floor.id, floor]));
 const spacesById = new Map(BUILDING_PACKAGE.spaces.map((space) => [space.id, space]));
 const poisById = new Map(BUILDING_PACKAGE.pois.map((poi) => [poi.id, poi]));
+const connectorsById = new Map(
+  BUILDING_PACKAGE.verticalConnectors.map((connector) => [connector.id, connector]),
+);
 
 function describePoi(poi: PoiSource, space: SpaceSource) {
   const floor = floorsById.get(poi.floorId);
@@ -165,7 +168,12 @@ export const ROUTING_EDGES: GraphEdge[] = BUILDING_PACKAGE.routing.edges.map((ed
   from: edge.from,
   to: edge.to,
   distance: edge.distanceMeters,
-  corridor: edge.spaceId ? spacesById.get(edge.spaceId)?.name : undefined,
+  corridor:
+    edge.kind === 'vertical-connector'
+      ? connectorsById.get(edge.sourceId)?.name
+      : edge.spaceId
+        ? spacesById.get(edge.spaceId)?.name
+        : undefined,
   accessible: edge.accessible,
   restricted: edge.restricted,
   kind: edge.kind,

@@ -30,6 +30,20 @@ describe('compiled route policy and receipts', () => {
     ]);
   });
 
+  it('summarises a multi-floor connector run from boarding floor to exit floor', () => {
+    const result = calculateCompiledRoute('poi:poi-main-entrance', 'poi:poi-pediatrics');
+
+    expect(result.found).toBe(true);
+    expect(result.receipt.selectedConnectors).toEqual([
+      {
+        sourceId: 'lift-south',
+        kind: 'elevator',
+        fromFloorId: 'g',
+        toFloorId: 'l2',
+      },
+    ]);
+  });
+
   it('reroutes a standard profile to stairs when the lift closes', () => {
     const result = calculateCompiledRoute('poi:poi-main-entrance', 'poi:poi-cardiology', {
       profile: 'standard',

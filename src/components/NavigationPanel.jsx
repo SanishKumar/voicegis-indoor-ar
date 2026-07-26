@@ -23,9 +23,14 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
-import { getFloorById, getNodeById } from '../data/compiledBuilding';
+import { BUILDING_PACKAGE, getFloorById, getNodeById } from '../data/compiledBuilding';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
 import { STEP_TYPE } from '../engine/routingEngine';
+
+function shortFloorLabel(floorId) {
+  const floor = getFloorById(String(floorId));
+  return floor?.level === 0 ? 'G' : `L${floor?.level ?? floorId}`;
+}
 
 /**
  * Get the Lucide icon component for a step type.
@@ -64,9 +69,14 @@ function RouteReceiptDetails({ receipt }) {
   const connectorLabel =
     receipt.selectedConnectors.length > 0
       ? receipt.selectedConnectors
-          .map(
-            (connector) => `${connector.kind}: ${connector.fromFloorId} → ${connector.toFloorId}`,
-          )
+          .map((connector) => {
+            const source = BUILDING_PACKAGE.verticalConnectors.find(
+              (candidate) => candidate.id === connector.sourceId,
+            );
+            return `${source?.name ?? connector.sourceId}: ${shortFloorLabel(
+              connector.fromFloorId,
+            )} → ${shortFloorLabel(connector.toFloorId)}`;
+          })
           .join(', ')
       : 'No vertical connector';
   const closureLabel =
@@ -138,6 +148,7 @@ export default function NavigationPanel() {
   }
 
   const destNode = getNodeById(destinationNodeId);
+  const destinationFloor = destNode ? getFloorById(String(destNode.floor)) : null;
   const steps = route.steps;
   const currentStep = steps[currentStepIndex];
   const currentFloor = currentStep?.floorId ? getFloorById(String(currentStep.floorId)) : null;
@@ -148,6 +159,17 @@ export default function NavigationPanel() {
   const remainingDistance = steps
     .slice(currentStepIndex)
     .reduce((sum, s) => sum + (s.distance || 0), 0);
+  const connectorReceipt = route.receipt?.selectedConnectors?.[0];
+  const connector = connectorReceipt
+    ? BUILDING_PACKAGE.verticalConnectors.find(
+        (candidate) => candidate.id === connectorReceipt.sourceId,
+      )
+    : null;
+  const routeProfile =
+    route.receipt?.profile === 'wheelchair' ? 'Step-free route' : 'Fastest available route';
+  const journeyLabel = connectorReceipt
+    ? `${shortFloorLabel(connectorReceipt.fromFloorId)} → ${connector?.name ?? connectorReceipt.sourceId} → ${shortFloorLabel(connectorReceipt.toFloorId)}`
+    : `${shortFloorLabel(destNode?.floor)} · same floor`;
 
   return (
     <div className={`nav-panel open`} id="nav-panel">
@@ -162,6 +184,9 @@ export default function NavigationPanel() {
           </div>
           <div>
             <div className="nav-panel-dest-name">{destNode?.poi?.name || 'Destination'}</div>
+            {destinationFloor && (
+              <div className="nav-panel-dest-floor">{destinationFloor.name}</div>
+            )}
             <div className="nav-panel-dest-eta">
               {isArrived
                 ? '✅ You have arrived!'
@@ -181,6 +206,11 @@ export default function NavigationPanel() {
       {/* Progress Bar */}
       <div className="nav-progress-bar">
         <div className="nav-progress-fill" style={{ width: `${progress}%` }} />
+      </div>
+
+      <div className="nav-route-summary" aria-label={routeProfile}>
+        <span>{routeProfile}</span>
+        <strong>{journeyLabel}</strong>
       </div>
 
       <RouteReceiptDetails receipt={route.receipt} />

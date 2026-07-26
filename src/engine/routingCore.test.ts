@@ -89,6 +89,71 @@ describe('A* routing core', () => {
     expect(result.steps[0].type).toBe(STEP_TYPE.ARRIVE);
   });
 
+  it('keeps a consecutive lift run as one instruction to the exit floor', () => {
+    const nodes: GraphNode[] = [
+      { id: 'start', x: 0, y: 0, floor: 'g', floorName: 'Ground', type: 'poi' },
+      {
+        id: 'lift-g',
+        x: 1,
+        y: 0,
+        floor: 'g',
+        floorName: 'Ground',
+        type: 'connector-stop',
+      },
+      {
+        id: 'lift-l1',
+        x: 1,
+        y: 0,
+        floor: 'l1',
+        floorName: 'Level 1',
+        type: 'connector-stop',
+      },
+      {
+        id: 'lift-l2',
+        x: 1,
+        y: 0,
+        floor: 'l2',
+        floorName: 'Level 2',
+        type: 'connector-stop',
+      },
+      { id: 'destination', x: 2, y: 0, floor: 'l2', floorName: 'Level 2', type: 'poi' },
+    ];
+    const edges: GraphEdge[] = [
+      { from: 'start', to: 'lift-g', distance: 1 },
+      {
+        from: 'lift-g',
+        to: 'lift-l1',
+        distance: 4.8,
+        kind: 'vertical-connector',
+        connectorKind: 'elevator',
+        sourceId: 'lift-south',
+        corridor: 'South Lift Bank',
+      },
+      {
+        from: 'lift-l1',
+        to: 'lift-l2',
+        distance: 4.2,
+        kind: 'vertical-connector',
+        connectorKind: 'elevator',
+        sourceId: 'lift-south',
+        corridor: 'South Lift Bank',
+      },
+      { from: 'lift-l2', to: 'destination', distance: 1 },
+    ];
+
+    const result = calculateRoute('start', 'destination', nodes, edges);
+
+    expect(result.found).toBe(true);
+    if (!result.found) return;
+    const liftSteps = result.steps.filter((step) => step.type === STEP_TYPE.ELEVATOR);
+    expect(liftSteps).toHaveLength(1);
+    expect(liftSteps[0]).toMatchObject({
+      instruction: 'Take South Lift Bank to Level 2',
+      distance: 9,
+      floorId: 'l2',
+    });
+  });
+
   it('fails cleanly when constraints disconnect the destination', () => {
     const nodes: GraphNode[] = [
       { id: 'a', x: 0, y: 0, floor: 1, type: 'junction' },
