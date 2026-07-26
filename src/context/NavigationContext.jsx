@@ -12,6 +12,7 @@
 
 import { createContext, useContext, useReducer, useCallback, useState, useEffect } from 'react';
 import { findRoute } from '../engine/routingEngine';
+import { calculateCompiledRoute } from '../engine/compiledRoutePolicy';
 import { BUILDING_CONFIG } from '../data/buildingConfig.js';
 import { getNodeById } from '../data/compiledBuilding';
 import liftClosureOverlay from '../../buildings/asterion-medical-center/operations/all-public-lifts-closed.overlay.json';
@@ -23,6 +24,18 @@ export const OPERATIONAL_SCENARIO = {
 };
 
 const LIFT_CLOSURE_REPLAY_TIME = '2026-07-22T12:00:00.000Z';
+
+function routeOptionsFor(scenario, stepFree) {
+  return {
+    profile: stepFree ? 'wheelchair' : 'standard',
+    ...(scenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY
+      ? {
+          operationalOverlay: liftClosureOverlay,
+          evaluatedAt: LIFT_CLOSURE_REPLAY_TIME,
+        }
+      : {}),
+  };
+}
 
 // ── Action Types ──
 const ACTION = {
@@ -271,15 +284,11 @@ export function NavigationProvider({ children }) {
         },
       });
       try {
-        const route = await findRoute(startId, destNodeId, {
-          profile: stepFree ? 'wheelchair' : 'standard',
-          ...(operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY
-            ? {
-                operationalOverlay: liftClosureOverlay,
-                evaluatedAt: LIFT_CLOSURE_REPLAY_TIME,
-              }
-            : {}),
-        });
+        const route = await findRoute(
+          startId,
+          destNodeId,
+          routeOptionsFor(operationalScenario, stepFree),
+        );
         dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: route });
       } catch (err) {
         console.error('Routing error:', err);
@@ -290,6 +299,16 @@ export function NavigationProvider({ children }) {
       }
     },
     [operationalScenario],
+  );
+
+  const previewRoute = useCallback(
+    (destNodeId, startNodeId = state.startNodeId) =>
+      calculateCompiledRoute(
+        startNodeId,
+        destNodeId,
+        routeOptionsFor(operationalScenario, accessibleRouting),
+      ),
+    [accessibleRouting, operationalScenario, state.startNodeId],
   );
 
   const toggleTheme = useCallback(() => {
@@ -392,6 +411,7 @@ export function NavigationProvider({ children }) {
         operationalScenario,
         setOperationalScenario,
         packageCacheStatus,
+        previewRoute,
       }}
     >
       {children}

@@ -87,7 +87,7 @@ The authored building source is compiled before runtime. Clients consume the com
 - 4 floors
 - 60 semantic spaces
 - 56 modeled portals
-- 36 public POIs
+- 32 public POIs and 4 restricted operational POIs
 - 4 vertical-circulation systems
 - 9 localization anchors
 - 216 routing nodes and 224 edges

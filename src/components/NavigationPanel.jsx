@@ -127,6 +127,13 @@ export default function NavigationPanel() {
   }
 
   if (!route.found) {
+    const isStepFreeLiftOutage =
+      route.receipt?.profile === 'wheelchair' &&
+      route.receipt?.operationalOverlayId === 'asterion-all-public-lifts-closed-2026-07-22';
+    const failureMessage = isStepFreeLiftOutage
+      ? 'Step-free routing is unavailable because both public lift banks are closed in this replay. Restore lift service before trying this journey again.'
+      : route.error;
+
     return (
       <div className="nav-panel route-failure-panel open" id="route-failure-panel" role="alert">
         <div className="nav-panel-handle" />
@@ -136,7 +143,7 @@ export default function NavigationPanel() {
           </div>
           <div>
             <strong>No compliant route</strong>
-            <p>{route.error}</p>
+            <p>{failureMessage}</p>
           </div>
           <button className="nav-panel-close-btn" onClick={() => actions.clearRoute()}>
             <X size={12} /> Dismiss
@@ -234,6 +241,7 @@ export default function NavigationPanel() {
               className="btn btn-icon btn-ghost"
               onClick={() => actions.prevStep()}
               disabled={currentStepIndex === 0}
+              aria-label="Previous route instruction"
               style={{ width: '32px', height: '32px', opacity: currentStepIndex === 0 ? 0.3 : 1 }}
               id="btn-prev-step"
             >
@@ -243,6 +251,7 @@ export default function NavigationPanel() {
               className="btn btn-icon btn-ghost"
               onClick={() => actions.nextStep()}
               disabled={currentStepIndex >= steps.length - 1}
+              aria-label="Next route instruction"
               style={{
                 width: '32px',
                 height: '32px',

@@ -5,15 +5,15 @@
  * and navigation start.
  */
 
-import { useState, useRef, useMemo, useCallback } from 'react';
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { Search, X, Navigation, MapPin } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs, getAvailableCategories } from '../engine/searchIndex.js';
-import { CATEGORIES, getNodeById } from '../data/compiledBuilding';
-import { BUILDING_CONFIG, formatDistance } from '../data/buildingConfig.js';
+import { CATEGORIES } from '../data/compiledBuilding';
+import { formatDistance } from '../data/buildingConfig.js';
 
 export default function SearchPanel() {
-  const { state, actions } = useNavigation();
+  const { state, actions, previewRoute } = useNavigation();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
@@ -56,25 +56,25 @@ export default function SearchPanel() {
     setActiveCategory((prev) => (prev === cat ? null : cat));
   }, []);
 
-  // Estimate distance from current position
-  const getDistanceEstimate = useCallback(
-    (node) => {
-      if (!state.startNodeId || state.startNodeId === node.id) return null;
-      const startNode = getNodeById(state.startNodeId);
-      if (startNode && node) {
-        const dx = startNode.x - node.x;
-        const dy = startNode.y - node.y;
-        const startFloor = BUILDING_CONFIG.floors.find(
-          (floor) => floor.id === String(startNode.floor),
-        );
-        const endFloor = BUILDING_CONFIG.floors.find((floor) => floor.id === String(node.floor));
-        const floorDelta = Math.abs((endFloor?.level ?? 0) - (startFloor?.level ?? 0)) * 3.6;
-        return Math.hypot(dx, dy, floorDelta);
-      }
-      return null;
-    },
-    [state.startNodeId],
+  const routePreviews = useMemo(
+    () =>
+      new Map(
+        results.map(({ node }) => [
+          node.id,
+          state.startNodeId && state.startNodeId !== node.id ? previewRoute(node.id) : null,
+        ]),
+      ),
+    [previewRoute, results, state.startNodeId],
   );
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') closePanel();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [closePanel, isOpen]);
 
   // Don't show search trigger when navigating
   if (state.navStatus === 'navigating' || state.navStatus === 'arrived') {
@@ -86,15 +86,16 @@ export default function SearchPanel() {
       {/* Search Trigger Pill */}
       {!isOpen && (
         <div className="search-trigger">
-          <div
+          <button
+            type="button"
             className="search-trigger-pill animate-slide-up"
             onClick={openPanel}
             id="btn-search-open"
-            role="button"
+            aria-label="Search rooms and departments"
           >
             <Search size={18} color="var(--color-accent-blue)" />
             <span>Search rooms, departments...</span>
-          </div>
+          </button>
         </div>
       )}
 
@@ -121,9 +122,15 @@ export default function SearchPanel() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             id="search-input"
+            aria-label="Search rooms and departments"
           />
           {query && (
-            <button className="search-clear-btn" onClick={() => setQuery('')} id="btn-search-clear">
+            <button
+              className="search-clear-btn"
+              onClick={() => setQuery('')}
+              id="btn-search-clear"
+              aria-label="Clear search"
+            >
               <X size={14} />
             </button>
           )}
@@ -140,6 +147,7 @@ export default function SearchPanel() {
                 className={`category-chip ${activeCategory === catId ? 'active' : ''}`}
                 data-cat={catId}
                 onClick={() => toggleCategory(catId)}
+                aria-pressed={activeCategory === catId}
               >
                 {cat.icon} {cat.label}
               </button>
@@ -152,27 +160,29 @@ export default function SearchPanel() {
           {results.length > 0 ? (
             results.map(({ node }) => {
               const cat = CATEGORIES[node.poi.category];
-              const dist = getDistanceEstimate(node);
+              const routePreview = routePreviews.get(node.id);
               return (
-                <div
-                  key={node.id}
-                  className="search-result-item"
-                  onClick={() => handleResultClick(node)}
-                  id={`search-result-${node.id}`}
-                >
-                  <div
-                    className="search-result-icon"
-                    style={{ background: cat?.bgColor, color: cat?.color }}
+                <div key={node.id} className="search-result-item" id={`search-result-${node.id}`}>
+                  <button
+                    type="button"
+                    className="search-result-select"
+                    onClick={() => handleResultClick(node)}
+                    aria-label={`View details for ${node.poi.name}`}
                   >
-                    {node.poi.icon}
-                  </div>
-                  <div className="search-result-info">
-                    <div className="search-result-name">{node.poi.name}</div>
-                    <div className="search-result-desc">
-                      {node.poi.description} ·{' '}
-                      {node.poi.accessible ? 'Accessible' : 'Not accessible'}
+                    <div
+                      className="search-result-icon"
+                      style={{ background: cat?.bgColor, color: cat?.color }}
+                    >
+                      {node.poi.icon}
                     </div>
-                  </div>
+                    <div className="search-result-info">
+                      <div className="search-result-name">{node.poi.name}</div>
+                      <div className="search-result-desc">
+                        {node.poi.description} ·{' '}
+                        {node.poi.accessible ? 'Accessible' : 'Not accessible'}
+                      </div>
+                    </div>
+                  </button>
                   <div
                     style={{
                       display: 'flex',
@@ -181,13 +191,19 @@ export default function SearchPanel() {
                       gap: '4px',
                     }}
                   >
-                    {dist !== null && (
-                      <span className="search-result-distance">{formatDistance(dist)}</span>
+                    {routePreview?.found && (
+                      <span className="search-result-distance">
+                        {formatDistance(routePreview.totalDistance)}
+                      </span>
+                    )}
+                    {routePreview && !routePreview.found && (
+                      <span className="search-result-distance">No route</span>
                     )}
                     <button
                       className="btn btn-sm btn-success"
                       onClick={(e) => handleNavigate(node, e)}
                       style={{ padding: '4px 10px', fontSize: '11px' }}
+                      aria-label={`Navigate to ${node.poi.name}`}
                     >
                       <Navigation size={11} />
                       Go

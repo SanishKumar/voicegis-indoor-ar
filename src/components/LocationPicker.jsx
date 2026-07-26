@@ -5,7 +5,7 @@
  * Features search, category filtering, and a beautiful list.
  */
 
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Search, MapPin, X, ChevronRight } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { getPOIs, CATEGORIES } from '../data/compiledBuilding';
@@ -39,6 +39,15 @@ export default function LocationPicker({ isOpen, onClose }) {
     onClose();
   };
 
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -48,11 +57,18 @@ export default function LocationPicker({ isOpen, onClose }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="location-picker animate-slide-up">
+      <div
+        className="location-picker animate-slide-up"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="location-picker-title"
+      >
         {/* Header */}
         <div className="lp-header">
           <div>
-            <h2 className="lp-title">Set Your Location</h2>
+            <h2 className="lp-title" id="location-picker-title">
+              Set Your Location
+            </h2>
             <p className="lp-subtitle">Where are you right now?</p>
           </div>
           <button className="lp-close" onClick={onClose} aria-label="Close">
@@ -70,6 +86,7 @@ export default function LocationPicker({ isOpen, onClose }) {
             onChange={(e) => setQuery(e.target.value)}
             className="lp-search-input"
             autoFocus
+            aria-label="Search starting locations"
           />
         </div>
 
@@ -82,6 +99,7 @@ export default function LocationPicker({ isOpen, onClose }) {
                 key={cat.id}
                 className={`lp-chip ${activeCategory === cat.id ? 'active' : ''}`}
                 onClick={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
+                aria-pressed={activeCategory === cat.id}
                 style={
                   activeCategory === cat.id
                     ? { background: cat.bgColor, color: cat.color, borderColor: cat.color }

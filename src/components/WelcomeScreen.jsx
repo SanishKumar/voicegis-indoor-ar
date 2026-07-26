@@ -8,6 +8,7 @@ export default function WelcomeScreen({ onComplete }) {
   const { actions } = useNavigation();
   const [step, setStep] = useState(0); // 0 = welcome, 1 = location, 2 = destination
   const [query, setQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState(null);
 
   const handleStart = () => setStep(1);
 
@@ -28,13 +29,17 @@ export default function WelcomeScreen({ onComplete }) {
   const landmarks = useMemo(() => {
     return getPOIs()
       .filter((n) => n.poi.category === 'entrance' || n.poi.category === 'service')
+      .sort(
+        (a, b) =>
+          Number(b.poi.category === 'entrance') - Number(a.poi.category === 'entrance'),
+      )
       .slice(0, 4);
   }, []);
 
   const searchResults = useMemo(() => {
-    if (!query) return [];
-    return searchPOIs(query).slice(0, 5);
-  }, [query]);
+    if (!query && !activeCategory) return [];
+    return searchPOIs(query, { category: activeCategory }).slice(0, 5);
+  }, [activeCategory, query]);
 
   const quickCategories = ['medical', 'pharmacy', 'diagnostic'];
 
@@ -183,10 +188,37 @@ export default function WelcomeScreen({ onComplete }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="lp-search-input"
+                aria-label="Search destination rooms"
               />
             </div>
 
-            {query ? (
+            <div
+              className="lp-categories"
+              style={{ flexWrap: 'wrap', justifyContent: 'center', marginBottom: '16px' }}
+            >
+              {quickCategories.map((catId) => {
+                const cat = CATEGORIES[catId];
+                return (
+                  <button
+                    key={catId}
+                    className={`lp-chip ${activeCategory === catId ? 'active' : ''}`}
+                    style={{
+                      background: cat.bgColor,
+                      color: cat.color,
+                      border: `1px solid ${cat.color}`,
+                    }}
+                    onClick={() =>
+                      setActiveCategory((current) => (current === catId ? null : catId))
+                    }
+                    aria-pressed={activeCategory === catId}
+                  >
+                    {cat.icon} {cat.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {(query || activeCategory) && (
               <div
                 className="lp-results"
                 style={{
@@ -225,33 +257,6 @@ export default function WelcomeScreen({ onComplete }) {
                     No results found.
                   </div>
                 )}
-              </div>
-            ) : (
-              <div
-                className="lp-categories"
-                style={{ flexWrap: 'wrap', justifyContent: 'center', marginBottom: '24px' }}
-              >
-                {quickCategories.map((catId) => {
-                  const cat = CATEGORIES[catId];
-                  return (
-                    <button
-                      key={catId}
-                      className="lp-chip"
-                      style={{
-                        background: cat.bgColor,
-                        color: cat.color,
-                        border: `1px solid ${cat.color}`,
-                      }}
-                      onClick={() => {
-                        // Navigate to the first POI in this category
-                        const poi = getPOIs().find((n) => n.poi.category === catId);
-                        if (poi) handleDestinationSelect(poi.id);
-                      }}
-                    >
-                      {cat.icon} {cat.label}
-                    </button>
-                  );
-                })}
               </div>
             )}
 

@@ -6,36 +6,37 @@
  */
 
 import { X, Navigation, MapPin, Clock } from 'lucide-react';
+import { useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext.jsx';
-import { CATEGORIES, getFloorById, getNodeById } from '../data/compiledBuilding';
+import { CATEGORIES } from '../data/compiledBuilding';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
 
 export default function POICard() {
-  const { state, actions } = useNavigation();
+  const { state, actions, previewRoute } = useNavigation();
   const { selectedPOI, startNodeId } = state;
+
+  useEffect(() => {
+    if (!selectedPOI) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') actions.clearSelectedPOI();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [actions, selectedPOI]);
 
   if (!selectedPOI) return null;
 
   const poi = selectedPOI.poi;
   const cat = CATEGORIES[poi.category];
 
-  // Calculate straight-line approximate distance (no async call)
-  let distanceInfo = null;
-  if (startNodeId && startNodeId !== selectedPOI.id) {
-    const startNode = getNodeById(startNodeId);
-    const endNode = getNodeById(selectedPOI.id);
-    if (startNode && endNode) {
-      const dx = startNode.x - endNode.x;
-      const dy = startNode.y - endNode.y;
-      const startElevation = getFloorById(String(startNode.floor))?.elevation ?? 0;
-      const endElevation = getFloorById(String(endNode.floor))?.elevation ?? 0;
-      const approxDist = Math.hypot(dx, dy, endElevation - startElevation);
-      distanceInfo = {
-        distance: approxDist,
-        walkTime: estimateWalkTime(approxDist),
-      };
-    }
-  }
+  const routePreview =
+    startNodeId && startNodeId !== selectedPOI.id ? previewRoute(selectedPOI.id) : null;
+  const distanceInfo = routePreview?.found
+    ? {
+        distance: routePreview.totalDistance,
+        walkTime: estimateWalkTime(routePreview.totalDistance),
+      }
+    : null;
 
   const handleNavigate = () => {
     actions.navigateTo(selectedPOI.id);
@@ -54,12 +55,19 @@ export default function POICard() {
       }}
       id="poi-card-overlay"
     >
-      <div className="poi-card animate-slide-up" id="poi-card">
+      <div
+        className="poi-card animate-slide-up"
+        id="poi-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="poi-card-title"
+      >
         {/* Close Button */}
         <button
           className="poi-card-close"
           onClick={() => actions.clearSelectedPOI()}
           id="btn-poi-close"
+          aria-label="Close destination details"
           style={{
             position: 'relative',
             marginLeft: 'auto',
@@ -76,7 +84,9 @@ export default function POICard() {
             {poi.icon}
           </div>
           <div>
-            <h2 className="poi-card-title">{poi.name}</h2>
+            <h2 className="poi-card-title" id="poi-card-title">
+              {poi.name}
+            </h2>
             <span
               className="poi-card-category"
               style={{ background: cat?.bgColor, color: cat?.color }}
@@ -95,7 +105,8 @@ export default function POICard() {
         {distanceInfo && (
           <div className="poi-card-meta">
             <div className="poi-card-meta-item">
-              <MapPin size={14} />~{formatDistance(distanceInfo.distance)} away
+              <MapPin size={14} />
+              {formatDistance(distanceInfo.distance)} by route
             </div>
             <div className="poi-card-meta-item">
               <Clock size={14} />~{distanceInfo.walkTime} walk
@@ -118,8 +129,9 @@ export default function POICard() {
             <button
               className="btn btn-ghost"
               onClick={handleSetAsStart}
-              id="btn-set-start"
-              title="Set as starting point"
+            id="btn-set-start"
+            title="Set as starting point"
+            aria-label={`Set ${poi.name} as starting point`}
             >
               <MapPin size={16} />
             </button>

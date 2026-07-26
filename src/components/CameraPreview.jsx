@@ -122,6 +122,7 @@ function CameraPreviewInner({
   }, [headingState]);
 
   useEffect(() => {
+    if (!isNavigating) return undefined;
     let cancelled = false;
 
     async function startCamera() {
@@ -167,7 +168,7 @@ function CameraPreviewInner({
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       setIsVideoReady(false);
     };
-  }, [animationFrameRef, setCameraError, setIsVideoReady, streamRef, videoRef]);
+  }, [animationFrameRef, isNavigating, setCameraError, setIsVideoReady, streamRef, videoRef]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -223,19 +224,44 @@ function CameraPreviewInner({
 
   return (
     <div className="camera-preview animate-fade-in" id="camera-preview">
-      {!cameraError && (
+      {isNavigating && !cameraError && (
         <video ref={videoRef} className="camera-preview-video" playsInline muted autoPlay />
       )}
 
-      {!cameraError && <canvas ref={canvasRef} className="camera-preview-canvas" />}
+      {isNavigating && !cameraError && (
+        <canvas ref={canvasRef} className="camera-preview-canvas" />
+      )}
 
-      <div className="camera-preview-status" role="status">
-        <Camera size={14} />
-        <strong>Guidance preview</strong>
-        <span>Not world-anchored</span>
-      </div>
+      {isNavigating && (
+        <div className="camera-preview-status" role="status">
+          <Camera size={14} />
+          <strong>Guidance preview</strong>
+          <span>Not world-anchored</span>
+        </div>
+      )}
 
-      {cameraError && (
+      {!isNavigating && (
+        <div className="camera-preview-fallback">
+          <div className="camera-preview-fallback-icon">
+            <Navigation size={48} />
+          </div>
+          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)' }}>
+            Plan a route first
+          </h3>
+          <p style={{ maxWidth: '340px', color: 'var(--color-text-muted)' }}>
+            Camera permission is requested only when there is an active route to preview.
+          </p>
+          <button
+            className="btn btn-primary"
+            onClick={() => actions.setView(VIEW_TYPE.MAP)}
+            style={{ marginTop: 'var(--space-4)' }}
+          >
+            <Map size={16} /> Choose a destination
+          </button>
+        </div>
+      )}
+
+      {isNavigating && cameraError && (
         <div className="camera-preview-fallback">
           <div className="camera-preview-fallback-icon">
             <CameraOff size={48} />
@@ -259,7 +285,7 @@ function CameraPreviewInner({
         </div>
       )}
 
-      {!cameraError && (
+      {isNavigating && !cameraError && (
         <aside className="camera-preview-telemetry" aria-label="Guidance readiness">
           <div>
             <Camera size={13} />
@@ -330,26 +356,6 @@ function CameraPreviewInner({
         </div>
       )}
 
-      {!cameraError && !isNavigating && (
-        <div className="camera-preview-instruction animate-slide-down">
-          <div
-            className="camera-preview-instruction-icon"
-            style={{ background: 'var(--color-accent-amber)' }}
-          >
-            <Navigation size={22} />
-          </div>
-          <div>
-            <div className="camera-preview-instruction-text">No active navigation</div>
-            <div
-              className="camera-preview-instruction-distance"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              Choose a destination on the map to preview its instructions.
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="camera-preview-controls">
         <button
           className="camera-preview-control"
@@ -359,7 +365,7 @@ function CameraPreviewInner({
           <Map size={16} />
           Exit to plan
         </button>
-        {!cameraError && headingDegrees === null && (
+        {isNavigating && !cameraError && headingDegrees === null && (
           <button className="camera-preview-control heading" onClick={enableHeading}>
             <Compass size={16} />
             {headingState === 'listening' ? 'Move device' : 'Enable heading'}

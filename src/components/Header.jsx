@@ -61,6 +61,7 @@ export default function Header() {
           onClick={() => setShowLocationPicker(true)}
           id="btn-set-location"
           title="Change your current location"
+          aria-label={`Change start location. Current: ${locationLabel}`}
         >
           <MapPin size={14} />
           <span className="header-location-text">{locationLabel}</span>
@@ -73,6 +74,7 @@ export default function Header() {
             onClick={() => actions.setView(VIEW_TYPE.MAP)}
             id="btn-map-view"
             aria-label="Switch to map view"
+            aria-pressed={activeView === VIEW_TYPE.MAP}
           >
             <Map size={14} />
             Plan
@@ -82,6 +84,7 @@ export default function Header() {
             onClick={() => actions.setView(VIEW_TYPE.SPATIAL_TWIN)}
             id="btn-spatial-twin"
             aria-label="Switch to compiled 3D spatial twin"
+            aria-pressed={activeView === VIEW_TYPE.SPATIAL_TWIN}
           >
             <Box size={14} />
             Spatial
@@ -91,6 +94,7 @@ export default function Header() {
             onClick={() => actions.setView(VIEW_TYPE.CAMERA_PREVIEW)}
             id="btn-camera-preview"
             aria-label="Switch to camera preview"
+            aria-pressed={activeView === VIEW_TYPE.CAMERA_PREVIEW}
           >
             <Camera size={14} />
             Guide
