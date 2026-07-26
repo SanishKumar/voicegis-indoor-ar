@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ROUTING_EDGES, ROUTING_NODES } from '../data/compiledBuilding';
+import { ASTERION_RUNTIME } from '../test/venueFixtures';
 import type { GraphEdge, GraphNode } from './routingCore';
 import { validateGraph } from './graphValidation';
 
 describe('graph validation', () => {
   it('accepts the graph emitted by the building compiler', () => {
-    expect(validateGraph(ROUTING_NODES, ROUTING_EDGES)).toEqual([]);
+    expect(validateGraph(ASTERION_RUNTIME.routingNodes, ASTERION_RUNTIME.routingEdges)).toEqual([]);
   });
 
   it('reports structural defects with stable issue codes', () => {

@@ -1,4 +1,5 @@
 import { calculateCompiledRoute, type CompiledRouteOptions } from './compiledRoutePolicy';
+import type { CompiledBuildingRuntime } from '../data/compiledBuilding';
 import { STEP_TYPE, type RouteResult } from './routingCore';
 
 export { STEP_TYPE };
@@ -58,12 +59,13 @@ function getRoutingWorker() {
 }
 
 export function findRoute(
+  venue: CompiledBuildingRuntime,
   startId: string,
   endId: string,
   options: CompiledRouteOptions = {},
 ): Promise<RouteResult> {
   if (typeof Worker === 'undefined') {
-    return Promise.resolve(calculateCompiledRoute(startId, endId, options));
+    return Promise.resolve(calculateCompiledRoute(venue, startId, endId, options));
   }
 
   const worker = getRoutingWorker();
@@ -76,7 +78,14 @@ export function findRoute(
     }, REQUEST_TIMEOUT_MS);
 
     pendingRequests.set(requestId, { resolve, timeoutId });
-    worker.postMessage({ type: 'COMPUTE_ROUTE', requestId, startId, endId, options });
+    worker.postMessage({
+      type: 'COMPUTE_ROUTE',
+      requestId,
+      buildingPackage: venue.buildingPackage,
+      startId,
+      endId,
+      options,
+    });
   });
 }
 

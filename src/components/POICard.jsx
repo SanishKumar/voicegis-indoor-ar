@@ -8,11 +8,10 @@
 import { X, Navigation, MapPin, Clock } from 'lucide-react';
 import { useEffect } from 'react';
 import { useNavigation } from '../context/NavigationContext.jsx';
-import { CATEGORIES } from '../data/compiledBuilding';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
 
 export default function POICard() {
-  const { state, actions, previewRoute } = useNavigation();
+  const { state, actions, previewRoute, venue } = useNavigation();
   const { selectedPOI, startNodeId } = state;
 
   useEffect(() => {
@@ -27,14 +26,14 @@ export default function POICard() {
   if (!selectedPOI) return null;
 
   const poi = selectedPOI.poi;
-  const cat = CATEGORIES[poi.category];
+  const cat = venue.getCategory(poi.category);
 
   const routePreview =
     startNodeId && startNodeId !== selectedPOI.id ? previewRoute(selectedPOI.id) : null;
   const distanceInfo = routePreview?.found
     ? {
         distance: routePreview.totalDistance,
-        walkTime: estimateWalkTime(routePreview.totalDistance),
+        walkTime: estimateWalkTime(routePreview.totalDistance, venue.config.walkSpeedMps),
       }
     : null;
 
@@ -129,9 +128,9 @@ export default function POICard() {
             <button
               className="btn btn-ghost"
               onClick={handleSetAsStart}
-            id="btn-set-start"
-            title="Set as starting point"
-            aria-label={`Set ${poi.name} as starting point`}
+              id="btn-set-start"
+              title="Set as starting point"
+              aria-label={`Set ${poi.name} as starting point`}
             >
               <MapPin size={16} />
             </button>

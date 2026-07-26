@@ -8,13 +8,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Search, MapPin, X, ChevronRight } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
-import { getPOIs, CATEGORIES } from '../data/compiledBuilding';
 
 export default function LocationPicker({ isOpen, onClose }) {
-  const { actions } = useNavigation();
+  const { actions, venue } = useNavigation();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
-  const allPOIs = useMemo(() => getPOIs(), []);
+  const allPOIs = useMemo(() => venue.getPOIs(), [venue]);
   const availableCategories = useMemo(
     () => new Set(allPOIs.map((node) => node.poi.category)),
     [allPOIs],
@@ -92,7 +91,7 @@ export default function LocationPicker({ isOpen, onClose }) {
 
         {/* Category Chips */}
         <div className="lp-categories">
-          {Object.values(CATEGORIES)
+          {Object.values(venue.categories)
             .filter((cat) => availableCategories.has(cat.id))
             .map((cat) => (
               <button
@@ -120,7 +119,7 @@ export default function LocationPicker({ isOpen, onClose }) {
             </div>
           )}
           {filteredPOIs.map((node) => {
-            const cat = CATEGORIES[node.poi.category];
+            const cat = venue.getCategory(node.poi.category);
             return (
               <button key={node.id} className="lp-result-item" onClick={() => handleSelect(node)}>
                 <div

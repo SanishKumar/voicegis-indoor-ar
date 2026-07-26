@@ -11,29 +11,15 @@
  */
 
 import { createContext, useContext, useReducer, useCallback, useState, useEffect } from 'react';
-import { findRoute } from '../engine/routingEngine';
+import { findRoute, shutdownRoutingWorker } from '../engine/routingEngine';
 import { calculateCompiledRoute } from '../engine/compiledRoutePolicy';
-import { BUILDING_CONFIG } from '../data/buildingConfig.js';
-import { getNodeById } from '../data/compiledBuilding';
-import liftClosureOverlay from '../../buildings/asterion-medical-center/operations/all-public-lifts-closed.overlay.json';
-import { bootstrapBundledPackageCache } from '../data/packageCacheRuntime';
+import { useVenue } from './VenueContext.jsx';
+import { createVenueScopedState } from '../data/venueSession';
 
-export const OPERATIONAL_SCENARIO = {
-  NOMINAL: 'nominal',
-  LIFT_CLOSED_REPLAY: 'lift-closed-replay',
-};
-
-const LIFT_CLOSURE_REPLAY_TIME = '2026-07-22T12:00:00.000Z';
-
-function routeOptionsFor(scenario, stepFree) {
+function routeOptionsFor(stepFree, operationalOverlay, evaluatedAt) {
   return {
     profile: stepFree ? 'wheelchair' : 'standard',
-    ...(scenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY
-      ? {
-          operationalOverlay: liftClosureOverlay,
-          evaluatedAt: LIFT_CLOSURE_REPLAY_TIME,
-        }
-      : {}),
+    ...(operationalOverlay ? { operationalOverlay, evaluatedAt } : {}),
   };
 }
 
@@ -69,16 +55,9 @@ export const VIEW_TYPE = {
 };
 
 // ── Initial State ──
-const initialState = {
-  startNodeId: BUILDING_CONFIG.defaultStartNode,
-  destinationNodeId: null,
-  route: null, // { path, pathIds, totalDistance, steps, found }
-  activeView: VIEW_TYPE.MAP,
-  activeFloorId: BUILDING_CONFIG.defaultFloorId,
-  selectedPOI: null, // node object for POI card
-  currentStepIndex: 0,
-  navStatus: NAV_STATUS.IDLE,
-};
+function createInitialState(venue) {
+  return createVenueScopedState(venue).navigation;
+}
 
 // ── Reducer ──
 function navigationReducer(state, action) {
@@ -193,8 +172,9 @@ function navigationReducer(state, action) {
 const NavigationContext = createContext(null);
 
 // ── Provider ──
-export function NavigationProvider({ children }) {
-  const [state, dispatch] = useReducer(navigationReducer, initialState);
+export function NavigationProvider({ children, venue }) {
+  const [state, dispatch] = useReducer(navigationReducer, venue, createInitialState);
+  const { packageCacheStatus } = useVenue();
 
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -227,13 +207,8 @@ export function NavigationProvider({ children }) {
   });
 
   const [showLocationPicker, setShowLocationPicker] = useState(false);
-  const [operationalScenario, setOperationalScenarioState] = useState(OPERATIONAL_SCENARIO.NOMINAL);
-  const [packageCacheStatus, setPackageCacheStatus] = useState({
-    state: 'pending',
-    activeHash: null,
-    previousHash: null,
-    detail: 'Verifying the bundled building package.',
-  });
+  const [operationalOverlay, setOperationalOverlayState] = useState(null);
+  const [operationalEvaluatedAt, setOperationalEvaluatedAt] = useState(null);
 
   const completeOnboarding = useCallback(() => {
     setOnboardingComplete(true);
@@ -254,15 +229,7 @@ export function NavigationProvider({ children }) {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  useEffect(() => {
-    let active = true;
-    void bootstrapBundledPackageCache().then((status) => {
-      if (active) setPackageCacheStatus(status);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
+  useEffect(() => () => shutdownRoutingWorker(), []);
 
   useEffect(() => {
     if (highContrast) {
@@ -285,9 +252,10 @@ export function NavigationProvider({ children }) {
       });
       try {
         const route = await findRoute(
+          venue,
           startId,
           destNodeId,
-          routeOptionsFor(operationalScenario, stepFree),
+          routeOptionsFor(stepFree, operationalOverlay, operationalEvaluatedAt),
         );
         dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: route });
       } catch (err) {
@@ -298,17 +266,18 @@ export function NavigationProvider({ children }) {
         });
       }
     },
-    [operationalScenario],
+    [operationalEvaluatedAt, operationalOverlay, venue],
   );
 
   const previewRoute = useCallback(
     (destNodeId, startNodeId = state.startNodeId) =>
       calculateCompiledRoute(
+        venue,
         startNodeId,
         destNodeId,
-        routeOptionsFor(operationalScenario, accessibleRouting),
+        routeOptionsFor(accessibleRouting, operationalOverlay, operationalEvaluatedAt),
       ),
-    [accessibleRouting, operationalScenario, state.startNodeId],
+    [accessibleRouting, operationalEvaluatedAt, operationalOverlay, state.startNodeId, venue],
   );
 
   const toggleTheme = useCallback(() => {
@@ -326,27 +295,25 @@ export function NavigationProvider({ children }) {
     if (state.route && state.startNodeId && state.destinationNodeId) {
       void requestRoute(state.destinationNodeId, state.startNodeId, next, undefined);
     }
-  }, [
-    accessibleRouting,
-    requestRoute,
-    state.destinationNodeId,
-    state.route,
-    state.startNodeId,
-  ]);
+  }, [accessibleRouting, requestRoute, state.destinationNodeId, state.route, state.startNodeId]);
 
-  const setOperationalScenario = useCallback((scenario) => {
-    setOperationalScenarioState(scenario);
+  const setOperationalOverlay = useCallback((overlay, evaluatedAt = new Date().toISOString()) => {
+    setOperationalOverlayState(overlay);
+    setOperationalEvaluatedAt(overlay ? evaluatedAt : null);
     dispatch({ type: ACTION.CLEAR_ROUTE });
   }, []);
 
   const actions = {
-    setStart: useCallback((nodeId) => {
-      const node = getNodeById(nodeId);
-      dispatch({
-        type: ACTION.SET_START,
-        payload: { nodeId, floorId: node ? String(node.floor) : undefined },
-      });
-    }, []),
+    setStart: useCallback(
+      (nodeId) => {
+        const node = venue.getNodeById(nodeId);
+        dispatch({
+          type: ACTION.SET_START,
+          payload: { nodeId, floorId: node ? String(node.floor) : undefined },
+        });
+      },
+      [venue],
+    ),
 
     setDestination: useCallback((nodeId) => {
       dispatch({ type: ACTION.SET_DESTINATION, payload: nodeId });
@@ -354,7 +321,7 @@ export function NavigationProvider({ children }) {
 
     navigateTo: async (destNodeId, startNodeId) => {
       const startId = startNodeId || state.startNodeId;
-      const startNode = getNodeById(startId);
+      const startNode = venue.getNodeById(startId);
       return requestRoute(
         destNodeId,
         startId,
@@ -408,10 +375,12 @@ export function NavigationProvider({ children }) {
         toggleHighContrast,
         accessibleRouting,
         toggleAccessibleRouting,
-        operationalScenario,
-        setOperationalScenario,
+        operationalOverlay,
+        operationalEvaluatedAt,
+        setOperationalOverlay,
         packageCacheStatus,
         previewRoute,
+        venue,
       }}
     >
       {children}

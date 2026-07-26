@@ -1,0 +1,18 @@
+{
+  "catalogVersion": "0.1.0",
+  "defaultVenueId": "asterion-medical-center",
+  "venues": [
+    {
+      "id": "asterion-medical-center",
+      "name": "Asterion University Medical Center",
+      "description": "Four-floor academic medical benchmark",
+      "packageUrl": "/venues/asterion-medical-center.package.json"
+    },
+    {
+      "id": "harbor-exchange",
+      "name": "Harbor Exchange",
+      "description": "Two-floor ferry, market, and community venue",
+      "packageUrl": "/venues/harbor-exchange.package.json"
+    }
+  ]
+}

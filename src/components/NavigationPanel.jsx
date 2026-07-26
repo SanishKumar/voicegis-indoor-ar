@@ -23,12 +23,11 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
-import { BUILDING_PACKAGE, getFloorById, getNodeById } from '../data/compiledBuilding';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
 import { STEP_TYPE } from '../engine/routingEngine';
 
-function shortFloorLabel(floorId) {
-  const floor = getFloorById(String(floorId));
+function shortFloorLabel(venue, floorId) {
+  const floor = venue.getFloorById(String(floorId));
   return floor?.level === 0 ? 'G' : `L${floor?.level ?? floorId}`;
 }
 
@@ -64,18 +63,19 @@ function StepIcon({ type, size = 20 }) {
   }
 }
 
-function RouteReceiptDetails({ receipt }) {
+function RouteReceiptDetails({ receipt, venue }) {
   if (!receipt) return null;
   const connectorLabel =
     receipt.selectedConnectors.length > 0
       ? receipt.selectedConnectors
           .map((connector) => {
-            const source = BUILDING_PACKAGE.verticalConnectors.find(
+            const source = venue.buildingPackage.verticalConnectors.find(
               (candidate) => candidate.id === connector.sourceId,
             );
             return `${source?.name ?? connector.sourceId}: ${shortFloorLabel(
+              venue,
               connector.fromFloorId,
-            )} → ${shortFloorLabel(connector.toFloorId)}`;
+            )} → ${shortFloorLabel(venue, connector.toFloorId)}`;
           })
           .join(', ')
       : 'No vertical connector';
@@ -119,7 +119,7 @@ function RouteReceiptDetails({ receipt }) {
 }
 
 export default function NavigationPanel() {
-  const { state, actions } = useNavigation();
+  const { state, actions, venue } = useNavigation();
   const { route, navStatus, currentStepIndex, destinationNodeId } = state;
 
   if (!route) {
@@ -127,11 +127,10 @@ export default function NavigationPanel() {
   }
 
   if (!route.found) {
-    const isStepFreeLiftOutage =
-      route.receipt?.profile === 'wheelchair' &&
-      route.receipt?.operationalOverlayId === 'asterion-all-public-lifts-closed-2026-07-22';
-    const failureMessage = isStepFreeLiftOutage
-      ? 'Step-free routing is unavailable because both public lift banks are closed in this replay. Restore lift service before trying this journey again.'
+    const isClosureFailure =
+      route.receipt?.profile === 'wheelchair' && route.receipt?.excludedEdges.closed > 0;
+    const failureMessage = isClosureFailure
+      ? 'No step-free route is available under the active operational closures.'
       : route.error;
 
     return (
@@ -149,16 +148,18 @@ export default function NavigationPanel() {
             <X size={12} /> Dismiss
           </button>
         </div>
-        <RouteReceiptDetails receipt={route.receipt} />
+        <RouteReceiptDetails receipt={route.receipt} venue={venue} />
       </div>
     );
   }
 
-  const destNode = getNodeById(destinationNodeId);
-  const destinationFloor = destNode ? getFloorById(String(destNode.floor)) : null;
+  const destNode = venue.getNodeById(destinationNodeId);
+  const destinationFloor = destNode ? venue.getFloorById(String(destNode.floor)) : null;
   const steps = route.steps;
   const currentStep = steps[currentStepIndex];
-  const currentFloor = currentStep?.floorId ? getFloorById(String(currentStep.floorId)) : null;
+  const currentFloor = currentStep?.floorId
+    ? venue.getFloorById(String(currentStep.floorId))
+    : null;
   const progress = steps.length > 1 ? (currentStepIndex / (steps.length - 1)) * 100 : 0;
   const isArrived = navStatus === NAV_STATUS.ARRIVED;
 
@@ -168,15 +169,15 @@ export default function NavigationPanel() {
     .reduce((sum, s) => sum + (s.distance || 0), 0);
   const connectorReceipt = route.receipt?.selectedConnectors?.[0];
   const connector = connectorReceipt
-    ? BUILDING_PACKAGE.verticalConnectors.find(
+    ? venue.buildingPackage.verticalConnectors.find(
         (candidate) => candidate.id === connectorReceipt.sourceId,
       )
     : null;
   const routeProfile =
     route.receipt?.profile === 'wheelchair' ? 'Step-free route' : 'Fastest available route';
   const journeyLabel = connectorReceipt
-    ? `${shortFloorLabel(connectorReceipt.fromFloorId)} → ${connector?.name ?? connectorReceipt.sourceId} → ${shortFloorLabel(connectorReceipt.toFloorId)}`
-    : `${shortFloorLabel(destNode?.floor)} · same floor`;
+    ? `${shortFloorLabel(venue, connectorReceipt.fromFloorId)} → ${connector?.name ?? connectorReceipt.sourceId} → ${shortFloorLabel(venue, connectorReceipt.toFloorId)}`
+    : `${shortFloorLabel(venue, destNode?.floor)} · same floor`;
 
   return (
     <div className={`nav-panel open`} id="nav-panel">
@@ -197,7 +198,7 @@ export default function NavigationPanel() {
             <div className="nav-panel-dest-eta">
               {isArrived
                 ? '✅ You have arrived!'
-                : `${formatDistance(remainingDistance)} · ~${estimateWalkTime(remainingDistance)}`}
+                : `${formatDistance(remainingDistance)} · ~${estimateWalkTime(remainingDistance, venue.config.walkSpeedMps)}`}
             </div>
           </div>
         </div>
@@ -220,7 +221,7 @@ export default function NavigationPanel() {
         <strong>{journeyLabel}</strong>
       </div>
 
-      <RouteReceiptDetails receipt={route.receipt} />
+      <RouteReceiptDetails receipt={route.receipt} venue={venue} />
 
       {/* Current Step (Hero) */}
       {currentStep && !isArrived && (

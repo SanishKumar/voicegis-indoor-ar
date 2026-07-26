@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
 import { Navigation, MapPin, ArrowRight, QrCode, Search, ChevronRight } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
-import { BUILDING_PACKAGE, getPOIs, CATEGORIES } from '../data/compiledBuilding';
 import { searchPOIs } from '../engine/searchIndex.js';
 
 export default function WelcomeScreen({ onComplete }) {
-  const { actions } = useNavigation();
+  const { actions, venue } = useNavigation();
+  const buildingPackage = venue.buildingPackage;
   const [step, setStep] = useState(0); // 0 = welcome, 1 = location, 2 = destination
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
@@ -26,22 +26,25 @@ export default function WelcomeScreen({ onComplete }) {
     onComplete();
   };
 
+  const pois = useMemo(() => venue.getPOIs(), [venue]);
   const landmarks = useMemo(() => {
-    return getPOIs()
+    const preferred = pois
       .filter((n) => n.poi.category === 'entrance' || n.poi.category === 'service')
       .sort(
-        (a, b) =>
-          Number(b.poi.category === 'entrance') - Number(a.poi.category === 'entrance'),
-      )
-      .slice(0, 4);
-  }, []);
+        (a, b) => Number(b.poi.category === 'entrance') - Number(a.poi.category === 'entrance'),
+      );
+    return (preferred.length > 0 ? preferred : pois).slice(0, 4);
+  }, [pois]);
 
   const searchResults = useMemo(() => {
     if (!query && !activeCategory) return [];
-    return searchPOIs(query, { category: activeCategory }).slice(0, 5);
-  }, [activeCategory, query]);
+    return searchPOIs(pois, query, { category: activeCategory }).slice(0, 5);
+  }, [activeCategory, pois, query]);
 
-  const quickCategories = ['medical', 'pharmacy', 'diagnostic'];
+  const quickCategories = useMemo(
+    () => [...new Set(pois.map((node) => node.poi.category))].slice(0, 3),
+    [pois],
+  );
 
   return (
     <div className="welcome-screen">
@@ -50,7 +53,7 @@ export default function WelcomeScreen({ onComplete }) {
       <div className="welcome-content">
         {step === 0 && (
           <div className="welcome-hero animate-fade-in">
-            <div className="welcome-eyebrow">Asterion navigation benchmark / v0.4</div>
+            <div className="welcome-eyebrow">VenuePackage runtime / bootstrap v0</div>
             <div className="welcome-logo-container">
               <div className="welcome-logo">
                 <MapPin size={30} strokeWidth={1.8} />
@@ -58,11 +61,11 @@ export default function WelcomeScreen({ onComplete }) {
             </div>
 
             <h1 className="welcome-title">
-              Find a clinical service without learning the building first.
+              Find your destination without learning the venue first.
             </h1>
             <p className="welcome-subtitle">
-              A deterministic four-level hospital routing benchmark with accessible paths,
-              operational closures, and an inspectable spatial model.
+              Deterministic routing over the active verified package, with accessible paths and
+              venue-independent spatial views.
             </p>
 
             <div className="welcome-cta-group">
@@ -74,15 +77,17 @@ export default function WelcomeScreen({ onComplete }) {
 
             <div className="welcome-proof-grid" aria-label="Benchmark facts">
               <div>
-                <strong>04</strong>
+                <strong>{String(buildingPackage.floors.length).padStart(2, '0')}</strong>
                 <span>connected levels</span>
               </div>
               <div>
-                <strong>{BUILDING_PACKAGE.routing.edges.length}</strong>
+                <strong>{buildingPackage.routing.edges.length}</strong>
                 <span>routing edges</span>
               </div>
               <div>
-                <strong>09</strong>
+                <strong>
+                  {String(buildingPackage.localizationAnchors.length).padStart(2, '0')}
+                </strong>
                 <span>localization anchors</span>
               </div>
             </div>
@@ -133,7 +138,7 @@ export default function WelcomeScreen({ onComplete }) {
               }}
             >
               {landmarks.map((node) => {
-                const cat = CATEGORIES[node.poi.category];
+                const cat = venue.getCategory(node.poi.category);
                 return (
                   <button
                     key={node.id}
@@ -197,7 +202,7 @@ export default function WelcomeScreen({ onComplete }) {
               style={{ flexWrap: 'wrap', justifyContent: 'center', marginBottom: '16px' }}
             >
               {quickCategories.map((catId) => {
-                const cat = CATEGORIES[catId];
+                const cat = venue.getCategory(catId);
                 return (
                   <button
                     key={catId}
@@ -232,7 +237,7 @@ export default function WelcomeScreen({ onComplete }) {
               >
                 {searchResults.length > 0 ? (
                   searchResults.map(({ node }) => {
-                    const cat = CATEGORIES[node.poi.category];
+                    const cat = venue.getCategory(node.poi.category);
                     return (
                       <button
                         key={node.id}

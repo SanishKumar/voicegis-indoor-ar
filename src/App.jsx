@@ -1,12 +1,6 @@
-/**
- * App.jsx
- *
- * Root application component.
- * Shows the WelcomeScreen on first visit, then the main navigation app.
- */
-
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { NavigationProvider, useNavigation, VIEW_TYPE } from './context/NavigationContext.jsx';
+import { VenueProvider, useVenue } from './context/VenueContext.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import Header from './components/Header.jsx';
 import SearchPanel from './components/SearchPanel.jsx';
@@ -15,11 +9,29 @@ import NavigationPanel from './components/NavigationPanel.jsx';
 import LocationPicker from './components/LocationPicker.jsx';
 import CameraPreview from './components/CameraPreview.jsx';
 import StatusBar from './components/StatusBar.jsx';
+import SurfaceNav from './components/SurfaceNav.jsx';
+import VenuePackageManager from './components/VenuePackageManager.jsx';
 
 const SpatialTwinViewer = lazy(() => import('./components/SpatialTwinViewer.tsx'));
 const FloorplanViewer = lazy(() => import('./components/FloorplanViewer.tsx'));
 
-function AppContent() {
+function currentSurface() {
+  const value = window.location.hash.replace(/^#\/?/, '').split('/')[0];
+  return ['visitor', 'inspector', 'studio'].includes(value) ? value : 'visitor';
+}
+
+function useSurfaceRoute() {
+  const [surface, setSurface] = useState(currentSurface);
+  useEffect(() => {
+    const handleHashChange = () => setSurface(currentSurface());
+    window.addEventListener('hashchange', handleHashChange);
+    if (!window.location.hash) window.history.replaceState(null, '', '#/visitor');
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+  return surface;
+}
+
+function VisitorApp() {
   const {
     state,
     onboardingComplete,
@@ -27,9 +39,7 @@ function AppContent() {
     showLocationPicker,
     setShowLocationPicker,
   } = useNavigation();
-  const { activeView } = state;
 
-  // Show onboarding on first visit
   if (!onboardingComplete) {
     return <WelcomeScreen onComplete={completeOnboarding} />;
   }
@@ -37,18 +47,10 @@ function AppContent() {
   return (
     <>
       <Header />
-
       <main className="main-content" id="main-content">
-        {/* Map View */}
-        {activeView === VIEW_TYPE.MAP && (
+        {state.activeView === VIEW_TYPE.MAP && (
           <>
-            <Suspense
-              fallback={
-                <div className="map-loading" role="status">
-                  Loading compiled floor map…
-                </div>
-              }
-            >
+            <Suspense fallback={<div className="map-loading">Loading compiled floor map…</div>}>
               <FloorplanViewer />
             </Suspense>
             <SearchPanel />
@@ -56,35 +58,86 @@ function AppContent() {
             <NavigationPanel />
           </>
         )}
-
-        {activeView === VIEW_TYPE.SPATIAL_TWIN && (
-          <Suspense
-            fallback={
-              <div className="twin-loading" role="status">
-                <span />
-                Loading compiled spatial package…
-              </div>
-            }
-          >
-            <SpatialTwinViewer />
-          </Suspense>
-        )}
-
         <CameraPreview />
       </main>
-
       <StatusBar />
-
-      {/* Location Picker Modal */}
       <LocationPicker isOpen={showLocationPicker} onClose={() => setShowLocationPicker(false)} />
     </>
   );
 }
 
+function InspectorApp() {
+  const { actions } = useNavigation();
+  const setView = actions.setView;
+  useEffect(() => {
+    setView(VIEW_TYPE.SPATIAL_TWIN);
+  }, [setView]);
+
+  return (
+    <main className="inspector-surface" id="main-content">
+      <Suspense
+        fallback={
+          <div className="twin-loading">
+            <span />
+            Loading active VenuePackage…
+          </div>
+        }
+      >
+        <SpatialTwinViewer />
+      </Suspense>
+      <VenuePackageManager />
+    </main>
+  );
+}
+
+function StudioApp() {
+  const { venue } = useNavigation();
+  return (
+    <main className="studio-boundary" id="main-content">
+      <span>Future authoring surface</span>
+      <h1>Venue Studio</h1>
+      <p>
+        The runtime boundary is active for {venue.buildingPackage.building.name}. Import, review,
+        compile, and publish workflows belong here in Venue Studio v0.
+      </p>
+      <code>Importer → BuildingSource → Compiler → VenuePackage → Runtime</code>
+    </main>
+  );
+}
+
+function ActiveVenueApplication() {
+  const { venue, status } = useVenue();
+  const surface = useSurfaceRoute();
+
+  if (!venue) {
+    return (
+      <main className="venue-bootstrap-state" role="status">
+        <strong>
+          {status.state === 'error' ? 'Venue bootstrap failed' : 'Loading VenuePackage'}
+        </strong>
+        <p>{status.error ?? status.detail}</p>
+      </main>
+    );
+  }
+
+  return (
+    <NavigationProvider key={venue.key} venue={venue}>
+      <SurfaceNav activeSurface={surface} />
+      {surface === 'inspector' ? (
+        <InspectorApp />
+      ) : surface === 'studio' ? (
+        <StudioApp />
+      ) : (
+        <VisitorApp />
+      )}
+    </NavigationProvider>
+  );
+}
+
 export default function App() {
   return (
-    <NavigationProvider>
-      <AppContent />
-    </NavigationProvider>
+    <VenueProvider>
+      <ActiveVenueApplication />
+    </VenueProvider>
   );
 }

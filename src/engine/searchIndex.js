@@ -7,8 +7,6 @@
  * @module engine/searchIndex
  */
 
-import { getPOIs } from '../data/compiledBuilding';
-
 /**
  * Generate trigrams from a string.
  */
@@ -45,19 +43,19 @@ function trigramSimilarity(a, b) {
  * @param {number} [options.threshold=0.15] - Minimum similarity threshold
  * @returns {Array<{ node: object, score: number }>}
  */
-export function searchPOIs(query, options = {}) {
+export function searchPOIs(pois, query, options = {}) {
   const { category, limit = 10, threshold = 0.15 } = options;
 
-  let pois = getPOIs();
+  let candidates = [...pois];
 
   // Category filter
   if (category) {
-    pois = pois.filter((p) => p.poi.category === category);
+    candidates = candidates.filter((p) => p.poi.category === category);
   }
 
   if (!query || query.trim().length === 0) {
     // Return all POIs sorted by category importance when no query
-    return pois
+    return candidates
       .sort((a, b) => categoryPriority(a.poi.category) - categoryPriority(b.poi.category))
       .slice(0, limit)
       .map((node) => ({ node, score: 1 }));
@@ -65,7 +63,7 @@ export function searchPOIs(query, options = {}) {
 
   const q = query.toLowerCase().trim();
 
-  const results = pois
+  const results = candidates
     .map((node) => {
       const name = node.poi.name.toLowerCase();
       const desc = (node.poi.description || '').toLowerCase();
@@ -118,8 +116,7 @@ export function searchPOIs(query, options = {}) {
 /**
  * Get all available categories from the current POI set.
  */
-export function getAvailableCategories() {
-  const pois = getPOIs();
+export function getAvailableCategories(pois) {
   const catSet = new Set(pois.map((p) => p.poi.category));
   return Array.from(catSet).sort((a, b) => categoryPriority(a) - categoryPriority(b));
 }

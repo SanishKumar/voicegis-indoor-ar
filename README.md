@@ -4,7 +4,7 @@
 
 An indoor-navigation platform built around versioned spatial data, deterministic routing, operational constraints, and shared 2D/3D presentation.
 
-The repository includes a compiler, routing engine, browser application, offline package registry, localization replay core, and a four-level hospital benchmark.
+The repository includes a compiler, routing engine, browser application, offline package registry, localization replay core, and two unrelated runtime-switchable venue benchmarks.
 
 ## Product preview
 
@@ -78,9 +78,11 @@ flowchart LR
   Replay["Observation recording"] --> Localization["Localization + route matching"]
 ```
 
-The authored building source is compiled before runtime. Clients consume the compiled package and do not repair malformed topology independently.
+The authored building source is compiled before runtime. Clients load a verified
+package artifact by URL or file and do not repair malformed topology
+independently.
 
-## Included benchmark
+## Included venues
 
 `buildings/asterion-medical-center` contains the Asterion University Medical Center benchmark:
 
@@ -93,6 +95,11 @@ The authored building source is compiled before runtime. Clients consume the com
 - 216 routing nodes and 224 edges
 
 The package includes a reproducible public-lift outage used to exercise standard and wheelchair routing behavior. A smaller two-floor building is retained as a stable compiler and localization regression fixture.
+
+`buildings/harbor-exchange` is a structurally different two-floor ferry, market,
+and community venue with a lift, stair, escalator, ten public destinations, and
+three localization anchors. Inspector can switch between both compiled packages
+at runtime without a rebuild.
 
 ## Run locally
 
@@ -112,21 +119,24 @@ The development server prints the local URL after startup.
 
 ## Useful commands
 
-| Command | Purpose |
-| --- | --- |
-| `npm run check` | Run lint, type checking, tests, deterministic package checks, replay verification, and the production build |
-| `npm test` | Run the Vitest suite |
-| `npm run compile:asterion` | Recompile the Asterion building package |
-| `npm run compile:asterion:check` | Verify that the committed Asterion package is reproducible |
-| `npm run replay:reference` | Regenerate the reference localization replay report |
-| `npm run replay:check` | Verify the committed replay report byte-for-byte |
-| `npm run build` | Create a production build in `dist/` |
+| Command                          | Purpose                                                                                                     |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `npm run check`                  | Run lint, type checking, tests, deterministic package checks, replay verification, and the production build |
+| `npm test`                       | Run the Vitest suite                                                                                        |
+| `npm run compile:asterion`       | Recompile the Asterion building package                                                                     |
+| `npm run compile:asterion:check` | Verify that the committed Asterion package is reproducible                                                  |
+| `npm run compile:harbor:check`   | Verify that the committed Harbor Exchange package is reproducible                                           |
+| `npm run venues:sync:check`      | Verify browser-served package artifacts match compiler output                                               |
+| `npm run replay:reference`       | Regenerate the reference localization replay report                                                         |
+| `npm run replay:check`           | Verify the committed replay report byte-for-byte                                                            |
+| `npm run build`                  | Create a production build in `dist/`                                                                        |
 
 ## Repository structure
 
 ```text
 buildings/
 ├── asterion-medical-center/     four-level application benchmark
+├── harbor-exchange/              two-level non-medical venue
 └── reference-medical-centre/    compact compiler regression fixture
 
 packages/
@@ -153,6 +163,8 @@ The camera guidance view is screen-aligned and can optionally compare device hea
 ## Technical documentation
 
 - [Architecture overview](docs/architecture/overview.md)
+- [VenuePackage runtime contract](docs/architecture/venue-package-contract.md)
+- [Asterion assumption audit](docs/architecture/asterion-assumption-audit.md)
 - [Architecture decision records](docs/adr/)
 - [Reference localization replay](docs/localization/reference-replay.md)
 

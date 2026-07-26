@@ -92,3 +92,18 @@ The runtime owns progress gates, instruction advancement, wrong-way hysteresis, 
 5. LLM output cannot directly mutate safety-relevant navigation state.
 6. Physical-walk traces must be replayable without camera footage by default.
 7. Every marketing claim should map to a reproducible test or labeled prototype behavior.
+
+## Venue Bootstrap v0
+
+The live browser now consumes a verified `VenuePackage` artifact rather than a
+source-code venue import:
+
+```text
+Importer -> BuildingSource -> Compiler -> VenuePackage -> Runtime
+```
+
+The current format, activation rules, application boundaries, and ingestion
+boundary are specified in the
+[VenuePackage runtime contract](venue-package-contract.md). The
+[Asterion assumption audit](asterion-assumption-audit.md) records removed and
+remaining coupling.

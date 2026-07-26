@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import liftClosureJson from '../../buildings/asterion-medical-center/operations/all-public-lifts-closed.overlay.json';
-import { getPOIs, ROUTING_EDGES } from '../data/compiledBuilding';
+import { ASTERION_RUNTIME } from '../test/venueFixtures';
 import { calculateCompiledRoute, type RoutingProfile } from './compiledRoutePolicy';
 import type { OperationalOverlay } from './operationalOverlay';
 
-const publicPois = getPOIs();
+const publicPois = ASTERION_RUNTIME.getPOIs();
 const liftClosure = liftClosureJson as OperationalOverlay;
 const evaluatedAt = '2026-07-22T12:00:00.000Z';
 
@@ -13,16 +13,19 @@ function edgeKey(a: string, b: string) {
 }
 
 const edgesByPair = new Map(
-  ROUTING_EDGES.map((edge) => [edgeKey(edge.from, edge.to), edge] as const),
+  ASTERION_RUNTIME.routingEdges.map((edge) => [edgeKey(edge.from, edge.to), edge] as const),
 );
 
 function routeIssues(
   fromId: string,
   toId: string,
   profile: RoutingProfile,
-  options: Parameters<typeof calculateCompiledRoute>[2] = {},
+  options: Parameters<typeof calculateCompiledRoute>[3] = {},
 ) {
-  const result = calculateCompiledRoute(fromId, toId, { ...options, profile });
+  const result = calculateCompiledRoute(ASTERION_RUNTIME, fromId, toId, {
+    ...options,
+    profile,
+  });
   if (!result.found) return [result.error];
 
   const issues: string[] = [];
@@ -66,8 +69,8 @@ describe('public destination route matrix', () => {
             ...reverseIssues.map((issue) => `${profile} ${to.id} -> ${from.id}: ${issue}`),
           );
 
-          const forward = calculateCompiledRoute(from.id, to.id, { profile });
-          const reverse = calculateCompiledRoute(to.id, from.id, { profile });
+          const forward = calculateCompiledRoute(ASTERION_RUNTIME, from.id, to.id, { profile });
+          const reverse = calculateCompiledRoute(ASTERION_RUNTIME, to.id, from.id, { profile });
           if (
             forward.found &&
             reverse.found &&
@@ -95,11 +98,11 @@ describe('public destination route matrix', () => {
         const to = publicPois[toIndex];
         const options = { operationalOverlay: liftClosure, evaluatedAt };
         const sameFloor = String(from.floor) === String(to.floor);
-        const standard = calculateCompiledRoute(from.id, to.id, {
+        const standard = calculateCompiledRoute(ASTERION_RUNTIME, from.id, to.id, {
           ...options,
           profile: 'standard',
         });
-        const wheelchair = calculateCompiledRoute(from.id, to.id, {
+        const wheelchair = calculateCompiledRoute(ASTERION_RUNTIME, from.id, to.id, {
           ...options,
           profile: 'wheelchair',
         });
@@ -121,9 +124,7 @@ describe('public destination route matrix', () => {
         if (!standard.found) {
           failures.push(`standard outage route failed for ${from.id} -> ${to.id}`);
         } else if (
-          standard.receipt.selectedConnectors.some(
-            (connector) => connector.kind === 'elevator',
-          )
+          standard.receipt.selectedConnectors.some((connector) => connector.kind === 'elevator')
         ) {
           failures.push(`standard outage route used a lift for ${from.id} -> ${to.id}`);
         }

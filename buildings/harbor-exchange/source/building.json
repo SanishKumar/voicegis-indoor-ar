@@ -1,0 +1,500 @@
+{
+  "schemaVersion": "0.1.0",
+  "building": {
+    "id": "harbor-exchange",
+    "name": "Harbor Exchange",
+    "units": "meters",
+    "entrySpaceId": "g-entry",
+    "coordinateSystem": {
+      "type": "local-cartesian",
+      "origin": [0, 0, 0],
+      "northOffsetDegrees": 18
+    }
+  },
+  "floors": [
+    {
+      "id": "g",
+      "name": "Concourse",
+      "level": 0,
+      "elevation": 0,
+      "clearHeight": 4.2,
+      "outline": [
+        [0, 0],
+        [44, 0],
+        [44, 22],
+        [0, 22]
+      ]
+    },
+    {
+      "id": "m",
+      "name": "Mezzanine",
+      "level": 1,
+      "elevation": 4.8,
+      "clearHeight": 3.4,
+      "outline": [
+        [8, 0],
+        [36, 0],
+        [36, 18],
+        [8, 18]
+      ]
+    }
+  ],
+  "spaces": [
+    {
+      "id": "g-entry",
+      "floorId": "g",
+      "name": "Ferry Walk Entrance",
+      "type": "entrance",
+      "polygon": [
+        [0, 8],
+        [6, 8],
+        [6, 14],
+        [0, 14]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-concourse",
+      "floorId": "g",
+      "name": "Exchange Concourse",
+      "type": "corridor",
+      "polygon": [
+        [6, 8],
+        [38, 8],
+        [38, 14],
+        [6, 14]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-ticket",
+      "floorId": "g",
+      "name": "Ticket Hall",
+      "type": "service",
+      "polygon": [
+        [6, 0],
+        [16, 0],
+        [16, 8],
+        [6, 8]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-market",
+      "floorId": "g",
+      "name": "Harbor Market",
+      "type": "room",
+      "polygon": [
+        [16, 0],
+        [28, 0],
+        [28, 8],
+        [16, 8]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-gallery",
+      "floorId": "g",
+      "name": "Tide Gallery",
+      "type": "room",
+      "polygon": [
+        [28, 0],
+        [38, 0],
+        [38, 8],
+        [28, 8]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-platform",
+      "floorId": "g",
+      "name": "Waterfront Platform",
+      "type": "lobby",
+      "polygon": [
+        [6, 14],
+        [30, 14],
+        [30, 22],
+        [6, 22]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-bike",
+      "floorId": "g",
+      "name": "Cycle Hub",
+      "type": "service",
+      "polygon": [
+        [30, 14],
+        [38, 14],
+        [38, 22],
+        [30, 22]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-core",
+      "floorId": "g",
+      "name": "East Circulation Core",
+      "type": "vertical-circulation",
+      "polygon": [
+        [38, 8],
+        [44, 8],
+        [44, 14],
+        [38, 14]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "m-lobby",
+      "floorId": "m",
+      "name": "Mezzanine Bridge",
+      "type": "corridor",
+      "polygon": [
+        [8, 8],
+        [36, 8],
+        [36, 14],
+        [8, 14]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "m-overlook",
+      "floorId": "m",
+      "name": "Harbor Overlook",
+      "type": "room",
+      "polygon": [
+        [8, 0],
+        [20, 0],
+        [20, 8],
+        [8, 8]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "m-cafe",
+      "floorId": "m",
+      "name": "Signal Cafe",
+      "type": "service",
+      "polygon": [
+        [20, 0],
+        [36, 0],
+        [36, 8],
+        [20, 8]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "m-community",
+      "floorId": "m",
+      "name": "Community Room",
+      "type": "room",
+      "polygon": [
+        [8, 14],
+        [24, 14],
+        [24, 18],
+        [8, 18]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "m-terrace",
+      "floorId": "m",
+      "name": "Reading Terrace",
+      "type": "room",
+      "polygon": [
+        [24, 14],
+        [36, 14],
+        [36, 18],
+        [24, 18]
+      ],
+      "public": true,
+      "accessible": true
+    }
+  ],
+  "portals": [
+    {
+      "id": "p-entry-concourse",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": ["g-entry", "g-concourse"],
+      "position": [6, 11],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-ticket-concourse",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": ["g-ticket", "g-concourse"],
+      "position": [11, 8],
+      "width": 2.4,
+      "accessible": true
+    },
+    {
+      "id": "p-market-concourse",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": ["g-market", "g-concourse"],
+      "position": [22, 8],
+      "width": 2.2,
+      "accessible": true
+    },
+    {
+      "id": "p-gallery-concourse",
+      "floorId": "g",
+      "kind": "door",
+      "connects": ["g-gallery", "g-concourse"],
+      "position": [33, 8],
+      "width": 1.4,
+      "accessible": true
+    },
+    {
+      "id": "p-platform-concourse",
+      "floorId": "g",
+      "kind": "gate",
+      "connects": ["g-platform", "g-concourse"],
+      "position": [20, 14],
+      "width": 3.2,
+      "accessible": true
+    },
+    {
+      "id": "p-bike-platform",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": ["g-bike", "g-platform"],
+      "position": [30, 18],
+      "width": 2,
+      "accessible": true
+    },
+    {
+      "id": "p-core-concourse",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": ["g-core", "g-concourse"],
+      "position": [38, 11],
+      "width": 2.2,
+      "accessible": true
+    },
+    {
+      "id": "p-overlook-bridge",
+      "floorId": "m",
+      "kind": "opening",
+      "connects": ["m-overlook", "m-lobby"],
+      "position": [14, 8],
+      "width": 2,
+      "accessible": true
+    },
+    {
+      "id": "p-cafe-bridge",
+      "floorId": "m",
+      "kind": "opening",
+      "connects": ["m-cafe", "m-lobby"],
+      "position": [28, 8],
+      "width": 2,
+      "accessible": true
+    },
+    {
+      "id": "p-community-bridge",
+      "floorId": "m",
+      "kind": "door",
+      "connects": ["m-community", "m-lobby"],
+      "position": [16, 14],
+      "width": 1.2,
+      "accessible": true
+    },
+    {
+      "id": "p-terrace-bridge",
+      "floorId": "m",
+      "kind": "opening",
+      "connects": ["m-terrace", "m-lobby"],
+      "position": [30, 14],
+      "width": 1.8,
+      "accessible": true
+    }
+  ],
+  "verticalConnectors": [
+    {
+      "id": "lift-east",
+      "name": "East Glass Lift",
+      "kind": "elevator",
+      "accessible": true,
+      "stops": [
+        { "floorId": "g", "spaceId": "g-concourse", "position": [34, 11] },
+        { "floorId": "m", "spaceId": "m-lobby", "position": [34, 11] }
+      ]
+    },
+    {
+      "id": "stairs-west",
+      "name": "West Stair",
+      "kind": "stairs",
+      "accessible": false,
+      "stops": [
+        { "floorId": "g", "spaceId": "g-concourse", "position": [10, 11] },
+        { "floorId": "m", "spaceId": "m-lobby", "position": [10, 11] }
+      ]
+    },
+    {
+      "id": "escalator-center",
+      "name": "Central Escalator",
+      "kind": "escalator",
+      "accessible": false,
+      "stops": [
+        { "floorId": "g", "spaceId": "g-concourse", "position": [24, 11] },
+        { "floorId": "m", "spaceId": "m-lobby", "position": [24, 11] }
+      ]
+    }
+  ],
+  "pois": [
+    {
+      "id": "poi-ferry-entry",
+      "floorId": "g",
+      "spaceId": "g-entry",
+      "name": "Ferry Walk Entrance",
+      "category": "entrance",
+      "position": [2, 11],
+      "public": true,
+      "accessible": true,
+      "aliases": ["main entrance", "ferry entrance"]
+    },
+    {
+      "id": "poi-ticket-hall",
+      "floorId": "g",
+      "spaceId": "g-ticket",
+      "name": "Tickets and Information",
+      "category": "service",
+      "position": [10, 4],
+      "public": true,
+      "accessible": true,
+      "aliases": ["ticket desk", "information"]
+    },
+    {
+      "id": "poi-harbor-market",
+      "floorId": "g",
+      "spaceId": "g-market",
+      "name": "Harbor Market",
+      "category": "food",
+      "position": [22, 4],
+      "public": true,
+      "accessible": true,
+      "aliases": ["market", "shops"]
+    },
+    {
+      "id": "poi-tide-gallery",
+      "floorId": "g",
+      "spaceId": "g-gallery",
+      "name": "Tide Gallery",
+      "category": "landmark",
+      "position": [33, 4],
+      "public": true,
+      "accessible": true,
+      "aliases": ["exhibition"]
+    },
+    {
+      "id": "poi-waterfront-platform",
+      "floorId": "g",
+      "spaceId": "g-platform",
+      "name": "Waterfront Platform",
+      "category": "transit",
+      "position": [18, 18],
+      "public": true,
+      "accessible": true,
+      "aliases": ["ferry platform", "boarding"]
+    },
+    {
+      "id": "poi-cycle-hub",
+      "floorId": "g",
+      "spaceId": "g-bike",
+      "name": "Cycle Hub",
+      "category": "service",
+      "position": [34, 18],
+      "public": true,
+      "accessible": true,
+      "aliases": ["bike parking"]
+    },
+    {
+      "id": "poi-overlook",
+      "floorId": "m",
+      "spaceId": "m-overlook",
+      "name": "Harbor Overlook",
+      "category": "landmark",
+      "position": [14, 4],
+      "public": true,
+      "accessible": true,
+      "aliases": ["viewpoint"]
+    },
+    {
+      "id": "poi-signal-cafe",
+      "floorId": "m",
+      "spaceId": "m-cafe",
+      "name": "Signal Cafe",
+      "category": "food",
+      "position": [28, 4],
+      "public": true,
+      "accessible": true,
+      "aliases": ["coffee"]
+    },
+    {
+      "id": "poi-community-room",
+      "floorId": "m",
+      "spaceId": "m-community",
+      "name": "Community Room",
+      "category": "community",
+      "position": [16, 16],
+      "public": true,
+      "accessible": true,
+      "aliases": ["meeting room"]
+    },
+    {
+      "id": "poi-reading-terrace",
+      "floorId": "m",
+      "spaceId": "m-terrace",
+      "name": "Reading Terrace",
+      "category": "education",
+      "position": [30, 16],
+      "public": true,
+      "accessible": true,
+      "aliases": ["terrace", "reading area"]
+    }
+  ],
+  "localizationAnchors": [
+    {
+      "id": "anchor-ferry-entry",
+      "floorId": "g",
+      "spaceId": "g-entry",
+      "kind": "qr",
+      "position": [2, 11],
+      "headingDegrees": 90,
+      "payload": "voicegis://harbor-exchange/g/ferry-entry"
+    },
+    {
+      "id": "anchor-platform-board",
+      "floorId": "g",
+      "spaceId": "g-platform",
+      "kind": "image",
+      "position": [15, 18],
+      "headingDegrees": 0,
+      "payload": "voicegis://harbor-exchange/g/platform-board"
+    },
+    {
+      "id": "anchor-mezzanine-lift",
+      "floorId": "m",
+      "spaceId": "m-lobby",
+      "kind": "apriltag",
+      "position": [34, 11],
+      "headingDegrees": 270,
+      "payload": "voicegis://harbor-exchange/m/lift"
+    }
+  ]
+}

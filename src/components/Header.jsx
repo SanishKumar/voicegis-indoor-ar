@@ -4,21 +4,8 @@
  * Top navigation bar with brand, view toggle, location setter, and floor selector.
  */
 
-import {
-  Accessibility,
-  Box,
-  Map,
-  Camera,
-  Sun,
-  Moon,
-  MapPin,
-  Home,
-  Eye,
-  Building2,
-} from 'lucide-react';
+import { Accessibility, Map, Camera, Sun, Moon, MapPin, Home, Eye, Building2 } from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
-import { BUILDING_CONFIG } from '../data/buildingConfig.js';
-import { getNodeById } from '../data/compiledBuilding';
 
 export default function Header() {
   const {
@@ -32,10 +19,11 @@ export default function Header() {
     toggleHighContrast,
     accessibleRouting,
     toggleAccessibleRouting,
+    venue,
   } = useNavigation();
   const { activeView, startNodeId } = state;
 
-  const startNode = getNodeById(startNodeId);
+  const startNode = venue.getNodeById(startNodeId);
   const locationLabel = startNode?.poi
     ? `${startNode.poi.name} · ${startNode.poi.floorName}`
     : 'Set Location';
@@ -48,7 +36,7 @@ export default function Header() {
           <Building2 size={17} strokeWidth={1.8} />
         </div>
         <div>
-          <div className="header-title">{BUILDING_CONFIG.name}</div>
+          <div className="header-title">{venue.config.name}</div>
           <div className="header-subtitle">Indoor navigation / simulation package</div>
         </div>
       </div>
@@ -78,16 +66,6 @@ export default function Header() {
           >
             <Map size={14} />
             Plan
-          </button>
-          <button
-            className={`view-toggle-btn ${activeView === VIEW_TYPE.SPATIAL_TWIN ? 'active' : ''}`}
-            onClick={() => actions.setView(VIEW_TYPE.SPATIAL_TWIN)}
-            id="btn-spatial-twin"
-            aria-label="Switch to compiled 3D spatial twin"
-            aria-pressed={activeView === VIEW_TYPE.SPATIAL_TWIN}
-          >
-            <Box size={14} />
-            Spatial
           </button>
           <button
             className={`view-toggle-btn ${activeView === VIEW_TYPE.CAMERA_PREVIEW ? 'active' : ''}`}
@@ -137,9 +115,7 @@ export default function Header() {
           className={`header-route-profile ${accessibleRouting ? 'active' : ''}`}
           onClick={toggleAccessibleRouting}
           aria-label={
-            accessibleRouting
-              ? 'Use fastest available routing'
-              : 'Use step-free accessible routing'
+            accessibleRouting ? 'Use fastest available routing' : 'Use step-free accessible routing'
           }
           aria-pressed={accessibleRouting}
           title="Switch between fastest and step-free routing"

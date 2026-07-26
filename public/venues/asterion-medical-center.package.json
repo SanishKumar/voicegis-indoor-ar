@@ -1,0 +1,8646 @@
+{
+  "building": {
+    "coordinateSystem": {
+      "northOffsetDegrees": -12,
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "type": "local-cartesian"
+    },
+    "entrySpaceId": "g-arrival",
+    "id": "asterion-medical-center",
+    "name": "Asterion University Medical Center",
+    "units": "meters"
+  },
+  "compilerVersion": "0.2.0",
+  "floors": [
+    {
+      "clearHeight": 4.2,
+      "elevation": 0,
+      "id": "g",
+      "level": 0,
+      "name": "Ground · Diagnostics & Outpatients",
+      "outline": [
+        [
+          0,
+          8
+        ],
+        [
+          72,
+          8
+        ],
+        [
+          72,
+          40
+        ],
+        [
+          0,
+          40
+        ]
+      ]
+    },
+    {
+      "clearHeight": 3.7,
+      "elevation": 4.8,
+      "id": "l1",
+      "level": 1,
+      "name": "Level 1 · Specialty Care",
+      "outline": [
+        [
+          0,
+          8
+        ],
+        [
+          72,
+          8
+        ],
+        [
+          72,
+          40
+        ],
+        [
+          0,
+          40
+        ]
+      ]
+    },
+    {
+      "clearHeight": 3.7,
+      "elevation": 9,
+      "id": "l2",
+      "level": 2,
+      "name": "Level 2 · Women & Children",
+      "outline": [
+        [
+          0,
+          8
+        ],
+        [
+          72,
+          8
+        ],
+        [
+          72,
+          40
+        ],
+        [
+          0,
+          40
+        ]
+      ]
+    },
+    {
+      "clearHeight": 3.7,
+      "elevation": 13.2,
+      "id": "l3",
+      "level": 3,
+      "name": "Level 3 · Research & Learning",
+      "outline": [
+        [
+          0,
+          8
+        ],
+        [
+          72,
+          8
+        ],
+        [
+          72,
+          40
+        ],
+        [
+          0,
+          40
+        ]
+      ]
+    }
+  ],
+  "localizationAnchors": [
+    {
+      "floorId": "g",
+      "headingDegrees": 270,
+      "id": "anchor-g-east",
+      "kind": "qr",
+      "payload": "voicegis://asterion/g/east",
+      "position": [
+        60,
+        24
+      ],
+      "spaceId": "g-concourse"
+    },
+    {
+      "floorId": "g",
+      "headingDegrees": 90,
+      "id": "anchor-g-entry",
+      "kind": "apriltag",
+      "payload": "voicegis://asterion/g/entry",
+      "position": [
+        6,
+        24
+      ],
+      "spaceId": "g-arrival"
+    },
+    {
+      "floorId": "g",
+      "headingDegrees": 90,
+      "id": "anchor-g-west",
+      "kind": "qr",
+      "payload": "voicegis://asterion/g/west",
+      "position": [
+        12,
+        24
+      ],
+      "spaceId": "g-concourse"
+    },
+    {
+      "floorId": "l1",
+      "headingDegrees": 270,
+      "id": "anchor-l1-east",
+      "kind": "qr",
+      "payload": "voicegis://asterion/l1/east",
+      "position": [
+        60,
+        24
+      ],
+      "spaceId": "l1-concourse"
+    },
+    {
+      "floorId": "l1",
+      "headingDegrees": 90,
+      "id": "anchor-l1-west",
+      "kind": "qr",
+      "payload": "voicegis://asterion/l1/west",
+      "position": [
+        12,
+        24
+      ],
+      "spaceId": "l1-concourse"
+    },
+    {
+      "floorId": "l2",
+      "headingDegrees": 270,
+      "id": "anchor-l2-east",
+      "kind": "qr",
+      "payload": "voicegis://asterion/l2/east",
+      "position": [
+        60,
+        24
+      ],
+      "spaceId": "l2-concourse"
+    },
+    {
+      "floorId": "l2",
+      "headingDegrees": 90,
+      "id": "anchor-l2-west",
+      "kind": "qr",
+      "payload": "voicegis://asterion/l2/west",
+      "position": [
+        12,
+        24
+      ],
+      "spaceId": "l2-concourse"
+    },
+    {
+      "floorId": "l3",
+      "headingDegrees": 270,
+      "id": "anchor-l3-east",
+      "kind": "qr",
+      "payload": "voicegis://asterion/l3/east",
+      "position": [
+        60,
+        24
+      ],
+      "spaceId": "l3-concourse"
+    },
+    {
+      "floorId": "l3",
+      "headingDegrees": 90,
+      "id": "anchor-l3-west",
+      "kind": "qr",
+      "payload": "voicegis://asterion/l3/west",
+      "position": [
+        12,
+        24
+      ],
+      "spaceId": "l3-concourse"
+    }
+  ],
+  "manifest": {
+    "contentHash": "9a9c9d37907c78ec1b72bed95658ec248c43d96a891ae4109ac8eebfad144a13",
+    "hashAlgorithm": "sha256"
+  },
+  "packageVersion": "0.2.0",
+  "pois": [
+    {
+      "accessible": true,
+      "category": "service",
+      "floorId": "l3",
+      "id": "poi-admin",
+      "name": "Administration Reception",
+      "position": [
+        13,
+        34
+      ],
+      "public": true,
+      "spaceId": "l3-admin-reception"
+    },
+    {
+      "accessible": true,
+      "category": "landmark",
+      "floorId": "g",
+      "id": "poi-atrium",
+      "name": "Central Atrium",
+      "position": [
+        33,
+        14
+      ],
+      "public": true,
+      "spaceId": "g-atrium"
+    },
+    {
+      "accessible": true,
+      "category": "staff",
+      "floorId": "l2",
+      "id": "poi-birth-center",
+      "name": "Birth Center",
+      "position": [
+        46,
+        34
+      ],
+      "public": false,
+      "spaceId": "l2-birth-center"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "cafeteria",
+        "coffee"
+      ],
+      "category": "food",
+      "floorId": "g",
+      "id": "poi-cafe",
+      "name": "Garden Café",
+      "position": [
+        46,
+        34
+      ],
+      "public": true,
+      "spaceId": "g-cafe"
+    },
+    {
+      "accessible": true,
+      "category": "diagnostic",
+      "floorId": "l1",
+      "id": "poi-cardiac-diagnostics",
+      "name": "Cardiac Diagnostics",
+      "position": [
+        13,
+        14
+      ],
+      "public": true,
+      "spaceId": "l1-cardiac-diagnostics"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "cardiology",
+        "heart clinic"
+      ],
+      "category": "medical",
+      "floorId": "l1",
+      "id": "poi-cardiology",
+      "name": "Heart & Vascular Clinic",
+      "position": [
+        23,
+        14
+      ],
+      "public": true,
+      "spaceId": "l1-cardiology"
+    },
+    {
+      "accessible": true,
+      "category": "medical",
+      "floorId": "l2",
+      "id": "poi-child-development",
+      "name": "Child Development Clinic",
+      "position": [
+        13,
+        34
+      ],
+      "public": true,
+      "spaceId": "l2-child-development"
+    },
+    {
+      "accessible": true,
+      "category": "education",
+      "floorId": "l3",
+      "id": "poi-conference",
+      "name": "Clinical Conference Center",
+      "position": [
+        53,
+        14
+      ],
+      "public": true,
+      "spaceId": "l3-conference"
+    },
+    {
+      "accessible": true,
+      "category": "medical",
+      "floorId": "l1",
+      "id": "poi-consultation",
+      "name": "Consultation Neighborhood",
+      "position": [
+        58,
+        34
+      ],
+      "public": true,
+      "spaceId": "l1-consultation"
+    },
+    {
+      "accessible": true,
+      "category": "staff",
+      "floorId": "l3",
+      "id": "poi-data-center",
+      "name": "Clinical Data Center",
+      "position": [
+        58,
+        34
+      ],
+      "public": false,
+      "spaceId": "l3-data-center"
+    },
+    {
+      "accessible": true,
+      "category": "service",
+      "floorId": "l1",
+      "id": "poi-day-surgery",
+      "name": "Day Surgery Reception",
+      "position": [
+        13,
+        34
+      ],
+      "public": true,
+      "spaceId": "l1-surgery-reception"
+    },
+    {
+      "accessible": true,
+      "category": "education",
+      "floorId": "l3",
+      "id": "poi-education",
+      "name": "Medical Education Center",
+      "position": [
+        23,
+        14
+      ],
+      "public": true,
+      "spaceId": "l3-education"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "ER",
+        "emergency department"
+      ],
+      "category": "emergency",
+      "floorId": "g",
+      "id": "poi-emergency",
+      "name": "Emergency Reception",
+      "position": [
+        13,
+        14
+      ],
+      "public": true,
+      "spaceId": "g-emergency-reception"
+    },
+    {
+      "accessible": true,
+      "category": "service",
+      "floorId": "l2",
+      "id": "poi-family-services",
+      "name": "Family Support Services",
+      "position": [
+        61,
+        14
+      ],
+      "public": true,
+      "spaceId": "l2-family-services"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "CT",
+        "MRI",
+        "radiology"
+      ],
+      "category": "diagnostic",
+      "floorId": "g",
+      "id": "poi-imaging",
+      "name": "Advanced Imaging",
+      "position": [
+        23,
+        14
+      ],
+      "public": true,
+      "spaceId": "g-imaging"
+    },
+    {
+      "accessible": true,
+      "category": "medical",
+      "floorId": "l1",
+      "id": "poi-infusion",
+      "name": "Infusion Welcome Suite",
+      "position": [
+        61,
+        14
+      ],
+      "public": true,
+      "spaceId": "l1-infusion"
+    },
+    {
+      "accessible": true,
+      "category": "education",
+      "floorId": "l3",
+      "id": "poi-library",
+      "name": "Health Sciences Library",
+      "position": [
+        61,
+        14
+      ],
+      "public": true,
+      "spaceId": "l3-library"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "front door",
+        "main entrance"
+      ],
+      "category": "entrance",
+      "floorId": "g",
+      "id": "poi-main-entrance",
+      "name": "Civic Plaza Entrance",
+      "position": [
+        3,
+        24
+      ],
+      "public": true,
+      "spaceId": "g-arrival"
+    },
+    {
+      "accessible": true,
+      "category": "medical",
+      "floorId": "l2",
+      "id": "poi-maternity",
+      "name": "Maternity Clinic",
+      "position": [
+        43,
+        14
+      ],
+      "public": true,
+      "spaceId": "l2-maternity"
+    },
+    {
+      "accessible": true,
+      "category": "staff",
+      "floorId": "l2",
+      "id": "poi-neonatal-unit",
+      "name": "Neonatal Care Unit",
+      "position": [
+        58,
+        34
+      ],
+      "public": false,
+      "spaceId": "l2-neonatal-unit"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "brain clinic",
+        "neurology"
+      ],
+      "category": "medical",
+      "floorId": "l1",
+      "id": "poi-neuroscience",
+      "name": "Neuroscience Clinic",
+      "position": [
+        43,
+        14
+      ],
+      "public": true,
+      "spaceId": "l1-neuroscience"
+    },
+    {
+      "accessible": true,
+      "category": "family",
+      "floorId": "l2",
+      "id": "poi-nicu-family",
+      "name": "NICU Family Center",
+      "position": [
+        23,
+        14
+      ],
+      "public": true,
+      "spaceId": "l2-nicu-family"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "cancer clinic"
+      ],
+      "category": "medical",
+      "floorId": "l1",
+      "id": "poi-oncology",
+      "name": "Oncology Clinic",
+      "position": [
+        53,
+        14
+      ],
+      "public": true,
+      "spaceId": "l1-oncology"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "bone clinic",
+        "fracture clinic"
+      ],
+      "category": "medical",
+      "floorId": "g",
+      "id": "poi-orthopedics",
+      "name": "Orthopedics & Fracture Clinic",
+      "position": [
+        23,
+        34
+      ],
+      "public": true,
+      "spaceId": "g-orthopedics"
+    },
+    {
+      "accessible": true,
+      "category": "staff",
+      "floorId": "g",
+      "id": "poi-pathology-operations",
+      "name": "Pathology Operations",
+      "position": [
+        43,
+        14
+      ],
+      "public": false,
+      "spaceId": "g-pathology"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "children's clinic",
+        "kids clinic"
+      ],
+      "category": "medical",
+      "floorId": "l2",
+      "id": "poi-pediatrics",
+      "name": "General Pediatrics",
+      "position": [
+        13,
+        14
+      ],
+      "public": true,
+      "spaceId": "l2-pediatrics"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "medicines",
+        "prescriptions"
+      ],
+      "category": "pharmacy",
+      "floorId": "g",
+      "id": "poi-pharmacy",
+      "name": "Outpatient Pharmacy",
+      "position": [
+        53,
+        14
+      ],
+      "public": true,
+      "spaceId": "g-pharmacy"
+    },
+    {
+      "accessible": true,
+      "category": "medical",
+      "floorId": "l2",
+      "id": "poi-play-therapy",
+      "name": "Play Therapy Studio",
+      "position": [
+        23,
+        34
+      ],
+      "public": true,
+      "spaceId": "l2-play-therapy"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "pre-op"
+      ],
+      "category": "medical",
+      "floorId": "l1",
+      "id": "poi-preop",
+      "name": "Pre-Operative Assessment",
+      "position": [
+        23,
+        34
+      ],
+      "public": true,
+      "spaceId": "l1-preop"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "appointments",
+        "check in"
+      ],
+      "category": "service",
+      "floorId": "g",
+      "id": "poi-registration",
+      "name": "Outpatient Registration",
+      "position": [
+        13,
+        34
+      ],
+      "public": true,
+      "spaceId": "g-registration"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "physiotherapy",
+        "rehab"
+      ],
+      "category": "medical",
+      "floorId": "l1",
+      "id": "poi-rehabilitation",
+      "name": "Rehabilitation Studio",
+      "position": [
+        46,
+        34
+      ],
+      "public": true,
+      "spaceId": "l1-rehabilitation"
+    },
+    {
+      "accessible": true,
+      "category": "research",
+      "floorId": "l3",
+      "id": "poi-research-gallery",
+      "name": "Clinical Research Gallery",
+      "position": [
+        13,
+        14
+      ],
+      "public": true,
+      "spaceId": "l3-research-gallery"
+    },
+    {
+      "accessible": true,
+      "category": "education",
+      "floorId": "l3",
+      "id": "poi-simulation",
+      "name": "Simulation Lab",
+      "position": [
+        43,
+        14
+      ],
+      "public": true,
+      "spaceId": "l3-simulation"
+    },
+    {
+      "accessible": true,
+      "category": "education",
+      "floorId": "l3",
+      "id": "poi-training",
+      "name": "Staff Learning Studio",
+      "position": [
+        23,
+        34
+      ],
+      "public": true,
+      "spaceId": "l3-training"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "information",
+        "restrooms"
+      ],
+      "category": "service",
+      "floorId": "g",
+      "id": "poi-visitor-services",
+      "name": "Visitor Services",
+      "position": [
+        58,
+        34
+      ],
+      "public": true,
+      "spaceId": "g-visitor-services"
+    },
+    {
+      "accessible": true,
+      "category": "diagnostic",
+      "floorId": "l2",
+      "id": "poi-womens-imaging",
+      "name": "Women's Imaging",
+      "position": [
+        53,
+        14
+      ],
+      "public": true,
+      "spaceId": "l2-womens-imaging"
+    }
+  ],
+  "portals": [
+    {
+      "accessible": true,
+      "connects": [
+        "g-arrival",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-arrival",
+      "kind": "opening",
+      "position": [
+        8,
+        24
+      ],
+      "width": 4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-atrium",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-atrium",
+      "kind": "opening",
+      "position": [
+        33,
+        20
+      ],
+      "width": 4.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-cafe",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-cafe",
+      "kind": "opening",
+      "position": [
+        46,
+        28
+      ],
+      "width": 3
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-concourse",
+        "g-courtyard-lobby"
+      ],
+      "floorId": "g",
+      "id": "p-g-courtyard",
+      "kind": "opening",
+      "position": [
+        64,
+        24
+      ],
+      "width": 3
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-emergency-reception",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-emergency",
+      "kind": "opening",
+      "position": [
+        13,
+        20
+      ],
+      "width": 2.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-imaging",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-imaging",
+      "kind": "door",
+      "position": [
+        23,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-lift-hall",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-lifts",
+      "kind": "opening",
+      "position": [
+        31,
+        28
+      ],
+      "width": 2.8
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-orthopedics",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-orthopedics",
+      "kind": "door",
+      "position": [
+        23,
+        28
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-pathology",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-pathology",
+      "kind": "gate",
+      "position": [
+        43,
+        20
+      ],
+      "restricted": true,
+      "width": 1.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-pharmacy",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-pharmacy",
+      "kind": "door",
+      "position": [
+        53,
+        20
+      ],
+      "width": 1.8
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-registration",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-registration",
+      "kind": "opening",
+      "position": [
+        13,
+        28
+      ],
+      "width": 2.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-retail",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-retail",
+      "kind": "opening",
+      "position": [
+        61,
+        20
+      ],
+      "width": 2.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-visitor-services",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-services",
+      "kind": "door",
+      "position": [
+        58,
+        28
+      ],
+      "width": 1.8
+    },
+    {
+      "accessible": false,
+      "connects": [
+        "g-stair-hall",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-g-stairs",
+      "kind": "door",
+      "position": [
+        37,
+        28
+      ],
+      "width": 1.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-atrium",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-atrium",
+      "kind": "opening",
+      "position": [
+        33,
+        20
+      ],
+      "width": 4.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-cardiac-diagnostics",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-cardiac",
+      "kind": "door",
+      "position": [
+        13,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-cardiology",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-cardiology",
+      "kind": "door",
+      "position": [
+        23,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-consultation",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-consultation",
+      "kind": "door",
+      "position": [
+        58,
+        28
+      ],
+      "width": 1.8
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-concourse",
+        "l1-east-lounge"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-east",
+      "kind": "opening",
+      "position": [
+        64,
+        24
+      ],
+      "width": 3
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-infusion",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-infusion",
+      "kind": "door",
+      "position": [
+        61,
+        20
+      ],
+      "width": 1.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-lift-hall",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-lifts",
+      "kind": "opening",
+      "position": [
+        31,
+        28
+      ],
+      "width": 2.8
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-neuroscience",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-neuroscience",
+      "kind": "door",
+      "position": [
+        43,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-oncology",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-oncology",
+      "kind": "door",
+      "position": [
+        53,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-preop",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-preop",
+      "kind": "door",
+      "position": [
+        23,
+        28
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-rehabilitation",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-rehab",
+      "kind": "opening",
+      "position": [
+        46,
+        28
+      ],
+      "width": 2.6
+    },
+    {
+      "accessible": false,
+      "connects": [
+        "l1-stair-hall",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-stairs",
+      "kind": "door",
+      "position": [
+        37,
+        28
+      ],
+      "width": 1.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-surgery-reception",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-surgery",
+      "kind": "opening",
+      "position": [
+        13,
+        28
+      ],
+      "width": 2.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l1-west-lobby",
+        "l1-concourse"
+      ],
+      "floorId": "l1",
+      "id": "p-l1-west",
+      "kind": "opening",
+      "position": [
+        8,
+        24
+      ],
+      "width": 3
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-atrium",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-atrium",
+      "kind": "opening",
+      "position": [
+        33,
+        20
+      ],
+      "width": 4.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-birth-center",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-birth-center",
+      "kind": "gate",
+      "position": [
+        46,
+        28
+      ],
+      "restricted": true,
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-child-development",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-child-development",
+      "kind": "door",
+      "position": [
+        13,
+        28
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-concourse",
+        "l2-east-lounge"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-east",
+      "kind": "opening",
+      "position": [
+        64,
+        24
+      ],
+      "width": 3
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-family-services",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-family-services",
+      "kind": "door",
+      "position": [
+        61,
+        20
+      ],
+      "width": 1.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-lift-hall",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-lifts",
+      "kind": "opening",
+      "position": [
+        31,
+        28
+      ],
+      "width": 2.8
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-maternity",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-maternity",
+      "kind": "door",
+      "position": [
+        43,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-neonatal-unit",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-neonatal",
+      "kind": "gate",
+      "position": [
+        58,
+        28
+      ],
+      "restricted": true,
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-nicu-family",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-nicu-family",
+      "kind": "door",
+      "position": [
+        23,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-pediatrics",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-pediatrics",
+      "kind": "door",
+      "position": [
+        13,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-play-therapy",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-play-therapy",
+      "kind": "opening",
+      "position": [
+        23,
+        28
+      ],
+      "width": 2.2
+    },
+    {
+      "accessible": false,
+      "connects": [
+        "l2-stair-hall",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-stairs",
+      "kind": "door",
+      "position": [
+        37,
+        28
+      ],
+      "width": 1.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-west-lobby",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-west",
+      "kind": "opening",
+      "position": [
+        8,
+        24
+      ],
+      "width": 3
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l2-womens-imaging",
+        "l2-concourse"
+      ],
+      "floorId": "l2",
+      "id": "p-l2-womens-imaging",
+      "kind": "door",
+      "position": [
+        53,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-admin-reception",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-admin",
+      "kind": "opening",
+      "position": [
+        13,
+        28
+      ],
+      "width": 2.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-atrium",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-atrium",
+      "kind": "opening",
+      "position": [
+        33,
+        20
+      ],
+      "width": 4.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-conference",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-conference",
+      "kind": "door",
+      "position": [
+        53,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-data-center",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-data",
+      "kind": "gate",
+      "position": [
+        58,
+        28
+      ],
+      "restricted": true,
+      "width": 1.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-concourse",
+        "l3-roof-lobby"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-east",
+      "kind": "opening",
+      "position": [
+        64,
+        24
+      ],
+      "width": 3
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-education",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-education",
+      "kind": "door",
+      "position": [
+        23,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-executive",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-executive",
+      "kind": "gate",
+      "position": [
+        46,
+        28
+      ],
+      "restricted": true,
+      "width": 1.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-library",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-library",
+      "kind": "door",
+      "position": [
+        61,
+        20
+      ],
+      "width": 1.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-lift-hall",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-lifts",
+      "kind": "opening",
+      "position": [
+        31,
+        28
+      ],
+      "width": 2.8
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-research-gallery",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-research",
+      "kind": "door",
+      "position": [
+        13,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-simulation",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-simulation",
+      "kind": "door",
+      "position": [
+        43,
+        20
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": false,
+      "connects": [
+        "l3-stair-hall",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-stairs",
+      "kind": "door",
+      "position": [
+        37,
+        28
+      ],
+      "width": 1.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-training",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-training",
+      "kind": "door",
+      "position": [
+        23,
+        28
+      ],
+      "width": 1.6
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "l3-west-lobby",
+        "l3-concourse"
+      ],
+      "floorId": "l3",
+      "id": "p-l3-west",
+      "kind": "opening",
+      "position": [
+        8,
+        24
+      ],
+      "width": 3
+    }
+  ],
+  "routing": {
+    "edges": [
+      {
+        "accessible": true,
+        "connectorKind": "elevator",
+        "distanceMeters": 4.8,
+        "floorIds": [
+          "g",
+          "l1"
+        ],
+        "from": "connector:lift-atrium:g",
+        "id": "edge:connector:lift-atrium:g--connector:lift-atrium:l1",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "lift-atrium",
+        "to": "connector:lift-atrium:l1"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-atrium",
+        "id": "edge:connector:lift-atrium:g--space:g-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "lift-atrium",
+        "spaceId": "g-atrium",
+        "to": "connector:lift-atrium:g"
+      },
+      {
+        "accessible": true,
+        "connectorKind": "elevator",
+        "distanceMeters": 4.2,
+        "floorIds": [
+          "l1",
+          "l2"
+        ],
+        "from": "connector:lift-atrium:l1",
+        "id": "edge:connector:lift-atrium:l1--connector:lift-atrium:l2",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "lift-atrium",
+        "to": "connector:lift-atrium:l2"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-atrium",
+        "id": "edge:connector:lift-atrium:l1--space:l1-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "lift-atrium",
+        "spaceId": "l1-atrium",
+        "to": "connector:lift-atrium:l1"
+      },
+      {
+        "accessible": true,
+        "connectorKind": "elevator",
+        "distanceMeters": 4.2,
+        "floorIds": [
+          "l2",
+          "l3"
+        ],
+        "from": "connector:lift-atrium:l2",
+        "id": "edge:connector:lift-atrium:l2--connector:lift-atrium:l3",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "lift-atrium",
+        "to": "connector:lift-atrium:l3"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-atrium",
+        "id": "edge:connector:lift-atrium:l2--space:l2-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "lift-atrium",
+        "spaceId": "l2-atrium",
+        "to": "connector:lift-atrium:l2"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-atrium",
+        "id": "edge:connector:lift-atrium:l3--space:l3-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "lift-atrium",
+        "spaceId": "l3-atrium",
+        "to": "connector:lift-atrium:l3"
+      },
+      {
+        "accessible": true,
+        "connectorKind": "elevator",
+        "distanceMeters": 4.8,
+        "floorIds": [
+          "g",
+          "l1"
+        ],
+        "from": "connector:lift-south:g",
+        "id": "edge:connector:lift-south:g--connector:lift-south:l1",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "lift-south",
+        "to": "connector:lift-south:l1"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-lift-hall",
+        "id": "edge:connector:lift-south:g--space:g-lift-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "lift-south",
+        "spaceId": "g-lift-hall",
+        "to": "connector:lift-south:g"
+      },
+      {
+        "accessible": true,
+        "connectorKind": "elevator",
+        "distanceMeters": 4.2,
+        "floorIds": [
+          "l1",
+          "l2"
+        ],
+        "from": "connector:lift-south:l1",
+        "id": "edge:connector:lift-south:l1--connector:lift-south:l2",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "lift-south",
+        "to": "connector:lift-south:l2"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-lift-hall",
+        "id": "edge:connector:lift-south:l1--space:l1-lift-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "lift-south",
+        "spaceId": "l1-lift-hall",
+        "to": "connector:lift-south:l1"
+      },
+      {
+        "accessible": true,
+        "connectorKind": "elevator",
+        "distanceMeters": 4.2,
+        "floorIds": [
+          "l2",
+          "l3"
+        ],
+        "from": "connector:lift-south:l2",
+        "id": "edge:connector:lift-south:l2--connector:lift-south:l3",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "lift-south",
+        "to": "connector:lift-south:l3"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-lift-hall",
+        "id": "edge:connector:lift-south:l2--space:l2-lift-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "lift-south",
+        "spaceId": "l2-lift-hall",
+        "to": "connector:lift-south:l2"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-lift-hall",
+        "id": "edge:connector:lift-south:l3--space:l3-lift-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "lift-south",
+        "spaceId": "l3-lift-hall",
+        "to": "connector:lift-south:l3"
+      },
+      {
+        "accessible": false,
+        "connectorKind": "stairs",
+        "distanceMeters": 4.8,
+        "floorIds": [
+          "g",
+          "l1"
+        ],
+        "from": "connector:stairs-atrium:g",
+        "id": "edge:connector:stairs-atrium:g--connector:stairs-atrium:l1",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "stairs-atrium",
+        "to": "connector:stairs-atrium:l1"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-atrium",
+        "id": "edge:connector:stairs-atrium:g--space:g-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "stairs-atrium",
+        "spaceId": "g-atrium",
+        "to": "connector:stairs-atrium:g"
+      },
+      {
+        "accessible": false,
+        "connectorKind": "stairs",
+        "distanceMeters": 4.2,
+        "floorIds": [
+          "l1",
+          "l2"
+        ],
+        "from": "connector:stairs-atrium:l1",
+        "id": "edge:connector:stairs-atrium:l1--connector:stairs-atrium:l2",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "stairs-atrium",
+        "to": "connector:stairs-atrium:l2"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-atrium",
+        "id": "edge:connector:stairs-atrium:l1--space:l1-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "stairs-atrium",
+        "spaceId": "l1-atrium",
+        "to": "connector:stairs-atrium:l1"
+      },
+      {
+        "accessible": false,
+        "connectorKind": "stairs",
+        "distanceMeters": 4.2,
+        "floorIds": [
+          "l2",
+          "l3"
+        ],
+        "from": "connector:stairs-atrium:l2",
+        "id": "edge:connector:stairs-atrium:l2--connector:stairs-atrium:l3",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "stairs-atrium",
+        "to": "connector:stairs-atrium:l3"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-atrium",
+        "id": "edge:connector:stairs-atrium:l2--space:l2-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "stairs-atrium",
+        "spaceId": "l2-atrium",
+        "to": "connector:stairs-atrium:l2"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-atrium",
+        "id": "edge:connector:stairs-atrium:l3--space:l3-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "stairs-atrium",
+        "spaceId": "l3-atrium",
+        "to": "connector:stairs-atrium:l3"
+      },
+      {
+        "accessible": false,
+        "connectorKind": "stairs",
+        "distanceMeters": 4.8,
+        "floorIds": [
+          "g",
+          "l1"
+        ],
+        "from": "connector:stairs-south:g",
+        "id": "edge:connector:stairs-south:g--connector:stairs-south:l1",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "stairs-south",
+        "to": "connector:stairs-south:l1"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-stair-hall",
+        "id": "edge:connector:stairs-south:g--space:g-stair-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "stairs-south",
+        "spaceId": "g-stair-hall",
+        "to": "connector:stairs-south:g"
+      },
+      {
+        "accessible": false,
+        "connectorKind": "stairs",
+        "distanceMeters": 4.2,
+        "floorIds": [
+          "l1",
+          "l2"
+        ],
+        "from": "connector:stairs-south:l1",
+        "id": "edge:connector:stairs-south:l1--connector:stairs-south:l2",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "stairs-south",
+        "to": "connector:stairs-south:l2"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-stair-hall",
+        "id": "edge:connector:stairs-south:l1--space:l1-stair-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "stairs-south",
+        "spaceId": "l1-stair-hall",
+        "to": "connector:stairs-south:l1"
+      },
+      {
+        "accessible": false,
+        "connectorKind": "stairs",
+        "distanceMeters": 4.2,
+        "floorIds": [
+          "l2",
+          "l3"
+        ],
+        "from": "connector:stairs-south:l2",
+        "id": "edge:connector:stairs-south:l2--connector:stairs-south:l3",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "stairs-south",
+        "to": "connector:stairs-south:l3"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-stair-hall",
+        "id": "edge:connector:stairs-south:l2--space:l2-stair-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "stairs-south",
+        "spaceId": "l2-stair-hall",
+        "to": "connector:stairs-south:l2"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-stair-hall",
+        "id": "edge:connector:stairs-south:l3--space:l3-stair-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "stairs-south",
+        "spaceId": "l3-stair-hall",
+        "to": "connector:stairs-south:l3"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-admin-reception",
+        "id": "edge:poi:poi-admin--space:l3-admin-reception",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-admin",
+        "spaceId": "l3-admin-reception",
+        "to": "poi:poi-admin"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-atrium",
+        "id": "edge:poi:poi-atrium--space:g-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-atrium",
+        "spaceId": "g-atrium",
+        "to": "poi:poi-atrium"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-birth-center",
+        "id": "edge:poi:poi-birth-center--space:l2-birth-center",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "poi-birth-center",
+        "spaceId": "l2-birth-center",
+        "to": "poi:poi-birth-center"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-cafe",
+        "id": "edge:poi:poi-cafe--space:g-cafe",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-cafe",
+        "spaceId": "g-cafe",
+        "to": "poi:poi-cafe"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-cardiac-diagnostics",
+        "id": "edge:poi:poi-cardiac-diagnostics--space:l1-cardiac-diagnostics",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-cardiac-diagnostics",
+        "spaceId": "l1-cardiac-diagnostics",
+        "to": "poi:poi-cardiac-diagnostics"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-cardiology",
+        "id": "edge:poi:poi-cardiology--space:l1-cardiology",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-cardiology",
+        "spaceId": "l1-cardiology",
+        "to": "poi:poi-cardiology"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-child-development",
+        "id": "edge:poi:poi-child-development--space:l2-child-development",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-child-development",
+        "spaceId": "l2-child-development",
+        "to": "poi:poi-child-development"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-conference",
+        "id": "edge:poi:poi-conference--space:l3-conference",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-conference",
+        "spaceId": "l3-conference",
+        "to": "poi:poi-conference"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-consultation",
+        "id": "edge:poi:poi-consultation--space:l1-consultation",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-consultation",
+        "spaceId": "l1-consultation",
+        "to": "poi:poi-consultation"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-data-center",
+        "id": "edge:poi:poi-data-center--space:l3-data-center",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "poi-data-center",
+        "spaceId": "l3-data-center",
+        "to": "poi:poi-data-center"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-surgery-reception",
+        "id": "edge:poi:poi-day-surgery--space:l1-surgery-reception",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-day-surgery",
+        "spaceId": "l1-surgery-reception",
+        "to": "poi:poi-day-surgery"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-education",
+        "id": "edge:poi:poi-education--space:l3-education",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-education",
+        "spaceId": "l3-education",
+        "to": "poi:poi-education"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-emergency-reception",
+        "id": "edge:poi:poi-emergency--space:g-emergency-reception",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-emergency",
+        "spaceId": "g-emergency-reception",
+        "to": "poi:poi-emergency"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-family-services",
+        "id": "edge:poi:poi-family-services--space:l2-family-services",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-family-services",
+        "spaceId": "l2-family-services",
+        "to": "poi:poi-family-services"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-imaging",
+        "id": "edge:poi:poi-imaging--space:g-imaging",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-imaging",
+        "spaceId": "g-imaging",
+        "to": "poi:poi-imaging"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-infusion",
+        "id": "edge:poi:poi-infusion--space:l1-infusion",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-infusion",
+        "spaceId": "l1-infusion",
+        "to": "poi:poi-infusion"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-library",
+        "id": "edge:poi:poi-library--space:l3-library",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-library",
+        "spaceId": "l3-library",
+        "to": "poi:poi-library"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-arrival",
+        "id": "edge:poi:poi-main-entrance--space:g-arrival",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-main-entrance",
+        "spaceId": "g-arrival",
+        "to": "poi:poi-main-entrance"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-maternity",
+        "id": "edge:poi:poi-maternity--space:l2-maternity",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-maternity",
+        "spaceId": "l2-maternity",
+        "to": "poi:poi-maternity"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-neonatal-unit",
+        "id": "edge:poi:poi-neonatal-unit--space:l2-neonatal-unit",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "poi-neonatal-unit",
+        "spaceId": "l2-neonatal-unit",
+        "to": "poi:poi-neonatal-unit"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-neuroscience",
+        "id": "edge:poi:poi-neuroscience--space:l1-neuroscience",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-neuroscience",
+        "spaceId": "l1-neuroscience",
+        "to": "poi:poi-neuroscience"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-nicu-family",
+        "id": "edge:poi:poi-nicu-family--space:l2-nicu-family",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-nicu-family",
+        "spaceId": "l2-nicu-family",
+        "to": "poi:poi-nicu-family"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-oncology",
+        "id": "edge:poi:poi-oncology--space:l1-oncology",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-oncology",
+        "spaceId": "l1-oncology",
+        "to": "poi:poi-oncology"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-orthopedics",
+        "id": "edge:poi:poi-orthopedics--space:g-orthopedics",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-orthopedics",
+        "spaceId": "g-orthopedics",
+        "to": "poi:poi-orthopedics"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-pathology",
+        "id": "edge:poi:poi-pathology-operations--space:g-pathology",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "poi-pathology-operations",
+        "spaceId": "g-pathology",
+        "to": "poi:poi-pathology-operations"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-pediatrics",
+        "id": "edge:poi:poi-pediatrics--space:l2-pediatrics",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-pediatrics",
+        "spaceId": "l2-pediatrics",
+        "to": "poi:poi-pediatrics"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-pharmacy",
+        "id": "edge:poi:poi-pharmacy--space:g-pharmacy",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-pharmacy",
+        "spaceId": "g-pharmacy",
+        "to": "poi:poi-pharmacy"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-play-therapy",
+        "id": "edge:poi:poi-play-therapy--space:l2-play-therapy",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-play-therapy",
+        "spaceId": "l2-play-therapy",
+        "to": "poi:poi-play-therapy"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-preop",
+        "id": "edge:poi:poi-preop--space:l1-preop",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-preop",
+        "spaceId": "l1-preop",
+        "to": "poi:poi-preop"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-registration",
+        "id": "edge:poi:poi-registration--space:g-registration",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-registration",
+        "spaceId": "g-registration",
+        "to": "poi:poi-registration"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-rehabilitation",
+        "id": "edge:poi:poi-rehabilitation--space:l1-rehabilitation",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-rehabilitation",
+        "spaceId": "l1-rehabilitation",
+        "to": "poi:poi-rehabilitation"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-research-gallery",
+        "id": "edge:poi:poi-research-gallery--space:l3-research-gallery",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-research-gallery",
+        "spaceId": "l3-research-gallery",
+        "to": "poi:poi-research-gallery"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-simulation",
+        "id": "edge:poi:poi-simulation--space:l3-simulation",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-simulation",
+        "spaceId": "l3-simulation",
+        "to": "poi:poi-simulation"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-training",
+        "id": "edge:poi:poi-training--space:l3-training",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-training",
+        "spaceId": "l3-training",
+        "to": "poi:poi-training"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-visitor-services",
+        "id": "edge:poi:poi-visitor-services--space:g-visitor-services",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-visitor-services",
+        "spaceId": "g-visitor-services",
+        "to": "poi:poi-visitor-services"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-womens-imaging",
+        "id": "edge:poi:poi-womens-imaging--space:l2-womens-imaging",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-womens-imaging",
+        "spaceId": "l2-womens-imaging",
+        "to": "poi:poi-womens-imaging"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-arrival",
+        "id": "edge:portal:p-g-arrival--space:g-arrival",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-arrival",
+        "spaceId": "g-arrival",
+        "to": "portal:p-g-arrival"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-arrival",
+        "id": "edge:portal:p-g-arrival--waypoint:g-concourse:01",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-arrival",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:01"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-atrium",
+        "id": "edge:portal:p-g-atrium--space:g-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-atrium",
+        "spaceId": "g-atrium",
+        "to": "portal:p-g-atrium"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-atrium",
+        "id": "edge:portal:p-g-atrium--waypoint:g-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-atrium",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-cafe",
+        "id": "edge:portal:p-g-cafe--space:g-cafe",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-cafe",
+        "spaceId": "g-cafe",
+        "to": "portal:p-g-cafe"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-cafe",
+        "id": "edge:portal:p-g-cafe--waypoint:g-concourse:08",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-cafe",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-courtyard-lobby",
+        "id": "edge:portal:p-g-courtyard--space:g-courtyard-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-courtyard",
+        "spaceId": "g-courtyard-lobby",
+        "to": "portal:p-g-courtyard"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-courtyard",
+        "id": "edge:portal:p-g-courtyard--waypoint:g-concourse:12",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-courtyard",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:12"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-emergency-reception",
+        "id": "edge:portal:p-g-emergency--space:g-emergency-reception",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-emergency",
+        "spaceId": "g-emergency-reception",
+        "to": "portal:p-g-emergency"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-emergency",
+        "id": "edge:portal:p-g-emergency--waypoint:g-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-emergency",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-imaging",
+        "id": "edge:portal:p-g-imaging--space:g-imaging",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-imaging",
+        "spaceId": "g-imaging",
+        "to": "portal:p-g-imaging"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-imaging",
+        "id": "edge:portal:p-g-imaging--waypoint:g-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-imaging",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-lift-hall",
+        "id": "edge:portal:p-g-lifts--space:g-lift-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-lifts",
+        "spaceId": "g-lift-hall",
+        "to": "portal:p-g-lifts"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-lifts",
+        "id": "edge:portal:p-g-lifts--waypoint:g-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-lifts",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-orthopedics",
+        "id": "edge:portal:p-g-orthopedics--space:g-orthopedics",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-orthopedics",
+        "spaceId": "g-orthopedics",
+        "to": "portal:p-g-orthopedics"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-orthopedics",
+        "id": "edge:portal:p-g-orthopedics--waypoint:g-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-orthopedics",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-pathology",
+        "id": "edge:portal:p-g-pathology--space:g-pathology",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "p-g-pathology",
+        "spaceId": "g-pathology",
+        "to": "portal:p-g-pathology"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-pathology",
+        "id": "edge:portal:p-g-pathology--waypoint:g-concourse:07",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "p-g-pathology",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-pharmacy",
+        "id": "edge:portal:p-g-pharmacy--space:g-pharmacy",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-pharmacy",
+        "spaceId": "g-pharmacy",
+        "to": "portal:p-g-pharmacy"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-pharmacy",
+        "id": "edge:portal:p-g-pharmacy--waypoint:g-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-pharmacy",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:09"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-registration",
+        "id": "edge:portal:p-g-registration--space:g-registration",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-registration",
+        "spaceId": "g-registration",
+        "to": "portal:p-g-registration"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-registration",
+        "id": "edge:portal:p-g-registration--waypoint:g-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-registration",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-retail",
+        "id": "edge:portal:p-g-retail--space:g-retail",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-retail",
+        "spaceId": "g-retail",
+        "to": "portal:p-g-retail"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-retail",
+        "id": "edge:portal:p-g-retail--waypoint:g-concourse:11",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-retail",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:11"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-visitor-services",
+        "id": "edge:portal:p-g-services--space:g-visitor-services",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-services",
+        "spaceId": "g-visitor-services",
+        "to": "portal:p-g-services"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-services",
+        "id": "edge:portal:p-g-services--waypoint:g-concourse:10",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-services",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:10"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-stair-hall",
+        "id": "edge:portal:p-g-stairs--space:g-stair-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-stairs",
+        "spaceId": "g-stair-hall",
+        "to": "portal:p-g-stairs"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-g-stairs",
+        "id": "edge:portal:p-g-stairs--waypoint:g-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-g-stairs",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-atrium",
+        "id": "edge:portal:p-l1-atrium--space:l1-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-atrium",
+        "spaceId": "l1-atrium",
+        "to": "portal:p-l1-atrium"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-atrium",
+        "id": "edge:portal:p-l1-atrium--waypoint:l1-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-atrium",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-cardiac-diagnostics",
+        "id": "edge:portal:p-l1-cardiac--space:l1-cardiac-diagnostics",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-cardiac",
+        "spaceId": "l1-cardiac-diagnostics",
+        "to": "portal:p-l1-cardiac"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-cardiac",
+        "id": "edge:portal:p-l1-cardiac--waypoint:l1-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-cardiac",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-cardiology",
+        "id": "edge:portal:p-l1-cardiology--space:l1-cardiology",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-cardiology",
+        "spaceId": "l1-cardiology",
+        "to": "portal:p-l1-cardiology"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-cardiology",
+        "id": "edge:portal:p-l1-cardiology--waypoint:l1-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-cardiology",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-consultation",
+        "id": "edge:portal:p-l1-consultation--space:l1-consultation",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-consultation",
+        "spaceId": "l1-consultation",
+        "to": "portal:p-l1-consultation"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-consultation",
+        "id": "edge:portal:p-l1-consultation--waypoint:l1-concourse:10",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-consultation",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:10"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-east-lounge",
+        "id": "edge:portal:p-l1-east--space:l1-east-lounge",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-east",
+        "spaceId": "l1-east-lounge",
+        "to": "portal:p-l1-east"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-east",
+        "id": "edge:portal:p-l1-east--waypoint:l1-concourse:12",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-east",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:12"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-infusion",
+        "id": "edge:portal:p-l1-infusion--space:l1-infusion",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-infusion",
+        "spaceId": "l1-infusion",
+        "to": "portal:p-l1-infusion"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-infusion",
+        "id": "edge:portal:p-l1-infusion--waypoint:l1-concourse:11",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-infusion",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:11"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-lift-hall",
+        "id": "edge:portal:p-l1-lifts--space:l1-lift-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-lifts",
+        "spaceId": "l1-lift-hall",
+        "to": "portal:p-l1-lifts"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-lifts",
+        "id": "edge:portal:p-l1-lifts--waypoint:l1-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-lifts",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-neuroscience",
+        "id": "edge:portal:p-l1-neuroscience--space:l1-neuroscience",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-neuroscience",
+        "spaceId": "l1-neuroscience",
+        "to": "portal:p-l1-neuroscience"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-neuroscience",
+        "id": "edge:portal:p-l1-neuroscience--waypoint:l1-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-neuroscience",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-oncology",
+        "id": "edge:portal:p-l1-oncology--space:l1-oncology",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-oncology",
+        "spaceId": "l1-oncology",
+        "to": "portal:p-l1-oncology"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-oncology",
+        "id": "edge:portal:p-l1-oncology--waypoint:l1-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-oncology",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:09"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-preop",
+        "id": "edge:portal:p-l1-preop--space:l1-preop",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-preop",
+        "spaceId": "l1-preop",
+        "to": "portal:p-l1-preop"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-preop",
+        "id": "edge:portal:p-l1-preop--waypoint:l1-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-preop",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-rehabilitation",
+        "id": "edge:portal:p-l1-rehab--space:l1-rehabilitation",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-rehab",
+        "spaceId": "l1-rehabilitation",
+        "to": "portal:p-l1-rehab"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-rehab",
+        "id": "edge:portal:p-l1-rehab--waypoint:l1-concourse:08",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-rehab",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:08"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-stair-hall",
+        "id": "edge:portal:p-l1-stairs--space:l1-stair-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-stairs",
+        "spaceId": "l1-stair-hall",
+        "to": "portal:p-l1-stairs"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-stairs",
+        "id": "edge:portal:p-l1-stairs--waypoint:l1-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-stairs",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-surgery-reception",
+        "id": "edge:portal:p-l1-surgery--space:l1-surgery-reception",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-surgery",
+        "spaceId": "l1-surgery-reception",
+        "to": "portal:p-l1-surgery"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-surgery",
+        "id": "edge:portal:p-l1-surgery--waypoint:l1-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-surgery",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-west-lobby",
+        "id": "edge:portal:p-l1-west--space:l1-west-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-west",
+        "spaceId": "l1-west-lobby",
+        "to": "portal:p-l1-west"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "portal:p-l1-west",
+        "id": "edge:portal:p-l1-west--waypoint:l1-concourse:01",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l1-west",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:01"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-atrium",
+        "id": "edge:portal:p-l2-atrium--space:l2-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-atrium",
+        "spaceId": "l2-atrium",
+        "to": "portal:p-l2-atrium"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-atrium",
+        "id": "edge:portal:p-l2-atrium--waypoint:l2-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-atrium",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-birth-center",
+        "id": "edge:portal:p-l2-birth-center--space:l2-birth-center",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "p-l2-birth-center",
+        "spaceId": "l2-birth-center",
+        "to": "portal:p-l2-birth-center"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-birth-center",
+        "id": "edge:portal:p-l2-birth-center--waypoint:l2-concourse:08",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "p-l2-birth-center",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-child-development",
+        "id": "edge:portal:p-l2-child-development--space:l2-child-development",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-child-development",
+        "spaceId": "l2-child-development",
+        "to": "portal:p-l2-child-development"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-child-development",
+        "id": "edge:portal:p-l2-child-development--waypoint:l2-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-child-development",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-east-lounge",
+        "id": "edge:portal:p-l2-east--space:l2-east-lounge",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-east",
+        "spaceId": "l2-east-lounge",
+        "to": "portal:p-l2-east"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-east",
+        "id": "edge:portal:p-l2-east--waypoint:l2-concourse:12",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-east",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:12"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-family-services",
+        "id": "edge:portal:p-l2-family-services--space:l2-family-services",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-family-services",
+        "spaceId": "l2-family-services",
+        "to": "portal:p-l2-family-services"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-family-services",
+        "id": "edge:portal:p-l2-family-services--waypoint:l2-concourse:11",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-family-services",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:11"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-lift-hall",
+        "id": "edge:portal:p-l2-lifts--space:l2-lift-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-lifts",
+        "spaceId": "l2-lift-hall",
+        "to": "portal:p-l2-lifts"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-lifts",
+        "id": "edge:portal:p-l2-lifts--waypoint:l2-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-lifts",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-maternity",
+        "id": "edge:portal:p-l2-maternity--space:l2-maternity",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-maternity",
+        "spaceId": "l2-maternity",
+        "to": "portal:p-l2-maternity"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-maternity",
+        "id": "edge:portal:p-l2-maternity--waypoint:l2-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-maternity",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-neonatal-unit",
+        "id": "edge:portal:p-l2-neonatal--space:l2-neonatal-unit",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "p-l2-neonatal",
+        "spaceId": "l2-neonatal-unit",
+        "to": "portal:p-l2-neonatal"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-neonatal",
+        "id": "edge:portal:p-l2-neonatal--waypoint:l2-concourse:10",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "p-l2-neonatal",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:10"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-nicu-family",
+        "id": "edge:portal:p-l2-nicu-family--space:l2-nicu-family",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-nicu-family",
+        "spaceId": "l2-nicu-family",
+        "to": "portal:p-l2-nicu-family"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-nicu-family",
+        "id": "edge:portal:p-l2-nicu-family--waypoint:l2-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-nicu-family",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-pediatrics",
+        "id": "edge:portal:p-l2-pediatrics--space:l2-pediatrics",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-pediatrics",
+        "spaceId": "l2-pediatrics",
+        "to": "portal:p-l2-pediatrics"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-pediatrics",
+        "id": "edge:portal:p-l2-pediatrics--waypoint:l2-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-pediatrics",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-play-therapy",
+        "id": "edge:portal:p-l2-play-therapy--space:l2-play-therapy",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-play-therapy",
+        "spaceId": "l2-play-therapy",
+        "to": "portal:p-l2-play-therapy"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-play-therapy",
+        "id": "edge:portal:p-l2-play-therapy--waypoint:l2-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-play-therapy",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:03"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-stair-hall",
+        "id": "edge:portal:p-l2-stairs--space:l2-stair-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-stairs",
+        "spaceId": "l2-stair-hall",
+        "to": "portal:p-l2-stairs"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-stairs",
+        "id": "edge:portal:p-l2-stairs--waypoint:l2-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-stairs",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-west-lobby",
+        "id": "edge:portal:p-l2-west--space:l2-west-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-west",
+        "spaceId": "l2-west-lobby",
+        "to": "portal:p-l2-west"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-west",
+        "id": "edge:portal:p-l2-west--waypoint:l2-concourse:01",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-west",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:01"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-womens-imaging",
+        "id": "edge:portal:p-l2-womens-imaging--space:l2-womens-imaging",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-womens-imaging",
+        "spaceId": "l2-womens-imaging",
+        "to": "portal:p-l2-womens-imaging"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "portal:p-l2-womens-imaging",
+        "id": "edge:portal:p-l2-womens-imaging--waypoint:l2-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l2-womens-imaging",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:09"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-admin-reception",
+        "id": "edge:portal:p-l3-admin--space:l3-admin-reception",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-admin",
+        "spaceId": "l3-admin-reception",
+        "to": "portal:p-l3-admin"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-admin",
+        "id": "edge:portal:p-l3-admin--waypoint:l3-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-admin",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-atrium",
+        "id": "edge:portal:p-l3-atrium--space:l3-atrium",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-atrium",
+        "spaceId": "l3-atrium",
+        "to": "portal:p-l3-atrium"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-atrium",
+        "id": "edge:portal:p-l3-atrium--waypoint:l3-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-atrium",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-conference",
+        "id": "edge:portal:p-l3-conference--space:l3-conference",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-conference",
+        "spaceId": "l3-conference",
+        "to": "portal:p-l3-conference"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-conference",
+        "id": "edge:portal:p-l3-conference--waypoint:l3-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-conference",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:09"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-data-center",
+        "id": "edge:portal:p-l3-data--space:l3-data-center",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "p-l3-data",
+        "spaceId": "l3-data-center",
+        "to": "portal:p-l3-data"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-data",
+        "id": "edge:portal:p-l3-data--waypoint:l3-concourse:10",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "p-l3-data",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:10"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-roof-lobby",
+        "id": "edge:portal:p-l3-east--space:l3-roof-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-east",
+        "spaceId": "l3-roof-lobby",
+        "to": "portal:p-l3-east"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-east",
+        "id": "edge:portal:p-l3-east--waypoint:l3-concourse:12",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-east",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:12"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-education",
+        "id": "edge:portal:p-l3-education--space:l3-education",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-education",
+        "spaceId": "l3-education",
+        "to": "portal:p-l3-education"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-education",
+        "id": "edge:portal:p-l3-education--waypoint:l3-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-education",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-executive",
+        "id": "edge:portal:p-l3-executive--space:l3-executive",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "p-l3-executive",
+        "spaceId": "l3-executive",
+        "to": "portal:p-l3-executive"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-executive",
+        "id": "edge:portal:p-l3-executive--waypoint:l3-concourse:08",
+        "kind": "within-space",
+        "restricted": true,
+        "sourceId": "p-l3-executive",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-library",
+        "id": "edge:portal:p-l3-library--space:l3-library",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-library",
+        "spaceId": "l3-library",
+        "to": "portal:p-l3-library"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-library",
+        "id": "edge:portal:p-l3-library--waypoint:l3-concourse:11",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-library",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:11"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-lift-hall",
+        "id": "edge:portal:p-l3-lifts--space:l3-lift-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-lifts",
+        "spaceId": "l3-lift-hall",
+        "to": "portal:p-l3-lifts"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-lifts",
+        "id": "edge:portal:p-l3-lifts--waypoint:l3-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-lifts",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-research-gallery",
+        "id": "edge:portal:p-l3-research--space:l3-research-gallery",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-research",
+        "spaceId": "l3-research-gallery",
+        "to": "portal:p-l3-research"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-research",
+        "id": "edge:portal:p-l3-research--waypoint:l3-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-research",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-simulation",
+        "id": "edge:portal:p-l3-simulation--space:l3-simulation",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-simulation",
+        "spaceId": "l3-simulation",
+        "to": "portal:p-l3-simulation"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-simulation",
+        "id": "edge:portal:p-l3-simulation--waypoint:l3-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-simulation",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:07"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-stair-hall",
+        "id": "edge:portal:p-l3-stairs--space:l3-stair-hall",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-stairs",
+        "spaceId": "l3-stair-hall",
+        "to": "portal:p-l3-stairs"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-stairs",
+        "id": "edge:portal:p-l3-stairs--waypoint:l3-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-stairs",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-training",
+        "id": "edge:portal:p-l3-training--space:l3-training",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-training",
+        "spaceId": "l3-training",
+        "to": "portal:p-l3-training"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-training",
+        "id": "edge:portal:p-l3-training--waypoint:l3-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-training",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-west-lobby",
+        "id": "edge:portal:p-l3-west--space:l3-west-lobby",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-west",
+        "spaceId": "l3-west-lobby",
+        "to": "portal:p-l3-west"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "portal:p-l3-west",
+        "id": "edge:portal:p-l3-west--waypoint:l3-concourse:01",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-l3-west",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:01"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:05",
+        "id": "edge:space:g-concourse--waypoint:g-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "space:g-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-concourse",
+        "id": "edge:space:g-concourse--waypoint:g-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:05",
+        "id": "edge:space:l1-concourse--waypoint:l1-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "space:l1-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "space:l1-concourse",
+        "id": "edge:space:l1-concourse--waypoint:l1-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:05",
+        "id": "edge:space:l2-concourse--waypoint:l2-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "space:l2-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "space:l2-concourse",
+        "id": "edge:space:l2-concourse--waypoint:l2-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:05",
+        "id": "edge:space:l3-concourse--waypoint:l3-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "space:l3-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "space:l3-concourse",
+        "id": "edge:space:l3-concourse--waypoint:l3-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:01",
+        "id": "edge:waypoint:g-concourse:01--waypoint:g-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 10,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:02",
+        "id": "edge:waypoint:g-concourse:02--waypoint:g-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 8,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:03",
+        "id": "edge:waypoint:g-concourse:03--waypoint:g-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:04",
+        "id": "edge:waypoint:g-concourse:04--waypoint:g-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:06",
+        "id": "edge:waypoint:g-concourse:06--waypoint:g-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:07",
+        "id": "edge:waypoint:g-concourse:07--waypoint:g-concourse:08",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 7,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:08",
+        "id": "edge:waypoint:g-concourse:08--waypoint:g-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:09"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:09",
+        "id": "edge:waypoint:g-concourse:09--waypoint:g-concourse:10",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:10"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:10",
+        "id": "edge:waypoint:g-concourse:10--waypoint:g-concourse:11",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:11"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:11",
+        "id": "edge:waypoint:g-concourse:11--waypoint:g-concourse:12",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:12"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:01",
+        "id": "edge:waypoint:l1-concourse:01--waypoint:l1-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 10,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:02",
+        "id": "edge:waypoint:l1-concourse:02--waypoint:l1-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 8,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:03",
+        "id": "edge:waypoint:l1-concourse:03--waypoint:l1-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:04",
+        "id": "edge:waypoint:l1-concourse:04--waypoint:l1-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:06",
+        "id": "edge:waypoint:l1-concourse:06--waypoint:l1-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:07",
+        "id": "edge:waypoint:l1-concourse:07--waypoint:l1-concourse:08",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 7,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:08",
+        "id": "edge:waypoint:l1-concourse:08--waypoint:l1-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:09"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:09",
+        "id": "edge:waypoint:l1-concourse:09--waypoint:l1-concourse:10",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:10"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:10",
+        "id": "edge:waypoint:l1-concourse:10--waypoint:l1-concourse:11",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:11"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l1"
+        ],
+        "from": "waypoint:l1-concourse:11",
+        "id": "edge:waypoint:l1-concourse:11--waypoint:l1-concourse:12",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l1-concourse",
+        "spaceId": "l1-concourse",
+        "to": "waypoint:l1-concourse:12"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:01",
+        "id": "edge:waypoint:l2-concourse:01--waypoint:l2-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 10,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:02",
+        "id": "edge:waypoint:l2-concourse:02--waypoint:l2-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 8,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:03",
+        "id": "edge:waypoint:l2-concourse:03--waypoint:l2-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:04",
+        "id": "edge:waypoint:l2-concourse:04--waypoint:l2-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:06",
+        "id": "edge:waypoint:l2-concourse:06--waypoint:l2-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:07",
+        "id": "edge:waypoint:l2-concourse:07--waypoint:l2-concourse:08",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 7,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:08",
+        "id": "edge:waypoint:l2-concourse:08--waypoint:l2-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:09"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:09",
+        "id": "edge:waypoint:l2-concourse:09--waypoint:l2-concourse:10",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:10"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:10",
+        "id": "edge:waypoint:l2-concourse:10--waypoint:l2-concourse:11",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:11"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l2"
+        ],
+        "from": "waypoint:l2-concourse:11",
+        "id": "edge:waypoint:l2-concourse:11--waypoint:l2-concourse:12",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l2-concourse",
+        "spaceId": "l2-concourse",
+        "to": "waypoint:l2-concourse:12"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:01",
+        "id": "edge:waypoint:l3-concourse:01--waypoint:l3-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 10,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:02",
+        "id": "edge:waypoint:l3-concourse:02--waypoint:l3-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 8,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:03",
+        "id": "edge:waypoint:l3-concourse:03--waypoint:l3-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:04",
+        "id": "edge:waypoint:l3-concourse:04--waypoint:l3-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:06",
+        "id": "edge:waypoint:l3-concourse:06--waypoint:l3-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:07",
+        "id": "edge:waypoint:l3-concourse:07--waypoint:l3-concourse:08",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 7,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:08",
+        "id": "edge:waypoint:l3-concourse:08--waypoint:l3-concourse:09",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:09"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 5,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:09",
+        "id": "edge:waypoint:l3-concourse:09--waypoint:l3-concourse:10",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:10"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:10",
+        "id": "edge:waypoint:l3-concourse:10--waypoint:l3-concourse:11",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:11"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "l3"
+        ],
+        "from": "waypoint:l3-concourse:11",
+        "id": "edge:waypoint:l3-concourse:11--waypoint:l3-concourse:12",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "l3-concourse",
+        "spaceId": "l3-concourse",
+        "to": "waypoint:l3-concourse:12"
+      }
+    ],
+    "nodes": [
+      {
+        "floorId": "g",
+        "id": "connector:lift-atrium:g",
+        "kind": "connector-stop",
+        "position": [
+          31,
+          14
+        ],
+        "sourceId": "lift-atrium"
+      },
+      {
+        "floorId": "l1",
+        "id": "connector:lift-atrium:l1",
+        "kind": "connector-stop",
+        "position": [
+          31,
+          14
+        ],
+        "sourceId": "lift-atrium"
+      },
+      {
+        "floorId": "l2",
+        "id": "connector:lift-atrium:l2",
+        "kind": "connector-stop",
+        "position": [
+          31,
+          14
+        ],
+        "sourceId": "lift-atrium"
+      },
+      {
+        "floorId": "l3",
+        "id": "connector:lift-atrium:l3",
+        "kind": "connector-stop",
+        "position": [
+          31,
+          14
+        ],
+        "sourceId": "lift-atrium"
+      },
+      {
+        "floorId": "g",
+        "id": "connector:lift-south:g",
+        "kind": "connector-stop",
+        "position": [
+          31,
+          34
+        ],
+        "sourceId": "lift-south"
+      },
+      {
+        "floorId": "l1",
+        "id": "connector:lift-south:l1",
+        "kind": "connector-stop",
+        "position": [
+          31,
+          34
+        ],
+        "sourceId": "lift-south"
+      },
+      {
+        "floorId": "l2",
+        "id": "connector:lift-south:l2",
+        "kind": "connector-stop",
+        "position": [
+          31,
+          34
+        ],
+        "sourceId": "lift-south"
+      },
+      {
+        "floorId": "l3",
+        "id": "connector:lift-south:l3",
+        "kind": "connector-stop",
+        "position": [
+          31,
+          34
+        ],
+        "sourceId": "lift-south"
+      },
+      {
+        "floorId": "g",
+        "id": "connector:stairs-atrium:g",
+        "kind": "connector-stop",
+        "position": [
+          36,
+          14
+        ],
+        "sourceId": "stairs-atrium"
+      },
+      {
+        "floorId": "l1",
+        "id": "connector:stairs-atrium:l1",
+        "kind": "connector-stop",
+        "position": [
+          36,
+          14
+        ],
+        "sourceId": "stairs-atrium"
+      },
+      {
+        "floorId": "l2",
+        "id": "connector:stairs-atrium:l2",
+        "kind": "connector-stop",
+        "position": [
+          36,
+          14
+        ],
+        "sourceId": "stairs-atrium"
+      },
+      {
+        "floorId": "l3",
+        "id": "connector:stairs-atrium:l3",
+        "kind": "connector-stop",
+        "position": [
+          36,
+          14
+        ],
+        "sourceId": "stairs-atrium"
+      },
+      {
+        "floorId": "g",
+        "id": "connector:stairs-south:g",
+        "kind": "connector-stop",
+        "position": [
+          37,
+          34
+        ],
+        "sourceId": "stairs-south"
+      },
+      {
+        "floorId": "l1",
+        "id": "connector:stairs-south:l1",
+        "kind": "connector-stop",
+        "position": [
+          37,
+          34
+        ],
+        "sourceId": "stairs-south"
+      },
+      {
+        "floorId": "l2",
+        "id": "connector:stairs-south:l2",
+        "kind": "connector-stop",
+        "position": [
+          37,
+          34
+        ],
+        "sourceId": "stairs-south"
+      },
+      {
+        "floorId": "l3",
+        "id": "connector:stairs-south:l3",
+        "kind": "connector-stop",
+        "position": [
+          37,
+          34
+        ],
+        "sourceId": "stairs-south"
+      },
+      {
+        "floorId": "l3",
+        "id": "poi:poi-admin",
+        "kind": "poi",
+        "position": [
+          13,
+          34
+        ],
+        "sourceId": "poi-admin"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-atrium",
+        "kind": "poi",
+        "position": [
+          33,
+          14
+        ],
+        "sourceId": "poi-atrium"
+      },
+      {
+        "floorId": "l2",
+        "id": "poi:poi-birth-center",
+        "kind": "poi",
+        "position": [
+          46,
+          34
+        ],
+        "sourceId": "poi-birth-center"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-cafe",
+        "kind": "poi",
+        "position": [
+          46,
+          34
+        ],
+        "sourceId": "poi-cafe"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:poi-cardiac-diagnostics",
+        "kind": "poi",
+        "position": [
+          13,
+          14
+        ],
+        "sourceId": "poi-cardiac-diagnostics"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:poi-cardiology",
+        "kind": "poi",
+        "position": [
+          23,
+          14
+        ],
+        "sourceId": "poi-cardiology"
+      },
+      {
+        "floorId": "l2",
+        "id": "poi:poi-child-development",
+        "kind": "poi",
+        "position": [
+          13,
+          34
+        ],
+        "sourceId": "poi-child-development"
+      },
+      {
+        "floorId": "l3",
+        "id": "poi:poi-conference",
+        "kind": "poi",
+        "position": [
+          53,
+          14
+        ],
+        "sourceId": "poi-conference"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:poi-consultation",
+        "kind": "poi",
+        "position": [
+          58,
+          34
+        ],
+        "sourceId": "poi-consultation"
+      },
+      {
+        "floorId": "l3",
+        "id": "poi:poi-data-center",
+        "kind": "poi",
+        "position": [
+          58,
+          34
+        ],
+        "sourceId": "poi-data-center"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:poi-day-surgery",
+        "kind": "poi",
+        "position": [
+          13,
+          34
+        ],
+        "sourceId": "poi-day-surgery"
+      },
+      {
+        "floorId": "l3",
+        "id": "poi:poi-education",
+        "kind": "poi",
+        "position": [
+          23,
+          14
+        ],
+        "sourceId": "poi-education"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-emergency",
+        "kind": "poi",
+        "position": [
+          13,
+          14
+        ],
+        "sourceId": "poi-emergency"
+      },
+      {
+        "floorId": "l2",
+        "id": "poi:poi-family-services",
+        "kind": "poi",
+        "position": [
+          61,
+          14
+        ],
+        "sourceId": "poi-family-services"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-imaging",
+        "kind": "poi",
+        "position": [
+          23,
+          14
+        ],
+        "sourceId": "poi-imaging"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:poi-infusion",
+        "kind": "poi",
+        "position": [
+          61,
+          14
+        ],
+        "sourceId": "poi-infusion"
+      },
+      {
+        "floorId": "l3",
+        "id": "poi:poi-library",
+        "kind": "poi",
+        "position": [
+          61,
+          14
+        ],
+        "sourceId": "poi-library"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-main-entrance",
+        "kind": "poi",
+        "position": [
+          3,
+          24
+        ],
+        "sourceId": "poi-main-entrance"
+      },
+      {
+        "floorId": "l2",
+        "id": "poi:poi-maternity",
+        "kind": "poi",
+        "position": [
+          43,
+          14
+        ],
+        "sourceId": "poi-maternity"
+      },
+      {
+        "floorId": "l2",
+        "id": "poi:poi-neonatal-unit",
+        "kind": "poi",
+        "position": [
+          58,
+          34
+        ],
+        "sourceId": "poi-neonatal-unit"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:poi-neuroscience",
+        "kind": "poi",
+        "position": [
+          43,
+          14
+        ],
+        "sourceId": "poi-neuroscience"
+      },
+      {
+        "floorId": "l2",
+        "id": "poi:poi-nicu-family",
+        "kind": "poi",
+        "position": [
+          23,
+          14
+        ],
+        "sourceId": "poi-nicu-family"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:poi-oncology",
+        "kind": "poi",
+        "position": [
+          53,
+          14
+        ],
+        "sourceId": "poi-oncology"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-orthopedics",
+        "kind": "poi",
+        "position": [
+          23,
+          34
+        ],
+        "sourceId": "poi-orthopedics"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-pathology-operations",
+        "kind": "poi",
+        "position": [
+          43,
+          14
+        ],
+        "sourceId": "poi-pathology-operations"
+      },
+      {
+        "floorId": "l2",
+        "id": "poi:poi-pediatrics",
+        "kind": "poi",
+        "position": [
+          13,
+          14
+        ],
+        "sourceId": "poi-pediatrics"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-pharmacy",
+        "kind": "poi",
+        "position": [
+          53,
+          14
+        ],
+        "sourceId": "poi-pharmacy"
+      },
+      {
+        "floorId": "l2",
+        "id": "poi:poi-play-therapy",
+        "kind": "poi",
+        "position": [
+          23,
+          34
+        ],
+        "sourceId": "poi-play-therapy"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:poi-preop",
+        "kind": "poi",
+        "position": [
+          23,
+          34
+        ],
+        "sourceId": "poi-preop"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-registration",
+        "kind": "poi",
+        "position": [
+          13,
+          34
+        ],
+        "sourceId": "poi-registration"
+      },
+      {
+        "floorId": "l1",
+        "id": "poi:poi-rehabilitation",
+        "kind": "poi",
+        "position": [
+          46,
+          34
+        ],
+        "sourceId": "poi-rehabilitation"
+      },
+      {
+        "floorId": "l3",
+        "id": "poi:poi-research-gallery",
+        "kind": "poi",
+        "position": [
+          13,
+          14
+        ],
+        "sourceId": "poi-research-gallery"
+      },
+      {
+        "floorId": "l3",
+        "id": "poi:poi-simulation",
+        "kind": "poi",
+        "position": [
+          43,
+          14
+        ],
+        "sourceId": "poi-simulation"
+      },
+      {
+        "floorId": "l3",
+        "id": "poi:poi-training",
+        "kind": "poi",
+        "position": [
+          23,
+          34
+        ],
+        "sourceId": "poi-training"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-visitor-services",
+        "kind": "poi",
+        "position": [
+          58,
+          34
+        ],
+        "sourceId": "poi-visitor-services"
+      },
+      {
+        "floorId": "l2",
+        "id": "poi:poi-womens-imaging",
+        "kind": "poi",
+        "position": [
+          53,
+          14
+        ],
+        "sourceId": "poi-womens-imaging"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-arrival",
+        "kind": "portal",
+        "position": [
+          8,
+          24
+        ],
+        "sourceId": "p-g-arrival"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-atrium",
+        "kind": "portal",
+        "position": [
+          33,
+          20
+        ],
+        "sourceId": "p-g-atrium"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-cafe",
+        "kind": "portal",
+        "position": [
+          46,
+          28
+        ],
+        "sourceId": "p-g-cafe"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-courtyard",
+        "kind": "portal",
+        "position": [
+          64,
+          24
+        ],
+        "sourceId": "p-g-courtyard"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-emergency",
+        "kind": "portal",
+        "position": [
+          13,
+          20
+        ],
+        "sourceId": "p-g-emergency"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-imaging",
+        "kind": "portal",
+        "position": [
+          23,
+          20
+        ],
+        "sourceId": "p-g-imaging"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-lifts",
+        "kind": "portal",
+        "position": [
+          31,
+          28
+        ],
+        "sourceId": "p-g-lifts"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-orthopedics",
+        "kind": "portal",
+        "position": [
+          23,
+          28
+        ],
+        "sourceId": "p-g-orthopedics"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-pathology",
+        "kind": "portal",
+        "position": [
+          43,
+          20
+        ],
+        "sourceId": "p-g-pathology"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-pharmacy",
+        "kind": "portal",
+        "position": [
+          53,
+          20
+        ],
+        "sourceId": "p-g-pharmacy"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-registration",
+        "kind": "portal",
+        "position": [
+          13,
+          28
+        ],
+        "sourceId": "p-g-registration"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-retail",
+        "kind": "portal",
+        "position": [
+          61,
+          20
+        ],
+        "sourceId": "p-g-retail"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-services",
+        "kind": "portal",
+        "position": [
+          58,
+          28
+        ],
+        "sourceId": "p-g-services"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-g-stairs",
+        "kind": "portal",
+        "position": [
+          37,
+          28
+        ],
+        "sourceId": "p-g-stairs"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-atrium",
+        "kind": "portal",
+        "position": [
+          33,
+          20
+        ],
+        "sourceId": "p-l1-atrium"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-cardiac",
+        "kind": "portal",
+        "position": [
+          13,
+          20
+        ],
+        "sourceId": "p-l1-cardiac"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-cardiology",
+        "kind": "portal",
+        "position": [
+          23,
+          20
+        ],
+        "sourceId": "p-l1-cardiology"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-consultation",
+        "kind": "portal",
+        "position": [
+          58,
+          28
+        ],
+        "sourceId": "p-l1-consultation"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-east",
+        "kind": "portal",
+        "position": [
+          64,
+          24
+        ],
+        "sourceId": "p-l1-east"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-infusion",
+        "kind": "portal",
+        "position": [
+          61,
+          20
+        ],
+        "sourceId": "p-l1-infusion"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-lifts",
+        "kind": "portal",
+        "position": [
+          31,
+          28
+        ],
+        "sourceId": "p-l1-lifts"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-neuroscience",
+        "kind": "portal",
+        "position": [
+          43,
+          20
+        ],
+        "sourceId": "p-l1-neuroscience"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-oncology",
+        "kind": "portal",
+        "position": [
+          53,
+          20
+        ],
+        "sourceId": "p-l1-oncology"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-preop",
+        "kind": "portal",
+        "position": [
+          23,
+          28
+        ],
+        "sourceId": "p-l1-preop"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-rehab",
+        "kind": "portal",
+        "position": [
+          46,
+          28
+        ],
+        "sourceId": "p-l1-rehab"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-stairs",
+        "kind": "portal",
+        "position": [
+          37,
+          28
+        ],
+        "sourceId": "p-l1-stairs"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-surgery",
+        "kind": "portal",
+        "position": [
+          13,
+          28
+        ],
+        "sourceId": "p-l1-surgery"
+      },
+      {
+        "floorId": "l1",
+        "id": "portal:p-l1-west",
+        "kind": "portal",
+        "position": [
+          8,
+          24
+        ],
+        "sourceId": "p-l1-west"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-atrium",
+        "kind": "portal",
+        "position": [
+          33,
+          20
+        ],
+        "sourceId": "p-l2-atrium"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-birth-center",
+        "kind": "portal",
+        "position": [
+          46,
+          28
+        ],
+        "sourceId": "p-l2-birth-center"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-child-development",
+        "kind": "portal",
+        "position": [
+          13,
+          28
+        ],
+        "sourceId": "p-l2-child-development"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-east",
+        "kind": "portal",
+        "position": [
+          64,
+          24
+        ],
+        "sourceId": "p-l2-east"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-family-services",
+        "kind": "portal",
+        "position": [
+          61,
+          20
+        ],
+        "sourceId": "p-l2-family-services"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-lifts",
+        "kind": "portal",
+        "position": [
+          31,
+          28
+        ],
+        "sourceId": "p-l2-lifts"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-maternity",
+        "kind": "portal",
+        "position": [
+          43,
+          20
+        ],
+        "sourceId": "p-l2-maternity"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-neonatal",
+        "kind": "portal",
+        "position": [
+          58,
+          28
+        ],
+        "sourceId": "p-l2-neonatal"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-nicu-family",
+        "kind": "portal",
+        "position": [
+          23,
+          20
+        ],
+        "sourceId": "p-l2-nicu-family"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-pediatrics",
+        "kind": "portal",
+        "position": [
+          13,
+          20
+        ],
+        "sourceId": "p-l2-pediatrics"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-play-therapy",
+        "kind": "portal",
+        "position": [
+          23,
+          28
+        ],
+        "sourceId": "p-l2-play-therapy"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-stairs",
+        "kind": "portal",
+        "position": [
+          37,
+          28
+        ],
+        "sourceId": "p-l2-stairs"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-west",
+        "kind": "portal",
+        "position": [
+          8,
+          24
+        ],
+        "sourceId": "p-l2-west"
+      },
+      {
+        "floorId": "l2",
+        "id": "portal:p-l2-womens-imaging",
+        "kind": "portal",
+        "position": [
+          53,
+          20
+        ],
+        "sourceId": "p-l2-womens-imaging"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-admin",
+        "kind": "portal",
+        "position": [
+          13,
+          28
+        ],
+        "sourceId": "p-l3-admin"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-atrium",
+        "kind": "portal",
+        "position": [
+          33,
+          20
+        ],
+        "sourceId": "p-l3-atrium"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-conference",
+        "kind": "portal",
+        "position": [
+          53,
+          20
+        ],
+        "sourceId": "p-l3-conference"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-data",
+        "kind": "portal",
+        "position": [
+          58,
+          28
+        ],
+        "sourceId": "p-l3-data"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-east",
+        "kind": "portal",
+        "position": [
+          64,
+          24
+        ],
+        "sourceId": "p-l3-east"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-education",
+        "kind": "portal",
+        "position": [
+          23,
+          20
+        ],
+        "sourceId": "p-l3-education"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-executive",
+        "kind": "portal",
+        "position": [
+          46,
+          28
+        ],
+        "sourceId": "p-l3-executive"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-library",
+        "kind": "portal",
+        "position": [
+          61,
+          20
+        ],
+        "sourceId": "p-l3-library"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-lifts",
+        "kind": "portal",
+        "position": [
+          31,
+          28
+        ],
+        "sourceId": "p-l3-lifts"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-research",
+        "kind": "portal",
+        "position": [
+          13,
+          20
+        ],
+        "sourceId": "p-l3-research"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-simulation",
+        "kind": "portal",
+        "position": [
+          43,
+          20
+        ],
+        "sourceId": "p-l3-simulation"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-stairs",
+        "kind": "portal",
+        "position": [
+          37,
+          28
+        ],
+        "sourceId": "p-l3-stairs"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-training",
+        "kind": "portal",
+        "position": [
+          23,
+          28
+        ],
+        "sourceId": "p-l3-training"
+      },
+      {
+        "floorId": "l3",
+        "id": "portal:p-l3-west",
+        "kind": "portal",
+        "position": [
+          8,
+          24
+        ],
+        "sourceId": "p-l3-west"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-arrival",
+        "kind": "space",
+        "position": [
+          4,
+          24
+        ],
+        "sourceId": "g-arrival"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-atrium",
+        "kind": "space",
+        "position": [
+          33,
+          14
+        ],
+        "sourceId": "g-atrium"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-cafe",
+        "kind": "space",
+        "position": [
+          46,
+          34
+        ],
+        "sourceId": "g-cafe"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-concourse",
+        "kind": "space",
+        "position": [
+          36,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-courtyard-lobby",
+        "kind": "space",
+        "position": [
+          68,
+          24
+        ],
+        "sourceId": "g-courtyard-lobby"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-emergency-reception",
+        "kind": "space",
+        "position": [
+          13,
+          14
+        ],
+        "sourceId": "g-emergency-reception"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-imaging",
+        "kind": "space",
+        "position": [
+          23,
+          14
+        ],
+        "sourceId": "g-imaging"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-lift-hall",
+        "kind": "space",
+        "position": [
+          31,
+          34
+        ],
+        "sourceId": "g-lift-hall"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-orthopedics",
+        "kind": "space",
+        "position": [
+          23,
+          34
+        ],
+        "sourceId": "g-orthopedics"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-pathology",
+        "kind": "space",
+        "position": [
+          43,
+          14
+        ],
+        "sourceId": "g-pathology"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-pharmacy",
+        "kind": "space",
+        "position": [
+          53,
+          14
+        ],
+        "sourceId": "g-pharmacy"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-registration",
+        "kind": "space",
+        "position": [
+          13,
+          34
+        ],
+        "sourceId": "g-registration"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-retail",
+        "kind": "space",
+        "position": [
+          61,
+          14
+        ],
+        "sourceId": "g-retail"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-stair-hall",
+        "kind": "space",
+        "position": [
+          37,
+          34
+        ],
+        "sourceId": "g-stair-hall"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-visitor-services",
+        "kind": "space",
+        "position": [
+          58,
+          34
+        ],
+        "sourceId": "g-visitor-services"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-atrium",
+        "kind": "space",
+        "position": [
+          33,
+          14
+        ],
+        "sourceId": "l1-atrium"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-cardiac-diagnostics",
+        "kind": "space",
+        "position": [
+          13,
+          14
+        ],
+        "sourceId": "l1-cardiac-diagnostics"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-cardiology",
+        "kind": "space",
+        "position": [
+          23,
+          14
+        ],
+        "sourceId": "l1-cardiology"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-concourse",
+        "kind": "space",
+        "position": [
+          36,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-consultation",
+        "kind": "space",
+        "position": [
+          58,
+          34
+        ],
+        "sourceId": "l1-consultation"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-east-lounge",
+        "kind": "space",
+        "position": [
+          68,
+          24
+        ],
+        "sourceId": "l1-east-lounge"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-infusion",
+        "kind": "space",
+        "position": [
+          61,
+          14
+        ],
+        "sourceId": "l1-infusion"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-lift-hall",
+        "kind": "space",
+        "position": [
+          31,
+          34
+        ],
+        "sourceId": "l1-lift-hall"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-neuroscience",
+        "kind": "space",
+        "position": [
+          43,
+          14
+        ],
+        "sourceId": "l1-neuroscience"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-oncology",
+        "kind": "space",
+        "position": [
+          53,
+          14
+        ],
+        "sourceId": "l1-oncology"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-preop",
+        "kind": "space",
+        "position": [
+          23,
+          34
+        ],
+        "sourceId": "l1-preop"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-rehabilitation",
+        "kind": "space",
+        "position": [
+          46,
+          34
+        ],
+        "sourceId": "l1-rehabilitation"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-stair-hall",
+        "kind": "space",
+        "position": [
+          37,
+          34
+        ],
+        "sourceId": "l1-stair-hall"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-surgery-reception",
+        "kind": "space",
+        "position": [
+          13,
+          34
+        ],
+        "sourceId": "l1-surgery-reception"
+      },
+      {
+        "floorId": "l1",
+        "id": "space:l1-west-lobby",
+        "kind": "space",
+        "position": [
+          4,
+          24
+        ],
+        "sourceId": "l1-west-lobby"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-atrium",
+        "kind": "space",
+        "position": [
+          33,
+          14
+        ],
+        "sourceId": "l2-atrium"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-birth-center",
+        "kind": "space",
+        "position": [
+          46,
+          34
+        ],
+        "sourceId": "l2-birth-center"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-child-development",
+        "kind": "space",
+        "position": [
+          13,
+          34
+        ],
+        "sourceId": "l2-child-development"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-concourse",
+        "kind": "space",
+        "position": [
+          36,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-east-lounge",
+        "kind": "space",
+        "position": [
+          68,
+          24
+        ],
+        "sourceId": "l2-east-lounge"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-family-services",
+        "kind": "space",
+        "position": [
+          61,
+          14
+        ],
+        "sourceId": "l2-family-services"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-lift-hall",
+        "kind": "space",
+        "position": [
+          31,
+          34
+        ],
+        "sourceId": "l2-lift-hall"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-maternity",
+        "kind": "space",
+        "position": [
+          43,
+          14
+        ],
+        "sourceId": "l2-maternity"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-neonatal-unit",
+        "kind": "space",
+        "position": [
+          58,
+          34
+        ],
+        "sourceId": "l2-neonatal-unit"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-nicu-family",
+        "kind": "space",
+        "position": [
+          23,
+          14
+        ],
+        "sourceId": "l2-nicu-family"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-pediatrics",
+        "kind": "space",
+        "position": [
+          13,
+          14
+        ],
+        "sourceId": "l2-pediatrics"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-play-therapy",
+        "kind": "space",
+        "position": [
+          23,
+          34
+        ],
+        "sourceId": "l2-play-therapy"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-stair-hall",
+        "kind": "space",
+        "position": [
+          37,
+          34
+        ],
+        "sourceId": "l2-stair-hall"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-west-lobby",
+        "kind": "space",
+        "position": [
+          4,
+          24
+        ],
+        "sourceId": "l2-west-lobby"
+      },
+      {
+        "floorId": "l2",
+        "id": "space:l2-womens-imaging",
+        "kind": "space",
+        "position": [
+          53,
+          14
+        ],
+        "sourceId": "l2-womens-imaging"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-admin-reception",
+        "kind": "space",
+        "position": [
+          13,
+          34
+        ],
+        "sourceId": "l3-admin-reception"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-atrium",
+        "kind": "space",
+        "position": [
+          33,
+          14
+        ],
+        "sourceId": "l3-atrium"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-concourse",
+        "kind": "space",
+        "position": [
+          36,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-conference",
+        "kind": "space",
+        "position": [
+          53,
+          14
+        ],
+        "sourceId": "l3-conference"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-data-center",
+        "kind": "space",
+        "position": [
+          58,
+          34
+        ],
+        "sourceId": "l3-data-center"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-education",
+        "kind": "space",
+        "position": [
+          23,
+          14
+        ],
+        "sourceId": "l3-education"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-executive",
+        "kind": "space",
+        "position": [
+          46,
+          34
+        ],
+        "sourceId": "l3-executive"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-library",
+        "kind": "space",
+        "position": [
+          61,
+          14
+        ],
+        "sourceId": "l3-library"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-lift-hall",
+        "kind": "space",
+        "position": [
+          31,
+          34
+        ],
+        "sourceId": "l3-lift-hall"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-research-gallery",
+        "kind": "space",
+        "position": [
+          13,
+          14
+        ],
+        "sourceId": "l3-research-gallery"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-roof-lobby",
+        "kind": "space",
+        "position": [
+          68,
+          24
+        ],
+        "sourceId": "l3-roof-lobby"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-simulation",
+        "kind": "space",
+        "position": [
+          43,
+          14
+        ],
+        "sourceId": "l3-simulation"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-stair-hall",
+        "kind": "space",
+        "position": [
+          37,
+          34
+        ],
+        "sourceId": "l3-stair-hall"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-training",
+        "kind": "space",
+        "position": [
+          23,
+          34
+        ],
+        "sourceId": "l3-training"
+      },
+      {
+        "floorId": "l3",
+        "id": "space:l3-west-lobby",
+        "kind": "space",
+        "position": [
+          4,
+          24
+        ],
+        "sourceId": "l3-west-lobby"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:01",
+        "kind": "waypoint",
+        "position": [
+          8,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:02",
+        "kind": "waypoint",
+        "position": [
+          13,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:03",
+        "kind": "waypoint",
+        "position": [
+          23,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:04",
+        "kind": "waypoint",
+        "position": [
+          31,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:05",
+        "kind": "waypoint",
+        "position": [
+          33,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:06",
+        "kind": "waypoint",
+        "position": [
+          37,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:07",
+        "kind": "waypoint",
+        "position": [
+          43,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:08",
+        "kind": "waypoint",
+        "position": [
+          46,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:09",
+        "kind": "waypoint",
+        "position": [
+          53,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:10",
+        "kind": "waypoint",
+        "position": [
+          58,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:11",
+        "kind": "waypoint",
+        "position": [
+          61,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:12",
+        "kind": "waypoint",
+        "position": [
+          64,
+          24
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:01",
+        "kind": "waypoint",
+        "position": [
+          8,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:02",
+        "kind": "waypoint",
+        "position": [
+          13,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:03",
+        "kind": "waypoint",
+        "position": [
+          23,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:04",
+        "kind": "waypoint",
+        "position": [
+          31,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:05",
+        "kind": "waypoint",
+        "position": [
+          33,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:06",
+        "kind": "waypoint",
+        "position": [
+          37,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:07",
+        "kind": "waypoint",
+        "position": [
+          43,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:08",
+        "kind": "waypoint",
+        "position": [
+          46,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:09",
+        "kind": "waypoint",
+        "position": [
+          53,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:10",
+        "kind": "waypoint",
+        "position": [
+          58,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:11",
+        "kind": "waypoint",
+        "position": [
+          61,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l1",
+        "id": "waypoint:l1-concourse:12",
+        "kind": "waypoint",
+        "position": [
+          64,
+          24
+        ],
+        "sourceId": "l1-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:01",
+        "kind": "waypoint",
+        "position": [
+          8,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:02",
+        "kind": "waypoint",
+        "position": [
+          13,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:03",
+        "kind": "waypoint",
+        "position": [
+          23,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:04",
+        "kind": "waypoint",
+        "position": [
+          31,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:05",
+        "kind": "waypoint",
+        "position": [
+          33,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:06",
+        "kind": "waypoint",
+        "position": [
+          37,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:07",
+        "kind": "waypoint",
+        "position": [
+          43,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:08",
+        "kind": "waypoint",
+        "position": [
+          46,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:09",
+        "kind": "waypoint",
+        "position": [
+          53,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:10",
+        "kind": "waypoint",
+        "position": [
+          58,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:11",
+        "kind": "waypoint",
+        "position": [
+          61,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l2",
+        "id": "waypoint:l2-concourse:12",
+        "kind": "waypoint",
+        "position": [
+          64,
+          24
+        ],
+        "sourceId": "l2-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:01",
+        "kind": "waypoint",
+        "position": [
+          8,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:02",
+        "kind": "waypoint",
+        "position": [
+          13,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:03",
+        "kind": "waypoint",
+        "position": [
+          23,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:04",
+        "kind": "waypoint",
+        "position": [
+          31,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:05",
+        "kind": "waypoint",
+        "position": [
+          33,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:06",
+        "kind": "waypoint",
+        "position": [
+          37,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:07",
+        "kind": "waypoint",
+        "position": [
+          43,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:08",
+        "kind": "waypoint",
+        "position": [
+          46,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:09",
+        "kind": "waypoint",
+        "position": [
+          53,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:10",
+        "kind": "waypoint",
+        "position": [
+          58,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:11",
+        "kind": "waypoint",
+        "position": [
+          61,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      },
+      {
+        "floorId": "l3",
+        "id": "waypoint:l3-concourse:12",
+        "kind": "waypoint",
+        "position": [
+          64,
+          24
+        ],
+        "sourceId": "l3-concourse"
+      }
+    ]
+  },
+  "sourceSchemaVersion": "0.1.0",
+  "spaces": [
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-arrival",
+      "name": "Civic Plaza Entrance",
+      "polygon": [
+        [
+          0,
+          20
+        ],
+        [
+          8,
+          20
+        ],
+        [
+          8,
+          28
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "public": true,
+      "type": "entrance"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-atrium",
+      "name": "Four-Storey Atrium",
+      "polygon": [
+        [
+          28,
+          8
+        ],
+        [
+          38,
+          8
+        ],
+        [
+          38,
+          20
+        ],
+        [
+          28,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-cafe",
+      "name": "Garden Café",
+      "polygon": [
+        [
+          40,
+          28
+        ],
+        [
+          52,
+          28
+        ],
+        [
+          52,
+          40
+        ],
+        [
+          40,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-concourse",
+      "name": "Central Concourse",
+      "polygon": [
+        [
+          8,
+          20
+        ],
+        [
+          64,
+          20
+        ],
+        [
+          64,
+          28
+        ],
+        [
+          8,
+          28
+        ]
+      ],
+      "public": true,
+      "type": "corridor"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-courtyard-lobby",
+      "name": "Healing Garden Lobby",
+      "polygon": [
+        [
+          64,
+          20
+        ],
+        [
+          72,
+          20
+        ],
+        [
+          72,
+          28
+        ],
+        [
+          64,
+          28
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-emergency-reception",
+      "name": "Emergency Reception",
+      "polygon": [
+        [
+          8,
+          8
+        ],
+        [
+          18,
+          8
+        ],
+        [
+          18,
+          20
+        ],
+        [
+          8,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-imaging",
+      "name": "Advanced Imaging",
+      "polygon": [
+        [
+          18,
+          8
+        ],
+        [
+          28,
+          8
+        ],
+        [
+          28,
+          20
+        ],
+        [
+          18,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-lift-hall",
+      "name": "South Lift Hall",
+      "polygon": [
+        [
+          28,
+          28
+        ],
+        [
+          34,
+          28
+        ],
+        [
+          34,
+          40
+        ],
+        [
+          28,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-orthopedics",
+      "name": "Orthopedics & Fracture Clinic",
+      "polygon": [
+        [
+          18,
+          28
+        ],
+        [
+          28,
+          28
+        ],
+        [
+          28,
+          40
+        ],
+        [
+          18,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-pathology",
+      "name": "Pathology Operations",
+      "polygon": [
+        [
+          38,
+          8
+        ],
+        [
+          48,
+          8
+        ],
+        [
+          48,
+          20
+        ],
+        [
+          38,
+          20
+        ]
+      ],
+      "public": false,
+      "type": "restricted"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-pharmacy",
+      "name": "Outpatient Pharmacy",
+      "polygon": [
+        [
+          48,
+          8
+        ],
+        [
+          58,
+          8
+        ],
+        [
+          58,
+          20
+        ],
+        [
+          48,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-registration",
+      "name": "Outpatient Registration",
+      "polygon": [
+        [
+          8,
+          28
+        ],
+        [
+          18,
+          28
+        ],
+        [
+          18,
+          40
+        ],
+        [
+          8,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-retail",
+      "name": "Wellness Market",
+      "polygon": [
+        [
+          58,
+          8
+        ],
+        [
+          64,
+          8
+        ],
+        [
+          64,
+          20
+        ],
+        [
+          58,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": false,
+      "floorId": "g",
+      "id": "g-stair-hall",
+      "name": "South Stair Hall",
+      "polygon": [
+        [
+          34,
+          28
+        ],
+        [
+          40,
+          28
+        ],
+        [
+          40,
+          40
+        ],
+        [
+          34,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-visitor-services",
+      "name": "Visitor Services & Restrooms",
+      "polygon": [
+        [
+          52,
+          28
+        ],
+        [
+          64,
+          28
+        ],
+        [
+          64,
+          40
+        ],
+        [
+          52,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-atrium",
+      "name": "Atrium Overlook · Level 1",
+      "polygon": [
+        [
+          28,
+          8
+        ],
+        [
+          38,
+          8
+        ],
+        [
+          38,
+          20
+        ],
+        [
+          28,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-cardiac-diagnostics",
+      "name": "Cardiac Diagnostics",
+      "polygon": [
+        [
+          8,
+          8
+        ],
+        [
+          18,
+          8
+        ],
+        [
+          18,
+          20
+        ],
+        [
+          8,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-cardiology",
+      "name": "Heart & Vascular Clinic",
+      "polygon": [
+        [
+          18,
+          8
+        ],
+        [
+          28,
+          8
+        ],
+        [
+          28,
+          20
+        ],
+        [
+          18,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-concourse",
+      "name": "Specialty Care Concourse",
+      "polygon": [
+        [
+          8,
+          20
+        ],
+        [
+          64,
+          20
+        ],
+        [
+          64,
+          28
+        ],
+        [
+          8,
+          28
+        ]
+      ],
+      "public": true,
+      "type": "corridor"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-consultation",
+      "name": "Consultation Neighborhood",
+      "polygon": [
+        [
+          52,
+          28
+        ],
+        [
+          64,
+          28
+        ],
+        [
+          64,
+          40
+        ],
+        [
+          52,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-east-lounge",
+      "name": "Family Lounge",
+      "polygon": [
+        [
+          64,
+          20
+        ],
+        [
+          72,
+          20
+        ],
+        [
+          72,
+          28
+        ],
+        [
+          64,
+          28
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-infusion",
+      "name": "Infusion Welcome Suite",
+      "polygon": [
+        [
+          58,
+          8
+        ],
+        [
+          64,
+          8
+        ],
+        [
+          64,
+          20
+        ],
+        [
+          58,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-lift-hall",
+      "name": "South Lift Hall · Level 1",
+      "polygon": [
+        [
+          28,
+          28
+        ],
+        [
+          34,
+          28
+        ],
+        [
+          34,
+          40
+        ],
+        [
+          28,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-neuroscience",
+      "name": "Neuroscience Clinic",
+      "polygon": [
+        [
+          38,
+          8
+        ],
+        [
+          48,
+          8
+        ],
+        [
+          48,
+          20
+        ],
+        [
+          38,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-oncology",
+      "name": "Oncology Clinic",
+      "polygon": [
+        [
+          48,
+          8
+        ],
+        [
+          58,
+          8
+        ],
+        [
+          58,
+          20
+        ],
+        [
+          48,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-preop",
+      "name": "Pre-Operative Assessment",
+      "polygon": [
+        [
+          18,
+          28
+        ],
+        [
+          28,
+          28
+        ],
+        [
+          28,
+          40
+        ],
+        [
+          18,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-rehabilitation",
+      "name": "Rehabilitation Studio",
+      "polygon": [
+        [
+          40,
+          28
+        ],
+        [
+          52,
+          28
+        ],
+        [
+          52,
+          40
+        ],
+        [
+          40,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": false,
+      "floorId": "l1",
+      "id": "l1-stair-hall",
+      "name": "South Stair Hall · Level 1",
+      "polygon": [
+        [
+          34,
+          28
+        ],
+        [
+          40,
+          28
+        ],
+        [
+          40,
+          40
+        ],
+        [
+          34,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-surgery-reception",
+      "name": "Day Surgery Reception",
+      "polygon": [
+        [
+          8,
+          28
+        ],
+        [
+          18,
+          28
+        ],
+        [
+          18,
+          40
+        ],
+        [
+          8,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": true,
+      "floorId": "l1",
+      "id": "l1-west-lobby",
+      "name": "West Specialty Lobby",
+      "polygon": [
+        [
+          0,
+          20
+        ],
+        [
+          8,
+          20
+        ],
+        [
+          8,
+          28
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-atrium",
+      "name": "Atrium Overlook · Level 2",
+      "polygon": [
+        [
+          28,
+          8
+        ],
+        [
+          38,
+          8
+        ],
+        [
+          38,
+          20
+        ],
+        [
+          28,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-birth-center",
+      "name": "Birth Center",
+      "polygon": [
+        [
+          40,
+          28
+        ],
+        [
+          52,
+          28
+        ],
+        [
+          52,
+          40
+        ],
+        [
+          40,
+          40
+        ]
+      ],
+      "public": false,
+      "type": "restricted"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-child-development",
+      "name": "Child Development Clinic",
+      "polygon": [
+        [
+          8,
+          28
+        ],
+        [
+          18,
+          28
+        ],
+        [
+          18,
+          40
+        ],
+        [
+          8,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-concourse",
+      "name": "Family Care Concourse",
+      "polygon": [
+        [
+          8,
+          20
+        ],
+        [
+          64,
+          20
+        ],
+        [
+          64,
+          28
+        ],
+        [
+          8,
+          28
+        ]
+      ],
+      "public": true,
+      "type": "corridor"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-east-lounge",
+      "name": "Quiet Family Lounge",
+      "polygon": [
+        [
+          64,
+          20
+        ],
+        [
+          72,
+          20
+        ],
+        [
+          72,
+          28
+        ],
+        [
+          64,
+          28
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-family-services",
+      "name": "Family Support Services",
+      "polygon": [
+        [
+          58,
+          8
+        ],
+        [
+          64,
+          8
+        ],
+        [
+          64,
+          20
+        ],
+        [
+          58,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-lift-hall",
+      "name": "South Lift Hall · Level 2",
+      "polygon": [
+        [
+          28,
+          28
+        ],
+        [
+          34,
+          28
+        ],
+        [
+          34,
+          40
+        ],
+        [
+          28,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-maternity",
+      "name": "Maternity Clinic",
+      "polygon": [
+        [
+          38,
+          8
+        ],
+        [
+          48,
+          8
+        ],
+        [
+          48,
+          20
+        ],
+        [
+          38,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-neonatal-unit",
+      "name": "Neonatal Care Unit",
+      "polygon": [
+        [
+          52,
+          28
+        ],
+        [
+          64,
+          28
+        ],
+        [
+          64,
+          40
+        ],
+        [
+          52,
+          40
+        ]
+      ],
+      "public": false,
+      "type": "restricted"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-nicu-family",
+      "name": "NICU Family Center",
+      "polygon": [
+        [
+          18,
+          8
+        ],
+        [
+          28,
+          8
+        ],
+        [
+          28,
+          20
+        ],
+        [
+          18,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-pediatrics",
+      "name": "General Pediatrics",
+      "polygon": [
+        [
+          8,
+          8
+        ],
+        [
+          18,
+          8
+        ],
+        [
+          18,
+          20
+        ],
+        [
+          8,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-play-therapy",
+      "name": "Play Therapy Studio",
+      "polygon": [
+        [
+          18,
+          28
+        ],
+        [
+          28,
+          28
+        ],
+        [
+          28,
+          40
+        ],
+        [
+          18,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": false,
+      "floorId": "l2",
+      "id": "l2-stair-hall",
+      "name": "South Stair Hall · Level 2",
+      "polygon": [
+        [
+          34,
+          28
+        ],
+        [
+          40,
+          28
+        ],
+        [
+          40,
+          40
+        ],
+        [
+          34,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-west-lobby",
+      "name": "Women & Children Welcome",
+      "polygon": [
+        [
+          0,
+          20
+        ],
+        [
+          8,
+          20
+        ],
+        [
+          8,
+          28
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    },
+    {
+      "accessible": true,
+      "floorId": "l2",
+      "id": "l2-womens-imaging",
+      "name": "Women's Imaging",
+      "polygon": [
+        [
+          48,
+          8
+        ],
+        [
+          58,
+          8
+        ],
+        [
+          58,
+          20
+        ],
+        [
+          48,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-admin-reception",
+      "name": "Administration Reception",
+      "polygon": [
+        [
+          8,
+          28
+        ],
+        [
+          18,
+          28
+        ],
+        [
+          18,
+          40
+        ],
+        [
+          8,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-atrium",
+      "name": "Atrium Overlook · Level 3",
+      "polygon": [
+        [
+          28,
+          8
+        ],
+        [
+          38,
+          8
+        ],
+        [
+          38,
+          20
+        ],
+        [
+          28,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-concourse",
+      "name": "Learning Concourse",
+      "polygon": [
+        [
+          8,
+          20
+        ],
+        [
+          64,
+          20
+        ],
+        [
+          64,
+          28
+        ],
+        [
+          8,
+          28
+        ]
+      ],
+      "public": true,
+      "type": "corridor"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-conference",
+      "name": "Clinical Conference Center",
+      "polygon": [
+        [
+          48,
+          8
+        ],
+        [
+          58,
+          8
+        ],
+        [
+          58,
+          20
+        ],
+        [
+          48,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-data-center",
+      "name": "Clinical Data Center",
+      "polygon": [
+        [
+          52,
+          28
+        ],
+        [
+          64,
+          28
+        ],
+        [
+          64,
+          40
+        ],
+        [
+          52,
+          40
+        ]
+      ],
+      "public": false,
+      "type": "restricted"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-education",
+      "name": "Medical Education Center",
+      "polygon": [
+        [
+          18,
+          8
+        ],
+        [
+          28,
+          8
+        ],
+        [
+          28,
+          20
+        ],
+        [
+          18,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-executive",
+      "name": "Executive Offices",
+      "polygon": [
+        [
+          40,
+          28
+        ],
+        [
+          52,
+          28
+        ],
+        [
+          52,
+          40
+        ],
+        [
+          40,
+          40
+        ]
+      ],
+      "public": false,
+      "type": "restricted"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-library",
+      "name": "Health Sciences Library",
+      "polygon": [
+        [
+          58,
+          8
+        ],
+        [
+          64,
+          8
+        ],
+        [
+          64,
+          20
+        ],
+        [
+          58,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-lift-hall",
+      "name": "South Lift Hall · Level 3",
+      "polygon": [
+        [
+          28,
+          28
+        ],
+        [
+          34,
+          28
+        ],
+        [
+          34,
+          40
+        ],
+        [
+          28,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-research-gallery",
+      "name": "Clinical Research Gallery",
+      "polygon": [
+        [
+          8,
+          8
+        ],
+        [
+          18,
+          8
+        ],
+        [
+          18,
+          20
+        ],
+        [
+          8,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-roof-lobby",
+      "name": "Roof Garden Lobby",
+      "polygon": [
+        [
+          64,
+          20
+        ],
+        [
+          72,
+          20
+        ],
+        [
+          72,
+          28
+        ],
+        [
+          64,
+          28
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-simulation",
+      "name": "Simulation Lab",
+      "polygon": [
+        [
+          38,
+          8
+        ],
+        [
+          48,
+          8
+        ],
+        [
+          48,
+          20
+        ],
+        [
+          38,
+          20
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": false,
+      "floorId": "l3",
+      "id": "l3-stair-hall",
+      "name": "South Stair Hall · Level 3",
+      "polygon": [
+        [
+          34,
+          28
+        ],
+        [
+          40,
+          28
+        ],
+        [
+          40,
+          40
+        ],
+        [
+          34,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-training",
+      "name": "Staff Learning Studio",
+      "polygon": [
+        [
+          18,
+          28
+        ],
+        [
+          28,
+          28
+        ],
+        [
+          28,
+          40
+        ],
+        [
+          18,
+          40
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "l3",
+      "id": "l3-west-lobby",
+      "name": "Discovery Lobby",
+      "polygon": [
+        [
+          0,
+          20
+        ],
+        [
+          8,
+          20
+        ],
+        [
+          8,
+          28
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    }
+  ],
+  "verticalConnectors": [
+    {
+      "accessible": true,
+      "id": "lift-atrium",
+      "kind": "elevator",
+      "name": "Panoramic Atrium Lift",
+      "stops": [
+        {
+          "floorId": "g",
+          "position": [
+            31,
+            14
+          ],
+          "spaceId": "g-atrium"
+        },
+        {
+          "floorId": "l1",
+          "position": [
+            31,
+            14
+          ],
+          "spaceId": "l1-atrium"
+        },
+        {
+          "floorId": "l2",
+          "position": [
+            31,
+            14
+          ],
+          "spaceId": "l2-atrium"
+        },
+        {
+          "floorId": "l3",
+          "position": [
+            31,
+            14
+          ],
+          "spaceId": "l3-atrium"
+        }
+      ]
+    },
+    {
+      "accessible": true,
+      "id": "lift-south",
+      "kind": "elevator",
+      "name": "South Lift Bank",
+      "stops": [
+        {
+          "floorId": "g",
+          "position": [
+            31,
+            34
+          ],
+          "spaceId": "g-lift-hall"
+        },
+        {
+          "floorId": "l1",
+          "position": [
+            31,
+            34
+          ],
+          "spaceId": "l1-lift-hall"
+        },
+        {
+          "floorId": "l2",
+          "position": [
+            31,
+            34
+          ],
+          "spaceId": "l2-lift-hall"
+        },
+        {
+          "floorId": "l3",
+          "position": [
+            31,
+            34
+          ],
+          "spaceId": "l3-lift-hall"
+        }
+      ]
+    },
+    {
+      "accessible": false,
+      "id": "stairs-atrium",
+      "kind": "stairs",
+      "name": "Atrium Feature Stair",
+      "stops": [
+        {
+          "floorId": "g",
+          "position": [
+            36,
+            14
+          ],
+          "spaceId": "g-atrium"
+        },
+        {
+          "floorId": "l1",
+          "position": [
+            36,
+            14
+          ],
+          "spaceId": "l1-atrium"
+        },
+        {
+          "floorId": "l2",
+          "position": [
+            36,
+            14
+          ],
+          "spaceId": "l2-atrium"
+        },
+        {
+          "floorId": "l3",
+          "position": [
+            36,
+            14
+          ],
+          "spaceId": "l3-atrium"
+        }
+      ]
+    },
+    {
+      "accessible": false,
+      "id": "stairs-south",
+      "kind": "stairs",
+      "name": "South Public Stair",
+      "stops": [
+        {
+          "floorId": "g",
+          "position": [
+            37,
+            34
+          ],
+          "spaceId": "g-stair-hall"
+        },
+        {
+          "floorId": "l1",
+          "position": [
+            37,
+            34
+          ],
+          "spaceId": "l1-stair-hall"
+        },
+        {
+          "floorId": "l2",
+          "position": [
+            37,
+            34
+          ],
+          "spaceId": "l2-stair-hall"
+        },
+        {
+          "floorId": "l3",
+          "position": [
+            37,
+            34
+          ],
+          "spaceId": "l3-stair-hall"
+        }
+      ]
+    }
+  ]
+}

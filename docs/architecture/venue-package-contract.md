@@ -1,0 +1,142 @@
+# VenuePackage runtime contract
+
+## Scope
+
+Venue Bootstrap v0 establishes the portable boundary between deterministic
+compilation and every runtime consumer:
+
+```text
+Importer -> BuildingSource -> Compiler -> VenuePackage -> Runtime
+```
+
+An importer may eventually read BIM, CAD, a floor plan, a scan, IndoorGML, or an
+authoring tool. It must emit the canonical `BuildingSource`; it does not write a
+routing graph or application state. The compiler remains the only component that
+normalizes source order, validates hard invariants, derives routing topology, and
+computes package identity.
+
+RoomPlan, ARCore, SLAM, automatic recognition, visual positioning, and
+world-anchored AR are outside this milestone.
+
+## Artifact format
+
+The current artifact is one UTF-8 JSON document:
+
+```text
+VenuePackage
+├── packageVersion              "0.2.0"
+├── sourceSchemaVersion         "0.1.0"
+├── compilerVersion             "0.2.0"
+├── building
+│   ├── id / name / units
+│   ├── entrySpaceId
+│   └── coordinateSystem
+├── floors[]
+├── spaces[]
+├── portals[]
+├── verticalConnectors[]
+├── pois[]
+├── localizationAnchors[]
+├── routing
+│   ├── nodes[]
+│   └── edges[]
+└── manifest
+    ├── hashAlgorithm           "sha256"
+    └── contentHash
+```
+
+The compiler canonicalizes object keys and source collection order. The content
+hash is SHA-256 over canonical package JSON without `manifest`. Recompiling the
+same normalized source must produce byte-equivalent package and validation
+artifacts.
+
+## Runtime verification
+
+The browser accepts a package from:
+
+- a catalog URL;
+- an arbitrary CORS-readable URL;
+- a local JSON artifact selected in Inspector.
+
+Activation is rejected unless all of the following pass:
+
+1. supported package, source-schema, and compiler versions;
+2. required building and collection shape;
+3. finite floor, space, and graph geometry;
+4. unique semantic, graph-node, and graph-edge identifiers;
+5. valid floor, space, source, and graph endpoint references;
+6. explicit `accessible` and `restricted` routing policy values;
+7. a public entry POI for deterministic visitor bootstrap;
+8. canonical SHA-256 content verification.
+
+Accessibility fails closed. Missing accessibility flags are invalid package data;
+the runtime never upgrades unknown values to accessible.
+
+The candidate is installed and activated in the existing content-addressed
+IndexedDB registry when storage is available. The in-memory active runtime
+changes only after verification completes. A rejected candidate leaves the
+current package active. Cache unavailability is reported separately and does not
+reinterpret a verified package.
+
+Package signatures, trust roots, delta updates, quota policy, and cross-tab
+activation coordination remain future work.
+
+## Active-package isolation
+
+`buildingId:contentHash` is the runtime identity. React navigation state is keyed
+by that identity, so a venue change recreates:
+
+- active floor and default start;
+- selected destination and POI;
+- current route, steps, and receipt;
+- operational overlay and its evaluation time;
+- future venue-scoped localization estimate state.
+
+Search, routing, floor controls, the 2D plan, the 3D twin, POIs, connector names,
+and localization anchors all read from the same active runtime adapter.
+Operational overlays remain separate immutable artifacts, but are validated
+against the active building ID and package hash and are cleared on venue change.
+
+The routing worker receives the active package with each request. Route receipts
+continue to include the active `buildingId`, package hash, profile, closures,
+excluded-edge counts, and selected connectors.
+
+## Application boundaries
+
+- `#/visitor` contains public search, routing, plan, camera guidance preview, and
+  accessibility preferences.
+- `#/inspector` contains the compiled 3D twin, graph/anchor inspection, package
+  URL/file activation, catalog switching, and closure-overlay loading.
+- `#/studio` is a boundary placeholder only. No authoring workflow is implemented
+  in Venue Bootstrap v0.
+
+This keeps package diagnostics and engineering-only controls out of the visitor
+surface without redesigning the entire application.
+
+## Bundled proof venues
+
+| Property   | Asterion                            | Harbor Exchange                           |
+| ---------- | ----------------------------------- | ----------------------------------------- |
+| Domain     | academic medical center             | ferry, market, and community exchange     |
+| Floors     | 4 repeated clinical levels          | 2 unequal footprints                      |
+| Connectors | lifts and stairs across four levels | lift, stair, and escalator                |
+| POIs       | clinical, diagnostics, services     | transit, market, gallery, cafe, community |
+| Anchors    | 9                                   | 3                                         |
+
+Both are compiler artifacts served from `public/venues/` and selected through
+`public/venues/catalog.json`. Neither is imported by application source code.
+
+## Exact next step: Venue Studio v0
+
+Build one narrow authoring vertical slice:
+
+1. open an existing `BuildingSource` JSON file;
+2. render its floors, spaces, portals, connectors, POIs, and validation issues;
+3. allow deterministic edits to metadata and geometry with explicit
+   accessibility values;
+4. run the existing compiler unchanged in a worker or service;
+5. show the validation report and package hash;
+6. publish/download the verified `VenuePackage` and add its URL to a catalog.
+
+Do not start scan reconstruction in this step. Studio v0 should first prove the
+human-review and publish boundary on canonical source data.

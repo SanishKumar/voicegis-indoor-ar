@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import {
   ContactShadows,
@@ -26,7 +26,8 @@ import type {
   SpaceSource,
   VerticalConnectorSource,
 } from '@voicegis/spatial-schema';
-import { BUILDING_PACKAGE as buildingPackage } from '../data/compiledBuilding';
+import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
+import type { CompiledBuildingRuntime } from '../data/compiledBuilding';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { routeConnectorRuns, routeFloorIds } from '../engine/floorplanModel';
 import type { GraphNode, RouteResult } from '../engine/routingCore';
@@ -60,9 +61,13 @@ const WALL_COLOR = '#d8d6cf';
 const RESTRICTED_WALL_COLOR = '#735061';
 const GLASS_COLOR = '#7dd3fc';
 const WALL_THICKNESS_METERS = 0.12;
-const CONNECTORS_BY_ID = new Map(
-  buildingPackage.verticalConnectors.map((connector) => [connector.id, connector]),
-);
+const SpatialPackageContext = createContext<CompiledBuildingPackage | null>(null);
+
+function useSpatialPackage() {
+  const buildingPackage = useContext(SpatialPackageContext);
+  if (!buildingPackage) throw new Error('Spatial twin requires an active VenuePackage.');
+  return buildingPackage;
+}
 
 function stairRoutePoints(
   from: [number, number, number],
@@ -401,6 +406,7 @@ function PortalAssembly({
   bounds: BuildingBounds;
   exploded: boolean;
 }) {
+  const buildingPackage = useSpatialPackage();
   const connectedSpace = buildingPackage.spaces.find((space) => space.id === portal.connects[0]);
   if (!connectedSpace) return null;
 
@@ -524,9 +530,10 @@ function PoiLabels({
   bounds: BuildingBounds;
   exploded: boolean;
 }) {
+  const buildingPackage = useSpatialPackage();
   const floorsById = useMemo(
     () => new Map(buildingPackage.floors.map((floor) => [floor.id, floor])),
-    [],
+    [buildingPackage],
   );
 
   return (
@@ -565,13 +572,14 @@ interface OverlayProps {
 }
 
 function RoutingOverlay({ bounds, exploded, floorSelection, visibleSpaceIds }: OverlayProps) {
+  const buildingPackage = useSpatialPackage();
   const floorsById = useMemo(
     () => new Map(buildingPackage.floors.map((floor) => [floor.id, floor])),
-    [],
+    [buildingPackage],
   );
   const nodesById = useMemo(
     () => new Map(buildingPackage.routing.nodes.map((node) => [node.id, node])),
-    [],
+    [buildingPackage],
   );
 
   const visibleNodes = buildingPackage.routing.nodes.filter((node) => {
@@ -646,9 +654,17 @@ function ActiveRouteOverlay({
   route,
   currentNodeId,
 }: ActiveRouteOverlayProps) {
+  const buildingPackage = useSpatialPackage();
+  const connectorsById = useMemo(
+    () =>
+      new Map(
+        buildingPackage.verticalConnectors.map((connector) => [connector.id, connector] as const),
+      ),
+    [buildingPackage],
+  );
   const floorsById = useMemo(
     () => new Map(buildingPackage.floors.map((floor) => [floor.id, floor])),
-    [],
+    [buildingPackage],
   );
 
   if (!route?.found || route.path.length === 0) return null;
@@ -673,17 +689,14 @@ function ActiveRouteOverlay({
     const vertical = String(previous.floor) !== String(node.floor);
     const connectorId =
       vertical && previous.sourceId === node.sourceId ? previous.sourceId : undefined;
-    const connector = connectorId ? CONNECTORS_BY_ID.get(connectorId) : undefined;
+    const connector = connectorId ? connectorsById.get(connectorId) : undefined;
     return [
       {
         from,
         to,
         vertical,
         connector,
-        points:
-          vertical && connector?.kind === 'stairs'
-            ? stairRoutePoints(from, to)
-            : [from, to],
+        points: vertical && connector?.kind === 'stairs' ? stairRoutePoints(from, to) : [from, to],
         node,
       },
     ];
@@ -692,9 +705,7 @@ function ActiveRouteOverlay({
   const visibleNodes = route.path.filter(visible);
   const startPoint = visibleNodes[0] ? pointForNode(visibleNodes[0]) : null;
   const destinationPoint = visibleNodes.at(-1) ? pointForNode(visibleNodes.at(-1)!) : null;
-  const destinationIsVisible = route.path.at(-1)
-    ? visible(route.path.at(-1)!)
-    : false;
+  const destinationIsVisible = route.path.at(-1) ? visible(route.path.at(-1)!) : false;
 
   return (
     <group>
@@ -718,7 +729,7 @@ function ActiveRouteOverlay({
       ))}
       {floorSelection === 'all' &&
         connectorRuns.map((run) => {
-          const connector = CONNECTORS_BY_ID.get(run.connectorId);
+          const connector = connectorsById.get(run.connectorId);
           const firstPoint = pointForNode(run.nodes[0]);
           const lastPoint = pointForNode(run.nodes.at(-1)!);
           if (!firstPoint || !lastPoint) return null;
@@ -764,7 +775,7 @@ function ActiveRouteOverlay({
           <group key={`current-${node.id}`} position={point}>
             <mesh rotation={[-Math.PI / 2, 0, 0]}>
               <torusGeometry args={[0.32, 0.1, 12, 28]} />
-            <meshBasicMaterial color="#fffaf4" />
+              <meshBasicMaterial color="#fffaf4" />
             </mesh>
             <mesh position={[0, 0.14, 0]}>
               <sphereGeometry args={[0.18, 16, 16]} />
@@ -795,9 +806,10 @@ function ActiveRouteOverlay({
 }
 
 function AnchorOverlay({ bounds, exploded, floorSelection, visibleSpaceIds }: OverlayProps) {
+  const buildingPackage = useSpatialPackage();
   const floorsById = useMemo(
     () => new Map(buildingPackage.floors.map((floor) => [floor.id, floor])),
-    [],
+    [buildingPackage],
   );
 
   return (
@@ -856,14 +868,15 @@ function TwinScene({
   onSelectSpace,
   onClearSelection,
 }: TwinSceneProps) {
-  const bounds = useMemo(() => computeBuildingBounds(buildingPackage), []);
+  const buildingPackage = useSpatialPackage();
+  const bounds = useMemo(() => computeBuildingBounds(buildingPackage), [buildingPackage]);
   const visibleSpaces = useMemo(
     () =>
       getVisibleSpaces(buildingPackage, {
         floorId: floorSelection,
         includeRestricted: showRestricted,
       }),
-    [floorSelection, showRestricted],
+    [buildingPackage, floorSelection, showRestricted],
   );
   const visibleSpaceIds = useMemo(
     () => new Set(visibleSpaces.map((space) => space.id)),
@@ -874,7 +887,7 @@ function TwinScene({
   );
   const floorsById = useMemo(
     () => new Map(buildingPackage.floors.map((floor) => [floor.id, floor])),
-    [],
+    [buildingPackage],
   );
   const orbitTargetY =
     visibleFloors.reduce((total, floor) => total + visualFloorElevation(floor, exploded) + 1.2, 0) /
@@ -1014,6 +1027,7 @@ interface SpatialNavigatorContextValue {
     route: RouteResult | null;
     currentStepIndex: number;
   };
+  venue: CompiledBuildingRuntime;
 }
 
 function ToggleButton({ active, label, onClick }: ToggleButtonProps) {
@@ -1030,7 +1044,15 @@ function ToggleButton({ active, label, onClick }: ToggleButtonProps) {
 }
 
 export default function SpatialTwinViewer() {
-  const { state } = useNavigation() as unknown as SpatialNavigatorContextValue;
+  const { state, venue } = useNavigation() as unknown as SpatialNavigatorContextValue;
+  const buildingPackage = venue.buildingPackage;
+  const connectorsById = useMemo(
+    () =>
+      new Map(
+        buildingPackage.verticalConnectors.map((connector) => [connector.id, connector] as const),
+      ),
+    [buildingPackage],
+  );
   const [floorSelection, setFloorSelection] = useState<FloorSelection>('all');
   const [exploded, setExploded] = useState(true);
   const [showRestricted, setShowRestricted] = useState(true);
@@ -1060,11 +1082,11 @@ export default function SpatialTwinViewer() {
         floorId: floorSelection,
         includeRestricted: showRestricted,
       }),
-    [floorSelection, showRestricted],
+    [buildingPackage, floorSelection, showRestricted],
   );
   const selectedSpace = visibleSpaces.find((space) => space.id === selectedSpaceId);
-  const graphSummary = useMemo(() => getGraphSummary(buildingPackage), []);
-  const buildingBounds = useMemo(() => computeBuildingBounds(buildingPackage), []);
+  const graphSummary = useMemo(() => getGraphSummary(buildingPackage), [buildingPackage]);
+  const buildingBounds = useMemo(() => computeBuildingBounds(buildingPackage), [buildingPackage]);
   const explodedHeight = Math.max(
     ...buildingPackage.floors.map((floor) => visualFloorElevation(floor, true) + floor.clearHeight),
   );
@@ -1085,249 +1107,251 @@ export default function SpatialTwinViewer() {
     : [];
 
   return (
-    <section className="spatial-twin" aria-label="Compiled indoor spatial twin inspector">
-      <div className="twin-toolbar">
-        <div className="twin-heading">
-          <span className="twin-eyebrow">Compiled package inspector</span>
-          <div className="twin-title-row">
-            <h1>{buildingPackage.building.name}</h1>
-            <span className="twin-fixture-badge">Fictional benchmark</span>
+    <SpatialPackageContext.Provider value={buildingPackage}>
+      <section className="spatial-twin" aria-label="Compiled indoor spatial twin inspector">
+        <div className="twin-toolbar">
+          <div className="twin-heading">
+            <span className="twin-eyebrow">Compiled package inspector</span>
+            <div className="twin-title-row">
+              <h1>{buildingPackage.building.name}</h1>
+              <span className="twin-fixture-badge">Verified package</span>
+            </div>
+            <p>Semantic geometry, policy metadata, graph topology, and localization anchors.</p>
           </div>
-          <p>Semantic geometry, policy metadata, graph topology, and localization anchors.</p>
-        </div>
 
-        <div className="twin-controls" aria-label="Spatial twin display controls">
-          <div className="twin-control-group" aria-label="Floor isolation">
-            <span>Floor</span>
-            <ToggleButton
-              active={floorSelection === 'all'}
-              label="All"
-              onClick={() => setFloorSelection('all')}
-            />
-            {buildingPackage.floors.map((floor) => (
+          <div className="twin-controls" aria-label="Spatial twin display controls">
+            <div className="twin-control-group" aria-label="Floor isolation">
+              <span>Floor</span>
               <ToggleButton
-                key={floor.id}
-                active={floorSelection === floor.id}
-                label={floor.level === 0 ? 'G' : `L${floor.level}`}
-                onClick={() => setFloorSelection(floor.id)}
+                active={floorSelection === 'all'}
+                label="All"
+                onClick={() => setFloorSelection('all')}
               />
-            ))}
-          </div>
-          <ToggleButton
-            active={exploded}
-            label="Exploded"
-            onClick={() => setExploded((value) => !value)}
-          />
-          <ToggleButton
-            active={showArchitecture}
-            label="Architecture"
-            onClick={() => setShowArchitecture((value) => !value)}
-          />
-          <ToggleButton
-            active={showLabels}
-            label="Labels"
-            onClick={() => setShowLabels((value) => !value)}
-          />
-          <ToggleButton
-            active={showRestricted}
-            label="Restricted"
-            onClick={() => setShowRestricted((value) => !value)}
-          />
-          <ToggleButton
-            active={showRouting}
-            label="Routing graph"
-            onClick={() => setShowRouting((value) => !value)}
-          />
-          <ToggleButton
-            active={showAnchors}
-            label="Anchors"
-            onClick={() => setShowAnchors((value) => !value)}
-          />
-        </div>
-      </div>
-
-      <div className="twin-stage">
-        <div
-          className="twin-canvas"
-          role="application"
-          aria-label="Interactive 3D model. Drag to orbit, scroll to zoom, and select a space."
-        >
-          <div className="twin-viewport-status" aria-hidden="true">
-            <span>
-              <Building2 size={13} />
-              Architectural cutaway
-            </span>
-            {activeRoute?.found && (
-              <span className="active-route">
-                <Route size={13} />
-                Active route · {Math.round(activeRoute.totalDistance)} m
-              </span>
-            )}
-            <span>
-              <DoorOpen size={13} />
-              {buildingPackage.portals.length} modeled portals
-            </span>
-          </div>
-          <Canvas
-            camera={{ position: cameraPosition, fov: 42, near: 0.1, far: 220 }}
-            dpr={[1, 1.5]}
-            frameloop="demand"
-            shadows
-          >
-            <TwinScene
-              floorSelection={floorSelection}
-              exploded={exploded}
-              showRestricted={showRestricted}
-              showArchitecture={showArchitecture}
-              showLabels={showLabels}
-              showRouting={showRouting}
-              showAnchors={showAnchors}
-              activeRoute={activeRoute}
-              currentNodeId={currentNodeId}
-              selectedSpaceId={selectedSpaceId}
-              onSelectSpace={setSelectedSpaceId}
-              onClearSelection={() => setSelectedSpaceId(null)}
+              {buildingPackage.floors.map((floor) => (
+                <ToggleButton
+                  key={floor.id}
+                  active={floorSelection === floor.id}
+                  label={floor.level === 0 ? 'G' : `L${floor.level}`}
+                  onClick={() => setFloorSelection(floor.id)}
+                />
+              ))}
+            </div>
+            <ToggleButton
+              active={exploded}
+              label="Exploded"
+              onClick={() => setExploded((value) => !value)}
             />
-          </Canvas>
+            <ToggleButton
+              active={showArchitecture}
+              label="Architecture"
+              onClick={() => setShowArchitecture((value) => !value)}
+            />
+            <ToggleButton
+              active={showLabels}
+              label="Labels"
+              onClick={() => setShowLabels((value) => !value)}
+            />
+            <ToggleButton
+              active={showRestricted}
+              label="Restricted"
+              onClick={() => setShowRestricted((value) => !value)}
+            />
+            <ToggleButton
+              active={showRouting}
+              label="Routing graph"
+              onClick={() => setShowRouting((value) => !value)}
+            />
+            <ToggleButton
+              active={showAnchors}
+              label="Anchors"
+              onClick={() => setShowAnchors((value) => !value)}
+            />
+          </div>
         </div>
 
-        <aside className="twin-inspector" aria-live="polite">
-          {selectedSpace ? (
-            <>
-              <div className="twin-inspector-header">
-                <span className="twin-space-type">{selectedSpace.type.replace('-', ' ')}</span>
-                <h2>{selectedSpace.name}</h2>
-                <code>{selectedSpace.id}</code>
-              </div>
-              <dl className="twin-property-grid">
-                <div>
-                  <dt>Floor</dt>
-                  <dd>
-                    {
-                      buildingPackage.floors.find((floor) => floor.id === selectedSpace.floorId)
-                        ?.name
-                    }
-                  </dd>
-                </div>
-                <div>
-                  <dt>Access</dt>
-                  <dd>{selectedSpace.public ? 'Public' : 'Restricted'}</dd>
-                </div>
-                <div>
-                  <dt>Mobility</dt>
-                  <dd>{selectedSpace.accessible ? 'Accessible' : 'Not accessible'}</dd>
-                </div>
-                <div>
-                  <dt>Boundary</dt>
-                  <dd>{selectedSpace.polygon.length} vertices</dd>
-                </div>
-              </dl>
-              <div className="twin-related-data">
-                <h3>Compiled relationships</h3>
-                <p>{selectedPortals.length} portals</p>
-                <p>{selectedPois.length} points of interest</p>
-                <p>{selectedAnchors.length} localization anchors</p>
-              </div>
-              {selectedPois.length > 0 && (
-                <div className="twin-tag-list">
-                  {selectedPois.map((poi) => (
-                    <span key={poi.id}>{poi.name}</span>
-                  ))}
-                </div>
-              )}
-            </>
-          ) : activeRoute?.found ? (
-            <div className="twin-route-inspector">
-              <span className="twin-space-type">Active route</span>
-              <h2>{destinationName}</h2>
-              <p className="twin-route-journey-copy">
-                {activeRouteFloors.map(floorLabel).join(' → ')}
-                {activeConnectorRuns.map((run) => {
-                  const connector = CONNECTORS_BY_ID.get(run.connectorId);
-                  return ` via ${connector?.name ?? run.connectorId}`;
-                })}
-              </p>
-              <div className="twin-route-current">
-                <span>
-                  Decision {Math.min(state.currentStepIndex + 1, activeRoute.steps.length)} of{' '}
-                  {activeRoute.steps.length}
-                </span>
-                <strong>
-                  {activeRoute.steps[state.currentStepIndex]?.instruction ?? 'Route ready'}
-                </strong>
-              </div>
-              <dl className="twin-property-grid">
-                <div>
-                  <dt>Distance</dt>
-                  <dd>{Math.round(activeRoute.totalDistance)} m</dd>
-                </div>
-                <div>
-                  <dt>Floors</dt>
-                  <dd>{activeRouteFloors.length}</dd>
-                </div>
-              </dl>
-              <p className="twin-route-note">
-                Orange marks walking segments. Violet is anchored to the selected lift or stair.
-              </p>
-            </div>
-          ) : (
-            <div className="twin-empty-inspector">
-              <ScanLine size={24} />
-              <h2>Inspect a semantic space</h2>
-              <p>
-                Select any extruded area to trace its source metadata and compiled relationships.
-              </p>
-            </div>
-          )}
-
-          <div className="twin-package-facts">
-            <div>
-              <Layers size={15} />
-              <span>{buildingPackage.spaces.length} spaces</span>
-            </div>
-            <div>
-              <Route size={15} />
+        <div className="twin-stage">
+          <div
+            className="twin-canvas"
+            role="application"
+            aria-label="Interactive 3D model. Drag to orbit, scroll to zoom, and select a space."
+          >
+            <div className="twin-viewport-status" aria-hidden="true">
               <span>
-                {graphSummary.nodeCount} nodes / {graphSummary.edgeCount} edges
+                <Building2 size={13} />
+                Architectural cutaway
+              </span>
+              {activeRoute?.found && (
+                <span className="active-route">
+                  <Route size={13} />
+                  Active route · {Math.round(activeRoute.totalDistance)} m
+                </span>
+              )}
+              <span>
+                <DoorOpen size={13} />
+                {buildingPackage.portals.length} modeled portals
               </span>
             </div>
-            <div>
-              <Accessibility size={15} />
-              <span>{graphSummary.accessibleEdgeCount} accessible edges</span>
-            </div>
-            <div>
-              <LockKeyhole size={15} />
-              <span>{graphSummary.restrictedEdgeCount} restricted edges</span>
-            </div>
-            <div title={buildingPackage.manifest.contentHash}>
-              <Database size={15} />
-              <code>{buildingPackage.manifest.contentHash.slice(0, 12)}</code>
-            </div>
+            <Canvas
+              camera={{ position: cameraPosition, fov: 42, near: 0.1, far: 220 }}
+              dpr={[1, 1.5]}
+              frameloop="demand"
+              shadows
+            >
+              <TwinScene
+                floorSelection={floorSelection}
+                exploded={exploded}
+                showRestricted={showRestricted}
+                showArchitecture={showArchitecture}
+                showLabels={showLabels}
+                showRouting={showRouting}
+                showAnchors={showAnchors}
+                activeRoute={activeRoute}
+                currentNodeId={currentNodeId}
+                selectedSpaceId={selectedSpaceId}
+                onSelectSpace={setSelectedSpaceId}
+                onClearSelection={() => setSelectedSpaceId(null)}
+              />
+            </Canvas>
           </div>
-        </aside>
-      </div>
 
-      <div className="twin-legend" aria-label="Spatial twin legend">
-        <span>
-          <i className="legend-swatch public" /> Public space
-        </span>
-        <span>
-          <i className="legend-swatch restricted" /> Restricted space
-        </span>
-        <span>
-          <i className="legend-line accessible" /> Accessible edge
-        </span>
-        <span>
-          <i className="legend-line inaccessible" /> Inaccessible edge
-        </span>
-        <span>
-          <i className="legend-anchor" /> Localization anchor
-        </span>
-        <span>
-          <i className="legend-line active-route" /> Active route
-        </span>
-        <strong>Fictional benchmark — not surveyed or deployment-safe</strong>
-      </div>
-    </section>
+          <aside className="twin-inspector" aria-live="polite">
+            {selectedSpace ? (
+              <>
+                <div className="twin-inspector-header">
+                  <span className="twin-space-type">{selectedSpace.type.replace('-', ' ')}</span>
+                  <h2>{selectedSpace.name}</h2>
+                  <code>{selectedSpace.id}</code>
+                </div>
+                <dl className="twin-property-grid">
+                  <div>
+                    <dt>Floor</dt>
+                    <dd>
+                      {
+                        buildingPackage.floors.find((floor) => floor.id === selectedSpace.floorId)
+                          ?.name
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Access</dt>
+                    <dd>{selectedSpace.public ? 'Public' : 'Restricted'}</dd>
+                  </div>
+                  <div>
+                    <dt>Mobility</dt>
+                    <dd>{selectedSpace.accessible ? 'Accessible' : 'Not accessible'}</dd>
+                  </div>
+                  <div>
+                    <dt>Boundary</dt>
+                    <dd>{selectedSpace.polygon.length} vertices</dd>
+                  </div>
+                </dl>
+                <div className="twin-related-data">
+                  <h3>Compiled relationships</h3>
+                  <p>{selectedPortals.length} portals</p>
+                  <p>{selectedPois.length} points of interest</p>
+                  <p>{selectedAnchors.length} localization anchors</p>
+                </div>
+                {selectedPois.length > 0 && (
+                  <div className="twin-tag-list">
+                    {selectedPois.map((poi) => (
+                      <span key={poi.id}>{poi.name}</span>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : activeRoute?.found ? (
+              <div className="twin-route-inspector">
+                <span className="twin-space-type">Active route</span>
+                <h2>{destinationName}</h2>
+                <p className="twin-route-journey-copy">
+                  {activeRouteFloors.map(floorLabel).join(' → ')}
+                  {activeConnectorRuns.map((run) => {
+                    const connector = connectorsById.get(run.connectorId);
+                    return ` via ${connector?.name ?? run.connectorId}`;
+                  })}
+                </p>
+                <div className="twin-route-current">
+                  <span>
+                    Decision {Math.min(state.currentStepIndex + 1, activeRoute.steps.length)} of{' '}
+                    {activeRoute.steps.length}
+                  </span>
+                  <strong>
+                    {activeRoute.steps[state.currentStepIndex]?.instruction ?? 'Route ready'}
+                  </strong>
+                </div>
+                <dl className="twin-property-grid">
+                  <div>
+                    <dt>Distance</dt>
+                    <dd>{Math.round(activeRoute.totalDistance)} m</dd>
+                  </div>
+                  <div>
+                    <dt>Floors</dt>
+                    <dd>{activeRouteFloors.length}</dd>
+                  </div>
+                </dl>
+                <p className="twin-route-note">
+                  Orange marks walking segments. Violet is anchored to the selected lift or stair.
+                </p>
+              </div>
+            ) : (
+              <div className="twin-empty-inspector">
+                <ScanLine size={24} />
+                <h2>Inspect a semantic space</h2>
+                <p>
+                  Select any extruded area to trace its source metadata and compiled relationships.
+                </p>
+              </div>
+            )}
+
+            <div className="twin-package-facts">
+              <div>
+                <Layers size={15} />
+                <span>{buildingPackage.spaces.length} spaces</span>
+              </div>
+              <div>
+                <Route size={15} />
+                <span>
+                  {graphSummary.nodeCount} nodes / {graphSummary.edgeCount} edges
+                </span>
+              </div>
+              <div>
+                <Accessibility size={15} />
+                <span>{graphSummary.accessibleEdgeCount} accessible edges</span>
+              </div>
+              <div>
+                <LockKeyhole size={15} />
+                <span>{graphSummary.restrictedEdgeCount} restricted edges</span>
+              </div>
+              <div title={buildingPackage.manifest.contentHash}>
+                <Database size={15} />
+                <code>{buildingPackage.manifest.contentHash.slice(0, 12)}</code>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <div className="twin-legend" aria-label="Spatial twin legend">
+          <span>
+            <i className="legend-swatch public" /> Public space
+          </span>
+          <span>
+            <i className="legend-swatch restricted" /> Restricted space
+          </span>
+          <span>
+            <i className="legend-line accessible" /> Accessible edge
+          </span>
+          <span>
+            <i className="legend-line inaccessible" /> Inaccessible edge
+          </span>
+          <span>
+            <i className="legend-anchor" /> Localization anchor
+          </span>
+          <span>
+            <i className="legend-line active-route" /> Active route
+          </span>
+          <strong>Compiled package inspector</strong>
+        </div>
+      </section>
+    </SpatialPackageContext.Provider>
   );
 }

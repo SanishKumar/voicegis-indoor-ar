@@ -11,17 +11,9 @@ import {
   Layers,
   LockKeyhole,
   Route,
-  Wrench,
 } from 'lucide-react';
-import { OPERATIONAL_SCENARIO, useNavigation } from '../context/NavigationContext.jsx';
-import {
-  BUILDING_PACKAGE,
-  CATEGORIES,
-  getFloorById,
-  getNodeById,
-  getPOIs,
-  type VisitorPoiNode,
-} from '../data/compiledBuilding';
+import { useNavigation } from '../context/NavigationContext.jsx';
+import type { CompiledBuildingRuntime, VisitorPoiNode } from '../data/compiledBuilding';
 import {
   polygonCentroid,
   routeConnectorRuns,
@@ -33,10 +25,6 @@ import { getNearestBoundaryAngle, getPolygonBounds } from '../engine/spatialTwin
 
 const WORLD_SCALE = 44;
 const MAP_PADDING = 50;
-const CONNECTORS_BY_ID = new Map(
-  BUILDING_PACKAGE.verticalConnectors.map((connector) => [connector.id, connector]),
-);
-
 interface NavigatorContextValue {
   state: {
     activeFloorId: string;
@@ -50,8 +38,7 @@ interface NavigatorContextValue {
     selectPOI: (node: VisitorPoiNode) => void;
   };
   theme: 'light' | 'dark';
-  operationalScenario: string;
-  setOperationalScenario: (scenario: string) => void;
+  venue: CompiledBuildingRuntime;
 }
 
 const SPACE_COLORS = {
@@ -85,9 +72,16 @@ function roomCode(id: string) {
 }
 
 export default function FloorplanViewer() {
-  const { state, actions, theme, operationalScenario, setOperationalScenario } =
-    useNavigation() as unknown as NavigatorContextValue;
+  const { state, actions, theme, venue } = useNavigation() as unknown as NavigatorContextValue;
   const { activeFloorId } = state;
+  const buildingPackage = venue.buildingPackage;
+  const connectorsById = useMemo(
+    () =>
+      new Map(
+        buildingPackage.verticalConnectors.map((connector) => [connector.id, connector] as const),
+      ),
+    [buildingPackage],
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const [dimensions, setDimensions] = useState({ width: 900, height: 620 });
@@ -107,17 +101,17 @@ export default function FloorplanViewer() {
     return () => observer.disconnect();
   }, []);
 
-  const activeFloor = getFloorById(activeFloorId) ?? BUILDING_PACKAGE.floors[0];
-  const floorSpaces = BUILDING_PACKAGE.spaces.filter((space) => space.floorId === activeFloor.id);
-  const floorPortals = BUILDING_PACKAGE.portals.filter(
+  const activeFloor = venue.getFloorById(activeFloorId) ?? buildingPackage.floors[0];
+  const floorSpaces = buildingPackage.spaces.filter((space) => space.floorId === activeFloor.id);
+  const floorPortals = buildingPackage.portals.filter(
     (portal) => portal.floorId === activeFloor.id,
   );
-  const floorConnectorStops = BUILDING_PACKAGE.verticalConnectors.flatMap((connector) =>
+  const floorConnectorStops = buildingPackage.verticalConnectors.flatMap((connector) =>
     connector.stops
       .filter((stop) => stop.floorId === activeFloor.id)
       .map((stop) => ({ connector, stop })),
   );
-  const floorPois = getPOIs().filter((node) => String(node.floor) === activeFloor.id);
+  const floorPois = venue.getPOIs().filter((node) => String(node.floor) === activeFloor.id);
   const poisBySpace = useMemo(() => {
     const result = new Map<string, typeof floorPois>();
     for (const poi of floorPois) {
@@ -163,7 +157,7 @@ export default function FloorplanViewer() {
     if (floorIndex < 0) return [];
     const node = run.nodes.find((candidate) => String(candidate.floor) === activeFloor.id);
     if (!node) return [];
-    const connector = CONNECTORS_BY_ID.get(run.connectorId);
+    const connector = connectorsById.get(run.connectorId);
     const movement =
       floorIndex === 0
         ? `to ${run.toFloorId.toUpperCase()}`
@@ -172,8 +166,8 @@ export default function FloorplanViewer() {
           : `continue to ${run.toFloorId.toUpperCase()}`;
     return [{ run, node, connector, movement }];
   });
-  const startNode = getNodeById(state.startNodeId);
-  const destinationNode = getNodeById(state.destinationNodeId);
+  const startNode = venue.getNodeById(state.startNodeId);
+  const destinationNode = venue.getNodeById(state.destinationNodeId);
   const destinationSpaceId = (destinationNode as VisitorPoiNode | null)?.poi?.spaceId;
 
   const colors = {
@@ -191,17 +185,11 @@ export default function FloorplanViewer() {
   const gridLines = (() => {
     const vertical = [];
     for (let x = Math.ceil(minX / 8) * 8; x <= maxX; x += 8) {
-      vertical.push([
-        toCanvas([x, minY]),
-        toCanvas([x, maxY]),
-      ] as const);
+      vertical.push([toCanvas([x, minY]), toCanvas([x, maxY])] as const);
     }
     const horizontal = [];
     for (let y = Math.ceil(minY / 8) * 8; y <= maxY; y += 8) {
-      horizontal.push([
-        toCanvas([minX, y]),
-        toCanvas([maxX, y]),
-      ] as const);
+      horizontal.push([toCanvas([minX, y]), toCanvas([maxX, y])] as const);
     }
     return { vertical, horizontal };
   })();
@@ -536,7 +524,7 @@ export default function FloorplanViewer() {
 
           {floorPois.map((node) => {
             const point = toCanvas([node.x, node.y]);
-            const category = CATEGORIES[node.poi.category as keyof typeof CATEGORIES];
+            const category = venue.getCategory(node.poi.category);
             return (
               <Group
                 key={node.id}
@@ -582,7 +570,7 @@ export default function FloorplanViewer() {
       <div className="compiled-map-topbar">
         <div className="compiled-floor-switcher" aria-label="Select floor">
           <Layers size={15} />
-          {BUILDING_PACKAGE.floors.map((floor) => (
+          {buildingPackage.floors.map((floor) => (
             <button
               key={floor.id}
               type="button"
@@ -597,29 +585,9 @@ export default function FloorplanViewer() {
           ))}
         </div>
         <div className="compiled-map-operations">
-          <button
-            type="button"
-            className={
-              operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY ? 'active' : ''
-            }
-            aria-pressed={operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY}
-            title="Deterministic public-lift outage replay at 22 July 2026; clears the current route"
-            onClick={() =>
-              setOperationalScenario(
-                operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY
-                  ? OPERATIONAL_SCENARIO.NOMINAL
-                  : OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY,
-              )
-            }
-          >
-            <Wrench size={14} />
-            {operationalScenario === OPERATIONAL_SCENARIO.LIFT_CLOSED_REPLAY
-              ? 'Public lift outage on'
-              : 'Replay lift outage'}
-          </button>
-          <div className="compiled-map-proof" title={BUILDING_PACKAGE.manifest.contentHash}>
+          <div className="compiled-map-proof" title={buildingPackage.manifest.contentHash}>
             <Database size={14} />
-            <span>Package {BUILDING_PACKAGE.manifest.contentHash.slice(0, 8)}</span>
+            <span>Package {buildingPackage.manifest.contentHash.slice(0, 8)}</span>
           </div>
         </div>
       </div>
@@ -632,7 +600,7 @@ export default function FloorplanViewer() {
           </span>
           <div className="compiled-route-floor-chain">
             {routeFloors.map((floorId, index) => {
-              const floor = getFloorById(floorId);
+              const floor = venue.getFloorById(floorId);
               return (
                 <span key={floorId}>
                   {index > 0 && <i aria-hidden="true">→</i>}
@@ -649,7 +617,7 @@ export default function FloorplanViewer() {
             })}
           </div>
           {connectorRuns.map((run) => {
-            const connector = CONNECTORS_BY_ID.get(run.connectorId);
+            const connector = connectorsById.get(run.connectorId);
             const ConnectorIcon = connector?.kind === 'elevator' ? ArrowUpDown : Footprints;
             return (
               <span className="compiled-route-connector" key={run.connectorId}>
@@ -677,7 +645,7 @@ export default function FloorplanViewer() {
       <div className="compiled-map-orientation" aria-hidden="true">
         <Compass size={15} />
         <strong>N</strong>
-        <span>{BUILDING_PACKAGE.building.coordinateSystem.northOffsetDegrees}°</span>
+        <span>{buildingPackage.building.coordinateSystem.northOffsetDegrees}°</span>
       </div>
 
       <div className="compiled-map-legend">
@@ -693,7 +661,7 @@ export default function FloorplanViewer() {
         <span>
           <LockKeyhole size={12} /> Restricted areas shown
         </span>
-        <strong>Fictional benchmark · not surveyed</strong>
+        <strong>Compiled venue geometry</strong>
       </div>
 
       <div className="compiled-map-zoom">

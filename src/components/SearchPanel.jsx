@@ -9,19 +9,19 @@ import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { Search, X, Navigation, MapPin } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs, getAvailableCategories } from '../engine/searchIndex.js';
-import { CATEGORIES } from '../data/compiledBuilding';
 import { formatDistance } from '../data/buildingConfig.js';
 
 export default function SearchPanel() {
-  const { state, actions, previewRoute } = useNavigation();
+  const { state, actions, previewRoute, venue } = useNavigation();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
   const inputRef = useRef(null);
-  const categories = getAvailableCategories();
+  const pois = useMemo(() => venue.getPOIs(), [venue]);
+  const categories = useMemo(() => getAvailableCategories(pois), [pois]);
   const results = useMemo(
-    () => searchPOIs(query, { category: activeCategory }),
-    [query, activeCategory],
+    () => searchPOIs(pois, query, { category: activeCategory }),
+    [activeCategory, pois, query],
   );
 
   const openPanel = useCallback(() => {
@@ -139,7 +139,7 @@ export default function SearchPanel() {
         {/* Category Chips */}
         <div className="category-chips" id="category-chips">
           {categories.map((catId) => {
-            const cat = CATEGORIES[catId];
+            const cat = venue.getCategory(catId);
             if (!cat) return null;
             return (
               <button
@@ -159,7 +159,7 @@ export default function SearchPanel() {
         <div className="search-results" id="search-results">
           {results.length > 0 ? (
             results.map(({ node }) => {
-              const cat = CATEGORIES[node.poi.category];
+              const cat = venue.getCategory(node.poi.category);
               const routePreview = routePreviews.get(node.id);
               return (
                 <div key={node.id} className="search-result-item" id={`search-result-${node.id}`}>

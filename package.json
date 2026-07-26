@@ -20,9 +20,13 @@
     "compile:check": "tsx packages/map-compiler/src/cli.ts buildings/reference-medical-centre/source/building.json buildings/reference-medical-centre/compiled --check",
     "compile:asterion": "tsx packages/map-compiler/src/cli.ts buildings/asterion-medical-center/source/building.json buildings/asterion-medical-center/compiled",
     "compile:asterion:check": "tsx packages/map-compiler/src/cli.ts buildings/asterion-medical-center/source/building.json buildings/asterion-medical-center/compiled --check",
+    "compile:harbor": "tsx packages/map-compiler/src/cli.ts buildings/harbor-exchange/source/building.json buildings/harbor-exchange/compiled",
+    "compile:harbor:check": "tsx packages/map-compiler/src/cli.ts buildings/harbor-exchange/source/building.json buildings/harbor-exchange/compiled --check",
+    "venues:sync": "tsx scripts/syncVenueArtifacts.ts",
+    "venues:sync:check": "tsx scripts/syncVenueArtifacts.ts --check",
     "replay:reference": "tsx packages/localization-core/src/cli.ts recordings/reference-corridor-walk.json recordings/reference-corridor-walk.report.json",
     "replay:check": "tsx packages/localization-core/src/cli.ts recordings/reference-corridor-walk.json recordings/reference-corridor-walk.report.json --check",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run compile:check && npm run compile:asterion:check && npm run replay:check && npm run build"
+    "check": "npm run lint && npm run typecheck && npm run test && npm run compile:check && npm run compile:asterion:check && npm run compile:harbor:check && npm run venues:sync:check && npm run replay:check && npm run build"
   },
   "dependencies": {
     "ajv": "^8.18.0",

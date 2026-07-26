@@ -1,4 +1,4 @@
-import { BUILDING_PACKAGE, ROUTING_EDGES, ROUTING_NODES } from '../data/compiledBuilding';
+import type { CompiledBuildingRuntime } from '../data/compiledBuilding';
 import {
   calculateRoute,
   type RouteFailure,
@@ -58,17 +58,19 @@ function pairKey(a: string, b: string) {
   return a < b ? `${a}::${b}` : `${b}::${a}`;
 }
 
-const edgesByPair = new Map(
-  ROUTING_EDGES.map((edge) => [pairKey(edge.from, edge.to), edge] as const),
-);
-
-function selectedConnectors(pathIds: string[]): SelectedConnectorReceipt[] {
+function selectedConnectors(
+  venue: CompiledBuildingRuntime,
+  pathIds: string[],
+): SelectedConnectorReceipt[] {
+  const edgesByPair = new Map(
+    venue.routingEdges.map((edge) => [pairKey(edge.from, edge.to), edge] as const),
+  );
   const connectors = new Map<string, SelectedConnectorReceipt>();
   for (let index = 0; index < pathIds.length - 1; index += 1) {
     const edge = edgesByPair.get(pairKey(pathIds[index], pathIds[index + 1]));
     if (!edge || edge.kind !== 'vertical-connector' || !edge.sourceId) continue;
-    const from = ROUTING_NODES.find((node) => node.id === pathIds[index]);
-    const to = ROUTING_NODES.find((node) => node.id === pathIds[index + 1]);
+    const from = venue.getNodeById(pathIds[index]);
+    const to = venue.getNodeById(pathIds[index + 1]);
     if (!from || !to) continue;
     const existing = connectors.get(edge.sourceId);
     connectors.set(edge.sourceId, {
@@ -82,20 +84,22 @@ function selectedConnectors(pathIds: string[]): SelectedConnectorReceipt[] {
 }
 
 export function calculateCompiledRoute(
+  venue: CompiledBuildingRuntime,
   startId: string,
   destinationId: string,
   options: CompiledRouteOptions = {},
 ): ExplainedRouteResult {
+  const { buildingPackage, routingEdges, routingNodes } = venue;
   const profile: RoutingProfile =
     options.profile ?? (options.accessibleOnly ? 'wheelchair' : 'standard');
   const overlay = options.operationalOverlay;
   const overlayResolution = overlay
-    ? resolveOperationalOverlay(overlay, BUILDING_PACKAGE, options.evaluatedAt ?? '')
+    ? resolveOperationalOverlay(overlay, buildingPackage, options.evaluatedAt ?? '')
     : null;
   const baseReceipt: Omit<RouteReceipt, 'status' | 'totalDistanceMeters' | 'selectedConnectors'> = {
     receiptVersion: ROUTE_RECEIPT_VERSION,
-    buildingId: BUILDING_PACKAGE.building.id,
-    packageHash: BUILDING_PACKAGE.manifest.contentHash,
+    buildingId: buildingPackage.building.id,
+    packageHash: buildingPackage.manifest.contentHash,
     profile,
     startId,
     destinationId,
@@ -105,10 +109,10 @@ export function calculateCompiledRoute(
     excludedEdges: {
       restricted: options.allowRestricted
         ? 0
-        : ROUTING_EDGES.filter((edge) => edge.restricted).length,
+        : routingEdges.filter((edge) => edge.restricted).length,
       inaccessible:
         profile === 'wheelchair'
-          ? ROUTING_EDGES.filter((edge) => edge.accessible === false).length
+          ? routingEdges.filter((edge) => edge.accessible === false).length
           : 0,
       closed: overlayResolution?.closedEdgeIds.length ?? 0,
     },
@@ -128,7 +132,7 @@ export function calculateCompiledRoute(
     };
   }
 
-  const route = calculateRoute(startId, destinationId, ROUTING_NODES, ROUTING_EDGES, {
+  const route = calculateRoute(startId, destinationId, routingNodes, routingEdges, {
     accessibleOnly: profile === 'wheelchair',
     allowRestricted: options.allowRestricted,
     closedEdgeIds: overlayResolution?.closedEdgeIds,
@@ -139,7 +143,7 @@ export function calculateCompiledRoute(
       ...baseReceipt,
       status: route.found ? 'routed' : 'unroutable',
       totalDistanceMeters: route.found ? route.totalDistance : null,
-      selectedConnectors: route.found ? selectedConnectors(route.pathIds) : [],
+      selectedConnectors: route.found ? selectedConnectors(venue, route.pathIds) : [],
     },
   };
 }

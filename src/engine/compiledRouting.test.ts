@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ROUTING_EDGES, ROUTING_NODES } from '../data/compiledBuilding';
+import { ASTERION_RUNTIME } from '../test/venueFixtures';
 import { STEP_TYPE, calculateRoute } from './routingCore';
 
 function edgeKey(a: string, b: string) {
@@ -7,7 +7,7 @@ function edgeKey(a: string, b: string) {
 }
 
 const edgesByPair = new Map(
-  ROUTING_EDGES.map((edge) => [edgeKey(edge.from, edge.to), edge] as const),
+  ASTERION_RUNTIME.routingEdges.map((edge) => [edgeKey(edge.from, edge.to), edge] as const),
 );
 
 describe('compiled package routing', () => {
@@ -15,8 +15,8 @@ describe('compiled package routing', () => {
     const result = calculateRoute(
       'poi:poi-main-entrance',
       'poi:poi-emergency',
-      ROUTING_NODES,
-      ROUTING_EDGES,
+      ASTERION_RUNTIME.routingNodes,
+      ASTERION_RUNTIME.routingEdges,
     );
 
     expect(result.found).toBe(true);
@@ -27,9 +27,7 @@ describe('compiled package routing', () => {
     expect(
       result.steps.filter(
         (step) =>
-          step.distance < 0.02 &&
-          step.type !== STEP_TYPE.START &&
-          step.type !== STEP_TYPE.ARRIVE,
+          step.distance < 0.02 && step.type !== STEP_TYPE.START && step.type !== STEP_TYPE.ARRIVE,
       ),
     ).toEqual([]);
   });
@@ -38,8 +36,8 @@ describe('compiled package routing', () => {
     const result = calculateRoute(
       'poi:poi-main-entrance',
       'poi:poi-cardiology',
-      ROUTING_NODES,
-      ROUTING_EDGES,
+      ASTERION_RUNTIME.routingNodes,
+      ASTERION_RUNTIME.routingEdges,
       { accessibleOnly: true },
     );
 
@@ -63,8 +61,8 @@ describe('compiled package routing', () => {
     const result = calculateRoute(
       'poi:poi-main-entrance',
       'poi:poi-training',
-      ROUTING_NODES,
-      ROUTING_EDGES,
+      ASTERION_RUNTIME.routingNodes,
+      ASTERION_RUNTIME.routingEdges,
     );
 
     expect(result.found).toBe(true);
@@ -79,14 +77,14 @@ describe('compiled package routing', () => {
     const denied = calculateRoute(
       'poi:poi-main-entrance',
       'poi:poi-data-center',
-      ROUTING_NODES,
-      ROUTING_EDGES,
+      ASTERION_RUNTIME.routingNodes,
+      ASTERION_RUNTIME.routingEdges,
     );
     const allowed = calculateRoute(
       'poi:poi-main-entrance',
       'poi:poi-data-center',
-      ROUTING_NODES,
-      ROUTING_EDGES,
+      ASTERION_RUNTIME.routingNodes,
+      ASTERION_RUNTIME.routingEdges,
       { allowRestricted: true },
     );
 

@@ -7,13 +7,12 @@
 import { HardDrive, Navigation, MapPin, Wifi, WifiOff } from 'lucide-react';
 import { useNavigation, NAV_STATUS, VIEW_TYPE } from '../context/NavigationContext.jsx';
 import { useState, useEffect } from 'react';
-import { getNodeById } from '../data/compiledBuilding';
 
 export default function StatusBar() {
-  const { state, packageCacheStatus } = useNavigation();
+  const { state, packageCacheStatus, venue } = useNavigation();
   const { navStatus, activeView, startNodeId } = state;
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const startNode = getNodeById(startNodeId);
+  const startNode = venue.getNodeById(startNodeId);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -79,11 +78,9 @@ export default function StatusBar() {
       <div className="status-item status-package" title={packageCacheStatus.detail}>
         <HardDrive size={11} />
         <span>
-          {packageCacheStatus.state === 'verified'
+          {packageCacheStatus.activeHash
             ? `Package ${packageCacheStatus.activeHash.slice(0, 8)} verified`
-            : packageCacheStatus.state === 'pending'
-              ? 'Verifying package…'
-              : 'Package cache unavailable'}
+            : 'Package cache unavailable'}
         </span>
       </div>
 

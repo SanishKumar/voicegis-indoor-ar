@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import liftClosureJson from '../../buildings/asterion-medical-center/operations/all-public-lifts-closed.overlay.json';
-import { BUILDING_PACKAGE } from '../data/compiledBuilding';
+import { ASTERION_PACKAGE } from '../test/venueFixtures';
 import { resolveOperationalOverlay, type OperationalOverlay } from './operationalOverlay';
 
 const liftClosure = liftClosureJson as OperationalOverlay;
@@ -8,8 +8,8 @@ const evaluatedAt = '2026-07-22T12:00:00.000Z';
 
 describe('operational overlay resolution', () => {
   it('resolves a connector-source closure to every compiled edge from that source', () => {
-    const result = resolveOperationalOverlay(liftClosure, BUILDING_PACKAGE, evaluatedAt);
-    const expectedEdgeIds = BUILDING_PACKAGE.routing.edges
+    const result = resolveOperationalOverlay(liftClosure, ASTERION_PACKAGE, evaluatedAt);
+    const expectedEdgeIds = ASTERION_PACKAGE.routing.edges
       .filter((edge) => ['lift-atrium', 'lift-south'].includes(edge.sourceId))
       .map((edge) => edge.id)
       .sort();
@@ -23,7 +23,7 @@ describe('operational overlay resolution', () => {
     const invalid: OperationalOverlay = structuredClone(liftClosure);
     invalid.closures[0].target.id = 'missing-lift';
 
-    const result = resolveOperationalOverlay(invalid, BUILDING_PACKAGE, evaluatedAt);
+    const result = resolveOperationalOverlay(invalid, ASTERION_PACKAGE, evaluatedAt);
     expect(result.valid).toBe(false);
     expect(result.closedEdgeIds).toEqual([]);
     expect(result.issues.map((issue) => issue.code)).toContain('unknown-target');
@@ -32,7 +32,7 @@ describe('operational overlay resolution', () => {
   it('rejects expired overlays at an explicit evaluation time', () => {
     const result = resolveOperationalOverlay(
       liftClosure,
-      BUILDING_PACKAGE,
+      ASTERION_PACKAGE,
       '2026-08-01T00:00:00.000Z',
     );
 
@@ -43,7 +43,7 @@ describe('operational overlay resolution', () => {
   it('rejects malformed external data before semantic resolution', () => {
     const result = resolveOperationalOverlay(
       { id: 'malformed', closures: [{ target: null }] },
-      BUILDING_PACKAGE,
+      ASTERION_PACKAGE,
       evaluatedAt,
     );
 

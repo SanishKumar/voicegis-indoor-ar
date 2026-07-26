@@ -1,10 +1,13 @@
 /// <reference lib="webworker" />
 
 import { calculateCompiledRoute, type CompiledRouteOptions } from './compiledRoutePolicy';
+import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
+import { createCompiledBuildingRuntime } from '../data/compiledBuilding';
 
 interface RouteRequest {
   type: 'COMPUTE_ROUTE';
   requestId: number;
+  buildingPackage: CompiledBuildingPackage;
   startId: string;
   endId: string;
   options?: CompiledRouteOptions;
@@ -16,7 +19,8 @@ workerScope.onmessage = ({ data }: MessageEvent<RouteRequest>) => {
   if (data.type !== 'COMPUTE_ROUTE') return;
 
   try {
-    const result = calculateCompiledRoute(data.startId, data.endId, data.options);
+    const venue = createCompiledBuildingRuntime(data.buildingPackage);
+    const result = calculateCompiledRoute(venue, data.startId, data.endId, data.options);
     workerScope.postMessage({ type: 'ROUTE_RESULT', requestId: data.requestId, result });
   } catch (error) {
     workerScope.postMessage({

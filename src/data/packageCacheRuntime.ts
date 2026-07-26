@@ -1,21 +1,25 @@
-import { BUILDING_PACKAGE } from './compiledBuilding';
+import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import { IndexedDbPackageStore, openPackageDatabase } from './indexedDbPackageStore';
 import { PackageLifecycle } from './packageLifecycle';
 
 export interface PackageCacheStatus {
   state: 'verified' | 'unavailable' | 'failed';
+  buildingId: string | null;
   activeHash: string | null;
   previousHash: string | null;
   detail: string;
 }
 
-export async function bootstrapBundledPackageCache(): Promise<PackageCacheStatus> {
+export async function cacheAndActivateVenuePackage(
+  buildingPackage: CompiledBuildingPackage,
+): Promise<PackageCacheStatus> {
   if (typeof indexedDB === 'undefined') {
     return {
       state: 'unavailable',
-      activeHash: null,
+      buildingId: buildingPackage.building.id,
+      activeHash: buildingPackage.manifest.contentHash,
       previousHash: null,
-      detail: 'IndexedDB is not available in this browser context.',
+      detail: 'Package verified in memory; IndexedDB is not available in this browser context.',
     };
   }
 
@@ -25,26 +29,28 @@ export async function bootstrapBundledPackageCache(): Promise<PackageCacheStatus
     const store = new IndexedDbPackageStore(database);
     const lifecycle = new PackageLifecycle(store);
     const now = new Date().toISOString();
-    const installed = await lifecycle.install(BUILDING_PACKAGE, now);
-    const current = await store.getActivation(BUILDING_PACKAGE.building.id);
+    const installed = await lifecycle.install(buildingPackage, now);
+    const current = await store.getActivation(buildingPackage.building.id);
     const activation =
       current?.activeHash === installed.contentHash
         ? current
-        : await lifecycle.activate(BUILDING_PACKAGE.building.id, installed.contentHash, now);
-    await lifecycle.getActive(BUILDING_PACKAGE.building.id);
+        : await lifecycle.activate(buildingPackage.building.id, installed.contentHash, now);
+    await lifecycle.getActive(buildingPackage.building.id);
 
     return {
       state: 'verified',
+      buildingId: buildingPackage.building.id,
       activeHash: activation.activeHash,
       previousHash: activation.previousHash,
-      detail: 'The active package was verified and cached for offline use.',
+      detail: 'The active venue package was verified and cached for offline use.',
     };
   } catch (error) {
     return {
       state: 'failed',
-      activeHash: null,
+      buildingId: buildingPackage.building.id,
+      activeHash: buildingPackage.manifest.contentHash,
       previousHash: null,
-      detail: error instanceof Error ? error.message : 'Package cache initialization failed.',
+      detail: error instanceof Error ? error.message : 'Package cache activation failed.',
     };
   } finally {
     database?.close();

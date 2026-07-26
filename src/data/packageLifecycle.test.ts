@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
-import { BUILDING_PACKAGE } from './compiledBuilding';
+import { ASTERION_PACKAGE } from '../test/venueFixtures';
 import {
   PackageIntegrityError,
   PackageLifecycle,
@@ -33,7 +33,7 @@ class MemoryPackageStore implements PackageStore {
 }
 
 async function createNextPackage(): Promise<CompiledBuildingPackage> {
-  const next = structuredClone(BUILDING_PACKAGE);
+  const next = structuredClone(ASTERION_PACKAGE);
   next.building.name = `${next.building.name} v2`;
   next.manifest.contentHash = await calculatePackageContentHash(next);
   return next;
@@ -41,15 +41,15 @@ async function createNextPackage(): Promise<CompiledBuildingPackage> {
 
 describe('verified package lifecycle', () => {
   it('reproduces the compiler content hash in the browser-compatible verifier', async () => {
-    expect(await calculatePackageContentHash(BUILDING_PACKAGE)).toBe(
-      BUILDING_PACKAGE.manifest.contentHash,
+    expect(await calculatePackageContentHash(ASTERION_PACKAGE)).toBe(
+      ASTERION_PACKAGE.manifest.contentHash,
     );
   });
 
   it('refuses a tampered package before writing it to storage', async () => {
     const store = new MemoryPackageStore();
     const lifecycle = new PackageLifecycle(store);
-    const tampered = structuredClone(BUILDING_PACKAGE);
+    const tampered = structuredClone(ASTERION_PACKAGE);
     tampered.building.name = 'Tampered after compilation';
 
     await expect(lifecycle.install(tampered, '2026-07-22T00:00:00.000Z')).rejects.toBeInstanceOf(
@@ -62,7 +62,7 @@ describe('verified package lifecycle', () => {
     const store = new MemoryPackageStore();
     const lifecycle = new PackageLifecycle(store);
     const next = await createNextPackage();
-    const first = await lifecycle.install(BUILDING_PACKAGE, '2026-07-22T00:00:00.000Z');
+    const first = await lifecycle.install(ASTERION_PACKAGE, '2026-07-22T00:00:00.000Z');
     await lifecycle.activate(first.buildingId, first.contentHash, '2026-07-22T00:01:00.000Z');
     const second = await lifecycle.install(next, '2026-07-22T00:02:00.000Z');
     const upgraded = await lifecycle.activate(
@@ -77,7 +77,7 @@ describe('verified package lifecycle', () => {
     });
 
     const rolledBack = await lifecycle.rollback(
-      BUILDING_PACKAGE.building.id,
+      ASTERION_PACKAGE.building.id,
       '2026-07-22T00:04:00.000Z',
     );
     expect(rolledBack).toMatchObject({
@@ -90,7 +90,7 @@ describe('verified package lifecycle', () => {
     const store = new MemoryPackageStore();
     const lifecycle = new PackageLifecycle(store);
     const next = await createNextPackage();
-    const first = await lifecycle.install(BUILDING_PACKAGE, '2026-07-22T00:00:00.000Z');
+    const first = await lifecycle.install(ASTERION_PACKAGE, '2026-07-22T00:00:00.000Z');
     await lifecycle.activate(first.buildingId, first.contentHash, '2026-07-22T00:01:00.000Z');
     const second = await lifecycle.install(next, '2026-07-22T00:02:00.000Z');
     const corrupted = store.packages.get(second.key)!;

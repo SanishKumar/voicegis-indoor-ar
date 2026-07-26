@@ -1,0 +1,2205 @@
+{
+  "building": {
+    "coordinateSystem": {
+      "northOffsetDegrees": 18,
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "type": "local-cartesian"
+    },
+    "entrySpaceId": "g-entry",
+    "id": "harbor-exchange",
+    "name": "Harbor Exchange",
+    "units": "meters"
+  },
+  "compilerVersion": "0.2.0",
+  "floors": [
+    {
+      "clearHeight": 4.2,
+      "elevation": 0,
+      "id": "g",
+      "level": 0,
+      "name": "Concourse",
+      "outline": [
+        [
+          0,
+          0
+        ],
+        [
+          44,
+          0
+        ],
+        [
+          44,
+          22
+        ],
+        [
+          0,
+          22
+        ]
+      ]
+    },
+    {
+      "clearHeight": 3.4,
+      "elevation": 4.8,
+      "id": "m",
+      "level": 1,
+      "name": "Mezzanine",
+      "outline": [
+        [
+          8,
+          0
+        ],
+        [
+          36,
+          0
+        ],
+        [
+          36,
+          18
+        ],
+        [
+          8,
+          18
+        ]
+      ]
+    }
+  ],
+  "localizationAnchors": [
+    {
+      "floorId": "g",
+      "headingDegrees": 90,
+      "id": "anchor-ferry-entry",
+      "kind": "qr",
+      "payload": "voicegis://harbor-exchange/g/ferry-entry",
+      "position": [
+        2,
+        11
+      ],
+      "spaceId": "g-entry"
+    },
+    {
+      "floorId": "m",
+      "headingDegrees": 270,
+      "id": "anchor-mezzanine-lift",
+      "kind": "apriltag",
+      "payload": "voicegis://harbor-exchange/m/lift",
+      "position": [
+        34,
+        11
+      ],
+      "spaceId": "m-lobby"
+    },
+    {
+      "floorId": "g",
+      "headingDegrees": 0,
+      "id": "anchor-platform-board",
+      "kind": "image",
+      "payload": "voicegis://harbor-exchange/g/platform-board",
+      "position": [
+        15,
+        18
+      ],
+      "spaceId": "g-platform"
+    }
+  ],
+  "manifest": {
+    "contentHash": "639ca9c4a7ae2cdfe7384f78586a3e179f6ca2ba467022fd7b184a4b7d164222",
+    "hashAlgorithm": "sha256"
+  },
+  "packageVersion": "0.2.0",
+  "pois": [
+    {
+      "accessible": true,
+      "aliases": [
+        "meeting room"
+      ],
+      "category": "community",
+      "floorId": "m",
+      "id": "poi-community-room",
+      "name": "Community Room",
+      "position": [
+        16,
+        16
+      ],
+      "public": true,
+      "spaceId": "m-community"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "bike parking"
+      ],
+      "category": "service",
+      "floorId": "g",
+      "id": "poi-cycle-hub",
+      "name": "Cycle Hub",
+      "position": [
+        34,
+        18
+      ],
+      "public": true,
+      "spaceId": "g-bike"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "ferry entrance",
+        "main entrance"
+      ],
+      "category": "entrance",
+      "floorId": "g",
+      "id": "poi-ferry-entry",
+      "name": "Ferry Walk Entrance",
+      "position": [
+        2,
+        11
+      ],
+      "public": true,
+      "spaceId": "g-entry"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "market",
+        "shops"
+      ],
+      "category": "food",
+      "floorId": "g",
+      "id": "poi-harbor-market",
+      "name": "Harbor Market",
+      "position": [
+        22,
+        4
+      ],
+      "public": true,
+      "spaceId": "g-market"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "viewpoint"
+      ],
+      "category": "landmark",
+      "floorId": "m",
+      "id": "poi-overlook",
+      "name": "Harbor Overlook",
+      "position": [
+        14,
+        4
+      ],
+      "public": true,
+      "spaceId": "m-overlook"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "reading area",
+        "terrace"
+      ],
+      "category": "education",
+      "floorId": "m",
+      "id": "poi-reading-terrace",
+      "name": "Reading Terrace",
+      "position": [
+        30,
+        16
+      ],
+      "public": true,
+      "spaceId": "m-terrace"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "coffee"
+      ],
+      "category": "food",
+      "floorId": "m",
+      "id": "poi-signal-cafe",
+      "name": "Signal Cafe",
+      "position": [
+        28,
+        4
+      ],
+      "public": true,
+      "spaceId": "m-cafe"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "information",
+        "ticket desk"
+      ],
+      "category": "service",
+      "floorId": "g",
+      "id": "poi-ticket-hall",
+      "name": "Tickets and Information",
+      "position": [
+        10,
+        4
+      ],
+      "public": true,
+      "spaceId": "g-ticket"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "exhibition"
+      ],
+      "category": "landmark",
+      "floorId": "g",
+      "id": "poi-tide-gallery",
+      "name": "Tide Gallery",
+      "position": [
+        33,
+        4
+      ],
+      "public": true,
+      "spaceId": "g-gallery"
+    },
+    {
+      "accessible": true,
+      "aliases": [
+        "boarding",
+        "ferry platform"
+      ],
+      "category": "transit",
+      "floorId": "g",
+      "id": "poi-waterfront-platform",
+      "name": "Waterfront Platform",
+      "position": [
+        18,
+        18
+      ],
+      "public": true,
+      "spaceId": "g-platform"
+    }
+  ],
+  "portals": [
+    {
+      "accessible": true,
+      "connects": [
+        "g-bike",
+        "g-platform"
+      ],
+      "floorId": "g",
+      "id": "p-bike-platform",
+      "kind": "opening",
+      "position": [
+        30,
+        18
+      ],
+      "width": 2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "m-cafe",
+        "m-lobby"
+      ],
+      "floorId": "m",
+      "id": "p-cafe-bridge",
+      "kind": "opening",
+      "position": [
+        28,
+        8
+      ],
+      "width": 2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "m-community",
+        "m-lobby"
+      ],
+      "floorId": "m",
+      "id": "p-community-bridge",
+      "kind": "door",
+      "position": [
+        16,
+        14
+      ],
+      "width": 1.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-core",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-core-concourse",
+      "kind": "opening",
+      "position": [
+        38,
+        11
+      ],
+      "width": 2.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-entry",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-entry-concourse",
+      "kind": "opening",
+      "position": [
+        6,
+        11
+      ],
+      "width": 3
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-gallery",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-gallery-concourse",
+      "kind": "door",
+      "position": [
+        33,
+        8
+      ],
+      "width": 1.4
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-market",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-market-concourse",
+      "kind": "opening",
+      "position": [
+        22,
+        8
+      ],
+      "width": 2.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "m-overlook",
+        "m-lobby"
+      ],
+      "floorId": "m",
+      "id": "p-overlook-bridge",
+      "kind": "opening",
+      "position": [
+        14,
+        8
+      ],
+      "width": 2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-platform",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-platform-concourse",
+      "kind": "gate",
+      "position": [
+        20,
+        14
+      ],
+      "width": 3.2
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "m-terrace",
+        "m-lobby"
+      ],
+      "floorId": "m",
+      "id": "p-terrace-bridge",
+      "kind": "opening",
+      "position": [
+        30,
+        14
+      ],
+      "width": 1.8
+    },
+    {
+      "accessible": true,
+      "connects": [
+        "g-ticket",
+        "g-concourse"
+      ],
+      "floorId": "g",
+      "id": "p-ticket-concourse",
+      "kind": "opening",
+      "position": [
+        11,
+        8
+      ],
+      "width": 2.4
+    }
+  ],
+  "routing": {
+    "edges": [
+      {
+        "accessible": false,
+        "connectorKind": "escalator",
+        "distanceMeters": 4.8,
+        "floorIds": [
+          "g",
+          "m"
+        ],
+        "from": "connector:escalator-center:g",
+        "id": "edge:connector:escalator-center:g--connector:escalator-center:m",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "escalator-center",
+        "to": "connector:escalator-center:m"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "connector:escalator-center:g",
+        "id": "edge:connector:escalator-center:g--waypoint:g-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "escalator-center",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:05"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "m"
+        ],
+        "from": "connector:escalator-center:m",
+        "id": "edge:connector:escalator-center:m--waypoint:m-lobby:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "escalator-center",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:04"
+      },
+      {
+        "accessible": true,
+        "connectorKind": "elevator",
+        "distanceMeters": 4.8,
+        "floorIds": [
+          "g",
+          "m"
+        ],
+        "from": "connector:lift-east:g",
+        "id": "edge:connector:lift-east:g--connector:lift-east:m",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "lift-east",
+        "to": "connector:lift-east:m"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "connector:lift-east:g",
+        "id": "edge:connector:lift-east:g--waypoint:g-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "lift-east",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "m"
+        ],
+        "from": "connector:lift-east:m",
+        "id": "edge:connector:lift-east:m--waypoint:m-lobby:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "lift-east",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:07"
+      },
+      {
+        "accessible": false,
+        "connectorKind": "stairs",
+        "distanceMeters": 4.8,
+        "floorIds": [
+          "g",
+          "m"
+        ],
+        "from": "connector:stairs-west:g",
+        "id": "edge:connector:stairs-west:g--connector:stairs-west:m",
+        "kind": "vertical-connector",
+        "restricted": false,
+        "sourceId": "stairs-west",
+        "to": "connector:stairs-west:m"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "connector:stairs-west:g",
+        "id": "edge:connector:stairs-west:g--waypoint:g-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "stairs-west",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:02"
+      },
+      {
+        "accessible": false,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "m"
+        ],
+        "from": "connector:stairs-west:m",
+        "id": "edge:connector:stairs-west:m--waypoint:m-lobby:01",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "stairs-west",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:01"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "m"
+        ],
+        "from": "space:m-community",
+        "id": "edge:poi:poi-community-room--space:m-community",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-community-room",
+        "spaceId": "m-community",
+        "to": "poi:poi-community-room"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-bike",
+        "id": "edge:poi:poi-cycle-hub--space:g-bike",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-cycle-hub",
+        "spaceId": "g-bike",
+        "to": "poi:poi-cycle-hub"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-entry",
+        "id": "edge:poi:poi-ferry-entry--space:g-entry",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-ferry-entry",
+        "spaceId": "g-entry",
+        "to": "poi:poi-ferry-entry"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-market",
+        "id": "edge:poi:poi-harbor-market--space:g-market",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-harbor-market",
+        "spaceId": "g-market",
+        "to": "poi:poi-harbor-market"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "m"
+        ],
+        "from": "space:m-overlook",
+        "id": "edge:poi:poi-overlook--space:m-overlook",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-overlook",
+        "spaceId": "m-overlook",
+        "to": "poi:poi-overlook"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "m"
+        ],
+        "from": "space:m-terrace",
+        "id": "edge:poi:poi-reading-terrace--space:m-terrace",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-reading-terrace",
+        "spaceId": "m-terrace",
+        "to": "poi:poi-reading-terrace"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "m"
+        ],
+        "from": "space:m-cafe",
+        "id": "edge:poi:poi-signal-cafe--space:m-cafe",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-signal-cafe",
+        "spaceId": "m-cafe",
+        "to": "poi:poi-signal-cafe"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-ticket",
+        "id": "edge:poi:poi-ticket-hall--space:g-ticket",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-ticket-hall",
+        "spaceId": "g-ticket",
+        "to": "poi:poi-ticket-hall"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-gallery",
+        "id": "edge:poi:poi-tide-gallery--space:g-gallery",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-tide-gallery",
+        "spaceId": "g-gallery",
+        "to": "poi:poi-tide-gallery"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-platform",
+        "id": "edge:poi:poi-waterfront-platform--space:g-platform",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "poi-waterfront-platform",
+        "spaceId": "g-platform",
+        "to": "poi:poi-waterfront-platform"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-bike",
+        "id": "edge:portal:p-bike-platform--space:g-bike",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-bike-platform",
+        "spaceId": "g-bike",
+        "to": "portal:p-bike-platform"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 12,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-platform",
+        "id": "edge:portal:p-bike-platform--space:g-platform",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-bike-platform",
+        "spaceId": "g-platform",
+        "to": "portal:p-bike-platform"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "m"
+        ],
+        "from": "space:m-cafe",
+        "id": "edge:portal:p-cafe-bridge--space:m-cafe",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-cafe-bridge",
+        "spaceId": "m-cafe",
+        "to": "portal:p-cafe-bridge"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "m"
+        ],
+        "from": "portal:p-cafe-bridge",
+        "id": "edge:portal:p-cafe-bridge--waypoint:m-lobby:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-cafe-bridge",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "m"
+        ],
+        "from": "space:m-community",
+        "id": "edge:portal:p-community-bridge--space:m-community",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-community-bridge",
+        "spaceId": "m-community",
+        "to": "portal:p-community-bridge"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "m"
+        ],
+        "from": "portal:p-community-bridge",
+        "id": "edge:portal:p-community-bridge--waypoint:m-lobby:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-community-bridge",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-core",
+        "id": "edge:portal:p-core-concourse--space:g-core",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-core-concourse",
+        "spaceId": "g-core",
+        "to": "portal:p-core-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-core-concourse",
+        "id": "edge:portal:p-core-concourse--waypoint:g-concourse:08",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-core-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-entry",
+        "id": "edge:portal:p-entry-concourse--space:g-entry",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-entry-concourse",
+        "spaceId": "g-entry",
+        "to": "portal:p-entry-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 0.01,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-entry-concourse",
+        "id": "edge:portal:p-entry-concourse--waypoint:g-concourse:01",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-entry-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:01"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-gallery",
+        "id": "edge:portal:p-gallery-concourse--space:g-gallery",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-gallery-concourse",
+        "spaceId": "g-gallery",
+        "to": "portal:p-gallery-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-gallery-concourse",
+        "id": "edge:portal:p-gallery-concourse--waypoint:g-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-gallery-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-market-concourse",
+        "id": "edge:portal:p-market-concourse--space:g-concourse",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-market-concourse",
+        "spaceId": "g-concourse",
+        "to": "space:g-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-market",
+        "id": "edge:portal:p-market-concourse--space:g-market",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-market-concourse",
+        "spaceId": "g-market",
+        "to": "portal:p-market-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "m"
+        ],
+        "from": "space:m-overlook",
+        "id": "edge:portal:p-overlook-bridge--space:m-overlook",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-overlook-bridge",
+        "spaceId": "m-overlook",
+        "to": "portal:p-overlook-bridge"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "m"
+        ],
+        "from": "portal:p-overlook-bridge",
+        "id": "edge:portal:p-overlook-bridge--waypoint:m-lobby:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-overlook-bridge",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4.472,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-platform",
+        "id": "edge:portal:p-platform-concourse--space:g-platform",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-platform-concourse",
+        "spaceId": "g-platform",
+        "to": "portal:p-platform-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-platform-concourse",
+        "id": "edge:portal:p-platform-concourse--waypoint:g-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-platform-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "m"
+        ],
+        "from": "space:m-terrace",
+        "id": "edge:portal:p-terrace-bridge--space:m-terrace",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-terrace-bridge",
+        "spaceId": "m-terrace",
+        "to": "portal:p-terrace-bridge"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "m"
+        ],
+        "from": "portal:p-terrace-bridge",
+        "id": "edge:portal:p-terrace-bridge--waypoint:m-lobby:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-terrace-bridge",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-ticket",
+        "id": "edge:portal:p-ticket-concourse--space:g-ticket",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-ticket-concourse",
+        "spaceId": "g-ticket",
+        "to": "portal:p-ticket-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 3,
+        "floorIds": [
+          "g"
+        ],
+        "from": "portal:p-ticket-concourse",
+        "id": "edge:portal:p-ticket-concourse--waypoint:g-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "p-ticket-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:04",
+        "id": "edge:space:g-concourse--waypoint:g-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "space:g-concourse"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "g"
+        ],
+        "from": "space:g-concourse",
+        "id": "edge:space:g-concourse--waypoint:g-concourse:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 6,
+        "floorIds": [
+          "m"
+        ],
+        "from": "waypoint:m-lobby:03",
+        "id": "edge:space:m-lobby--waypoint:m-lobby:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "m-lobby",
+        "spaceId": "m-lobby",
+        "to": "space:m-lobby"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "m"
+        ],
+        "from": "space:m-lobby",
+        "id": "edge:space:m-lobby--waypoint:m-lobby:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "m-lobby",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:01",
+        "id": "edge:waypoint:g-concourse:01--waypoint:g-concourse:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:02",
+        "id": "edge:waypoint:g-concourse:02--waypoint:g-concourse:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 9,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:03",
+        "id": "edge:waypoint:g-concourse:03--waypoint:g-concourse:04",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:04"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 9,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:05",
+        "id": "edge:waypoint:g-concourse:05--waypoint:g-concourse:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 1,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:06",
+        "id": "edge:waypoint:g-concourse:06--waypoint:g-concourse:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:07"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "g"
+        ],
+        "from": "waypoint:g-concourse:07",
+        "id": "edge:waypoint:g-concourse:07--waypoint:g-concourse:08",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "g-concourse",
+        "spaceId": "g-concourse",
+        "to": "waypoint:g-concourse:08"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "m"
+        ],
+        "from": "waypoint:m-lobby:01",
+        "id": "edge:waypoint:m-lobby:01--waypoint:m-lobby:02",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "m-lobby",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:02"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "m"
+        ],
+        "from": "waypoint:m-lobby:02",
+        "id": "edge:waypoint:m-lobby:02--waypoint:m-lobby:03",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "m-lobby",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:03"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "m"
+        ],
+        "from": "waypoint:m-lobby:04",
+        "id": "edge:waypoint:m-lobby:04--waypoint:m-lobby:05",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "m-lobby",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:05"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 2,
+        "floorIds": [
+          "m"
+        ],
+        "from": "waypoint:m-lobby:05",
+        "id": "edge:waypoint:m-lobby:05--waypoint:m-lobby:06",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "m-lobby",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:06"
+      },
+      {
+        "accessible": true,
+        "distanceMeters": 4,
+        "floorIds": [
+          "m"
+        ],
+        "from": "waypoint:m-lobby:06",
+        "id": "edge:waypoint:m-lobby:06--waypoint:m-lobby:07",
+        "kind": "within-space",
+        "restricted": false,
+        "sourceId": "m-lobby",
+        "spaceId": "m-lobby",
+        "to": "waypoint:m-lobby:07"
+      }
+    ],
+    "nodes": [
+      {
+        "floorId": "g",
+        "id": "connector:escalator-center:g",
+        "kind": "connector-stop",
+        "position": [
+          24,
+          11
+        ],
+        "sourceId": "escalator-center"
+      },
+      {
+        "floorId": "m",
+        "id": "connector:escalator-center:m",
+        "kind": "connector-stop",
+        "position": [
+          24,
+          11
+        ],
+        "sourceId": "escalator-center"
+      },
+      {
+        "floorId": "g",
+        "id": "connector:lift-east:g",
+        "kind": "connector-stop",
+        "position": [
+          34,
+          11
+        ],
+        "sourceId": "lift-east"
+      },
+      {
+        "floorId": "m",
+        "id": "connector:lift-east:m",
+        "kind": "connector-stop",
+        "position": [
+          34,
+          11
+        ],
+        "sourceId": "lift-east"
+      },
+      {
+        "floorId": "g",
+        "id": "connector:stairs-west:g",
+        "kind": "connector-stop",
+        "position": [
+          10,
+          11
+        ],
+        "sourceId": "stairs-west"
+      },
+      {
+        "floorId": "m",
+        "id": "connector:stairs-west:m",
+        "kind": "connector-stop",
+        "position": [
+          10,
+          11
+        ],
+        "sourceId": "stairs-west"
+      },
+      {
+        "floorId": "m",
+        "id": "poi:poi-community-room",
+        "kind": "poi",
+        "position": [
+          16,
+          16
+        ],
+        "sourceId": "poi-community-room"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-cycle-hub",
+        "kind": "poi",
+        "position": [
+          34,
+          18
+        ],
+        "sourceId": "poi-cycle-hub"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-ferry-entry",
+        "kind": "poi",
+        "position": [
+          2,
+          11
+        ],
+        "sourceId": "poi-ferry-entry"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-harbor-market",
+        "kind": "poi",
+        "position": [
+          22,
+          4
+        ],
+        "sourceId": "poi-harbor-market"
+      },
+      {
+        "floorId": "m",
+        "id": "poi:poi-overlook",
+        "kind": "poi",
+        "position": [
+          14,
+          4
+        ],
+        "sourceId": "poi-overlook"
+      },
+      {
+        "floorId": "m",
+        "id": "poi:poi-reading-terrace",
+        "kind": "poi",
+        "position": [
+          30,
+          16
+        ],
+        "sourceId": "poi-reading-terrace"
+      },
+      {
+        "floorId": "m",
+        "id": "poi:poi-signal-cafe",
+        "kind": "poi",
+        "position": [
+          28,
+          4
+        ],
+        "sourceId": "poi-signal-cafe"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-ticket-hall",
+        "kind": "poi",
+        "position": [
+          10,
+          4
+        ],
+        "sourceId": "poi-ticket-hall"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-tide-gallery",
+        "kind": "poi",
+        "position": [
+          33,
+          4
+        ],
+        "sourceId": "poi-tide-gallery"
+      },
+      {
+        "floorId": "g",
+        "id": "poi:poi-waterfront-platform",
+        "kind": "poi",
+        "position": [
+          18,
+          18
+        ],
+        "sourceId": "poi-waterfront-platform"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-bike-platform",
+        "kind": "portal",
+        "position": [
+          30,
+          18
+        ],
+        "sourceId": "p-bike-platform"
+      },
+      {
+        "floorId": "m",
+        "id": "portal:p-cafe-bridge",
+        "kind": "portal",
+        "position": [
+          28,
+          8
+        ],
+        "sourceId": "p-cafe-bridge"
+      },
+      {
+        "floorId": "m",
+        "id": "portal:p-community-bridge",
+        "kind": "portal",
+        "position": [
+          16,
+          14
+        ],
+        "sourceId": "p-community-bridge"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-core-concourse",
+        "kind": "portal",
+        "position": [
+          38,
+          11
+        ],
+        "sourceId": "p-core-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-entry-concourse",
+        "kind": "portal",
+        "position": [
+          6,
+          11
+        ],
+        "sourceId": "p-entry-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-gallery-concourse",
+        "kind": "portal",
+        "position": [
+          33,
+          8
+        ],
+        "sourceId": "p-gallery-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-market-concourse",
+        "kind": "portal",
+        "position": [
+          22,
+          8
+        ],
+        "sourceId": "p-market-concourse"
+      },
+      {
+        "floorId": "m",
+        "id": "portal:p-overlook-bridge",
+        "kind": "portal",
+        "position": [
+          14,
+          8
+        ],
+        "sourceId": "p-overlook-bridge"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-platform-concourse",
+        "kind": "portal",
+        "position": [
+          20,
+          14
+        ],
+        "sourceId": "p-platform-concourse"
+      },
+      {
+        "floorId": "m",
+        "id": "portal:p-terrace-bridge",
+        "kind": "portal",
+        "position": [
+          30,
+          14
+        ],
+        "sourceId": "p-terrace-bridge"
+      },
+      {
+        "floorId": "g",
+        "id": "portal:p-ticket-concourse",
+        "kind": "portal",
+        "position": [
+          11,
+          8
+        ],
+        "sourceId": "p-ticket-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-bike",
+        "kind": "space",
+        "position": [
+          34,
+          18
+        ],
+        "sourceId": "g-bike"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-concourse",
+        "kind": "space",
+        "position": [
+          22,
+          11
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-core",
+        "kind": "space",
+        "position": [
+          41,
+          11
+        ],
+        "sourceId": "g-core"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-entry",
+        "kind": "space",
+        "position": [
+          3,
+          11
+        ],
+        "sourceId": "g-entry"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-gallery",
+        "kind": "space",
+        "position": [
+          33,
+          4
+        ],
+        "sourceId": "g-gallery"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-market",
+        "kind": "space",
+        "position": [
+          22,
+          4
+        ],
+        "sourceId": "g-market"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-platform",
+        "kind": "space",
+        "position": [
+          18,
+          18
+        ],
+        "sourceId": "g-platform"
+      },
+      {
+        "floorId": "g",
+        "id": "space:g-ticket",
+        "kind": "space",
+        "position": [
+          11,
+          4
+        ],
+        "sourceId": "g-ticket"
+      },
+      {
+        "floorId": "m",
+        "id": "space:m-cafe",
+        "kind": "space",
+        "position": [
+          28,
+          4
+        ],
+        "sourceId": "m-cafe"
+      },
+      {
+        "floorId": "m",
+        "id": "space:m-community",
+        "kind": "space",
+        "position": [
+          16,
+          16
+        ],
+        "sourceId": "m-community"
+      },
+      {
+        "floorId": "m",
+        "id": "space:m-lobby",
+        "kind": "space",
+        "position": [
+          22,
+          11
+        ],
+        "sourceId": "m-lobby"
+      },
+      {
+        "floorId": "m",
+        "id": "space:m-overlook",
+        "kind": "space",
+        "position": [
+          14,
+          4
+        ],
+        "sourceId": "m-overlook"
+      },
+      {
+        "floorId": "m",
+        "id": "space:m-terrace",
+        "kind": "space",
+        "position": [
+          30,
+          16
+        ],
+        "sourceId": "m-terrace"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:01",
+        "kind": "waypoint",
+        "position": [
+          6,
+          11
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:02",
+        "kind": "waypoint",
+        "position": [
+          10,
+          11
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:03",
+        "kind": "waypoint",
+        "position": [
+          11,
+          11
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:04",
+        "kind": "waypoint",
+        "position": [
+          20,
+          11
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:05",
+        "kind": "waypoint",
+        "position": [
+          24,
+          11
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:06",
+        "kind": "waypoint",
+        "position": [
+          33,
+          11
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:07",
+        "kind": "waypoint",
+        "position": [
+          34,
+          11
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "g",
+        "id": "waypoint:g-concourse:08",
+        "kind": "waypoint",
+        "position": [
+          38,
+          11
+        ],
+        "sourceId": "g-concourse"
+      },
+      {
+        "floorId": "m",
+        "id": "waypoint:m-lobby:01",
+        "kind": "waypoint",
+        "position": [
+          10,
+          11
+        ],
+        "sourceId": "m-lobby"
+      },
+      {
+        "floorId": "m",
+        "id": "waypoint:m-lobby:02",
+        "kind": "waypoint",
+        "position": [
+          14,
+          11
+        ],
+        "sourceId": "m-lobby"
+      },
+      {
+        "floorId": "m",
+        "id": "waypoint:m-lobby:03",
+        "kind": "waypoint",
+        "position": [
+          16,
+          11
+        ],
+        "sourceId": "m-lobby"
+      },
+      {
+        "floorId": "m",
+        "id": "waypoint:m-lobby:04",
+        "kind": "waypoint",
+        "position": [
+          24,
+          11
+        ],
+        "sourceId": "m-lobby"
+      },
+      {
+        "floorId": "m",
+        "id": "waypoint:m-lobby:05",
+        "kind": "waypoint",
+        "position": [
+          28,
+          11
+        ],
+        "sourceId": "m-lobby"
+      },
+      {
+        "floorId": "m",
+        "id": "waypoint:m-lobby:06",
+        "kind": "waypoint",
+        "position": [
+          30,
+          11
+        ],
+        "sourceId": "m-lobby"
+      },
+      {
+        "floorId": "m",
+        "id": "waypoint:m-lobby:07",
+        "kind": "waypoint",
+        "position": [
+          34,
+          11
+        ],
+        "sourceId": "m-lobby"
+      }
+    ]
+  },
+  "sourceSchemaVersion": "0.1.0",
+  "spaces": [
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-bike",
+      "name": "Cycle Hub",
+      "polygon": [
+        [
+          30,
+          14
+        ],
+        [
+          38,
+          14
+        ],
+        [
+          38,
+          22
+        ],
+        [
+          30,
+          22
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-concourse",
+      "name": "Exchange Concourse",
+      "polygon": [
+        [
+          6,
+          8
+        ],
+        [
+          38,
+          8
+        ],
+        [
+          38,
+          14
+        ],
+        [
+          6,
+          14
+        ]
+      ],
+      "public": true,
+      "type": "corridor"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-core",
+      "name": "East Circulation Core",
+      "polygon": [
+        [
+          38,
+          8
+        ],
+        [
+          44,
+          8
+        ],
+        [
+          44,
+          14
+        ],
+        [
+          38,
+          14
+        ]
+      ],
+      "public": true,
+      "type": "vertical-circulation"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-entry",
+      "name": "Ferry Walk Entrance",
+      "polygon": [
+        [
+          0,
+          8
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          0,
+          14
+        ]
+      ],
+      "public": true,
+      "type": "entrance"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-gallery",
+      "name": "Tide Gallery",
+      "polygon": [
+        [
+          28,
+          0
+        ],
+        [
+          38,
+          0
+        ],
+        [
+          38,
+          8
+        ],
+        [
+          28,
+          8
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-market",
+      "name": "Harbor Market",
+      "polygon": [
+        [
+          16,
+          0
+        ],
+        [
+          28,
+          0
+        ],
+        [
+          28,
+          8
+        ],
+        [
+          16,
+          8
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-platform",
+      "name": "Waterfront Platform",
+      "polygon": [
+        [
+          6,
+          14
+        ],
+        [
+          30,
+          14
+        ],
+        [
+          30,
+          22
+        ],
+        [
+          6,
+          22
+        ]
+      ],
+      "public": true,
+      "type": "lobby"
+    },
+    {
+      "accessible": true,
+      "floorId": "g",
+      "id": "g-ticket",
+      "name": "Ticket Hall",
+      "polygon": [
+        [
+          6,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          8
+        ],
+        [
+          6,
+          8
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": true,
+      "floorId": "m",
+      "id": "m-cafe",
+      "name": "Signal Cafe",
+      "polygon": [
+        [
+          20,
+          0
+        ],
+        [
+          36,
+          0
+        ],
+        [
+          36,
+          8
+        ],
+        [
+          20,
+          8
+        ]
+      ],
+      "public": true,
+      "type": "service"
+    },
+    {
+      "accessible": true,
+      "floorId": "m",
+      "id": "m-community",
+      "name": "Community Room",
+      "polygon": [
+        [
+          8,
+          14
+        ],
+        [
+          24,
+          14
+        ],
+        [
+          24,
+          18
+        ],
+        [
+          8,
+          18
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "m",
+      "id": "m-lobby",
+      "name": "Mezzanine Bridge",
+      "polygon": [
+        [
+          8,
+          8
+        ],
+        [
+          36,
+          8
+        ],
+        [
+          36,
+          14
+        ],
+        [
+          8,
+          14
+        ]
+      ],
+      "public": true,
+      "type": "corridor"
+    },
+    {
+      "accessible": true,
+      "floorId": "m",
+      "id": "m-overlook",
+      "name": "Harbor Overlook",
+      "polygon": [
+        [
+          8,
+          0
+        ],
+        [
+          20,
+          0
+        ],
+        [
+          20,
+          8
+        ],
+        [
+          8,
+          8
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    },
+    {
+      "accessible": true,
+      "floorId": "m",
+      "id": "m-terrace",
+      "name": "Reading Terrace",
+      "polygon": [
+        [
+          24,
+          14
+        ],
+        [
+          36,
+          14
+        ],
+        [
+          36,
+          18
+        ],
+        [
+          24,
+          18
+        ]
+      ],
+      "public": true,
+      "type": "room"
+    }
+  ],
+  "verticalConnectors": [
+    {
+      "accessible": false,
+      "id": "escalator-center",
+      "kind": "escalator",
+      "name": "Central Escalator",
+      "stops": [
+        {
+          "floorId": "g",
+          "position": [
+            24,
+            11
+          ],
+          "spaceId": "g-concourse"
+        },
+        {
+          "floorId": "m",
+          "position": [
+            24,
+            11
+          ],
+          "spaceId": "m-lobby"
+        }
+      ]
+    },
+    {
+      "accessible": true,
+      "id": "lift-east",
+      "kind": "elevator",
+      "name": "East Glass Lift",
+      "stops": [
+        {
+          "floorId": "g",
+          "position": [
+            34,
+            11
+          ],
+          "spaceId": "g-concourse"
+        },
+        {
+          "floorId": "m",
+          "position": [
+            34,
+            11
+          ],
+          "spaceId": "m-lobby"
+        }
+      ]
+    },
+    {
+      "accessible": false,
+      "id": "stairs-west",
+      "kind": "stairs",
+      "name": "West Stair",
+      "stops": [
+        {
+          "floorId": "g",
+          "position": [
+            10,
+            11
+          ],
+          "spaceId": "g-concourse"
+        },
+        {
+          "floorId": "m",
+          "position": [
+            10,
+            11
+          ],
+          "spaceId": "m-lobby"
+        }
+      ]
+    }
+  ]
+}
