@@ -14,6 +14,9 @@ import VenuePackageManager from './components/VenuePackageManager.jsx';
 
 const SpatialTwinViewer = lazy(() => import('./components/SpatialTwinViewer.tsx'));
 const FloorplanViewer = lazy(() => import('./components/FloorplanViewer.tsx'));
+const BuildingSourceWorkspace = lazy(
+  () => import('./components/BuildingSourceWorkspace.tsx'),
+);
 
 function currentSurface() {
   const value = window.location.hash.replace(/^#\/?/, '').split('/')[0];
@@ -45,9 +48,9 @@ function VisitorApp() {
   }
 
   return (
-    <>
+    <div className="visitor-shell">
       <Header />
-      <main className="main-content" id="main-content">
+      <main className="main-content visitor-map-stage" id="main-content">
         {state.activeView === VIEW_TYPE.MAP && (
           <>
             <Suspense fallback={<div className="map-loading">Loading compiled floor map…</div>}>
@@ -62,7 +65,7 @@ function VisitorApp() {
       </main>
       <StatusBar />
       <LocationPicker isOpen={showLocationPicker} onClose={() => setShowLocationPicker(false)} />
-    </>
+    </div>
   );
 }
 
@@ -91,17 +94,16 @@ function InspectorApp() {
 }
 
 function StudioApp() {
-  const { venue } = useNavigation();
   return (
-    <main className="studio-boundary" id="main-content">
-      <span>Future authoring surface</span>
-      <h1>Venue Studio</h1>
-      <p>
-        The runtime boundary is active for {venue.buildingPackage.building.name}. Import, review,
-        compile, and publish workflows belong here in Venue Studio v0.
-      </p>
-      <code>Importer → BuildingSource → Compiler → VenuePackage → Runtime</code>
-    </main>
+    <Suspense
+      fallback={
+        <main className="studio-boundary" id="main-content">
+          Loading BuildingSource workspace…
+        </main>
+      }
+    >
+      <BuildingSourceWorkspace />
+    </Suspense>
   );
 }
 

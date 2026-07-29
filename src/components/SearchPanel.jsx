@@ -6,7 +6,7 @@
  */
 
 import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { Search, X, Navigation, MapPin } from 'lucide-react';
+import { Search, X, Navigation, MapPin, ArrowRight } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs, getAvailableCategories } from '../engine/searchIndex.js';
 import { formatDistance } from '../data/buildingConfig.js';
@@ -93,8 +93,17 @@ export default function SearchPanel() {
             id="btn-search-open"
             aria-label="Search rooms and departments"
           >
-            <Search size={18} color="var(--color-accent-blue)" />
-            <span>Search rooms, departments...</span>
+            <span className="search-trigger-icon" aria-hidden="true">
+              <Search size={19} />
+            </span>
+            <span className="search-trigger-copy">
+              <strong>Where do you want to go?</strong>
+              <small>Search rooms, services, and entrances</small>
+            </span>
+            <span className="search-trigger-action" aria-hidden="true">
+              Search
+              <ArrowRight size={15} />
+            </span>
           </button>
         </div>
       )}
@@ -107,18 +116,30 @@ export default function SearchPanel() {
       />
 
       {/* Search Panel */}
-      <div className={`search-panel ${isOpen ? 'open' : ''}`} id="search-panel">
-        {/* Handle */}
+      <section
+        className={`search-panel ${isOpen ? 'open' : ''}`}
+        id="search-panel"
+        aria-label="Find a destination"
+      >
         <div className="search-panel-handle" />
 
-        {/* Search Input */}
+        <div className="search-panel-heading">
+          <div>
+            <span>Explore {venue.config.name}</span>
+            <h2>Find a destination</h2>
+          </div>
+          <button type="button" onClick={closePanel} aria-label="Close destination search">
+            <X size={18} />
+          </button>
+        </div>
+
         <div className="search-input-wrapper">
-          <Search size={16} color="var(--color-text-muted)" />
+          <Search size={18} />
           <input
             ref={inputRef}
             type="text"
             className="search-input"
-            placeholder="Search rooms, departments..."
+            placeholder="Room, service, department…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             id="search-input"
@@ -126,6 +147,7 @@ export default function SearchPanel() {
           />
           {query && (
             <button
+              type="button"
               className="search-clear-btn"
               onClick={() => setQuery('')}
               id="btn-search-clear"
@@ -136,7 +158,11 @@ export default function SearchPanel() {
           )}
         </div>
 
-        {/* Category Chips */}
+        <div className="search-section-label">
+          <span>Browse by category</span>
+          <span>{results.length} destinations</span>
+        </div>
+
         <div className="category-chips" id="category-chips">
           {categories.map((catId) => {
             const cat = venue.getCategory(catId);
@@ -183,14 +209,7 @@ export default function SearchPanel() {
                       </div>
                     </div>
                   </button>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-end',
-                      gap: '4px',
-                    }}
-                  >
+                  <div className="search-result-route">
                     {routePreview?.found && (
                       <span className="search-result-distance">
                         {formatDistance(routePreview.totalDistance)}
@@ -200,13 +219,12 @@ export default function SearchPanel() {
                       <span className="search-result-distance">No route</span>
                     )}
                     <button
-                      className="btn btn-sm btn-success"
+                      className="search-route-button"
                       onClick={(e) => handleNavigate(node, e)}
-                      style={{ padding: '4px 10px', fontSize: '11px' }}
                       aria-label={`Navigate to ${node.poi.name}`}
                     >
-                      <Navigation size={11} />
-                      Go
+                      <Navigation size={13} />
+                      Route
                     </button>
                   </div>
                 </div>
@@ -221,7 +239,7 @@ export default function SearchPanel() {
             </div>
           )}
         </div>
-      </div>
+      </section>
     </>
   );
 }

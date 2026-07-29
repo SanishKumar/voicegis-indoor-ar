@@ -1,18 +1,19 @@
 /**
  * StatusBar.jsx
  *
- * Bottom status bar showing navigation state and app info.
+ * Quiet visitor status line with route, floor, and connectivity context.
  */
 
-import { HardDrive, Navigation, MapPin, Wifi, WifiOff } from 'lucide-react';
-import { useNavigation, NAV_STATUS, VIEW_TYPE } from '../context/NavigationContext.jsx';
+import { MapPin, Wifi, WifiOff, Layers } from 'lucide-react';
+import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { useState, useEffect } from 'react';
 
 export default function StatusBar() {
-  const { state, packageCacheStatus, venue } = useNavigation();
-  const { navStatus, activeView, startNodeId } = state;
+  const { state, venue } = useNavigation();
+  const { navStatus, activeFloorId, startNodeId } = state;
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const startNode = venue.getNodeById(startNodeId);
+  const activeFloor = venue.getFloorById(activeFloorId);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -41,54 +42,26 @@ export default function StatusBar() {
         : 'status-dot';
 
   return (
-    <div className="status-bar" id="status-bar">
-      {/* Navigation Status */}
-      <div className="status-item">
+    <aside className="status-bar visitor-status-bar" id="status-bar" aria-label="Map status">
+      <div className="status-item status-primary">
         <span className={statusDotClass} />
         <span>{statusLabel}</span>
       </div>
 
-      {/* Start Location */}
-      <div className="status-item">
+      <div className="status-item status-location">
         <MapPin size={11} />
-        <span>Start: {startNode?.poi?.name || 'Not set'}</span>
+        <span>{startNode?.poi?.name || 'Starting point not set'}</span>
       </div>
 
-      {/* View */}
-      <div className="status-item">
-        {activeView === VIEW_TYPE.CAMERA_PREVIEW ? (
-          <>
-            <Navigation size={11} />
-            <span>Camera Preview</span>
-          </>
-        ) : activeView === VIEW_TYPE.SPATIAL_TWIN ? (
-          <>
-            <Navigation size={11} />
-            <span>3D Twin</span>
-          </>
-        ) : (
-          <>
-            <MapPin size={11} />
-            <span>Map Mode</span>
-          </>
-        )}
+      <div className="status-item status-floor">
+        <Layers size={11} />
+        <span>{activeFloor?.name ?? 'Floor unavailable'}</span>
       </div>
 
-      {/* Package cache */}
-      <div className="status-item status-package" title={packageCacheStatus.detail}>
-        <HardDrive size={11} />
-        <span>
-          {packageCacheStatus.activeHash
-            ? `Package ${packageCacheStatus.activeHash.slice(0, 8)} verified`
-            : 'Package cache unavailable'}
-        </span>
-      </div>
-
-      {/* Connection */}
-      <div className="status-item">
+      <div className="status-item status-network" title={isOnline ? 'Connected' : 'Offline-ready'}>
         {isOnline ? <Wifi size={11} /> : <WifiOff size={11} />}
-        <span>{isOnline ? 'Online' : 'Offline'}</span>
+        <span>{isOnline ? 'Connected' : 'Offline-ready'}</span>
       </div>
-    </div>
+    </aside>
   );
 }

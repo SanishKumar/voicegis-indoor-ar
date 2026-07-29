@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
   prepareBuildingCompilation,
   stableJson,
@@ -6,20 +5,24 @@ import {
 } from './compilerCore';
 import type { ValidationReport } from './validation';
 
-export * from './compilerCore';
-
-export interface CompilationResult {
+export interface BrowserCompilationResult {
   package: CompiledBuildingPackage | null;
   report: ValidationReport;
 }
 
-export function compileBuilding(value: unknown): CompilationResult {
+async function sha256Hex(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function compileBuildingInBrowser(value: unknown): Promise<BrowserCompilationResult> {
   const preparation = prepareBuildingCompilation(value);
   if (!preparation.content) {
     return { package: null, report: preparation.report };
   }
 
-  const contentHash = createHash('sha256').update(stableJson(preparation.content)).digest('hex');
+  const contentHash = await sha256Hex(stableJson(preparation.content));
   return {
     package: {
       ...preparation.content,

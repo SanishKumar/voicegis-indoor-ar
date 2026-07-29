@@ -1,18 +1,60 @@
 {
-  "catalogVersion": "0.1.0",
+  "catalogVersion": "0.2.0",
   "defaultVenueId": "asterion-medical-center",
   "venues": [
     {
       "id": "asterion-medical-center",
       "name": "Asterion University Medical Center",
       "description": "Four-floor academic medical benchmark",
-      "packageUrl": "/venues/asterion-medical-center.package.json"
+      "defaultReleaseId": "0.2.0+9a9c9d37907c",
+      "releases": [
+        {
+          "releaseId": "0.2.0+9a9c9d37907c",
+          "status": "stable",
+          "publishedAt": "2026-07-26T17:42:23+05:30",
+          "packageVersion": "0.2.0",
+          "compilerVersion": "0.2.0",
+          "sourceSchemaVersion": "0.1.0",
+          "contentHash": "9a9c9d37907c78ec1b72bed95658ec248c43d96a891ae4109ac8eebfad144a13",
+          "packageUrl": "/venues/asterion-medical-center.package.json",
+          "notes": "Initial deterministic Venue Bootstrap benchmark release.",
+          "summary": {
+            "floors": 4,
+            "spaces": 60,
+            "portals": 56,
+            "connectors": 4,
+            "pois": 36,
+            "anchors": 9
+          }
+        }
+      ]
     },
     {
       "id": "harbor-exchange",
       "name": "Harbor Exchange",
       "description": "Two-floor ferry, market, and community venue",
-      "packageUrl": "/venues/harbor-exchange.package.json"
+      "defaultReleaseId": "0.2.0+639ca9c4a7ae",
+      "releases": [
+        {
+          "releaseId": "0.2.0+639ca9c4a7ae",
+          "status": "stable",
+          "publishedAt": "2026-07-27T00:56:50+05:30",
+          "packageVersion": "0.2.0",
+          "compilerVersion": "0.2.0",
+          "sourceSchemaVersion": "0.1.0",
+          "contentHash": "639ca9c4a7ae2cdfe7384f78586a3e179f6ca2ba467022fd7b184a4b7d164222",
+          "packageUrl": "/venues/harbor-exchange.package.json",
+          "notes": "Structurally independent two-floor bootstrap proof venue.",
+          "summary": {
+            "floors": 2,
+            "spaces": 13,
+            "portals": 11,
+            "connectors": 3,
+            "pois": 10,
+            "anchors": 3
+          }
+        }
+      ]
     }
   ]
 }

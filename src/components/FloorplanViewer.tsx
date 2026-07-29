@@ -1,19 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Arc, Circle, Group, Layer, Line, Rect, Stage, Text } from 'react-konva';
 import type Konva from 'konva';
-import {
-  Accessibility,
-  ArrowUpDown,
-  Compass,
-  Database,
-  DoorOpen,
-  Footprints,
-  Layers,
-  LockKeyhole,
-  Route,
-} from 'lucide-react';
+import type { ConnectorKind } from '@voicegis/spatial-schema';
+import { Accessibility, ArrowUpDown, Compass, Footprints, Layers, Route } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import type { CompiledBuildingRuntime, VisitorPoiNode } from '../data/compiledBuilding';
+import { deriveFloorplanCartography } from '../engine/floorplanCartography';
 import {
   polygonCentroid,
   routeConnectorRuns,
@@ -21,10 +13,10 @@ import {
   routeSegmentsForFloor,
 } from '../engine/floorplanModel';
 import type { RouteResult } from '../engine/routingCore';
-import { getNearestBoundaryAngle, getPolygonBounds } from '../engine/spatialTwinArchitecture';
+import { getPolygonBounds } from '../engine/spatialTwinArchitecture';
 
 const WORLD_SCALE = 44;
-const MAP_PADDING = 50;
+const MAP_PADDING = 96;
 interface NavigatorContextValue {
   state: {
     activeFloorId: string;
@@ -42,33 +34,136 @@ interface NavigatorContextValue {
 }
 
 const SPACE_COLORS = {
-  entrance: '#e7f1ee',
-  room: '#f7f5ef',
-  corridor: '#ebe9e2',
-  lobby: '#eeecf8',
-  service: '#f2eee6',
-  restricted: '#f3e6e7',
-  'vertical-circulation': '#e9e5db',
+  entrance: '#dceff0',
+  room: '#f3efe7',
+  corridor: '#ffffff',
+  lobby: '#eef2ed',
+  service: '#e6edf2',
+  restricted: '#f2dfe2',
+  'vertical-circulation': '#e1e8e5',
 } as const;
 
-const SPACE_ACCENTS = {
-  entrance: '#207564',
-  room: '#7c7d82',
-  corridor: '#8d8a82',
-  lobby: '#6257c7',
-  service: '#9a6a34',
-  restricted: '#a44149',
-  'vertical-circulation': '#5f625e',
-} as const;
+function safeCategoryGlyph(icon: string | undefined) {
+  return icon && /^[\x20-\x7e]{1,3}$/.test(icon) ? icon : '•';
+}
 
-function roomCode(id: string) {
-  return id
-    .split('-')
-    .slice(1)
-    .map((part) => part.slice(0, 2))
-    .join('')
-    .toUpperCase()
-    .slice(0, 6);
+interface CartographicConnectorSymbolProps {
+  x: number;
+  y: number;
+  kind: ConnectorKind;
+  accessible: boolean;
+  restricted: boolean;
+}
+
+function CartographicConnectorSymbol({
+  x,
+  y,
+  kind,
+  accessible,
+  restricted,
+}: CartographicConnectorSymbolProps) {
+  const accent = restricted ? '#a54b55' : accessible ? '#176b5b' : '#b9782d';
+  const label =
+    kind === 'elevator' ? 'LIFT' : kind === 'stairs' ? 'STAIR' : kind === 'ramp' ? 'RAMP' : 'ESC';
+
+  return (
+    <Group x={x} y={y} listening={false}>
+      <Rect
+        x={-21}
+        y={-18}
+        width={42}
+        height={36}
+        cornerRadius={6}
+        fill="#ffffff"
+        stroke={accent}
+        strokeWidth={1.6}
+        shadowColor="rgba(23, 33, 31, 0.16)"
+        shadowBlur={7}
+        shadowOffsetY={2}
+      />
+      {kind === 'elevator' && (
+        <>
+          <Rect
+            x={-11}
+            y={-12}
+            width={22}
+            height={16}
+            cornerRadius={2}
+            stroke="#53605a"
+            strokeWidth={1.3}
+          />
+          <Line points={[0, -12, 0, 4]} stroke="#87928d" strokeWidth={1} />
+          <Line
+            points={[-7, -1, -4, -5, -1, -1]}
+            stroke={accent}
+            strokeWidth={1.3}
+            lineCap="round"
+            lineJoin="round"
+          />
+          <Line
+            points={[1, -7, 4, -3, 7, -7]}
+            stroke={accent}
+            strokeWidth={1.3}
+            lineCap="round"
+            lineJoin="round"
+          />
+        </>
+      )}
+      {kind === 'stairs' && (
+        <Line
+          points={[-12, 4, -7, 4, -7, 0, -2, 0, -2, -4, 3, -4, 3, -8, 11, -8]}
+          stroke="#53605a"
+          strokeWidth={1.8}
+          lineCap="square"
+          lineJoin="miter"
+        />
+      )}
+      {kind === 'ramp' && (
+        <>
+          <Rect x={-12} y={-10} width={24} height={14} stroke="#87928d" strokeWidth={1} />
+          <Line
+            points={[-9, 2, 8, -7, 4, -8, 8, -7, 7, -3]}
+            stroke={accent}
+            strokeWidth={1.7}
+            lineCap="round"
+            lineJoin="round"
+          />
+        </>
+      )}
+      {kind === 'escalator' && (
+        <>
+          <Line
+            points={[-10, 3, 9, -9]}
+            stroke="#53605a"
+            strokeWidth={2}
+            lineCap="round"
+          />
+          <Circle x={-11} y={4} radius={2.5} stroke={accent} strokeWidth={1.2} />
+          <Circle x={10} y={-10} radius={2.5} stroke={accent} strokeWidth={1.2} />
+          {[-5, 0, 5].map((offset) => (
+            <Line
+              key={offset}
+              points={[offset - 3, -offset * 0.62 + 1, offset + 1, -offset * 0.62 + 4]}
+              stroke="#87928d"
+              strokeWidth={1}
+            />
+          ))}
+        </>
+      )}
+      <Text
+        x={-18}
+        y={8}
+        width={36}
+        text={label}
+        align="center"
+        fontFamily="Inter, Segoe UI, sans-serif"
+        fontSize={6.8}
+        fontStyle="bold"
+        letterSpacing={0.7}
+        fill="#44504b"
+      />
+    </Group>
+  );
 }
 
 export default function FloorplanViewer() {
@@ -102,15 +197,11 @@ export default function FloorplanViewer() {
   }, []);
 
   const activeFloor = venue.getFloorById(activeFloorId) ?? buildingPackage.floors[0];
+  const cartography = useMemo(
+    () => deriveFloorplanCartography(buildingPackage, activeFloor.id),
+    [activeFloor.id, buildingPackage],
+  );
   const floorSpaces = buildingPackage.spaces.filter((space) => space.floorId === activeFloor.id);
-  const floorPortals = buildingPackage.portals.filter(
-    (portal) => portal.floorId === activeFloor.id,
-  );
-  const floorConnectorStops = buildingPackage.verticalConnectors.flatMap((connector) =>
-    connector.stops
-      .filter((stop) => stop.floorId === activeFloor.id)
-      .map((stop) => ({ connector, stop })),
-  );
   const floorPois = venue.getPOIs().filter((node) => String(node.floor) === activeFloor.id);
   const poisBySpace = useMemo(() => {
     const result = new Map<string, typeof floorPois>();
@@ -132,7 +223,7 @@ export default function FloorplanViewer() {
   const worldHeight = (maxY - minY) * WORLD_SCALE + MAP_PADDING * 2;
   const fitScale = Math.max(
     0.1,
-    Math.min(dimensions.width / worldWidth, dimensions.height / worldHeight) * 0.94,
+    Math.min(dimensions.width / worldWidth, dimensions.height / worldHeight) * 0.9,
   );
   const stageScale = fitScale * zoom;
   const basePosition = {
@@ -169,30 +260,22 @@ export default function FloorplanViewer() {
   const startNode = venue.getNodeById(state.startNodeId);
   const destinationNode = venue.getNodeById(state.destinationNodeId);
   const destinationSpaceId = (destinationNode as VisitorPoiNode | null)?.poi?.spaceId;
+  const mappedSpaceIds = new Set(floorSpaces.map((space) => space.id));
+  const standalonePois = floorPois.filter((node) => !mappedSpaceIds.has(node.poi.spaceId));
 
   const colors = {
-    background: theme === 'dark' ? '#242528' : '#e5e3dd',
-    paper: '#fbfaf6',
-    floor: '#f6f4ed',
-    wall: '#4b4d50',
-    partition: '#777871',
-    grid: '#d8d5cd',
-    text: '#25272b',
-    muted: '#74746e',
+    background:
+      theme === 'dark'
+        ? 'radial-gradient(circle at 48% 42%, #27312e 0%, #18201e 72%)'
+        : 'radial-gradient(circle at 48% 42%, #f5f7f4 0%, #e5eae6 72%)',
+    paper: '#fdfdf9',
+    floor: '#f7f8f4',
+    wall: '#59645f',
+    partition: '#b9c2bd',
+    text: '#17211f',
+    muted: '#6f7874',
     spaces: SPACE_COLORS,
   };
-
-  const gridLines = (() => {
-    const vertical = [];
-    for (let x = Math.ceil(minX / 8) * 8; x <= maxX; x += 8) {
-      vertical.push([toCanvas([x, minY]), toCanvas([x, maxY])] as const);
-    }
-    const horizontal = [];
-    for (let y = Math.ceil(minY / 8) * 8; y <= maxY; y += 8) {
-      horizontal.push([toCanvas([minX, y]), toCanvas([maxX, y])] as const);
-    }
-    return { vertical, horizontal };
-  })();
 
   const resetView = (floorId: string) => {
     actions.setFloor(floorId);
@@ -245,14 +328,27 @@ export default function FloorplanViewer() {
       >
         <Layer>
           <Line
+            x={0}
+            y={13}
+            points={flatPoints(activeFloor.outline)}
+            closed
+            fill="#b9c2bd"
+            stroke="#aab4af"
+            strokeWidth={3}
+            opacity={theme === 'dark' ? 0.46 : 0.7}
+            shadowColor="rgba(23, 33, 31, 0.24)"
+            shadowBlur={30}
+            shadowOffsetY={16}
+            listening={false}
+          />
+          <Line
             points={flatPoints(activeFloor.outline)}
             closed
             fill={colors.paper}
-            stroke={colors.wall}
-            strokeWidth={6}
-            shadowColor="rgba(20, 22, 25, 0.22)"
-            shadowBlur={26}
-            shadowOffsetY={12}
+            stroke="#c9d1cd"
+            strokeWidth={1.4}
+            lineJoin="round"
+            listening={false}
           />
 
           {floorSpaces.map((space) => {
@@ -260,10 +356,29 @@ export default function FloorplanViewer() {
             const bounds = getPolygonBounds(space.polygon);
             const topLeft = toCanvas([bounds.minX, bounds.minY]);
             const spacePois = poisBySpace.get(space.id) ?? [];
+            const primaryPoi = spacePois[0];
+            const category = primaryPoi ? venue.getCategory(primaryPoi.poi.category) : null;
             const selected = state.selectedPOI?.poi?.spaceId === space.id;
             const destination = destinationSpaceId === space.id;
             const clickable = spacePois.length > 0;
-            const compact = bounds.width < 8;
+            const compact = bounds.width < 8 || bounds.depth < 5;
+            const screenWidth = bounds.width * WORLD_SCALE * stageScale;
+            const screenDepth = bounds.depth * WORLD_SCALE * stageScale;
+            const showLabel =
+              space.type === 'corridor'
+                ? screenWidth > 150 && screenDepth > 42
+                : screenWidth > 70 && screenDepth > 48;
+            const labelWidth = Math.max(
+              48,
+              Math.min(230, bounds.width * WORLD_SCALE - (compact ? 10 : 24)),
+            );
+            const label = primaryPoi?.poi.name ?? space.name;
+            const labelFontSize = space.type === 'corridor' ? 15 : compact ? 15 : 19;
+            const roomFill = destination
+              ? '#f9d7ce'
+              : selected
+                ? '#dceee8'
+                : colors.spaces[space.type];
             return (
               <Group
                 key={space.id}
@@ -279,118 +394,194 @@ export default function FloorplanViewer() {
                 <Line
                   points={flatPoints(space.polygon)}
                   closed
-                  fill={colors.spaces[space.type]}
+                  fill={roomFill}
                   stroke={
                     selected
-                      ? '#5b4ee6'
+                      ? '#176b5b'
                       : destination
-                        ? '#16825d'
+                        ? '#df4f31'
                         : space.accessible
                           ? colors.partition
-                          : '#a9651a'
+                          : '#b9782d'
                   }
-                  strokeWidth={selected || destination ? 5 : 2.2}
-                  lineJoin="miter"
+                  strokeWidth={selected || destination ? 4 : 0.8}
+                  lineJoin="round"
                 />
-                <Line
-                  points={[
-                    topLeft[0] + 7,
-                    topLeft[1] + 7,
-                    topLeft[0] + Math.max(20, bounds.width * WORLD_SCALE - 7),
-                    topLeft[1] + 7,
-                  ]}
-                  stroke={SPACE_ACCENTS[space.type]}
-                  strokeWidth={3}
-                  opacity={0.9}
-                  listening={false}
-                />
-                <Text
-                  x={topLeft[0] + 9}
-                  y={topLeft[1] + 13}
-                  text={roomCode(space.id)}
-                  fontFamily="Consolas, monospace"
-                  fontSize={12}
-                  fontStyle="bold"
-                  letterSpacing={1.2}
-                  fill={SPACE_ACCENTS[space.type]}
-                  listening={false}
-                />
-                <Text
-                  x={centre[0] - 90}
-                  y={centre[1] - (space.public ? 8 : 15)}
-                  width={180}
-                  text={space.type === 'corridor' ? space.name.toUpperCase() : space.name}
-                  align="center"
-                  fontFamily="Inter, Segoe UI, sans-serif"
-                  fontSize={space.type === 'corridor' ? 18 : compact ? 17 : 22}
-                  fontStyle={space.type === 'corridor' ? 'bold' : '600'}
-                  letterSpacing={space.type === 'corridor' ? 2.2 : 0}
-                  fill={colors.text}
-                  listening={false}
-                />
-                {space.type === 'vertical-circulation' &&
-                  [0.25, 0.45, 0.65, 0.85].map((offset) => {
-                    const x = topLeft[0] + bounds.width * WORLD_SCALE * offset;
-                    return (
-                      <Line
-                        key={offset}
-                        points={[
-                          x - 18,
-                          topLeft[1] + bounds.depth * WORLD_SCALE - 11,
-                          x + 18,
-                          topLeft[1] + bounds.depth * WORLD_SCALE - 47,
-                        ]}
-                        stroke="#8b8a83"
-                        strokeWidth={1.3}
-                        opacity={0.55}
-                        listening={false}
-                      />
-                    );
-                  })}
-                {!space.public && (
-                  <Text
-                    x={centre[0] - 70}
-                    y={centre[1] + 8}
-                    width={140}
-                    text="STAFF ACCESS"
-                    align="center"
-                    fontSize={12}
-                    fontStyle="bold"
-                    letterSpacing={1.5}
-                    fill="#a44149"
+                {(space.type === 'restricted' || !space.public) && (
+                  <Line
+                    points={flatPoints(space.polygon)}
+                    closed
+                    stroke="#a54b55"
+                    strokeWidth={1.6}
+                    dash={[9, 6]}
+                    opacity={0.52}
+                    lineJoin="round"
                     listening={false}
                   />
+                )}
+                {showLabel && primaryPoi && space.type !== 'corridor' && (
+                  <Group x={centre[0]} y={centre[1] - (space.public ? 13 : 21)} listening={false}>
+                    <Circle
+                      radius={12}
+                      fill={category?.color ?? '#176b5b'}
+                      stroke="#ffffff"
+                      strokeWidth={3}
+                      shadowColor="rgba(23, 33, 31, 0.2)"
+                      shadowBlur={8}
+                      shadowOffsetY={2}
+                    />
+                    <Text
+                      x={-13}
+                      y={-4.5}
+                      width={26}
+                      text={safeCategoryGlyph(category?.icon)}
+                      align="center"
+                      fontFamily="Inter, Segoe UI, sans-serif"
+                      fontSize={8.5}
+                      fontStyle="bold"
+                      fill="#ffffff"
+                    />
+                    <Text
+                      x={-labelWidth / 2}
+                      y={20}
+                      width={labelWidth}
+                      text={label}
+                      align="center"
+                      fontFamily="Inter, Segoe UI, sans-serif"
+                      fontSize={labelFontSize}
+                      fontStyle="600"
+                      lineHeight={1.12}
+                      fill={colors.text}
+                    />
+                  </Group>
+                )}
+                {showLabel && (!primaryPoi || space.type === 'corridor') && (
+                  <Text
+                    x={centre[0] - labelWidth / 2}
+                    y={centre[1] - labelFontSize / 2}
+                    width={labelWidth}
+                    text={space.type === 'corridor' ? space.name.toUpperCase() : label}
+                    align="center"
+                    fontFamily="Inter, Segoe UI, sans-serif"
+                    fontSize={labelFontSize}
+                    fontStyle={space.type === 'corridor' ? 'bold' : '600'}
+                    letterSpacing={space.type === 'corridor' ? 2.4 : 0}
+                    fill={space.type === 'corridor' ? colors.muted : colors.text}
+                    opacity={space.type === 'corridor' ? 0.7 : 1}
+                    listening={false}
+                  />
+                )}
+                {!space.public && (
+                  <Group x={topLeft[0] + 10} y={topLeft[1] + 10} listening={false}>
+                    <Rect
+                      width={70}
+                      height={18}
+                      cornerRadius={6}
+                      fill="rgba(165, 75, 85, 0.1)"
+                    />
+                    <Text
+                      y={5}
+                      width={70}
+                      text="STAFF ONLY"
+                      align="center"
+                      fontSize={8}
+                      fontStyle="bold"
+                      letterSpacing={0.9}
+                      fill="#a54b55"
+                    />
+                  </Group>
                 )}
               </Group>
             );
           })}
 
-          {[...gridLines.vertical, ...gridLines.horizontal].map(([start, end], index) => (
-            <Line
-              key={`grid-${index}`}
-              points={[...start, ...end]}
-              stroke={colors.grid}
-              strokeWidth={1}
-              dash={[3, 9]}
-              opacity={0.6}
-              listening={false}
-            />
-          ))}
+          {cartography.walls
+            .filter((wall) => wall.kind !== 'exterior')
+            .map((wall) => {
+              const start = toCanvas(wall.start);
+              const end = toCanvas(wall.end);
+              return (
+                <Group key={wall.id} listening={false}>
+                  <Line
+                    points={[...start, ...end]}
+                    stroke={colors.wall}
+                    strokeWidth={4.4}
+                    lineCap="square"
+                    lineJoin="miter"
+                  />
+                  <Line
+                    points={[...start, ...end]}
+                    stroke={colors.paper}
+                    strokeWidth={1.25}
+                    lineCap="square"
+                  />
+                  {wall.kind === 'restricted' && (
+                    <Line
+                      points={[...start, ...end]}
+                      stroke="#a54b55"
+                      strokeWidth={1.25}
+                      dash={[7, 6]}
+                      opacity={0.82}
+                    />
+                  )}
+                </Group>
+              );
+            })}
 
-          {floorPortals.map((portal) => {
+          <Line
+            points={flatPoints(activeFloor.outline)}
+            closed
+            stroke={colors.wall}
+            strokeWidth={7}
+            lineJoin="round"
+            listening={false}
+          />
+          <Line
+            points={flatPoints(activeFloor.outline)}
+            closed
+            stroke="#cbd3cf"
+            strokeWidth={1.7}
+            lineJoin="round"
+            listening={false}
+          />
+
+          {cartography.portals.map((portal) => {
             const point = toCanvas(portal.position);
-            const connectedSpace = floorSpaces.find((space) => portal.connects.includes(space.id));
-            const angle = connectedSpace
-              ? (getNearestBoundaryAngle(connectedSpace.polygon, portal.position) * 180) / Math.PI
-              : 0;
+            const angle = (portal.angleRadians * 180) / Math.PI;
             const width = portal.width * WORLD_SCALE;
+            const portalAccent = portal.restricted
+              ? '#a54b55'
+              : portal.accessible
+                ? '#729c91'
+                : '#b9782d';
             return (
-              <Group key={portal.id} x={point[0]} y={point[1]} rotation={angle}>
+              <Group
+                key={portal.id}
+                x={point[0]}
+                y={point[1]}
+                rotation={angle}
+                listening={false}
+              >
                 <Line
                   points={[-width / 2, 0, width / 2, 0]}
                   stroke={colors.paper}
-                  strokeWidth={9}
-                  listening={false}
+                  strokeWidth={10}
+                />
+                <Line
+                  points={[-width / 2, -5, -width / 2, 5]}
+                  stroke={colors.wall}
+                  strokeWidth={2.2}
+                />
+                <Line
+                  points={[width / 2, -5, width / 2, 5]}
+                  stroke={colors.wall}
+                  strokeWidth={2.2}
+                />
+                <Line
+                  points={[-width / 2, 0, width / 2, 0]}
+                  stroke={portalAccent}
+                  strokeWidth={1}
+                  opacity={0.62}
                 />
                 {portal.kind === 'door' && (
                   <>
@@ -398,7 +589,7 @@ export default function FloorplanViewer() {
                       points={[-width / 2, 0, -width / 2, -width * 0.78]}
                       stroke={colors.wall}
                       strokeWidth={2}
-                      listening={false}
+                      lineCap="round"
                     />
                     <Arc
                       x={-width / 2}
@@ -408,28 +599,43 @@ export default function FloorplanViewer() {
                       angle={90}
                       rotation={-90}
                       stroke={colors.partition}
-                      strokeWidth={1}
-                      listening={false}
+                      strokeWidth={1.2}
                     />
                   </>
                 )}
                 {portal.kind === 'opening' && (
                   <Line
                     points={[-width / 2, 0, width / 2, 0]}
-                    stroke="#9a9992"
+                    stroke="#a8b1ad"
                     strokeWidth={1}
                     dash={[4, 5]}
-                    listening={false}
                   />
                 )}
                 {portal.kind === 'gate' && (
-                  <Line
-                    points={[-width / 2, 0, width / 2, 0]}
-                    stroke="#a44149"
-                    strokeWidth={3}
-                    dash={[6, 4]}
-                    listening={false}
-                  />
+                  <>
+                    <Rect
+                      x={-width / 2 - 2.5}
+                      y={-4.5}
+                      width={5}
+                      height={9}
+                      fill={portalAccent}
+                      cornerRadius={1}
+                    />
+                    <Rect
+                      x={width / 2 - 2.5}
+                      y={-4.5}
+                      width={5}
+                      height={9}
+                      fill={portalAccent}
+                      cornerRadius={1}
+                    />
+                    <Line
+                      points={[-width / 2 + 3, 0, width / 2 - 3, 0]}
+                      stroke={portalAccent}
+                      strokeWidth={2.2}
+                      dash={[6, 4]}
+                    />
+                  </>
                 )}
               </Group>
             );
@@ -444,55 +650,36 @@ export default function FloorplanViewer() {
               <Group key={`${from.id}-${to.id}`}>
                 <Line
                   points={[...fromPoint, ...toPoint]}
-                  stroke="#202226"
-                  strokeWidth={14}
+                  stroke="#ffffff"
+                  strokeWidth={13}
                   lineCap="round"
                   lineJoin="round"
+                  shadowColor="rgba(23, 33, 31, 0.28)"
+                  shadowBlur={8}
+                  shadowOffsetY={3}
                 />
                 <Line
                   points={[...fromPoint, ...toPoint]}
-                  stroke="#ff5c39"
+                  stroke="#176b5b"
                   strokeWidth={7}
                   lineCap="round"
                   lineJoin="round"
-                />
-                <Circle
-                  x={fromPoint[0]}
-                  y={fromPoint[1]}
-                  radius={4.5}
-                  fill="#fffaf4"
-                  stroke="#202226"
-                  strokeWidth={2}
                 />
               </Group>
             );
           })}
 
-          {floorConnectorStops.map(({ connector, stop }) => {
+          {cartography.connectorStops.map((stop) => {
             const point = toCanvas(stop.position);
             return (
-              <Group key={connector.id} x={point[0]} y={point[1]} listening={false}>
-                <Rect
-                  x={-16}
-                  y={-16}
-                  width={32}
-                  height={32}
-                  fill="#fbfaf6"
-                  stroke="#555750"
-                  strokeWidth={2}
-                />
-                <Text
-                  x={-16}
-                  y={-6}
-                  width={32}
-                  text={connector.kind === 'elevator' ? 'LIFT' : 'ST'}
-                  align="center"
-                  fontFamily="Consolas, monospace"
-                  fontSize={10}
-                  fontStyle="bold"
-                  fill="#3e403d"
-                />
-              </Group>
+              <CartographicConnectorSymbol
+                key={stop.id}
+                x={point[0]}
+                y={point[1]}
+                kind={stop.kind}
+                accessible={stop.accessible}
+                restricted={stop.restricted}
+              />
             );
           })}
 
@@ -501,13 +688,13 @@ export default function FloorplanViewer() {
             return (
               <Group key={`${run.connectorId}-${activeFloor.id}`} x={point[0]} y={point[1]}>
                 <Circle
-                  radius={23}
-                  fill="rgba(91, 78, 230, 0.08)"
-                  stroke="#5b4ee6"
-                  strokeWidth={3}
-                  dash={[5, 4]}
+                  radius={21}
+                  fill="rgba(23, 107, 91, 0.1)"
+                  stroke="#176b5b"
+                  strokeWidth={2.5}
+                  dash={[4, 4]}
                 />
-                <Circle radius={4} fill="#5b4ee6" />
+                <Circle radius={5} fill="#176b5b" stroke="#ffffff" strokeWidth={2} />
                 <Text
                   x={29}
                   y={-17}
@@ -517,12 +704,14 @@ export default function FloorplanViewer() {
                   lineHeight={1.35}
                   fontStyle="bold"
                   fill={colors.text}
+                  shadowColor="#ffffff"
+                  shadowBlur={3}
                 />
               </Group>
             );
           })}
 
-          {floorPois.map((node) => {
+          {standalonePois.map((node) => {
             const point = toCanvas([node.x, node.y]);
             const category = venue.getCategory(node.poi.category);
             return (
@@ -534,20 +723,35 @@ export default function FloorplanViewer() {
                 onTap={() => actions.selectPOI(node)}
               >
                 <Circle
-                  radius={13}
-                  fill="#fbfaf6"
-                  stroke={category?.color ?? '#5f625e'}
+                  radius={12}
+                  fill={category?.color ?? '#176b5b'}
+                  stroke="#ffffff"
                   strokeWidth={3}
+                  shadowColor="rgba(23, 33, 31, 0.2)"
+                  shadowBlur={7}
+                  shadowOffsetY={2}
                 />
                 <Text
-                  x={-15}
-                  y={-5}
-                  width={30}
-                  text={category?.icon ?? 'P'}
+                  x={-13}
+                  y={-4.5}
+                  width={26}
+                  text={safeCategoryGlyph(category?.icon)}
                   align="center"
-                  fontSize={9}
+                  fontSize={8.5}
                   fontStyle="bold"
-                  fill={category?.color ?? '#5f625e'}
+                  fill="#ffffff"
+                />
+                <Text
+                  x={17}
+                  y={-7}
+                  width={150}
+                  text={node.poi.name}
+                  fontFamily="Inter, Segoe UI, sans-serif"
+                  fontSize={12}
+                  fontStyle="600"
+                  fill={colors.text}
+                  shadowColor="#ffffff"
+                  shadowBlur={3}
                 />
               </Group>
             );
@@ -558,9 +762,40 @@ export default function FloorplanViewer() {
             (() => {
               const point = toCanvas([startNode.x, startNode.y]);
               return (
-                <Group x={point[0]} y={point[1]}>
-                  <Circle radius={17} fill="#ffffff" stroke="#202226" strokeWidth={3} />
-                  <Circle radius={8} fill="#5b4ee6" />
+                <Group x={point[0]} y={point[1]} listening={false}>
+                  <Circle radius={22} fill="rgba(23, 107, 91, 0.16)" />
+                  <Circle
+                    radius={13}
+                    fill="#ffffff"
+                    stroke="#176b5b"
+                    strokeWidth={3}
+                    shadowColor="rgba(23, 33, 31, 0.22)"
+                    shadowBlur={8}
+                    shadowOffsetY={2}
+                  />
+                  <Circle radius={6} fill="#176b5b" />
+                </Group>
+              );
+            })()}
+
+          {destinationNode &&
+            String(destinationNode.floor) === activeFloor.id &&
+            destinationNode.id !== startNode?.id &&
+            (() => {
+              const point = toCanvas([destinationNode.x, destinationNode.y]);
+              return (
+                <Group x={point[0]} y={point[1]} listening={false}>
+                  <Circle radius={20} fill="rgba(237, 91, 58, 0.18)" />
+                  <Circle
+                    radius={13}
+                    fill="#ed5b3a"
+                    stroke="#ffffff"
+                    strokeWidth={3}
+                    shadowColor="rgba(23, 33, 31, 0.24)"
+                    shadowBlur={8}
+                    shadowOffsetY={2}
+                  />
+                  <Circle radius={4} fill="#ffffff" />
                 </Group>
               );
             })()}
@@ -569,7 +804,10 @@ export default function FloorplanViewer() {
 
       <div className="compiled-map-topbar">
         <div className="compiled-floor-switcher" aria-label="Select floor">
-          <Layers size={15} />
+          <span className="compiled-floor-switcher-label">
+            <Layers size={14} />
+            Floors
+          </span>
           {buildingPackage.floors.map((floor) => (
             <button
               key={floor.id}
@@ -577,18 +815,13 @@ export default function FloorplanViewer() {
               className={floor.id === activeFloor.id ? 'active' : ''}
               data-route-floor={routeFloors.includes(floor.id) || undefined}
               aria-pressed={floor.id === activeFloor.id}
+              aria-label={`Show ${floor.name}`}
               onClick={() => resetView(floor.id)}
             >
-              {floor.level === 0 ? 'G' : `L${floor.level}`}
+              <strong>{floor.level === 0 ? 'G' : `L${floor.level}`}</strong>
               <small>{floor.name}</small>
             </button>
           ))}
-        </div>
-        <div className="compiled-map-operations">
-          <div className="compiled-map-proof" title={buildingPackage.manifest.contentHash}>
-            <Database size={14} />
-            <span>Package {buildingPackage.manifest.contentHash.slice(0, 8)}</span>
-          </div>
         </div>
       </div>
 
@@ -636,10 +869,9 @@ export default function FloorplanViewer() {
       )}
 
       <div className="compiled-map-floor-meta">
+        <span className="compiled-map-floor-kicker">You’re viewing</span>
         <strong>{activeFloor.name}</strong>
-        <span>{floorSpaces.length} semantic spaces</span>
-        <span>{floorPortals.length} modeled portals</span>
-        <span>{floorPois.length} public destinations</span>
+        <span>{floorPois.length} destinations</span>
       </div>
 
       <div className="compiled-map-orientation" aria-hidden="true">
@@ -653,15 +885,8 @@ export default function FloorplanViewer() {
           <i className="map-legend-route" /> Route
         </span>
         <span>
-          <DoorOpen size={12} /> Doors + openings
+          <Accessibility size={12} /> Step-free access
         </span>
-        <span>
-          <Accessibility size={12} /> Accessible
-        </span>
-        <span>
-          <LockKeyhole size={12} /> Restricted areas shown
-        </span>
-        <strong>Compiled venue geometry</strong>
       </div>
 
       <div className="compiled-map-zoom">

@@ -1,10 +1,20 @@
 /**
  * Header.jsx
  *
- * Top navigation bar with brand, view toggle, location setter, and floor selector.
+ * Visitor navigation shell with venue context, guidance mode, and preferences.
  */
 
-import { Accessibility, Map, Camera, Sun, Moon, MapPin, Home, Eye, Building2 } from 'lucide-react';
+import {
+  Accessibility,
+  Map,
+  Camera,
+  Sun,
+  Moon,
+  MapPin,
+  Home,
+  Eye,
+  Navigation2,
+} from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
 
 export default function Header() {
@@ -21,44 +31,45 @@ export default function Header() {
     toggleAccessibleRouting,
     venue,
   } = useNavigation();
-  const { activeView, startNodeId } = state;
+  const { activeFloorId, activeView, startNodeId } = state;
 
   const startNode = venue.getNodeById(startNodeId);
-  const locationLabel = startNode?.poi
-    ? `${startNode.poi.name} · ${startNode.poi.floorName}`
-    : 'Set Location';
+  const activeFloor = venue.getFloorById(activeFloorId);
+  const locationLabel = startNode?.poi ? startNode.poi.name : 'Choose a starting point';
 
   return (
-    <header className="app-header" id="app-header">
-      {/* Brand */}
-      <div className="header-brand">
-        <div className="header-logo" aria-hidden="true">
-          <Building2 size={17} strokeWidth={1.8} />
+    <header className="app-header visitor-header" id="app-header">
+      <div className="visitor-brand">
+        <div className="visitor-brand-mark" aria-hidden="true">
+          <Navigation2 size={19} strokeWidth={2} />
         </div>
-        <div>
-          <div className="header-title">{venue.config.name}</div>
-          <div className="header-subtitle">Indoor navigation / simulation package</div>
+        <div className="visitor-brand-copy">
+          <span>Indoor wayfinding</span>
+          <strong>{venue.config.name}</strong>
         </div>
+        {activeFloor && <span className="visitor-floor-context">{activeFloor.name}</span>}
       </div>
 
-      {/* Actions */}
-      <div className="header-actions">
-        {/* Location Button */}
+      <nav className="visitor-header-actions" aria-label="Visitor controls">
         <button
-          className="header-location-btn"
+          className="visitor-location-control"
           onClick={() => setShowLocationPicker(true)}
           id="btn-set-location"
           title="Change your current location"
           aria-label={`Change start location. Current: ${locationLabel}`}
         >
-          <MapPin size={14} />
-          <span className="header-location-text">{locationLabel}</span>
+          <span className="visitor-location-icon" aria-hidden="true">
+            <MapPin size={16} />
+          </span>
+          <span className="visitor-location-copy">
+            <small>Starting at</small>
+            <strong>{locationLabel}</strong>
+          </span>
         </button>
 
-        {/* View Toggle */}
-        <div className="view-toggle" id="view-toggle">
+        <div className="visitor-mode-switch" id="view-toggle" aria-label="Guidance mode">
           <button
-            className={`view-toggle-btn ${activeView === VIEW_TYPE.MAP ? 'active' : ''}`}
+            className={activeView === VIEW_TYPE.MAP ? 'active' : ''}
             onClick={() => actions.setView(VIEW_TYPE.MAP)}
             id="btn-map-view"
             aria-label="Switch to map view"
@@ -68,7 +79,7 @@ export default function Header() {
             Plan
           </button>
           <button
-            className={`view-toggle-btn ${activeView === VIEW_TYPE.CAMERA_PREVIEW ? 'active' : ''}`}
+            className={activeView === VIEW_TYPE.CAMERA_PREVIEW ? 'active' : ''}
             onClick={() => actions.setView(VIEW_TYPE.CAMERA_PREVIEW)}
             id="btn-camera-preview"
             aria-label="Switch to camera preview"
@@ -79,40 +90,8 @@ export default function Header() {
           </button>
         </div>
 
-        {/* Home / Welcome Button */}
         <button
-          className="header-btn"
-          onClick={resetOnboarding}
-          aria-label="Go to Welcome Screen"
-          title="Welcome Screen"
-        >
-          <Home size={18} />
-        </button>
-
-        {/* Theme Toggle */}
-        <button
-          className="header-btn"
-          onClick={toggleTheme}
-          aria-label="Toggle theme"
-          title="Toggle theme"
-        >
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
-
-        {/* High Contrast Toggle */}
-        <button
-          className="header-btn"
-          onClick={toggleHighContrast}
-          aria-label="Toggle high contrast mode"
-          title="Toggle high contrast mode"
-          style={{ color: highContrast ? 'var(--color-accent-blue)' : 'inherit' }}
-        >
-          <Eye size={18} />
-        </button>
-
-        {/* Accessible Routing Toggle */}
-        <button
-          className={`header-route-profile ${accessibleRouting ? 'active' : ''}`}
+          className={`visitor-access-profile ${accessibleRouting ? 'active' : ''}`}
           onClick={toggleAccessibleRouting}
           aria-label={
             accessibleRouting ? 'Use fastest available routing' : 'Use step-free accessible routing'
@@ -123,7 +102,29 @@ export default function Header() {
           <Accessibility size={16} />
           <span>{accessibleRouting ? 'Step-free' : 'Fastest'}</span>
         </button>
-      </div>
+
+        <div className="visitor-utility-actions">
+          <button
+            onClick={toggleHighContrast}
+            aria-label="Toggle high contrast mode"
+            aria-pressed={highContrast}
+            title="High contrast"
+            className={highContrast ? 'active' : ''}
+          >
+            <Eye size={17} />
+          </button>
+          <button onClick={toggleTheme} aria-label="Toggle theme" title="Theme">
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+          <button
+            onClick={resetOnboarding}
+            aria-label="Go to welcome screen"
+            title="Welcome screen"
+          >
+            <Home size={17} />
+          </button>
+        </div>
+      </nav>
     </header>
   );
 }

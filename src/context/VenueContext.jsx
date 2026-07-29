@@ -9,30 +9,42 @@ import {
 } from 'react';
 import { createCompiledBuildingRuntime } from '../data/compiledBuilding';
 import { cacheAndActivateVenuePackage } from '../data/packageCacheRuntime';
-import { loadVenuePackageFromFile, loadVenuePackageFromUrl } from '../data/venuePackageContract';
+import {
+  loadVenuePackageFromFile,
+  loadVenuePackageFromUrl,
+  verifyVenuePackage,
+} from '../data/venuePackageContract';
+import {
+  consumeRuntimeRollback,
+  createRuntimeActivationHistory,
+  recordRuntimeActivation,
+  summarizeRuntimePackage,
+} from '../data/runtimeActivationHistory';
+import { createRuntimeCatalogEntries, parseVenueVersionCatalog } from '../data/venueVersionCatalog';
 
 const VenueContext = createContext(null);
 const CATALOG_URL = '/venues/catalog.json';
 const ACTIVE_VENUE_URL_KEY = 'voicegis_active_venue_url';
 
+function persistRuntimeSource(source) {
+  if (typeof localStorage === 'undefined') return;
+  if (/^(https?:)?\/\//.test(source) || source.startsWith('/')) {
+    localStorage.setItem(ACTIVE_VENUE_URL_KEY, source);
+  } else {
+    localStorage.removeItem(ACTIVE_VENUE_URL_KEY);
+  }
+}
+
 async function loadCatalog() {
   const response = await fetch(CATALOG_URL, { headers: { Accept: 'application/json' } });
   if (!response.ok) throw new Error(`Venue catalog request failed (${response.status}).`);
-  const value = await response.json();
-  if (
-    !value ||
-    value.catalogVersion !== '0.1.0' ||
-    typeof value.defaultVenueId !== 'string' ||
-    !Array.isArray(value.venues)
-  ) {
-    throw new Error('Venue catalog does not match catalogVersion 0.1.0.');
-  }
-  return value;
+  return parseVenueVersionCatalog(await response.json());
 }
 
 export function VenueProvider({ children }) {
   const [venue, setVenue] = useState(null);
   const [catalog, setCatalog] = useState([]);
+  const [versionCatalog, setVersionCatalog] = useState(null);
   const [status, setStatus] = useState({
     state: 'loading',
     source: null,
@@ -46,19 +58,26 @@ export function VenueProvider({ children }) {
     previousHash: null,
     detail: 'No VenuePackage has been activated.',
   });
+  const [rollbackCandidate, setRollbackCandidate] = useState(null);
   const activationSequence = useRef(0);
+  const activationHistory = useRef(createRuntimeActivationHistory());
 
-  const activatePackage = useCallback(async (buildingPackage, source, sequence) => {
+  const activatePackage = useCallback(async (buildingPackage, source, sequence, options = {}) => {
     const cacheStatus = await cacheAndActivateVenuePackage(buildingPackage);
     if (sequence !== activationSequence.current) return null;
 
     const runtime = createCompiledBuildingRuntime(buildingPackage);
+    const nextHistory =
+      options.history ??
+      recordRuntimeActivation(activationHistory.current, { buildingPackage, source });
+    activationHistory.current = nextHistory;
+    setRollbackCandidate(summarizeRuntimePackage(nextHistory.rollback));
     setPackageCacheStatus(cacheStatus);
     setVenue(runtime);
     setStatus({
       state: 'ready',
       source,
-      detail: `${buildingPackage.building.name} is active.`,
+      detail: options.detail ?? `${buildingPackage.building.name} is active.`,
       error: null,
     });
     return runtime;
@@ -79,7 +98,7 @@ export function VenueProvider({ children }) {
         if (sequence !== activationSequence.current) return null;
         const runtime = await activatePackage(buildingPackage, url, sequence);
         if (runtime && options.persist !== false && typeof localStorage !== 'undefined') {
-          localStorage.setItem(ACTIVE_VENUE_URL_KEY, url);
+          persistRuntimeSource(url);
         }
         return runtime;
       } catch (error) {
@@ -113,7 +132,9 @@ export function VenueProvider({ children }) {
       try {
         const buildingPackage = await loadVenuePackageFromFile(file);
         if (sequence !== activationSequence.current) return null;
-        return await activatePackage(buildingPackage, source, sequence);
+        const runtime = await activatePackage(buildingPackage, source, sequence);
+        if (runtime) persistRuntimeSource(source);
+        return runtime;
       } catch (error) {
         if (sequence !== activationSequence.current) return null;
         setStatus((current) => ({
@@ -131,16 +152,95 @@ export function VenueProvider({ children }) {
     [activatePackage],
   );
 
+  const activateVerifiedPackage = useCallback(
+    async (candidatePackage, sourceLabel = 'studio:compiled-preview') => {
+      const sequence = ++activationSequence.current;
+      setStatus((current) => ({
+        ...current,
+        state: current.state === 'ready' ? 'switching' : 'loading',
+        source: sourceLabel,
+        detail: 'Verifying the compiled package before runtime activation.',
+        error: null,
+      }));
+      try {
+        const buildingPackage = await verifyVenuePackage(candidatePackage);
+        if (sequence !== activationSequence.current) return null;
+        const source = `${sourceLabel}:${buildingPackage.manifest.contentHash}`;
+        const runtime = await activatePackage(buildingPackage, source, sequence, {
+          detail: `${buildingPackage.building.name} was activated from a verified Studio preview.`,
+        });
+        if (runtime) persistRuntimeSource(source);
+        return runtime;
+      } catch (error) {
+        if (sequence !== activationSequence.current) return null;
+        setStatus((current) => ({
+          ...current,
+          state: current.state === 'switching' || current.state === 'ready' ? 'ready' : 'error',
+          detail:
+            current.state === 'switching' || current.state === 'ready'
+              ? 'Studio activation rejected; the current venue remains active.'
+              : 'No VenuePackage could be activated.',
+          error: error instanceof Error ? error.message : 'Studio activation failed.',
+        }));
+        throw error;
+      }
+    },
+    [activatePackage],
+  );
+
+  const rollbackRuntimePackage = useCallback(async () => {
+    const rollbackHistory = consumeRuntimeRollback(activationHistory.current);
+    const candidate = rollbackHistory.active;
+    if (!candidate) throw new Error('No previous runtime package is available.');
+
+    const sequence = ++activationSequence.current;
+    setStatus((current) => ({
+      ...current,
+      state: current.state === 'ready' ? 'switching' : 'loading',
+      source: candidate.source,
+      detail: 'Re-verifying the previous package before rollback.',
+      error: null,
+    }));
+    try {
+      const buildingPackage = await verifyVenuePackage(candidate.buildingPackage);
+      if (sequence !== activationSequence.current) return null;
+      const verifiedHistory = {
+        active: { ...candidate, buildingPackage },
+        rollback: null,
+      };
+      const runtime = await activatePackage(buildingPackage, candidate.source, sequence, {
+        history: verifiedHistory,
+        detail: `${buildingPackage.building.name} was restored from the rollback package.`,
+      });
+      if (runtime) persistRuntimeSource(candidate.source);
+      return runtime;
+    } catch (error) {
+      if (sequence !== activationSequence.current) return null;
+      setStatus((current) => ({
+        ...current,
+        state: current.state === 'switching' || current.state === 'ready' ? 'ready' : 'error',
+        detail:
+          current.state === 'switching' || current.state === 'ready'
+            ? 'Rollback rejected; the current venue remains active.'
+            : 'No VenuePackage could be activated.',
+        error: error instanceof Error ? error.message : 'VenuePackage rollback failed.',
+      }));
+      throw error;
+    }
+  }, [activatePackage]);
+
   useEffect(() => {
     let mounted = true;
     void (async () => {
       try {
         const nextCatalog = await loadCatalog();
         if (!mounted) return;
-        setCatalog(nextCatalog.venues);
+        const runtimeCatalog = createRuntimeCatalogEntries(nextCatalog);
+        setVersionCatalog(nextCatalog);
+        setCatalog(runtimeCatalog);
         const queryVenueUrl = new URLSearchParams(window.location.search).get('venue');
         const storedVenueUrl = localStorage.getItem(ACTIVE_VENUE_URL_KEY);
-        const defaultVenue = nextCatalog.venues.find(
+        const defaultVenue = runtimeCatalog.find(
           (candidate) => candidate.id === nextCatalog.defaultVenueId,
         );
         const packageUrl = queryVenueUrl || storedVenueUrl || defaultVenue?.packageUrl;
@@ -166,12 +266,27 @@ export function VenueProvider({ children }) {
     () => ({
       venue,
       catalog,
+      versionCatalog,
       status,
       packageCacheStatus,
+      rollbackCandidate,
       activateFromUrl,
       activateFromFile,
+      activateVerifiedPackage,
+      rollbackRuntimePackage,
     }),
-    [activateFromFile, activateFromUrl, catalog, packageCacheStatus, status, venue],
+    [
+      activateFromFile,
+      activateFromUrl,
+      activateVerifiedPackage,
+      catalog,
+      packageCacheStatus,
+      rollbackCandidate,
+      rollbackRuntimePackage,
+      status,
+      venue,
+      versionCatalog,
+    ],
   );
 
   return <VenueContext.Provider value={value}>{children}</VenueContext.Provider>;

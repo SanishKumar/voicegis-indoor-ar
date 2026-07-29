@@ -19,8 +19,8 @@ import {
   Navigation,
   Building2,
   Footprints,
-  FileCheck2,
   AlertTriangle,
+  List,
 } from 'lucide-react';
 import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
@@ -63,61 +63,6 @@ function StepIcon({ type, size = 20 }) {
   }
 }
 
-function RouteReceiptDetails({ receipt, venue }) {
-  if (!receipt) return null;
-  const connectorLabel =
-    receipt.selectedConnectors.length > 0
-      ? receipt.selectedConnectors
-          .map((connector) => {
-            const source = venue.buildingPackage.verticalConnectors.find(
-              (candidate) => candidate.id === connector.sourceId,
-            );
-            return `${source?.name ?? connector.sourceId}: ${shortFloorLabel(
-              venue,
-              connector.fromFloorId,
-            )} → ${shortFloorLabel(venue, connector.toFloorId)}`;
-          })
-          .join(', ')
-      : 'No vertical connector';
-  const closureLabel =
-    receipt.appliedClosureIds.length > 0 ? receipt.appliedClosureIds.join(', ') : 'None';
-
-  return (
-    <details className="route-receipt">
-      <summary>
-        <FileCheck2 size={14} />
-        Route receipt
-        <code>{receipt.packageHash.slice(0, 8)}</code>
-      </summary>
-      <dl>
-        <div>
-          <dt>Profile</dt>
-          <dd>{receipt.profile}</dd>
-        </div>
-        <div>
-          <dt>Status</dt>
-          <dd>{receipt.status}</dd>
-        </div>
-        <div>
-          <dt>Connector</dt>
-          <dd>{connectorLabel}</dd>
-        </div>
-        <div>
-          <dt>Closures</dt>
-          <dd>{closureLabel}</dd>
-        </div>
-        <div>
-          <dt>Excluded edges</dt>
-          <dd>
-            {receipt.excludedEdges.restricted} restricted · {receipt.excludedEdges.inaccessible}{' '}
-            inaccessible · {receipt.excludedEdges.closed} closed
-          </dd>
-        </div>
-      </dl>
-    </details>
-  );
-}
-
 export default function NavigationPanel() {
   const { state, actions, venue } = useNavigation();
   const { route, navStatus, currentStepIndex, destinationNodeId } = state;
@@ -148,7 +93,6 @@ export default function NavigationPanel() {
             <X size={12} /> Dismiss
           </button>
         </div>
-        <RouteReceiptDetails receipt={route.receipt} venue={venue} />
       </div>
     );
   }
@@ -221,8 +165,6 @@ export default function NavigationPanel() {
         <strong>{journeyLabel}</strong>
       </div>
 
-      <RouteReceiptDetails receipt={route.receipt} venue={venue} />
-
       {/* Current Step (Hero) */}
       {currentStep && !isArrived && (
         <div className="nav-current-step animate-slide-down" id="current-step" aria-live="polite">
@@ -292,30 +234,36 @@ export default function NavigationPanel() {
         </div>
       )}
 
-      {/* Steps List */}
-      <div className="nav-steps-list" id="nav-steps-list" role="list">
-        {steps.map((step, i) => {
-          let itemClass = 'nav-step-item';
-          if (i < currentStepIndex) itemClass += ' completed';
-          if (i === currentStepIndex) itemClass += ' active';
+      <details className="nav-all-steps">
+        <summary>
+          <List size={15} />
+          View all directions
+          <span>{steps.length} steps</span>
+        </summary>
+        <div className="nav-steps-list" id="nav-steps-list" role="list">
+          {steps.map((step, i) => {
+            let itemClass = 'nav-step-item';
+            if (i < currentStepIndex) itemClass += ' completed';
+            if (i === currentStepIndex) itemClass += ' active';
 
-          return (
-            <div key={i} className={itemClass} role="listitem">
-              <div className="nav-step-num" aria-hidden="true">
-                {i < currentStepIndex ? '✓' : i + 1}
+            return (
+              <div key={i} className={itemClass} role="listitem">
+                <div className="nav-step-num" aria-hidden="true">
+                  {i < currentStepIndex ? '✓' : i + 1}
+                </div>
+                <div className="nav-step-text">
+                  {step.instruction}
+                  {step.distance > 0 && (
+                    <span style={{ color: 'var(--color-text-muted)', marginLeft: '8px' }}>
+                      ({formatDistance(step.distance)})
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="nav-step-text">
-                {step.instruction}
-                {step.distance > 0 && (
-                  <span style={{ color: 'var(--color-text-muted)', marginLeft: '8px' }}>
-                    ({formatDistance(step.distance)})
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      </details>
     </div>
   );
 }
