@@ -17,6 +17,7 @@ import {
 } from '@voicegis/spatial-schema';
 
 export const DXF_IMPORT_PROFILE_VERSION = '0.1.0' as const;
+export const DXF_LAYER_MAPPING_PROFILE_VERSION = '0.1.0' as const;
 
 export type DxfImportIssueSeverity = 'error' | 'warning';
 
@@ -54,6 +55,37 @@ export interface DxfImportResult {
   source: BuildingSource | null;
   issues: DxfImportIssue[];
   stats: DxfImportStats;
+}
+
+export interface DxfLayerSummary {
+  name: string;
+  entityCount: number;
+  entityTypes: string[];
+  closedLightweightPolylines: number;
+}
+
+export interface DxfInspectionResult {
+  valid: boolean;
+  detectedUnits: string | null;
+  layers: DxfLayerSummary[];
+  issues: DxfImportIssue[];
+}
+
+export interface DxfLayerMapping {
+  sourceLayer: string;
+  targetLayer: string;
+}
+
+export interface DxfLayerMappingProfile {
+  profileVersion: typeof DXF_LAYER_MAPPING_PROFILE_VERSION;
+  mappings: DxfLayerMapping[];
+}
+
+export interface DxfLayerMappingApplication {
+  valid: boolean;
+  text: string | null;
+  inspection: DxfInspectionResult;
+  issues: DxfImportIssue[];
 }
 
 interface DxfPair {
@@ -185,6 +217,29 @@ function sectionPairs(pairs: DxfPair[], sectionName: string) {
     }
   }
   return null;
+}
+
+function detectUnit(pairs: DxfPair[], issues: DxfImportIssue[]) {
+  const header = sectionPairs(pairs, 'HEADER');
+  const unitsMarker = header?.findIndex(
+    (pair) => pair.code === 9 && pair.value.toUpperCase() === '$INSUNITS',
+  );
+  const unitsCodePair =
+    unitsMarker === undefined || unitsMarker < 0
+      ? undefined
+      : header?.slice(unitsMarker + 1).find((pair) => pair.code === 70);
+  const unitsCode = unitsCodePair ? Number(unitsCodePair.value) : Number.NaN;
+  const unit = UNIT_BY_INSUNITS.get(unitsCode) ?? null;
+  if (!unit) {
+    issue(
+      issues,
+      'error',
+      'unsupported-or-missing-units',
+      '/header/$INSUNITS',
+      'Declare $INSUNITS as inches, feet, millimeters, centimeters, or meters.',
+    );
+  }
+  return unit;
 }
 
 function parseEntities(pairs: DxfPair[], issues: DxfImportIssue[]) {
@@ -527,25 +582,7 @@ export function importAnnotatedDxf(text: string, options: DxfImportOptions = {})
   const issues: DxfImportIssue[] = [];
   const stats = emptyStats();
   const pairs = parsePairs(text, issues);
-  const header = sectionPairs(pairs, 'HEADER');
-  const unitsMarker = header?.findIndex(
-    (pair) => pair.code === 9 && pair.value.toUpperCase() === '$INSUNITS',
-  );
-  const unitsCodePair =
-    unitsMarker === undefined || unitsMarker < 0
-      ? undefined
-      : header?.slice(unitsMarker + 1).find((pair) => pair.code === 70);
-  const unitsCode = unitsCodePair ? Number(unitsCodePair.value) : Number.NaN;
-  const unit = UNIT_BY_INSUNITS.get(unitsCode);
-  if (!unit) {
-    issue(
-      issues,
-      'error',
-      'unsupported-or-missing-units',
-      '/header/$INSUNITS',
-      'Declare $INSUNITS as inches, feet, millimeters, centimeters, or meters.',
-    );
-  }
+  const unit = detectUnit(pairs, issues);
 
   const entities = parseEntities(pairs, issues);
   stats.parsedEntities = entities.length;
@@ -1023,5 +1060,174 @@ export function importAnnotatedDxf(text: string, options: DxfImportOptions = {})
     source,
     issues: finalIssues,
     stats,
+  };
+}
+
+/** Reads DXF structure without assigning any venue semantics. */
+export function inspectDxfLayers(text: string): DxfInspectionResult {
+  const issues: DxfImportIssue[] = [];
+  const pairs = parsePairs(text, issues);
+  const unit = detectUnit(pairs, issues);
+  const entities = parseEntities(pairs, issues);
+  const layerState = new Map<
+    string,
+    { entityCount: number; entityTypes: Set<string>; closedLightweightPolylines: number }
+  >();
+
+  for (const entity of entities) {
+    const layer = firstValue(entity, 8);
+    if (!layer) {
+      issue(
+        issues,
+        'warning',
+        'unlayered-entity',
+        `/entities/${entity.index}`,
+        `Entity ${entity.index} has no layer and cannot be mapped.`,
+      );
+      continue;
+    }
+    const current = layerState.get(layer) ?? {
+      entityCount: 0,
+      entityTypes: new Set<string>(),
+      closedLightweightPolylines: 0,
+    };
+    current.entityCount += 1;
+    current.entityTypes.add(entity.type);
+    if (entity.type === 'LWPOLYLINE' && (Number(firstValue(entity, 70) ?? 0) & 1) === 1) {
+      current.closedLightweightPolylines += 1;
+    }
+    layerState.set(layer, current);
+  }
+
+  const layers = [...layerState.entries()]
+    .map(([name, state]) => ({
+      name,
+      entityCount: state.entityCount,
+      entityTypes: [...state.entityTypes].sort((a, b) => a.localeCompare(b)),
+      closedLightweightPolylines: state.closedLightweightPolylines,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  if (layers.length === 0) {
+    issue(issues, 'error', 'no-mappable-layers', '/entities', 'DXF contains no named layers.');
+  }
+
+  const finalIssues = sortedIssues(issues);
+  return {
+    valid: finalIssues.every((entry) => entry.severity !== 'error'),
+    detectedUnits: unit?.name ?? null,
+    layers,
+    issues: finalIssues,
+  };
+}
+
+/**
+ * Applies an explicit floor/space layer profile without interpreting layer
+ * names. Later slices can add more roles while preserving this profile boundary.
+ */
+export function applyDxfLayerMapping(
+  text: string,
+  profile: DxfLayerMappingProfile,
+): DxfLayerMappingApplication {
+  const inspection = inspectDxfLayers(text);
+  const issues = [...inspection.issues];
+  if (profile.profileVersion !== DXF_LAYER_MAPPING_PROFILE_VERSION) {
+    issue(
+      issues,
+      'error',
+      'unsupported-mapping-profile',
+      '/profileVersion',
+      `Expected DXF layer mapping profile ${DXF_LAYER_MAPPING_PROFILE_VERSION}.`,
+    );
+  }
+  if (profile.mappings.length === 0) {
+    issue(issues, 'error', 'empty-layer-mapping', '/mappings', 'Map at least one DXF layer.');
+  }
+
+  const layerByName = new Map(inspection.layers.map((layer) => [layer.name, layer]));
+  const seenSources = new Set<string>();
+  const seenTargets = new Set<string>();
+  const mappingBySource = new Map<string, string>();
+  for (const [index, mapping] of profile.mappings.entries()) {
+    const path = `/mappings/${index}`;
+    if (seenSources.has(mapping.sourceLayer)) {
+      issue(
+        issues,
+        'error',
+        'duplicate-source-layer',
+        `${path}/sourceLayer`,
+        `Layer "${mapping.sourceLayer}" is mapped more than once.`,
+      );
+    }
+    if (seenTargets.has(mapping.targetLayer)) {
+      issue(
+        issues,
+        'error',
+        'duplicate-target-layer',
+        `${path}/targetLayer`,
+        'Every floor or space must have its own semantic target layer.',
+      );
+    }
+    seenSources.add(mapping.sourceLayer);
+    seenTargets.add(mapping.targetLayer);
+
+    const layer = layerByName.get(mapping.sourceLayer);
+    if (!layer) {
+      issue(
+        issues,
+        'error',
+        'unknown-source-layer',
+        `${path}/sourceLayer`,
+        `DXF layer "${mapping.sourceLayer}" does not exist.`,
+      );
+      continue;
+    }
+    if (
+      !mapping.targetLayer.startsWith('VG$FLOOR$') &&
+      !mapping.targetLayer.startsWith('VG$SPACE$')
+    ) {
+      issue(
+        issues,
+        'error',
+        'unsupported-mapping-role',
+        `${path}/targetLayer`,
+        'CAD Mapping Workspace v0 Slice 1 supports floor and space targets only.',
+      );
+    }
+    if (
+      layer.entityCount !== 1 ||
+      layer.closedLightweightPolylines !== 1 ||
+      layer.entityTypes.length !== 1 ||
+      layer.entityTypes[0] !== 'LWPOLYLINE'
+    ) {
+      issue(
+        issues,
+        'error',
+        'layer-not-single-closed-polyline',
+        `${path}/sourceLayer`,
+        `Layer "${mapping.sourceLayer}" must contain exactly one closed LWPOLYLINE in this slice.`,
+      );
+    }
+    mappingBySource.set(mapping.sourceLayer, mapping.targetLayer);
+  }
+
+  const finalIssues = sortedIssues(issues);
+  if (finalIssues.some((entry) => entry.severity === 'error')) {
+    return { valid: false, text: null, inspection, issues: finalIssues };
+  }
+
+  const parseIssues: DxfImportIssue[] = [];
+  const pairs = parsePairs(text, parseIssues);
+  const mappedText = `${pairs
+    .map((pair) => {
+      const value = pair.code === 8 ? (mappingBySource.get(pair.value) ?? pair.value) : pair.value;
+      return `${pair.code}\n${value}`;
+    })
+    .join('\n')}\n`;
+  const outputIssues = sortedIssues([...finalIssues, ...parseIssues]);
+  return {
+    valid: outputIssues.every((entry) => entry.severity !== 'error'),
+    text: outputIssues.some((entry) => entry.severity === 'error') ? null : mappedText,
+    inspection,
+    issues: outputIssues,
   };
 }

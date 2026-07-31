@@ -22,6 +22,11 @@ import {
   compileBuildingInBrowser,
   type BrowserCompilationResult,
 } from '@voicegis/map-compiler/browser';
+import {
+  inspectDxfLayers,
+  type DxfInspectionResult,
+  type DxfLayerMappingProfile,
+} from '@voicegis/dxf-importer';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { useVenue } from '../context/VenueContext.jsx';
 import {
@@ -29,7 +34,12 @@ import {
   sourceFromVenuePackage,
   validateBuildingSourceDraft,
 } from '../studio/buildingSourceWorkspace';
-import { stageDxfImport, type StudioDxfImportReport } from '../studio/dxfImportWorkspace';
+import {
+  stageDxfImport,
+  stageMappedDxfImport,
+  type StudioDxfImportOutcome,
+  type StudioDxfImportReport,
+} from '../studio/dxfImportWorkspace';
 import {
   createVenuePackageArtifact,
   formatArtifactSize,
@@ -40,6 +50,7 @@ import type { RuntimePackageSummary } from '../data/runtimeActivationHistory';
 import type { VenueVersionCatalog } from '../data/venueVersionCatalog';
 import type { BuildingSource } from '@voicegis/spatial-schema';
 import BuildingSourceFloorCanvas from './BuildingSourceFloorCanvas';
+import DxfLayerMappingPanel from './DxfLayerMappingPanel';
 import VenuePublishDryRunPanel from './VenuePublishDryRunPanel';
 import VenueVersionCatalogPanel from './VenueVersionCatalogPanel';
 
@@ -97,6 +108,11 @@ export default function BuildingSourceWorkspace() {
   const [visualHistory, setVisualHistory] = useState<string[]>([]);
   const [fileMessage, setFileMessage] = useState<string | null>(null);
   const [dxfImportReport, setDxfImportReport] = useState<StudioDxfImportReport | null>(null);
+  const [dxfMappingSession, setDxfMappingSession] = useState<{
+    fileName: string;
+    text: string;
+    inspection: DxfInspectionResult;
+  } | null>(null);
   const [compiling, setCompiling] = useState(false);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -124,6 +140,7 @@ export default function BuildingSourceWorkspace() {
     setDraftName(`${venue.buildingPackage.building.id}.json`);
     setFileMessage(null);
     setDxfImportReport(null);
+    setDxfMappingSession(null);
     setCompileError(null);
     setCompilePreview(null);
     setRuntimeError(null);
@@ -136,6 +153,7 @@ export default function BuildingSourceWorkspace() {
       setDraftText(`${JSON.stringify(JSON.parse(draftText), null, 2)}\n`);
       setFileMessage(null);
       setDxfImportReport(null);
+      setDxfMappingSession(null);
       setActivationArmed(false);
       setVisualHistory([]);
     } catch {
@@ -150,6 +168,7 @@ export default function BuildingSourceWorkspace() {
       setDraftName(file.name);
       setFileMessage(null);
       setDxfImportReport(null);
+      setDxfMappingSession(null);
       setCompileError(null);
       setCompilePreview(null);
       setRuntimeError(null);
@@ -163,29 +182,52 @@ export default function BuildingSourceWorkspace() {
     }
   };
 
+  const applyDxfOutcome = (outcome: StudioDxfImportOutcome, fileName: string) => {
+    setDxfImportReport(outcome.report);
+    setDxfMappingSession(null);
+    if (!outcome.report.accepted || !outcome.draftName) {
+      setFileMessage(`${fileName} was rejected; the current draft was preserved.`);
+      return;
+    }
+    setDraftText(outcome.draftText);
+    setDraftName(outcome.draftName);
+    setFileMessage(`${fileName} imported as a validated BuildingSource draft.`);
+    setCompileError(null);
+    setCompilePreview(null);
+    setRuntimeError(null);
+    setActivationArmed(false);
+    setVisualHistory([]);
+    setEditorMode('visual');
+  };
+
   const importDxf = async (file: File | undefined) => {
     if (!file) return;
     try {
-      const outcome = stageDxfImport(await file.text(), file.name, draftText);
-      setDxfImportReport(outcome.report);
-      if (!outcome.report.accepted || !outcome.draftName) {
-        setFileMessage(`${file.name} was rejected; the current draft was preserved.`);
+      const text = await file.text();
+      const inspection = inspectDxfLayers(text);
+      if (inspection.valid && !inspection.layers.some((layer) => layer.name.startsWith('VG$'))) {
+        setDxfMappingSession({ fileName: file.name, text, inspection });
+        setDxfImportReport(null);
+        setFileMessage(`${file.name} is ready for explicit layer mapping.`);
         return;
       }
-      setDraftText(outcome.draftText);
-      setDraftName(outcome.draftName);
-      setFileMessage(`${file.name} imported as a validated BuildingSource draft.`);
-      setCompileError(null);
-      setCompilePreview(null);
-      setRuntimeError(null);
-      setActivationArmed(false);
-      setVisualHistory([]);
-      setEditorMode('visual');
+      applyDxfOutcome(stageDxfImport(text, file.name, draftText), file.name);
     } catch {
       setFileMessage(`Could not read ${file.name}; the current draft was preserved.`);
     } finally {
       if (dxfInputRef.current) dxfInputRef.current.value = '';
     }
+  };
+
+  const stageMappedDxf = (profile: DxfLayerMappingProfile) => {
+    if (!dxfMappingSession) return;
+    const outcome = stageMappedDxfImport(
+      dxfMappingSession.text,
+      dxfMappingSession.fileName,
+      draftText,
+      profile,
+    );
+    applyDxfOutcome(outcome, dxfMappingSession.fileName);
   };
 
   const beginVisualEdit = () => {
@@ -266,9 +308,9 @@ export default function BuildingSourceWorkspace() {
     <main className="studio-surface" id="main-content">
       <header className="studio-header">
         <div className="studio-heading">
-          <span>Venue Studio · DXF Importer v0</span>
+          <span>Venue Studio · CAD Mapping v0</span>
           <h1>BuildingSource workspace</h1>
-          <p>Import an explicitly annotated floor plan into the deterministic venue pipeline.</p>
+          <p>Review ordinary DXF layers before they enter the deterministic venue pipeline.</p>
         </div>
         <div className="studio-boundary-note">
           <ShieldCheck size={17} />
@@ -282,7 +324,10 @@ export default function BuildingSourceWorkspace() {
       </header>
 
       <div className="studio-workspace">
-        <section className="studio-editor-panel" aria-label="BuildingSource JSON editor">
+        <section
+          className={`studio-editor-panel ${dxfMappingSession ? 'mapping-open' : ''}`}
+          aria-label="BuildingSource JSON editor"
+        >
           <div className="studio-panel-toolbar">
             <div className="studio-file-identity">
               <FileJson size={18} />
@@ -306,7 +351,7 @@ export default function BuildingSourceWorkspace() {
                 type="file"
                 accept=".dxf,application/dxf,application/x-dxf"
                 onChange={(event) => void importDxf(event.target.files?.[0])}
-                aria-label="Import annotated ASCII DXF"
+                aria-label="Inspect or import ASCII DXF"
               />
               <button type="button" onClick={() => dxfInputRef.current?.click()}>
                 <Upload size={14} />
@@ -326,6 +371,19 @@ export default function BuildingSourceWorkspace() {
               </button>
             </div>
           </div>
+
+          {dxfMappingSession && (
+            <DxfLayerMappingPanel
+              key={dxfMappingSession.fileName}
+              fileName={dxfMappingSession.fileName}
+              inspection={dxfMappingSession.inspection}
+              onCancel={() => {
+                setDxfMappingSession(null);
+                setFileMessage(null);
+              }}
+              onStage={stageMappedDxf}
+            />
+          )}
 
           {dxfImportReport && (
             <section
@@ -460,7 +518,13 @@ export default function BuildingSourceWorkspace() {
             <div className="active">
               <span>01</span>
               <strong>Importer</strong>
-              <small>{dxfImportReport?.accepted ? 'DXF import staged' : 'DXF v0 ready'}</small>
+              <small>
+                {dxfImportReport?.accepted
+                  ? 'DXF import staged'
+                  : dxfMappingSession
+                    ? 'Layer mapping open'
+                    : 'CAD mapping ready'}
+              </small>
             </div>
             <div className="active">
               <span>02</span>

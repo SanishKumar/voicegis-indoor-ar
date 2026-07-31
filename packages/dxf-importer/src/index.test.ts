@@ -1,10 +1,34 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { compileBuilding } from '@voicegis/map-compiler';
-import { importAnnotatedDxf } from './index';
+import {
+  DXF_LAYER_MAPPING_PROFILE_VERSION,
+  applyDxfLayerMapping,
+  importAnnotatedDxf,
+  inspectDxfLayers,
+  type DxfLayerMappingProfile,
+} from './index';
 
 const fixtureUrl = new URL('../../../buildings/import-fixtures/atrium-dxf-v0.dxf', import.meta.url);
 const fixture = readFileSync(fixtureUrl, 'utf8');
+const unannotatedFixture = readFileSync(
+  new URL('../../../buildings/import-fixtures/unannotated-lobby-v0.dxf', import.meta.url),
+  'utf8',
+);
+
+const unannotatedProfile: DxfLayerMappingProfile = {
+  profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+  mappings: [
+    {
+      sourceLayer: 'A-FLOOR-OUTLINE',
+      targetLayer: 'VG$FLOOR$g$0$0$3.2$Ground%20Floor',
+    },
+    {
+      sourceLayer: 'A-SPACE-ENTRY',
+      targetLayer: 'VG$SPACE$g$entry$entrance$true$true$Entry%20Lobby',
+    },
+  ],
+};
 
 function reorderEntities(text: string) {
   const marker = '0\nSECTION\n2\nENTITIES\n';
@@ -175,6 +199,86 @@ describe('annotated DXF importer v0', () => {
     expect(imported.source).toBeNull();
     expect(imported.issues).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'invalid-floor-entity' })]),
+    );
+  });
+});
+
+describe('DXF layer mapping profile v0', () => {
+  it('inventories ordinary CAD layers without assigning semantics', () => {
+    const inspected = inspectDxfLayers(unannotatedFixture);
+
+    expect(inspected.valid).toBe(true);
+    expect(inspected.detectedUnits).toBe('meters');
+    expect(inspected.layers).toEqual([
+      {
+        name: 'A-ANNOTATION',
+        entityCount: 1,
+        entityTypes: ['TEXT'],
+        closedLightweightPolylines: 0,
+      },
+      {
+        name: 'A-FLOOR-OUTLINE',
+        entityCount: 1,
+        entityTypes: ['LWPOLYLINE'],
+        closedLightweightPolylines: 1,
+      },
+      {
+        name: 'A-SPACE-ENTRY',
+        entityCount: 1,
+        entityTypes: ['LWPOLYLINE'],
+        closedLightweightPolylines: 1,
+      },
+    ]);
+  });
+
+  it('maps explicitly selected floor and space layers through the existing compiler', () => {
+    const mapped = applyDxfLayerMapping(unannotatedFixture, unannotatedProfile);
+
+    expect(mapped.valid).toBe(true);
+    expect(mapped.text).not.toBeNull();
+    const imported = importAnnotatedDxf(mapped.text!, { fileName: 'unannotated-lobby-v0.dxf' });
+    expect(imported.source).toMatchObject({
+      building: { id: 'unannotated-lobby-v0', entrySpaceId: 'entry' },
+      floors: [{ id: 'g' }],
+      spaces: [{ id: 'entry', accessible: true }],
+    });
+    expect(compileBuilding(imported.source).report.valid).toBe(true);
+  });
+
+  it('keeps package identity stable when mapping order changes', () => {
+    const first = applyDxfLayerMapping(unannotatedFixture, unannotatedProfile);
+    const second = applyDxfLayerMapping(unannotatedFixture, {
+      ...unannotatedProfile,
+      mappings: [...unannotatedProfile.mappings].reverse(),
+    });
+    const firstSource = importAnnotatedDxf(first.text!, {
+      fileName: 'unannotated-lobby-v0.dxf',
+    }).source;
+    const secondSource = importAnnotatedDxf(second.text!, {
+      fileName: 'unannotated-lobby-v0.dxf',
+    }).source;
+
+    expect(secondSource).toEqual(firstSource);
+    expect(compileBuilding(secondSource).package?.manifest.contentHash).toBe(
+      compileBuilding(firstSource).package?.manifest.contentHash,
+    );
+  });
+
+  it('rejects unsupported semantic roles before rewriting the drawing', () => {
+    const mapped = applyDxfLayerMapping(unannotatedFixture, {
+      profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+      mappings: [
+        {
+          sourceLayer: 'A-FLOOR-OUTLINE',
+          targetLayer: 'VG$PORTAL$g$p1$opening$a$b$true$false',
+        },
+      ],
+    });
+
+    expect(mapped.valid).toBe(false);
+    expect(mapped.text).toBeNull();
+    expect(mapped.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'unsupported-mapping-role' })]),
     );
   });
 });

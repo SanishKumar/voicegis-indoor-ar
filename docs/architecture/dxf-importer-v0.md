@@ -79,3 +79,7 @@ exercise the browser path.
 
 Those capabilities should extend this ingestion boundary rather than bypass the
 canonical source or deterministic compiler.
+
+The next implemented layer is the human-reviewed
+[CAD Layer Mapping Workspace v0](cad-layer-mapping-v0.md), which maps ordinary
+DXF floor and space layers into this annotated profile without guessing.
