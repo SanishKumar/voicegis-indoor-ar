@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { PortalSource, SpaceSource } from '@voicegis/spatial-schema';
 import { ASTERION_PACKAGE, HARBOR_PACKAGE } from '../test/venueFixtures';
-import { deriveCartographicWalls, deriveFloorplanCartography } from './floorplanCartography';
+import {
+  createCartographicProjection,
+  deriveCartographicExtrusionFaces,
+  deriveCartographicWalls,
+  deriveFloorplanCartography,
+  getCartographicBounds,
+  placeCartographicLabels,
+  projectCartographicPoint,
+  projectCartographicPortalFrame,
+} from './floorplanCartography';
 
 const leftRoom: SpaceSource = {
   id: 'left-room',
@@ -59,8 +68,9 @@ describe('floorplan cartography derivation', () => {
 
     expect(sharedPartitionRuns).toHaveLength(2);
     expect(sharedPartitionRuns.reduce((sum, wall) => sum + wall.length, 0)).toBeCloseTo(3, 6);
-    expect(sharedPartitionRuns.every((wall) => wall.spaceIds.join(',') === 'left-room,right-room'))
-      .toBe(true);
+    expect(
+      sharedPartitionRuns.every((wall) => wall.spaceIds.join(',') === 'left-room,right-room'),
+    ).toBe(true);
   });
 
   it('is deterministic when source arrays arrive in a different order', () => {
@@ -100,5 +110,65 @@ describe('floorplan cartography derivation', () => {
     expect(harbor.connectorStops.some((stop) => stop.kind === 'escalator')).toBe(true);
     expect(harbor).not.toEqual(asterion);
     expect(deriveFloorplanCartography(HARBOR_PACKAGE, harborFloorId)).toEqual(harbor);
+  });
+
+  it('projects the same canonical layout into deterministic plan and perspective scenes', () => {
+    const plan = createCartographicProjection(outline, 'plan', 10, 20);
+    const perspective = createCartographicProjection(outline, 'perspective', 10, 20);
+
+    expect(projectCartographicPoint(plan, [0, 0])).toEqual([20, 20]);
+    expect(projectCartographicPoint(plan, [8, 4])).toEqual([100, 60]);
+    expect(perspective.height).toBeLessThan(plan.height);
+    expect(createCartographicProjection(outline, 'perspective', 10, 20)).toEqual(perspective);
+
+    const projectedOutline = outline.map((point) => projectCartographicPoint(perspective, point));
+    const projectedBounds = getCartographicBounds(projectedOutline);
+    expect(projectedBounds.minX).toBeCloseTo(20, 6);
+    expect(projectedBounds.minY).toBeCloseTo(20, 6);
+    expect(projectedBounds.maxX).toBeCloseTo(perspective.width - 20, 6);
+    expect(projectedBounds.maxY).toBeCloseTo(perspective.height - 20, 6);
+  });
+
+  it('keeps portal glyphs aligned after perspective projection', () => {
+    const projection = createCartographicProjection(outline, 'perspective', 10, 20);
+    const frame = projectCartographicPortalFrame(projection, {
+      position: sharedDoor.position,
+      width: sharedDoor.width,
+      angleRadians: Math.PI / 2,
+    });
+
+    expect(frame.width).toBeGreaterThan(0);
+    expect(Number.isFinite(frame.angleRadians)).toBe(true);
+    const projectedCenter = projectCartographicPoint(projection, sharedDoor.position);
+    expect(frame.center[0]).toBeCloseTo(projectedCenter[0], 8);
+    expect(frame.center[1]).toBeCloseTo(projectedCenter[1], 8);
+  });
+
+  it('creates only the visible slab faces for a pitched floor plate', () => {
+    const projection = createCartographicProjection(outline, 'perspective', 10, 20);
+    const projectedOutline = outline.map((point) => projectCartographicPoint(projection, point));
+    const faces = deriveCartographicExtrusionFaces(projectedOutline, 14);
+
+    expect(faces.length).toBeGreaterThan(0);
+    expect(faces.length).toBeLessThan(outline.length);
+    for (const face of faces) {
+      expect(face.points[2][1] - face.points[1][1]).toBeCloseTo(14, 8);
+    }
+  });
+
+  it('places higher-priority labels first and removes deterministic collisions', () => {
+    const candidates = [
+      { id: 'secondary', center: [50, 50] as [number, number], width: 60, height: 24, priority: 2 },
+      { id: 'primary', center: [55, 50] as [number, number], width: 60, height: 24, priority: 10 },
+      { id: 'separate', center: [150, 50] as [number, number], width: 50, height: 24, priority: 1 },
+    ];
+
+    expect(placeCartographicLabels(candidates).map((label) => label.id)).toEqual([
+      'primary',
+      'separate',
+    ]);
+    expect(placeCartographicLabels([...candidates].reverse())).toEqual(
+      placeCartographicLabels(candidates),
+    );
   });
 });

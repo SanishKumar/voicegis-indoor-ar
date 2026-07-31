@@ -15,6 +15,10 @@ routing graph or application state. The compiler remains the only component that
 normalizes source order, validates hard invariants, derives routing topology, and
 computes package identity.
 
+The first implemented adapter is the constrained, non-CV
+[DXF Importer v0](dxf-importer-v0.md). It accepts an explicitly annotated ASCII
+DXF profile and fails closed rather than interpreting ambiguous CAD geometry.
+
 RoomPlan, ARCore, SLAM, automatic recognition, visual positioning, and
 world-anchored AR are outside this milestone.
 

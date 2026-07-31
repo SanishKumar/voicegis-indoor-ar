@@ -29,6 +29,7 @@
     "check": "npm run lint && npm run typecheck && npm run test && npm run compile:check && npm run compile:asterion:check && npm run compile:harbor:check && npm run venues:sync:check && npm run replay:check && npm run build"
   },
   "dependencies": {
+    "@voicegis/dxf-importer": "0.1.0",
     "ajv": "^8.18.0",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",

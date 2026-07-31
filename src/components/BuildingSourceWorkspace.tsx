@@ -29,6 +29,7 @@ import {
   sourceFromVenuePackage,
   validateBuildingSourceDraft,
 } from '../studio/buildingSourceWorkspace';
+import { stageDxfImport, type StudioDxfImportReport } from '../studio/dxfImportWorkspace';
 import {
   createVenuePackageArtifact,
   formatArtifactSize,
@@ -95,6 +96,7 @@ export default function BuildingSourceWorkspace() {
   const [editorMode, setEditorMode] = useState<'visual' | 'json'>('visual');
   const [visualHistory, setVisualHistory] = useState<string[]>([]);
   const [fileMessage, setFileMessage] = useState<string | null>(null);
+  const [dxfImportReport, setDxfImportReport] = useState<StudioDxfImportReport | null>(null);
   const [compiling, setCompiling] = useState(false);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -105,6 +107,7 @@ export default function BuildingSourceWorkspace() {
     artifact: VenuePackageArtifact;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dxfInputRef = useRef<HTMLInputElement>(null);
   const validation = useMemo(() => validateBuildingSourceDraft(draftText), [draftText]);
   const dirty = draftText !== initialText;
   const errorCount = validation.issues.filter((issue) => issue.severity === 'error').length;
@@ -120,6 +123,7 @@ export default function BuildingSourceWorkspace() {
     setDraftText(initialText);
     setDraftName(`${venue.buildingPackage.building.id}.json`);
     setFileMessage(null);
+    setDxfImportReport(null);
     setCompileError(null);
     setCompilePreview(null);
     setRuntimeError(null);
@@ -131,6 +135,7 @@ export default function BuildingSourceWorkspace() {
     try {
       setDraftText(`${JSON.stringify(JSON.parse(draftText), null, 2)}\n`);
       setFileMessage(null);
+      setDxfImportReport(null);
       setActivationArmed(false);
       setVisualHistory([]);
     } catch {
@@ -144,6 +149,7 @@ export default function BuildingSourceWorkspace() {
       setDraftText(await file.text());
       setDraftName(file.name);
       setFileMessage(null);
+      setDxfImportReport(null);
       setCompileError(null);
       setCompilePreview(null);
       setRuntimeError(null);
@@ -154,6 +160,31 @@ export default function BuildingSourceWorkspace() {
       setFileMessage(`Could not read ${file.name}.`);
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const importDxf = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const outcome = stageDxfImport(await file.text(), file.name, draftText);
+      setDxfImportReport(outcome.report);
+      if (!outcome.report.accepted || !outcome.draftName) {
+        setFileMessage(`${file.name} was rejected; the current draft was preserved.`);
+        return;
+      }
+      setDraftText(outcome.draftText);
+      setDraftName(outcome.draftName);
+      setFileMessage(`${file.name} imported as a validated BuildingSource draft.`);
+      setCompileError(null);
+      setCompilePreview(null);
+      setRuntimeError(null);
+      setActivationArmed(false);
+      setVisualHistory([]);
+      setEditorMode('visual');
+    } catch {
+      setFileMessage(`Could not read ${file.name}; the current draft was preserved.`);
+    } finally {
+      if (dxfInputRef.current) dxfInputRef.current.value = '';
     }
   };
 
@@ -235,14 +266,14 @@ export default function BuildingSourceWorkspace() {
     <main className="studio-surface" id="main-content">
       <header className="studio-header">
         <div className="studio-heading">
-          <span>Venue Studio v0 · Slice 9A</span>
+          <span>Venue Studio · DXF Importer v0</span>
           <h1>BuildingSource workspace</h1>
-          <p>Exercise deterministic publishing against a guarded reference service.</p>
+          <p>Import an explicitly annotated floor plan into the deterministic venue pipeline.</p>
         </div>
         <div className="studio-boundary-note">
           <ShieldCheck size={17} />
           <span>
-            Reference service tested only
+            Import is staged, never auto-activated
             <small>
               Studio has no live endpoint, credential storage, scan, video, or CV operations
             </small>
@@ -270,6 +301,17 @@ export default function BuildingSourceWorkspace() {
                 onChange={(event) => void openFile(event.target.files?.[0])}
                 aria-label="Open BuildingSource JSON"
               />
+              <input
+                ref={dxfInputRef}
+                type="file"
+                accept=".dxf,application/dxf,application/x-dxf"
+                onChange={(event) => void importDxf(event.target.files?.[0])}
+                aria-label="Import annotated ASCII DXF"
+              />
+              <button type="button" onClick={() => dxfInputRef.current?.click()}>
+                <Upload size={14} />
+                Import DXF
+              </button>
               <button type="button" onClick={() => fileInputRef.current?.click()}>
                 <Upload size={14} />
                 Open JSON
@@ -284,6 +326,53 @@ export default function BuildingSourceWorkspace() {
               </button>
             </div>
           </div>
+
+          {dxfImportReport && (
+            <section
+              className={`studio-dxf-report ${dxfImportReport.accepted ? 'accepted' : 'rejected'}`}
+              role={dxfImportReport.accepted ? 'status' : 'alert'}
+              aria-label="DXF import report"
+            >
+              <div>
+                {dxfImportReport.accepted ? (
+                  <CheckCircle2 size={16} />
+                ) : (
+                  <AlertTriangle size={16} />
+                )}
+                <span>
+                  <strong>
+                    {dxfImportReport.accepted ? 'DXF import accepted' : 'DXF import rejected'}
+                  </strong>
+                  <small>
+                    {dxfImportReport.fileName} · {dxfImportReport.detectedUnits ?? 'units unknown'}
+                  </small>
+                </span>
+              </div>
+              <div className="studio-dxf-facts">
+                <span>{dxfImportReport.stats.floors} floors</span>
+                <span>{dxfImportReport.stats.spaces} spaces</span>
+                <span>{dxfImportReport.stats.portals} portals</span>
+                <span>
+                  {dxfImportReport.issues.filter((entry) => entry.severity === 'error').length}{' '}
+                  errors
+                </span>
+              </div>
+              {dxfImportReport.issues.length > 0 && (
+                <details>
+                  <summary>{dxfImportReport.issues.length} import messages</summary>
+                  <ol>
+                    {dxfImportReport.issues.map((entry, index) => (
+                      <li key={`${entry.stage}-${entry.code}-${entry.path}-${index}`}>
+                        <strong>{entry.code}</strong>
+                        <code>{entry.path}</code>
+                        <span>{entry.message}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              )}
+            </section>
+          )}
 
           <div className="studio-editor-modebar" role="tablist" aria-label="Editor view">
             <button
@@ -368,10 +457,10 @@ export default function BuildingSourceWorkspace() {
           </section>
 
           <section className="studio-pipeline" aria-label="Venue creation pipeline">
-            <div>
+            <div className="active">
               <span>01</span>
               <strong>Importer</strong>
-              <small>Future adapter boundary</small>
+              <small>{dxfImportReport?.accepted ? 'DXF import staged' : 'DXF v0 ready'}</small>
             </div>
             <div className="active">
               <span>02</span>
