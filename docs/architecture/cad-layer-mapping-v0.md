@@ -8,15 +8,15 @@ importer without renaming layers in a CAD application:
 ```text
 ordinary ASCII DXF
   -> layer inventory
-  -> explicit human-reviewed floor/space/portal mapping profile
+  -> explicit human-reviewed floor/space/portal/POI/connector-stop mapping profile
   -> annotated DXF adapter
   -> BuildingSource validation
   -> staged Studio draft
 ```
 
 The mapping workspace does not infer semantics from layer names or geometry. A
-person chooses which supported layer represents a floor, space, or portal and
-supplies the required canonical metadata.
+person chooses which supported entity represents a floor, space, portal, POI,
+or vertical-connector stop and supplies the required canonical metadata.
 
 ## Profile contract
 
@@ -45,16 +45,31 @@ supplies the required canonical metadata.
       "sourceLayer": "A-DOORS",
       "sourceEntityKey": "line:8,3.5;8,4.5",
       "targetLayer": "VG$PORTAL$g$gallery-archive-door$door$gallery$archive$true$false"
+    },
+    {
+      "sourceLayer": "A-POIS",
+      "sourceEntityKey": "point:6,4",
+      "targetLayer": "VG$POI$g$gallery$featured-exhibit$exhibit$true$true$Featured%20Exhibit"
+    },
+    {
+      "sourceLayer": "A-RAMP-STOPS",
+      "sourceEntityKey": "point:4,4",
+      "targetLayer": "VG$CONNECTOR$east-ramp$ramp$true$false$g$entry$East%20Ramp"
+    },
+    {
+      "sourceLayer": "A-RAMP-STOPS",
+      "sourceEntityKey": "point:4.2,4",
+      "targetLayer": "VG$CONNECTOR$east-ramp$ramp$true$false$l1$gallery$East%20Ramp"
     }
   ]
 }
 ```
 
-Mappings are sorted by source-layer name and then entity key. A closed polygon
-entity key is derived from canonical geometry. A line key also sorts its
-endpoints. Starting vertex, winding, line direction, mapping-form order, and DXF
-entity order therefore do not change the resulting `BuildingSource` or
-VenuePackage hash.
+Mappings are sorted by source-layer name and then entity key. Closed polygon
+keys use canonical geometry, line keys sort their endpoints, and point keys use
+rounded XY coordinates. Starting vertex, winding, line direction, mapping-form
+order, and DXF entity order therefore do not change the resulting
+`BuildingSource` or VenuePackage hash.
 
 ## Guardrails
 
@@ -62,19 +77,27 @@ VenuePackage hash.
   units.
 - A whole-layer floor or space mapping must contain exactly one closed
   `LWPOLYLINE`.
-- When a layer contains multiple entities, each valid closed `LWPOLYLINE` and
-  non-zero `LINE` is listed separately and may be mapped using its canonical
-  `sourceEntityKey`.
+- When a layer contains multiple entities, each valid closed `LWPOLYLINE`,
+  non-zero `LINE`, and planar `POINT` is listed separately and may be mapped
+  using its canonical `sourceEntityKey`.
 - Identical selectable entities on one layer deliberately share an identity and are
   rejected as ambiguous rather than selected by unstable file position.
 - A whole-layer portal mapping must contain exactly one `LINE`. Shared-layer
   portals select one canonical line identity. Its midpoint becomes the portal
   position and its length becomes the portal width.
-- Slice 4 accepts individual floor/space polygons and individual portal lines.
-  Entity type and selected semantic role must agree.
+- A whole-layer POI or connector-stop mapping must contain exactly one `POINT`.
+  Shared-layer semantic points select one canonical point identity.
+- Slice 6 accepts individual floor/space polygons, portal lines, POI points, and
+  connector-stop points. Entity type and selected semantic role must agree.
 - Public and accessibility policy for spaces must be explicitly selected.
 - Kind, connected spaces, accessibility, and restriction policy for portals
   must be explicitly selected. A portal cannot connect a space to itself.
+- Floor, containing space, category, public policy, and accessibility policy for
+  POIs must be explicitly selected.
+- Every connector stop requires a connector ID, name, kind, floor, containing
+  space, accessibility policy, and restriction policy. A connector requires at
+  least two stops, may have only one stop per floor, and every stop sharing its
+  ID must use identical connector metadata.
 - Invalid profiles, unsupported geometry, schema failures, and semantic failures
   preserve the exact current Studio draft.
 - A mapped import is staged only. Compilation, publishing, and runtime activation
@@ -100,11 +123,20 @@ when entity order changes.
 lines on one ordinary `A-DOORS` layer. Studio maps each line to a different
 space pair and the compiled graph contains two independently routable portals.
 
+`buildings/import-fixtures/unannotated-shared-pois-v0.dxf` adds two points on
+one ordinary `A-POIS` layer. Studio maps each point to an independently named,
+categorized, and policy-reviewed POI while preserving deterministic package
+identity when entity order changes.
+
+`buildings/import-fixtures/unannotated-shared-connector-stops-v0.dxf` contains
+two floors and two points on one ordinary `A-RAMP-STOPS` layer. Studio groups
+the points into one accessible ramp with explicitly assigned floor and space
+stops; compiler validation proves the upper public space remains reachable.
+
 ## Remaining CAD mapping work
 
-- mixed semantic entity types on one source layer;
-- selecting individual point-based POIs, anchors, and connector stops;
-- connector, POI, and localization-anchor mapping;
+- explicit mixed-role validation on layers that combine entity types;
+- selecting and mapping individual localization-anchor points;
 - saving, loading, and versioning mapping profiles as artifacts;
 - multi-file floor alignment and georeferencing;
 - blocks, inserts, hatches, splines, holes, DWG, PDF, IFC/BIM, and GeoJSON;

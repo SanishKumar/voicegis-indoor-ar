@@ -5,9 +5,9 @@ import {
   type DxfLayerSummary,
   type DxfSelectableEntitySummary,
 } from '@voicegis/dxf-importer';
-import type { PortalKind, SpaceType } from '@voicegis/spatial-schema';
+import type { ConnectorKind, PortalKind, SpaceType } from '@voicegis/spatial-schema';
 
-export type DxfLayerRole = 'ignore' | 'floor' | 'space' | 'portal';
+export type DxfLayerRole = 'ignore' | 'floor' | 'space' | 'portal' | 'poi' | 'connector';
 export type ExplicitBoolean = '' | 'true' | 'false';
 
 export interface DxfLayerMappingDraft {
@@ -27,6 +27,9 @@ export interface DxfLayerMappingDraft {
   spaceA: string;
   spaceB: string;
   restrictedPolicy: ExplicitBoolean;
+  spaceId: string;
+  poiCategory: string;
+  connectorKind: ConnectorKind | '';
 }
 
 export interface DxfMappingProfileDraftResult {
@@ -81,6 +84,9 @@ export function createDxfLayerMappingDraft(
     spaceA: '',
     spaceB: '',
     restrictedPolicy: '',
+    spaceId: '',
+    poiCategory: '',
+    connectorKind: '',
   };
 }
 
@@ -231,6 +237,121 @@ export function buildDxfLayerMappingProfile(
       return;
     }
 
+    if (draft.role === 'connector') {
+      if (!name)
+        addIssue(issues, 'missing-mapping-name', `${path}/name`, 'Display name is required.');
+      const floorIdValid = validateIdentity(
+        draft.floorId,
+        issues,
+        `${path}/floorId`,
+        'Connector-stop floor id',
+      );
+      const spaceIdValid = validateIdentity(
+        draft.spaceId,
+        issues,
+        `${path}/spaceId`,
+        'Connector-stop space id',
+      );
+      if (!draft.connectorKind) {
+        addIssue(
+          issues,
+          'missing-connector-kind',
+          `${path}/connectorKind`,
+          'Connector kind is required.',
+        );
+      }
+      if (!draft.accessiblePolicy) {
+        addIssue(
+          issues,
+          'missing-accessibility-policy',
+          `${path}/accessiblePolicy`,
+          'Accessibility policy must be explicitly reviewed.',
+        );
+      }
+      if (!draft.restrictedPolicy) {
+        addIssue(
+          issues,
+          'missing-restricted-policy',
+          `${path}/restrictedPolicy`,
+          'Restricted policy must be explicitly reviewed.',
+        );
+      }
+      if (
+        idValid &&
+        floorIdValid &&
+        spaceIdValid &&
+        name &&
+        draft.connectorKind &&
+        draft.accessiblePolicy &&
+        draft.restrictedPolicy
+      ) {
+        mappings.push({
+          sourceLayer: draft.sourceLayer,
+          ...(draft.sourceEntityKey ? { sourceEntityKey: draft.sourceEntityKey } : {}),
+          targetLayer: `VG$CONNECTOR$${draft.id}$${draft.connectorKind}$${draft.accessiblePolicy}$${draft.restrictedPolicy}$${draft.floorId}$${draft.spaceId}$${encodeURIComponent(name)}`,
+        });
+      }
+      return;
+    }
+
+    if (draft.role === 'poi') {
+      if (!name)
+        addIssue(issues, 'missing-mapping-name', `${path}/name`, 'Display name is required.');
+      const floorIdValid = validateIdentity(
+        draft.floorId,
+        issues,
+        `${path}/floorId`,
+        'POI floor id',
+      );
+      const spaceIdValid = validateIdentity(
+        draft.spaceId,
+        issues,
+        `${path}/spaceId`,
+        'POI space id',
+      );
+      const category = draft.poiCategory.trim();
+      if (!category) {
+        addIssue(
+          issues,
+          'missing-poi-category',
+          `${path}/poiCategory`,
+          'POI category is required.',
+        );
+      }
+      if (!draft.publicPolicy) {
+        addIssue(
+          issues,
+          'missing-public-policy',
+          `${path}/publicPolicy`,
+          'Public policy must be explicitly reviewed.',
+        );
+      }
+      if (!draft.accessiblePolicy) {
+        addIssue(
+          issues,
+          'missing-accessibility-policy',
+          `${path}/accessiblePolicy`,
+          'Accessibility policy must be explicitly reviewed.',
+        );
+      }
+      if (
+        idValid &&
+        floorIdValid &&
+        spaceIdValid &&
+        name &&
+        category &&
+        draft.publicPolicy &&
+        draft.accessiblePolicy
+      ) {
+        mappings.push({
+          sourceLayer: draft.sourceLayer,
+          ...(draft.sourceEntityKey ? { sourceEntityKey: draft.sourceEntityKey } : {}),
+          targetLayer: `VG$POI$${draft.floorId}$${draft.spaceId}$${draft.id}$${encodeURIComponent(category)}$${draft.publicPolicy}$${draft.accessiblePolicy}$${encodeURIComponent(name)}`,
+        });
+      }
+      return;
+    }
+
     if (!name)
       addIssue(issues, 'missing-mapping-name', `${path}/name`, 'Display name is required.');
 
@@ -273,6 +394,62 @@ export function buildDxfLayerMappingProfile(
         targetLayer: `VG$SPACE$${draft.floorId}$${draft.id}$${draft.spaceType}$${draft.publicPolicy}$${draft.accessiblePolicy}$${encodeURIComponent(name)}`,
       });
     }
+  });
+
+  const connectorGroups = new Map<string, Array<{ draft: DxfLayerMappingDraft; index: number }>>();
+  drafts.forEach((draft, index) => {
+    if (draft.role !== 'connector' || !ID_PATTERN.test(draft.id)) return;
+    const group = connectorGroups.get(draft.id) ?? [];
+    group.push({ draft, index });
+    connectorGroups.set(draft.id, group);
+  });
+  connectorGroups.forEach((group, connectorId) => {
+    const first = group[0];
+    if (group.length < 2) {
+      addIssue(
+        issues,
+        'connector-requires-two-stops',
+        `/mappings/${first.index}/id`,
+        `Connector "${connectorId}" requires at least two mapped stops.`,
+      );
+    }
+    const usedFloors = new Set<string>();
+    const firstMetadataComplete =
+      first.draft.name.trim() &&
+      first.draft.connectorKind &&
+      first.draft.accessiblePolicy &&
+      first.draft.restrictedPolicy;
+    group.forEach(({ draft, index }) => {
+      if (draft.floorId && usedFloors.has(draft.floorId)) {
+        addIssue(
+          issues,
+          'duplicate-connector-floor-stop',
+          `/mappings/${index}/floorId`,
+          `Connector "${connectorId}" cannot have more than one stop on floor "${draft.floorId}".`,
+        );
+      }
+      if (draft.floorId) usedFloors.add(draft.floorId);
+      const metadataComplete =
+        draft.name.trim() &&
+        draft.connectorKind &&
+        draft.accessiblePolicy &&
+        draft.restrictedPolicy;
+      if (
+        firstMetadataComplete &&
+        metadataComplete &&
+        (draft.name.trim() !== first.draft.name.trim() ||
+          draft.connectorKind !== first.draft.connectorKind ||
+          draft.accessiblePolicy !== first.draft.accessiblePolicy ||
+          draft.restrictedPolicy !== first.draft.restrictedPolicy)
+      ) {
+        addIssue(
+          issues,
+          'inconsistent-connector-metadata',
+          `/mappings/${index}`,
+          `Every stop for connector "${connectorId}" must use the same name, kind, accessibility, and restriction policy.`,
+        );
+      }
+    });
   });
 
   if (!drafts.some((draft) => draft.role === 'floor')) {

@@ -27,11 +27,26 @@ const sharedDoorsFixture = readFileSync(
   new URL('../../../buildings/import-fixtures/unannotated-shared-doors-v0.dxf', import.meta.url),
   'utf8',
 );
+const sharedPoisFixture = readFileSync(
+  new URL('../../../buildings/import-fixtures/unannotated-shared-pois-v0.dxf', import.meta.url),
+  'utf8',
+);
+const sharedConnectorStopsFixture = readFileSync(
+  new URL(
+    '../../../buildings/import-fixtures/unannotated-shared-connector-stops-v0.dxf',
+    import.meta.url,
+  ),
+  'utf8',
+);
 
 const entryPolygonKey = 'lwpolyline:0,0;4,0;4,8;0,8';
 const galleryPolygonKey = 'lwpolyline:4,0;12,0;12,8;4,8';
 const entryDoorKey = 'line:4,3.5;4,4.5';
 const archiveDoorKey = 'line:8,3.5;8,4.5';
+const receptionPointKey = 'point:1.5,4';
+const exhibitPointKey = 'point:6,4';
+const groundRampPointKey = 'point:4,4';
+const levelOneRampPointKey = 'point:4.2,4';
 
 const unannotatedProfile: DxfLayerMappingProfile = {
   profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
@@ -121,6 +136,55 @@ const sharedDoorsProfile: DxfLayerMappingProfile = {
       sourceLayer: 'A-DOORS',
       sourceEntityKey: archiveDoorKey,
       targetLayer: 'VG$PORTAL$g$gallery-archive-door$door$gallery$archive$true$false',
+    },
+  ],
+};
+
+const sharedPoisProfile: DxfLayerMappingProfile = {
+  profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+  mappings: [
+    ...sharedDoorsProfile.mappings,
+    {
+      sourceLayer: 'A-POIS',
+      sourceEntityKey: receptionPointKey,
+      targetLayer: 'VG$POI$g$entry$reception$service$true$true$Reception',
+    },
+    {
+      sourceLayer: 'A-POIS',
+      sourceEntityKey: exhibitPointKey,
+      targetLayer: 'VG$POI$g$gallery$featured-exhibit$exhibit$true$true$Featured%20Exhibit',
+    },
+  ],
+};
+
+const sharedConnectorStopsProfile: DxfLayerMappingProfile = {
+  profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+  mappings: [
+    {
+      sourceLayer: 'A-FLOOR-G',
+      targetLayer: 'VG$FLOOR$g$0$0$3.2$Ground',
+    },
+    {
+      sourceLayer: 'A-FLOOR-L1',
+      targetLayer: 'VG$FLOOR$l1$1$3.2$3.2$Level%201',
+    },
+    {
+      sourceLayer: 'A-SPACE-ENTRY',
+      targetLayer: 'VG$SPACE$g$entry$entrance$true$true$Entry',
+    },
+    {
+      sourceLayer: 'A-SPACE-GALLERY',
+      targetLayer: 'VG$SPACE$l1$gallery$room$true$true$Gallery',
+    },
+    {
+      sourceLayer: 'A-RAMP-STOPS',
+      sourceEntityKey: groundRampPointKey,
+      targetLayer: 'VG$CONNECTOR$east-ramp$ramp$true$false$g$entry$East%20Ramp',
+    },
+    {
+      sourceLayer: 'A-RAMP-STOPS',
+      sourceEntityKey: levelOneRampPointKey,
+      targetLayer: 'VG$CONNECTOR$east-ramp$ramp$true$false$l1$gallery$East%20Ramp',
     },
   ],
 };
@@ -593,6 +657,198 @@ describe('DXF layer mapping profile v0', () => {
     expect(wrongRole.text).toBeNull();
   });
 
+  it('inventories and maps multiple POI points from one shared CAD layer', () => {
+    const inspected = inspectDxfLayers(sharedPoisFixture);
+    const poiLayer = inspected.layers.find((layer) => layer.name === 'A-POIS');
+
+    expect(poiLayer).toMatchObject({
+      entityCount: 2,
+      entityTypes: ['POINT'],
+      closedLightweightPolylines: 0,
+    });
+    expect(poiLayer?.selectableEntities).toEqual([
+      {
+        key: receptionPointKey,
+        type: 'POINT',
+        point: [1.5, 4],
+        occurrenceCount: 1,
+      },
+      {
+        key: exhibitPointKey,
+        type: 'POINT',
+        point: [6, 4],
+        occurrenceCount: 1,
+      },
+    ]);
+
+    const mapped = applyDxfLayerMapping(sharedPoisFixture, sharedPoisProfile);
+    expect(mapped.valid).toBe(true);
+    const imported = importAnnotatedDxf(mapped.text!, {
+      fileName: 'unannotated-shared-pois-v0.dxf',
+    });
+    expect(imported.valid).toBe(true);
+    expect(imported.source?.pois).toEqual([
+      expect.objectContaining({
+        id: 'featured-exhibit',
+        floorId: 'g',
+        spaceId: 'gallery',
+        position: [6, 4],
+      }),
+      expect.objectContaining({
+        id: 'reception',
+        floorId: 'g',
+        spaceId: 'entry',
+        position: [1.5, 4],
+      }),
+    ]);
+    const compiled = compileBuilding(imported.source);
+    expect(compiled.report.valid).toBe(true);
+    expect(compiled.package?.routing.nodes.filter((node) => node.kind === 'poi')).toHaveLength(2);
+  });
+
+  it('keeps POI-point selection stable across entity and mapping order', () => {
+    const first = applyDxfLayerMapping(sharedPoisFixture, sharedPoisProfile);
+    const second = applyDxfLayerMapping(reorderEntities(sharedPoisFixture), {
+      ...sharedPoisProfile,
+      mappings: [...sharedPoisProfile.mappings].reverse(),
+    });
+    const firstSource = importAnnotatedDxf(first.text!, {
+      fileName: 'unannotated-shared-pois-v0.dxf',
+    }).source;
+    const secondSource = importAnnotatedDxf(second.text!, {
+      fileName: 'unannotated-shared-pois-v0.dxf',
+    }).source;
+
+    expect(secondSource).toEqual(firstSource);
+    expect(compileBuilding(secondSource).package?.manifest.contentHash).toBe(
+      compileBuilding(firstSource).package?.manifest.contentHash,
+    );
+  });
+
+  it('rejects ambiguous POI points and point-role mismatches', () => {
+    const duplicatePointGeometry = sharedPoisFixture.replace(
+      '10\n6\n20\n4\n30\n0',
+      '10\n1.5\n20\n4\n30\n0',
+    );
+    const ambiguous = applyDxfLayerMapping(duplicatePointGeometry, {
+      profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+      mappings: [
+        {
+          sourceLayer: 'A-POIS',
+          sourceEntityKey: receptionPointKey,
+          targetLayer: 'VG$POI$g$entry$reception$service$true$true$Reception',
+        },
+      ],
+    });
+    const wrongRole = applyDxfLayerMapping(sharedPoisFixture, {
+      profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+      mappings: [
+        {
+          sourceLayer: 'A-POIS',
+          sourceEntityKey: receptionPointKey,
+          targetLayer: 'VG$PORTAL$g$door$door$entry$gallery$true$false',
+        },
+      ],
+    });
+
+    expect(ambiguous.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'ambiguous-source-entity' })]),
+    );
+    expect(wrongRole.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'source-entity-type-mismatch' })]),
+    );
+    expect(ambiguous.text).toBeNull();
+    expect(wrongRole.text).toBeNull();
+  });
+
+  it('inventories and groups multiple connector stops from one shared CAD layer', () => {
+    const inspected = inspectDxfLayers(sharedConnectorStopsFixture);
+    const connectorLayer = inspected.layers.find((layer) => layer.name === 'A-RAMP-STOPS');
+
+    expect(connectorLayer).toMatchObject({
+      entityCount: 2,
+      entityTypes: ['POINT'],
+      closedLightweightPolylines: 0,
+    });
+    expect(connectorLayer?.selectableEntities).toEqual([
+      {
+        key: groundRampPointKey,
+        type: 'POINT',
+        point: [4, 4],
+        occurrenceCount: 1,
+      },
+      {
+        key: levelOneRampPointKey,
+        type: 'POINT',
+        point: [4.2, 4],
+        occurrenceCount: 1,
+      },
+    ]);
+
+    const mapped = applyDxfLayerMapping(sharedConnectorStopsFixture, sharedConnectorStopsProfile);
+    expect(mapped.valid).toBe(true);
+    const imported = importAnnotatedDxf(mapped.text!, {
+      fileName: 'unannotated-shared-connector-stops-v0.dxf',
+    });
+    expect(imported.valid).toBe(true);
+    expect(imported.source?.verticalConnectors).toEqual([
+      {
+        id: 'east-ramp',
+        name: 'East Ramp',
+        kind: 'ramp',
+        accessible: true,
+        restricted: false,
+        stops: [
+          { floorId: 'g', spaceId: 'entry', position: [4, 4] },
+          { floorId: 'l1', spaceId: 'gallery', position: [4.2, 4] },
+        ],
+      },
+    ]);
+    const compiled = compileBuilding(imported.source);
+    expect(compiled.report.valid).toBe(true);
+    expect(
+      compiled.package?.routing.nodes.filter((node) => node.kind === 'connector-stop'),
+    ).toHaveLength(2);
+  });
+
+  it('keeps connector-stop grouping stable across entity and mapping order', () => {
+    const first = applyDxfLayerMapping(sharedConnectorStopsFixture, sharedConnectorStopsProfile);
+    const second = applyDxfLayerMapping(reorderEntities(sharedConnectorStopsFixture), {
+      ...sharedConnectorStopsProfile,
+      mappings: [...sharedConnectorStopsProfile.mappings].reverse(),
+    });
+    const firstSource = importAnnotatedDxf(first.text!, {
+      fileName: 'unannotated-shared-connector-stops-v0.dxf',
+    }).source;
+    const secondSource = importAnnotatedDxf(second.text!, {
+      fileName: 'unannotated-shared-connector-stops-v0.dxf',
+    }).source;
+
+    expect(secondSource).toEqual(firstSource);
+    expect(compileBuilding(secondSource).package?.manifest.contentHash).toBe(
+      compileBuilding(firstSource).package?.manifest.contentHash,
+    );
+  });
+
+  it('rejects non-point connector-stop selections', () => {
+    const mapped = applyDxfLayerMapping(sharedConnectorStopsFixture, {
+      profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+      mappings: [
+        {
+          sourceLayer: 'A-FLOOR-G',
+          sourceEntityKey: 'lwpolyline:0,0;8,0;8,8;0,8',
+          targetLayer: 'VG$CONNECTOR$east-ramp$ramp$true$false$g$entry$East%20Ramp',
+        },
+      ],
+    });
+
+    expect(mapped.valid).toBe(false);
+    expect(mapped.text).toBeNull();
+    expect(mapped.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'source-entity-type-mismatch' })]),
+    );
+  });
+
   it('rejects unknown and ambiguous geometry selectors instead of guessing', () => {
     const unknown = applyDxfLayerMapping(sharedRoomsFixture, {
       profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
@@ -653,7 +909,7 @@ describe('DXF layer mapping profile v0', () => {
       mappings: [
         {
           sourceLayer: 'A-FLOOR-OUTLINE',
-          targetLayer: 'VG$POI$g$entry$p1$service$true$true$1$1$Reception',
+          targetLayer: 'VG$ANCHOR$g$entry$a1$qr$0$payload',
         },
       ],
     });

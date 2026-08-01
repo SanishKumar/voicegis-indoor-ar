@@ -12,12 +12,20 @@ const floorLayer: DxfLayerSummary = {
   closedLightweightPolylines: 1,
   selectableEntities: [],
 };
+const levelOneFloorLayer: DxfLayerSummary = {
+  ...floorLayer,
+  name: 'A-FLOOR-L1',
+};
 const spaceLayer: DxfLayerSummary = {
   name: 'A-SPACE-ENTRY',
   entityCount: 1,
   entityTypes: ['LWPOLYLINE'],
   closedLightweightPolylines: 1,
   selectableEntities: [],
+};
+const gallerySpaceLayer: DxfLayerSummary = {
+  ...spaceLayer,
+  name: 'A-SPACE-GALLERY',
 };
 const portalLayer: DxfLayerSummary = {
   name: 'A-DOOR-ENTRY-GALLERY',
@@ -82,6 +90,46 @@ const sharedDoorLayer: DxfLayerSummary = {
         [8, 4.5],
       ],
       length: 1,
+      occurrenceCount: 1,
+    },
+  ],
+};
+const sharedPoiLayer: DxfLayerSummary = {
+  name: 'A-POIS',
+  entityCount: 2,
+  entityTypes: ['POINT'],
+  closedLightweightPolylines: 0,
+  selectableEntities: [
+    {
+      key: 'point:1.5,4',
+      type: 'POINT',
+      point: [1.5, 4],
+      occurrenceCount: 1,
+    },
+    {
+      key: 'point:6,4',
+      type: 'POINT',
+      point: [6, 4],
+      occurrenceCount: 1,
+    },
+  ],
+};
+const sharedConnectorStopLayer: DxfLayerSummary = {
+  name: 'A-RAMP-STOPS',
+  entityCount: 2,
+  entityTypes: ['POINT'],
+  closedLightweightPolylines: 0,
+  selectableEntities: [
+    {
+      key: 'point:4,4',
+      type: 'POINT',
+      point: [4, 4],
+      occurrenceCount: 1,
+    },
+    {
+      key: 'point:4.2,4',
+      type: 'POINT',
+      point: [4.2, 4],
       occurrenceCount: 1,
     },
   ],
@@ -324,6 +372,253 @@ describe('Studio CAD layer mapping profile', () => {
           targetLayer: 'VG$PORTAL$g$gallery-archive-door$door$gallery$archive$true$false',
         },
       ],
+    );
+  });
+
+  it('preserves stable entity selectors and explicit policy for shared-layer POIs', () => {
+    const floor = {
+      ...createDxfLayerMappingDraft(floorLayer),
+      role: 'floor' as const,
+      id: 'g',
+    };
+    const space = {
+      ...createDxfLayerMappingDraft(spaceLayer),
+      role: 'space' as const,
+      id: 'entry',
+      floorId: 'g',
+      spaceType: 'entrance' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const reception = {
+      ...createDxfLayerMappingDraft(sharedPoiLayer, sharedPoiLayer.selectableEntities[0], 0),
+      role: 'poi' as const,
+      id: 'reception',
+      name: 'Reception',
+      floorId: 'g',
+      spaceId: 'entry',
+      poiCategory: 'visitor service',
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const exhibit = {
+      ...createDxfLayerMappingDraft(sharedPoiLayer, sharedPoiLayer.selectableEntities[1], 1),
+      role: 'poi' as const,
+      id: 'featured-exhibit',
+      name: 'Featured Exhibit',
+      floorId: 'g',
+      spaceId: 'entry',
+      poiCategory: 'exhibit',
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'false' as const,
+    };
+
+    const result = buildDxfLayerMappingProfile([exhibit, space, floor, reception]);
+
+    expect(result.valid).toBe(true);
+    expect(result.profile?.mappings.filter((mapping) => mapping.sourceLayer === 'A-POIS')).toEqual([
+      {
+        sourceLayer: 'A-POIS',
+        sourceEntityKey: 'point:1.5,4',
+        targetLayer: 'VG$POI$g$entry$reception$visitor%20service$true$true$Reception',
+      },
+      {
+        sourceLayer: 'A-POIS',
+        sourceEntityKey: 'point:6,4',
+        targetLayer: 'VG$POI$g$entry$featured-exhibit$exhibit$true$false$Featured%20Exhibit',
+      },
+    ]);
+  });
+
+  it('does not create a POI mapping until category and policies are reviewed', () => {
+    const floor = {
+      ...createDxfLayerMappingDraft(floorLayer),
+      role: 'floor' as const,
+      id: 'g',
+    };
+    const space = {
+      ...createDxfLayerMappingDraft(spaceLayer),
+      role: 'space' as const,
+      id: 'entry',
+      floorId: 'g',
+      spaceType: 'entrance' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const poi = {
+      ...createDxfLayerMappingDraft(sharedPoiLayer, sharedPoiLayer.selectableEntities[0], 0),
+      role: 'poi' as const,
+      id: 'reception',
+      floorId: 'g',
+      spaceId: 'entry',
+    };
+
+    const result = buildDxfLayerMappingProfile([floor, space, poi]);
+
+    expect(result.valid).toBe(false);
+    expect(result.profile).toBeNull();
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'missing-poi-category' }),
+        expect.objectContaining({ code: 'missing-public-policy' }),
+        expect.objectContaining({ code: 'missing-accessibility-policy' }),
+      ]),
+    );
+  });
+
+  it('groups deterministic connector-stop selectors under consistent connector metadata', () => {
+    const groundFloor = {
+      ...createDxfLayerMappingDraft(floorLayer),
+      role: 'floor' as const,
+      id: 'g',
+      name: 'Ground',
+    };
+    const levelOneFloor = {
+      ...createDxfLayerMappingDraft(levelOneFloorLayer),
+      role: 'floor' as const,
+      id: 'l1',
+      name: 'Level 1',
+      level: '1',
+      elevation: '3.2',
+    };
+    const entry = {
+      ...createDxfLayerMappingDraft(spaceLayer),
+      role: 'space' as const,
+      id: 'entry',
+      name: 'Entry',
+      floorId: 'g',
+      spaceType: 'entrance' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const gallery = {
+      ...createDxfLayerMappingDraft(gallerySpaceLayer),
+      role: 'space' as const,
+      id: 'gallery',
+      name: 'Gallery',
+      floorId: 'l1',
+      spaceType: 'room' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const groundStop = {
+      ...createDxfLayerMappingDraft(
+        sharedConnectorStopLayer,
+        sharedConnectorStopLayer.selectableEntities[0],
+        0,
+      ),
+      role: 'connector' as const,
+      id: 'east-ramp',
+      name: 'East Ramp',
+      floorId: 'g',
+      spaceId: 'entry',
+      connectorKind: 'ramp' as const,
+      accessiblePolicy: 'true' as const,
+      restrictedPolicy: 'false' as const,
+    };
+    const levelOneStop = {
+      ...createDxfLayerMappingDraft(
+        sharedConnectorStopLayer,
+        sharedConnectorStopLayer.selectableEntities[1],
+        1,
+      ),
+      role: 'connector' as const,
+      id: 'east-ramp',
+      name: 'East Ramp',
+      floorId: 'l1',
+      spaceId: 'gallery',
+      connectorKind: 'ramp' as const,
+      accessiblePolicy: 'true' as const,
+      restrictedPolicy: 'false' as const,
+    };
+
+    const result = buildDxfLayerMappingProfile([
+      levelOneStop,
+      gallery,
+      groundFloor,
+      groundStop,
+      entry,
+      levelOneFloor,
+    ]);
+
+    expect(result.valid).toBe(true);
+    expect(
+      result.profile?.mappings.filter((mapping) => mapping.sourceLayer === 'A-RAMP-STOPS'),
+    ).toEqual([
+      {
+        sourceLayer: 'A-RAMP-STOPS',
+        sourceEntityKey: 'point:4,4',
+        targetLayer: 'VG$CONNECTOR$east-ramp$ramp$true$false$g$entry$East%20Ramp',
+      },
+      {
+        sourceLayer: 'A-RAMP-STOPS',
+        sourceEntityKey: 'point:4.2,4',
+        targetLayer: 'VG$CONNECTOR$east-ramp$ramp$true$false$l1$gallery$East%20Ramp',
+      },
+    ]);
+  });
+
+  it('fails closed for incomplete or inconsistent connector groups', () => {
+    const floor = {
+      ...createDxfLayerMappingDraft(floorLayer),
+      role: 'floor' as const,
+      id: 'g',
+    };
+    const space = {
+      ...createDxfLayerMappingDraft(spaceLayer),
+      role: 'space' as const,
+      id: 'entry',
+      floorId: 'g',
+      spaceType: 'entrance' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const first = {
+      ...createDxfLayerMappingDraft(
+        sharedConnectorStopLayer,
+        sharedConnectorStopLayer.selectableEntities[0],
+        0,
+      ),
+      role: 'connector' as const,
+      id: 'east-ramp',
+      name: 'East Ramp',
+      floorId: 'g',
+      spaceId: 'entry',
+      connectorKind: 'ramp' as const,
+      accessiblePolicy: 'true' as const,
+      restrictedPolicy: 'false' as const,
+    };
+    const inconsistent = {
+      ...createDxfLayerMappingDraft(
+        sharedConnectorStopLayer,
+        sharedConnectorStopLayer.selectableEntities[1],
+        1,
+      ),
+      role: 'connector' as const,
+      id: 'east-ramp',
+      name: 'Different Ramp',
+      floorId: 'g',
+      spaceId: 'entry',
+      connectorKind: 'stairs' as const,
+      accessiblePolicy: 'false' as const,
+      restrictedPolicy: 'false' as const,
+    };
+
+    const inconsistentResult = buildDxfLayerMappingProfile([floor, space, first, inconsistent]);
+    const singletonResult = buildDxfLayerMappingProfile([floor, space, first]);
+
+    expect(inconsistentResult.valid).toBe(false);
+    expect(inconsistentResult.profile).toBeNull();
+    expect(inconsistentResult.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'duplicate-connector-floor-stop' }),
+        expect.objectContaining({ code: 'inconsistent-connector-metadata' }),
+      ]),
+    );
+    expect(singletonResult.valid).toBe(false);
+    expect(singletonResult.profile).toBeNull();
+    expect(singletonResult.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'connector-requires-two-stops' })]),
     );
   });
 });

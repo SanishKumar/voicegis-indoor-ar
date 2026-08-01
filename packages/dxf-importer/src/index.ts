@@ -82,7 +82,13 @@ export interface DxfSelectableLineSummary extends DxfSelectableEntityBase {
   length: number;
 }
 
-export type DxfSelectableEntitySummary = DxfSelectablePolygonSummary | DxfSelectableLineSummary;
+export interface DxfSelectablePointSummary extends DxfSelectableEntityBase {
+  type: 'POINT';
+  point: Coordinate2D;
+}
+
+export type DxfSelectableEntitySummary =
+  DxfSelectablePolygonSummary | DxfSelectableLineSummary | DxfSelectablePointSummary;
 
 export interface DxfInspectionResult {
   valid: boolean;
@@ -614,8 +620,27 @@ function selectableLineSummary(entity: DxfEntity): DxfSelectableLineSummary | nu
   };
 }
 
+function selectablePointSummary(entity: DxfEntity): DxfSelectablePointSummary | null {
+  if (entity.type !== 'POINT') return null;
+  const summaryIssues: DxfImportIssue[] = [];
+  const path = `/entities/${entity.index}`;
+  if (!assertPlanarEntity(entity, summaryIssues, path)) return null;
+  const point = parsePoint(entity, 1, summaryIssues, path);
+  if (!point || summaryIssues.some((entry) => entry.severity === 'error')) return null;
+  return {
+    key: `point:${point[0]},${point[1]}`,
+    type: 'POINT',
+    point,
+    occurrenceCount: 1,
+  };
+}
+
 function selectableEntitySummary(entity: DxfEntity): DxfSelectableEntitySummary | null {
-  return selectablePolygonSummary(entity) ?? selectableLineSummary(entity);
+  return (
+    selectablePolygonSummary(entity) ??
+    selectableLineSummary(entity) ??
+    selectablePointSummary(entity)
+  );
 }
 
 function inferredBuildingId(fileName: string | undefined) {
@@ -1214,9 +1239,9 @@ export function inspectDxfLayers(text: string): DxfInspectionResult {
 }
 
 /**
- * Applies an explicit floor/space/portal mapping profile without interpreting
- * layer names. Closed polygons and portal lines may be selected individually by
- * stable geometry.
+ * Applies an explicit floor/space/portal/POI/connector mapping profile without
+ * interpreting layer names. Closed polygons, portal lines, and semantic points
+ * may be selected individually by stable geometry.
  */
 export function applyDxfLayerMapping(
   text: string,
@@ -1306,16 +1331,18 @@ export function applyDxfLayerMapping(
     const polygonTarget =
       mapping.targetLayer.startsWith('VG$FLOOR$') || mapping.targetLayer.startsWith('VG$SPACE$');
     const portalTarget = mapping.targetLayer.startsWith('VG$PORTAL$');
-    if (!polygonTarget && !portalTarget) {
+    const poiTarget = mapping.targetLayer.startsWith('VG$POI$');
+    const connectorTarget = mapping.targetLayer.startsWith('VG$CONNECTOR$');
+    if (!polygonTarget && !portalTarget && !poiTarget && !connectorTarget) {
       issue(
         issues,
         'error',
         'unsupported-mapping-role',
         `${path}/targetLayer`,
-        'CAD Mapping Workspace v0 Slice 4 supports floor, space, and portal targets only.',
+        'CAD Mapping Workspace v0 Slice 6 supports floor, space, portal, POI, and connector-stop targets only.',
       );
     }
-    if (entityKey && (polygonTarget || portalTarget)) {
+    if (entityKey && (polygonTarget || portalTarget || poiTarget || connectorTarget)) {
       const entity = layer.selectableEntities.find((candidate) => candidate.key === entityKey);
       if (!entity) {
         issue(
@@ -1349,6 +1376,22 @@ export function applyDxfLayerMapping(
           `${path}/sourceEntityKey`,
           'Portal targets require a LINE entity.',
         );
+      } else if (poiTarget && entity.type !== 'POINT') {
+        issue(
+          issues,
+          'error',
+          'source-entity-type-mismatch',
+          `${path}/sourceEntityKey`,
+          'POI targets require a POINT entity.',
+        );
+      } else if (connectorTarget && entity.type !== 'POINT') {
+        issue(
+          issues,
+          'error',
+          'source-entity-type-mismatch',
+          `${path}/sourceEntityKey`,
+          'Connector-stop targets require a POINT entity.',
+        );
       }
     }
     if (
@@ -1378,6 +1421,36 @@ export function applyDxfLayerMapping(
         'layer-not-single-line',
         `${path}/sourceLayer`,
         `Portal layer "${mapping.sourceLayer}" must contain exactly one LINE in this slice.`,
+      );
+    }
+    if (
+      !entityKey &&
+      poiTarget &&
+      (layer.entityCount !== 1 ||
+        layer.entityTypes.length !== 1 ||
+        layer.entityTypes[0] !== 'POINT')
+    ) {
+      issue(
+        issues,
+        'error',
+        'layer-not-single-point',
+        `${path}/sourceLayer`,
+        `POI layer "${mapping.sourceLayer}" must contain exactly one POINT in this slice.`,
+      );
+    }
+    if (
+      !entityKey &&
+      connectorTarget &&
+      (layer.entityCount !== 1 ||
+        layer.entityTypes.length !== 1 ||
+        layer.entityTypes[0] !== 'POINT')
+    ) {
+      issue(
+        issues,
+        'error',
+        'layer-not-single-point',
+        `${path}/sourceLayer`,
+        `Connector-stop layer "${mapping.sourceLayer}" must contain exactly one POINT in this slice.`,
       );
     }
     mappingBySource.set(selectionKey, mapping.targetLayer);

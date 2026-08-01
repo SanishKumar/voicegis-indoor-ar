@@ -4321,7 +4321,8 @@ body {
 }
 
 .studio-entity-preview polygon,
-.studio-entity-preview line {
+.studio-entity-preview line,
+.studio-entity-preview circle {
   fill: #dbece6;
   stroke: #23816d;
   stroke-width: 1.5px;
@@ -4331,6 +4332,12 @@ body {
 .studio-entity-preview line {
   stroke-width: 3px;
   stroke-linecap: round;
+}
+
+.studio-entity-preview circle {
+  fill: #23816d;
+  stroke: #e9f5f1;
+  stroke-width: 2px;
 }
 
 .studio-layer-source strong {

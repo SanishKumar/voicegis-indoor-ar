@@ -83,5 +83,6 @@ canonical source or deterministic compiler.
 The implemented human-reviewed
 [CAD Layer Mapping Workspace v0](cad-layer-mapping-v0.md) maps ordinary DXF
 floor and space polygons—including multiple polygons on one layer—and portal
-lines—including multiple doors on one layer—into this annotated profile without
-guessing.
+lines—including multiple doors on one layer—and POI points—including multiple
+points on one layer—and grouped vertical-connector stops into this annotated
+profile without guessing.
