@@ -3,14 +3,16 @@ import {
   type DxfImportIssue,
   type DxfLayerMappingProfile,
   type DxfLayerSummary,
+  type DxfSelectableEntitySummary,
 } from '@voicegis/dxf-importer';
-import type { SpaceType } from '@voicegis/spatial-schema';
+import type { PortalKind, SpaceType } from '@voicegis/spatial-schema';
 
-export type DxfLayerRole = 'ignore' | 'floor' | 'space';
+export type DxfLayerRole = 'ignore' | 'floor' | 'space' | 'portal';
 export type ExplicitBoolean = '' | 'true' | 'false';
 
 export interface DxfLayerMappingDraft {
   sourceLayer: string;
+  sourceEntityKey: string | null;
   role: DxfLayerRole;
   id: string;
   name: string;
@@ -21,6 +23,10 @@ export interface DxfLayerMappingDraft {
   spaceType: SpaceType | '';
   publicPolicy: ExplicitBoolean;
   accessiblePolicy: ExplicitBoolean;
+  portalKind: PortalKind | '';
+  spaceA: string;
+  spaceB: string;
+  restrictedPolicy: ExplicitBoolean;
 }
 
 export interface DxfMappingProfileDraftResult {
@@ -51,12 +57,19 @@ function layerDisplayName(layerName: string) {
     .join(' ');
 }
 
-export function createDxfLayerMappingDraft(layer: DxfLayerSummary): DxfLayerMappingDraft {
+export function createDxfLayerMappingDraft(
+  layer: DxfLayerSummary,
+  entity?: DxfSelectableEntitySummary,
+  entityNumber = 0,
+): DxfLayerMappingDraft {
+  const entitySuffix = entity ? `-${entityNumber + 1}` : '';
+  const displaySuffix = entity ? ` ${entityNumber + 1}` : '';
   return {
     sourceLayer: layer.name,
+    sourceEntityKey: entity?.key ?? null,
     role: 'ignore',
-    id: layerId(layer.name),
-    name: layerDisplayName(layer.name),
+    id: `${layerId(layer.name)}${entitySuffix}`,
+    name: `${layerDisplayName(layer.name)}${displaySuffix}`,
     floorId: '',
     level: '0',
     elevation: '0',
@@ -64,6 +77,10 @@ export function createDxfLayerMappingDraft(layer: DxfLayerSummary): DxfLayerMapp
     spaceType: '',
     publicPolicy: '',
     accessiblePolicy: '',
+    portalKind: '',
+    spaceA: '',
+    spaceB: '',
+    restrictedPolicy: '',
   };
 }
 
@@ -103,10 +120,10 @@ export function buildDxfLayerMappingProfile(
     const path = `/mappings/${index}`;
     const idValid = validateIdentity(draft.id, issues, `${path}/id`, `${draft.role} id`);
     const name = draft.name.trim();
-    if (!name)
-      addIssue(issues, 'missing-mapping-name', `${path}/name`, 'Display name is required.');
 
     if (draft.role === 'floor') {
+      if (!name)
+        addIssue(issues, 'missing-mapping-name', `${path}/name`, 'Display name is required.');
       const level = finiteNumber(draft.level, issues, `${path}/level`, 'Floor level');
       const elevation = finiteNumber(
         draft.elevation,
@@ -142,11 +159,80 @@ export function buildDxfLayerMappingProfile(
       ) {
         mappings.push({
           sourceLayer: draft.sourceLayer,
+          ...(draft.sourceEntityKey ? { sourceEntityKey: draft.sourceEntityKey } : {}),
           targetLayer: `VG$FLOOR$${draft.id}$${level}$${elevation}$${clearHeight}$${encodeURIComponent(name)}`,
         });
       }
       return;
     }
+
+    if (draft.role === 'portal') {
+      const floorIdValid = validateIdentity(
+        draft.floorId,
+        issues,
+        `${path}/floorId`,
+        'Portal floor id',
+      );
+      const spaceAValid = validateIdentity(
+        draft.spaceA,
+        issues,
+        `${path}/spaceA`,
+        'Portal start space id',
+      );
+      const spaceBValid = validateIdentity(
+        draft.spaceB,
+        issues,
+        `${path}/spaceB`,
+        'Portal end space id',
+      );
+      if (!draft.portalKind) {
+        addIssue(issues, 'missing-portal-kind', `${path}/portalKind`, 'Portal kind is required.');
+      }
+      if (draft.spaceA && draft.spaceA === draft.spaceB) {
+        addIssue(
+          issues,
+          'duplicate-portal-spaces',
+          `${path}/spaceB`,
+          'A portal must connect two different spaces.',
+        );
+      }
+      if (!draft.accessiblePolicy) {
+        addIssue(
+          issues,
+          'missing-accessibility-policy',
+          `${path}/accessiblePolicy`,
+          'Accessibility policy must be explicitly reviewed.',
+        );
+      }
+      if (!draft.restrictedPolicy) {
+        addIssue(
+          issues,
+          'missing-restricted-policy',
+          `${path}/restrictedPolicy`,
+          'Restricted policy must be explicitly reviewed.',
+        );
+      }
+      if (
+        idValid &&
+        floorIdValid &&
+        spaceAValid &&
+        spaceBValid &&
+        draft.spaceA !== draft.spaceB &&
+        draft.portalKind &&
+        draft.accessiblePolicy &&
+        draft.restrictedPolicy
+      ) {
+        mappings.push({
+          sourceLayer: draft.sourceLayer,
+          ...(draft.sourceEntityKey ? { sourceEntityKey: draft.sourceEntityKey } : {}),
+          targetLayer: `VG$PORTAL$${draft.floorId}$${draft.id}$${draft.portalKind}$${draft.spaceA}$${draft.spaceB}$${draft.accessiblePolicy}$${draft.restrictedPolicy}`,
+        });
+      }
+      return;
+    }
+
+    if (!name)
+      addIssue(issues, 'missing-mapping-name', `${path}/name`, 'Display name is required.');
 
     const floorIdValid = validateIdentity(
       draft.floorId,
@@ -183,6 +269,7 @@ export function buildDxfLayerMappingProfile(
     ) {
       mappings.push({
         sourceLayer: draft.sourceLayer,
+        ...(draft.sourceEntityKey ? { sourceEntityKey: draft.sourceEntityKey } : {}),
         targetLayer: `VG$SPACE$${draft.floorId}$${draft.id}$${draft.spaceType}$${draft.publicPolicy}$${draft.accessiblePolicy}$${encodeURIComponent(name)}`,
       });
     }
@@ -204,7 +291,11 @@ export function buildDxfLayerMappingProfile(
       sorted.length === 0
         ? {
             profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
-            mappings: mappings.sort((a, b) => a.sourceLayer.localeCompare(b.sourceLayer)),
+            mappings: mappings.sort(
+              (a, b) =>
+                a.sourceLayer.localeCompare(b.sourceLayer) ||
+                (a.sourceEntityKey ?? '').localeCompare(b.sourceEntityKey ?? ''),
+            ),
           }
         : null,
     issues: sorted,

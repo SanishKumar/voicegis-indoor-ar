@@ -70,7 +70,8 @@ exercise the browser path.
 
 ## Intentionally remaining
 
-- generic CAD layer mapping and manual mapping UI;
+- individual portal-line selection and mixed semantic entity types on one CAD
+  layer;
 - legacy `POLYLINE`, blocks, inserts, hatches, splines, and polygon holes;
 - distinct wall-body geometry in `BuildingSource`;
 - multi-file floor alignment and georeferencing;
@@ -80,6 +81,7 @@ exercise the browser path.
 Those capabilities should extend this ingestion boundary rather than bypass the
 canonical source or deterministic compiler.
 
-The next implemented layer is the human-reviewed
-[CAD Layer Mapping Workspace v0](cad-layer-mapping-v0.md), which maps ordinary
-DXF floor and space layers into this annotated profile without guessing.
+The implemented human-reviewed
+[CAD Layer Mapping Workspace v0](cad-layer-mapping-v0.md) maps ordinary DXF
+floor and space polygons—including multiple polygons on one layer—and
+single-line portal layers into this annotated profile without guessing.

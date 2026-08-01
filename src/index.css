@@ -4298,9 +4298,33 @@ body {
   padding: 7px 9px;
 }
 
-.studio-layer-source > span {
+.studio-layer-identity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.studio-layer-identity > span {
   min-width: 0;
   display: grid;
+}
+
+.studio-entity-preview {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  overflow: visible;
+  border: 1px solid #cbd8d2;
+  border-radius: 8px;
+  background: #f5f9f7;
+}
+
+.studio-entity-preview polygon {
+  fill: #dbece6;
+  stroke: #23816d;
+  stroke-width: 1.5%;
+  vector-effect: non-scaling-stroke;
 }
 
 .studio-layer-source strong {

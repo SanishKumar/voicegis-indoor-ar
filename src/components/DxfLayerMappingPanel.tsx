@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, Layers3, X } from 'lucide-react';
 import type { DxfInspectionResult, DxfLayerMappingProfile } from '@voicegis/dxf-importer';
-import type { SpaceType } from '@voicegis/spatial-schema';
+import type { PortalKind, SpaceType } from '@voicegis/spatial-schema';
 import {
   buildDxfLayerMappingProfile,
   createDxfLayerMappingDraft,
@@ -17,6 +17,35 @@ const SPACE_TYPES: SpaceType[] = [
   'restricted',
   'vertical-circulation',
 ];
+const PORTAL_KINDS: PortalKind[] = ['door', 'opening', 'gate'];
+
+function createLayerDrafts(layer: DxfInspectionResult['layers'][number]) {
+  if (layer.entityCount > 1 && layer.selectableEntities.length > 0) {
+    return layer.selectableEntities.map((entity, index) =>
+      createDxfLayerMappingDraft(layer, entity, index),
+    );
+  }
+  return [createDxfLayerMappingDraft(layer)];
+}
+
+function PolygonPreview({ polygon }: { polygon: [number, number][] }) {
+  const xs = polygon.map(([x]) => x);
+  const ys = polygon.map(([, y]) => y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const width = Math.max(0.01, Math.max(...xs) - minX);
+  const height = Math.max(0.01, Math.max(...ys) - minY);
+  const padding = Math.max(width, height) * 0.08;
+  return (
+    <svg
+      className="studio-entity-preview"
+      viewBox={`${minX - padding} ${minY - padding} ${width + padding * 2} ${height + padding * 2}`}
+      aria-hidden="true"
+    >
+      <polygon points={polygon.map(([x, y]) => `${x},${y}`).join(' ')} />
+    </svg>
+  );
+}
 
 interface DxfLayerMappingPanelProps {
   fileName: string;
@@ -32,11 +61,14 @@ export default function DxfLayerMappingPanel({
   onStage,
 }: DxfLayerMappingPanelProps) {
   const [drafts, setDrafts] = useState<DxfLayerMappingDraft[]>(() =>
-    inspection.layers.map(createDxfLayerMappingDraft),
+    inspection.layers.flatMap(createLayerDrafts),
   );
   const profile = useMemo(() => buildDxfLayerMappingProfile(drafts), [drafts]);
   const floorIds = drafts
     .filter((draft) => draft.role === 'floor' && draft.id)
+    .map((draft) => draft.id);
+  const spaceIds = drafts
+    .filter((draft) => draft.role === 'space' && draft.id)
     .map((draft) => draft.id);
 
   const updateDraft = (index: number, changes: Partial<DxfLayerMappingDraft>) => {
@@ -66,30 +98,52 @@ export default function DxfLayerMappingPanel({
       <div className="studio-layer-mapper-note">
         <AlertTriangle size={15} />
         <span>
-          This slice maps one closed polyline per layer to floors or spaces. Values such as
-          elevation and height use the drawing&apos;s declared units. Accessibility must be reviewed
-          explicitly.
+          Shared-layer closed polygons are listed individually; single closed-polygon layers can
+          still be mapped as a whole. One LINE can become a portal. Accessibility and restriction
+          policies must be reviewed explicitly.
         </span>
       </div>
 
       <div className="studio-layer-mapper-list">
-        {inspection.layers.map((layer, index) => {
-          const draft = drafts[index];
-          const supported =
+        {drafts.map((draft, index) => {
+          const layer = inspection.layers.find(
+            (candidate) => candidate.name === draft.sourceLayer,
+          )!;
+          const sourceEntity = draft.sourceEntityKey
+            ? layer.selectableEntities.find((entity) => entity.key === draft.sourceEntityKey)
+            : undefined;
+          const sourceEntityNumber = sourceEntity
+            ? layer.selectableEntities.findIndex((entity) => entity.key === sourceEntity.key) + 1
+            : null;
+          const supportsPolygon =
+            (sourceEntity && sourceEntity.occurrenceCount === 1) ||
+            (!sourceEntity &&
+              layer.entityCount === 1 &&
+              layer.closedLightweightPolylines === 1 &&
+              layer.entityTypes.length === 1 &&
+              layer.entityTypes[0] === 'LWPOLYLINE');
+          const supportsPortal =
+            !sourceEntity &&
             layer.entityCount === 1 &&
-            layer.closedLightweightPolylines === 1 &&
             layer.entityTypes.length === 1 &&
-            layer.entityTypes[0] === 'LWPOLYLINE';
+            layer.entityTypes[0] === 'LINE';
           return (
-            <article key={layer.name} className={draft.role === 'ignore' ? '' : 'mapped'}>
+            <article
+              key={`${layer.name}:${draft.sourceEntityKey ?? 'whole'}`}
+              className={draft.role === 'ignore' ? '' : 'mapped'}
+            >
               <div className="studio-layer-source">
-                <span>
-                  <strong>{layer.name}</strong>
-                  <small>
-                    {layer.entityCount} entities · {layer.entityTypes.join(', ')} ·{' '}
-                    {layer.closedLightweightPolylines} closed polylines
-                  </small>
-                </span>
+                <div className="studio-layer-identity">
+                  {sourceEntity && <PolygonPreview polygon={sourceEntity.polygon} />}
+                  <span>
+                    <strong>{layer.name}</strong>
+                    <small>
+                      {sourceEntity
+                        ? `Polygon ${sourceEntityNumber} of ${layer.selectableEntities.length} · area ${sourceEntity.area}`
+                        : `${layer.entityCount} entities · ${layer.entityTypes.join(', ')} · ${layer.closedLightweightPolylines} closed polylines`}
+                    </small>
+                  </span>
+                </div>
                 <label>
                   Role
                   <select
@@ -99,24 +153,31 @@ export default function DxfLayerMappingPanel({
                       updateDraft(index, {
                         role,
                         floorId:
-                          role === 'space' && floorIds.length === 1 ? floorIds[0] : draft.floorId,
+                          (role === 'space' || role === 'portal') && floorIds.length === 1
+                            ? floorIds[0]
+                            : draft.floorId,
                       });
                     }}
                   >
                     <option value="ignore">Ignore</option>
-                    <option value="floor" disabled={!supported}>
+                    <option value="floor" disabled={!supportsPolygon}>
                       Floor outline
                     </option>
-                    <option value="space" disabled={!supported}>
+                    <option value="space" disabled={!supportsPolygon}>
                       Space polygon
+                    </option>
+                    <option value="portal" disabled={!supportsPortal}>
+                      Door / opening / gate
                     </option>
                   </select>
                 </label>
               </div>
 
-              {!supported && (
+              {!supportsPolygon && !supportsPortal && (
                 <p className="studio-layer-unsupported">
-                  This layer is visible for inspection but cannot be mapped in Slice 1.
+                  {sourceEntity?.occurrenceCount && sourceEntity.occurrenceCount > 1
+                    ? `${sourceEntity.occurrenceCount} identical polygons share this geometry identity and cannot be selected safely.`
+                    : 'This entity is visible for inspection but cannot be mapped in this slice.'}
                 </p>
               )}
 
@@ -129,13 +190,15 @@ export default function DxfLayerMappingPanel({
                       onChange={(event) => updateDraft(index, { id: event.target.value })}
                     />
                   </label>
-                  <label>
-                    Display name
-                    <input
-                      value={draft.name}
-                      onChange={(event) => updateDraft(index, { name: event.target.value })}
-                    />
-                  </label>
+                  {draft.role !== 'portal' && (
+                    <label>
+                      Display name
+                      <input
+                        value={draft.name}
+                        onChange={(event) => updateDraft(index, { name: event.target.value })}
+                      />
+                    </label>
+                  )}
 
                   {draft.role === 'floor' ? (
                     <>
@@ -171,7 +234,7 @@ export default function DxfLayerMappingPanel({
                         />
                       </label>
                     </>
-                  ) : (
+                  ) : draft.role === 'space' ? (
                     <>
                       <label>
                         Floor
@@ -233,6 +296,99 @@ export default function DxfLayerMappingPanel({
                           <option value="">Review required</option>
                           <option value="true">Accessible</option>
                           <option value="false">Not accessible</option>
+                        </select>
+                      </label>
+                    </>
+                  ) : (
+                    <>
+                      <label>
+                        Floor
+                        <select
+                          value={draft.floorId}
+                          onChange={(event) => updateDraft(index, { floorId: event.target.value })}
+                        >
+                          <option value="">Choose floor</option>
+                          {floorIds.map((floorId) => (
+                            <option key={floorId} value={floorId}>
+                              {floorId}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Kind
+                        <select
+                          value={draft.portalKind}
+                          onChange={(event) =>
+                            updateDraft(index, { portalKind: event.target.value as PortalKind })
+                          }
+                        >
+                          <option value="">Choose kind</option>
+                          {PORTAL_KINDS.map((kind) => (
+                            <option key={kind} value={kind}>
+                              {kind}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        From space
+                        <select
+                          value={draft.spaceA}
+                          onChange={(event) => updateDraft(index, { spaceA: event.target.value })}
+                        >
+                          <option value="">Choose space</option>
+                          {spaceIds.map((spaceId) => (
+                            <option key={spaceId} value={spaceId}>
+                              {spaceId}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        To space
+                        <select
+                          value={draft.spaceB}
+                          onChange={(event) => updateDraft(index, { spaceB: event.target.value })}
+                        >
+                          <option value="">Choose space</option>
+                          {spaceIds.map((spaceId) => (
+                            <option key={spaceId} value={spaceId}>
+                              {spaceId}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Accessible
+                        <select
+                          value={draft.accessiblePolicy}
+                          onChange={(event) =>
+                            updateDraft(index, {
+                              accessiblePolicy: event.target
+                                .value as DxfLayerMappingDraft['accessiblePolicy'],
+                            })
+                          }
+                        >
+                          <option value="">Review required</option>
+                          <option value="true">Accessible</option>
+                          <option value="false">Not accessible</option>
+                        </select>
+                      </label>
+                      <label>
+                        Restricted
+                        <select
+                          value={draft.restrictedPolicy}
+                          onChange={(event) =>
+                            updateDraft(index, {
+                              restrictedPolicy: event.target
+                                .value as DxfLayerMappingDraft['restrictedPolicy'],
+                            })
+                          }
+                        >
+                          <option value="">Review required</option>
+                          <option value="true">Restricted</option>
+                          <option value="false">Not restricted</option>
                         </select>
                       </label>
                     </>

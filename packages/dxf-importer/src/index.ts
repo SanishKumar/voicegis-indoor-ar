@@ -62,6 +62,15 @@ export interface DxfLayerSummary {
   entityCount: number;
   entityTypes: string[];
   closedLightweightPolylines: number;
+  selectableEntities: DxfSelectableEntitySummary[];
+}
+
+export interface DxfSelectableEntitySummary {
+  key: string;
+  type: 'LWPOLYLINE';
+  polygon: Coordinate2D[];
+  area: number;
+  occurrenceCount: number;
 }
 
 export interface DxfInspectionResult {
@@ -73,6 +82,7 @@ export interface DxfInspectionResult {
 
 export interface DxfLayerMapping {
   sourceLayer: string;
+  sourceEntityKey?: string;
   targetLayer: string;
 }
 
@@ -509,6 +519,32 @@ function parsePolyline(entity: DxfEntity, scale: number, issues: DxfImportIssue[
     return null;
   }
   return polygon;
+}
+
+function polygonEntityKey(polygon: Coordinate2D[]) {
+  return `lwpolyline:${polygon.map(([x, y]) => `${x},${y}`).join(';')}`;
+}
+
+function selectablePolygonSummary(entity: DxfEntity): DxfSelectableEntitySummary | null {
+  if (entity.type !== 'LWPOLYLINE' || (Number(firstValue(entity, 70) ?? 0) & 1) !== 1) {
+    return null;
+  }
+  const summaryIssues: DxfImportIssue[] = [];
+  const path = `/entities/${entity.index}`;
+  if (!assertPlanarEntity(entity, summaryIssues, path)) return null;
+  const polygon = parsePolyline(entity, 1, summaryIssues, path);
+  if (!polygon || summaryIssues.some((entry) => entry.severity === 'error')) return null;
+  return {
+    key: polygonEntityKey(polygon),
+    type: 'LWPOLYLINE',
+    polygon,
+    area: roundCoordinate(Math.abs(signedPolygonArea(polygon))),
+    occurrenceCount: 1,
+  };
+}
+
+function sourceSelectionKey(sourceLayer: string, sourceEntityKey?: string) {
+  return `${sourceLayer}\u0000${sourceEntityKey ?? '*'}`;
 }
 
 function parsePoint(entity: DxfEntity, scale: number, issues: DxfImportIssue[], path: string) {
@@ -1071,7 +1107,12 @@ export function inspectDxfLayers(text: string): DxfInspectionResult {
   const entities = parseEntities(pairs, issues);
   const layerState = new Map<
     string,
-    { entityCount: number; entityTypes: Set<string>; closedLightweightPolylines: number }
+    {
+      entityCount: number;
+      entityTypes: Set<string>;
+      closedLightweightPolylines: number;
+      selectableEntities: Map<string, DxfSelectableEntitySummary>;
+    }
   >();
 
   for (const entity of entities) {
@@ -1090,11 +1131,18 @@ export function inspectDxfLayers(text: string): DxfInspectionResult {
       entityCount: 0,
       entityTypes: new Set<string>(),
       closedLightweightPolylines: 0,
+      selectableEntities: new Map<string, DxfSelectableEntitySummary>(),
     };
     current.entityCount += 1;
     current.entityTypes.add(entity.type);
     if (entity.type === 'LWPOLYLINE' && (Number(firstValue(entity, 70) ?? 0) & 1) === 1) {
       current.closedLightweightPolylines += 1;
+      const selectable = selectablePolygonSummary(entity);
+      if (selectable) {
+        const existing = current.selectableEntities.get(selectable.key);
+        if (existing) existing.occurrenceCount += 1;
+        else current.selectableEntities.set(selectable.key, selectable);
+      }
     }
     layerState.set(layer, current);
   }
@@ -1105,6 +1153,9 @@ export function inspectDxfLayers(text: string): DxfInspectionResult {
       entityCount: state.entityCount,
       entityTypes: [...state.entityTypes].sort((a, b) => a.localeCompare(b)),
       closedLightweightPolylines: state.closedLightweightPolylines,
+      selectableEntities: [...state.selectableEntities.values()].sort((a, b) =>
+        a.key.localeCompare(b.key),
+      ),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
   if (layers.length === 0) {
@@ -1121,8 +1172,8 @@ export function inspectDxfLayers(text: string): DxfInspectionResult {
 }
 
 /**
- * Applies an explicit floor/space layer profile without interpreting layer
- * names. Later slices can add more roles while preserving this profile boundary.
+ * Applies an explicit floor/space/portal mapping profile without interpreting
+ * layer names. Closed polygons may be selected individually by stable geometry.
  */
 export function applyDxfLayerMapping(
   text: string,
@@ -1146,16 +1197,30 @@ export function applyDxfLayerMapping(
   const layerByName = new Map(inspection.layers.map((layer) => [layer.name, layer]));
   const seenSources = new Set<string>();
   const seenTargets = new Set<string>();
+  const sourceModes = new Map<string, Set<'whole' | 'entity'>>();
   const mappingBySource = new Map<string, string>();
   for (const [index, mapping] of profile.mappings.entries()) {
     const path = `/mappings/${index}`;
-    if (seenSources.has(mapping.sourceLayer)) {
+    const entityKey = mapping.sourceEntityKey?.trim() || undefined;
+    const selectionKey = sourceSelectionKey(mapping.sourceLayer, entityKey);
+    if (mapping.sourceEntityKey !== undefined && !entityKey) {
       issue(
         issues,
         'error',
-        'duplicate-source-layer',
-        `${path}/sourceLayer`,
-        `Layer "${mapping.sourceLayer}" is mapped more than once.`,
+        'invalid-source-entity-key',
+        `${path}/sourceEntityKey`,
+        'Source entity key must be non-empty when provided.',
+      );
+    }
+    if (seenSources.has(selectionKey)) {
+      issue(
+        issues,
+        'error',
+        'duplicate-source-selection',
+        entityKey ? `${path}/sourceEntityKey` : `${path}/sourceLayer`,
+        entityKey
+          ? `Entity "${entityKey}" on layer "${mapping.sourceLayer}" is mapped more than once.`
+          : `Layer "${mapping.sourceLayer}" is mapped more than once.`,
       );
     }
     if (seenTargets.has(mapping.targetLayer)) {
@@ -1164,11 +1229,25 @@ export function applyDxfLayerMapping(
         'error',
         'duplicate-target-layer',
         `${path}/targetLayer`,
-        'Every floor or space must have its own semantic target layer.',
+        'Every semantic object must have its own target layer.',
       );
     }
-    seenSources.add(mapping.sourceLayer);
+    seenSources.add(selectionKey);
     seenTargets.add(mapping.targetLayer);
+
+    const mode = entityKey ? 'entity' : 'whole';
+    const modes = sourceModes.get(mapping.sourceLayer) ?? new Set<'whole' | 'entity'>();
+    modes.add(mode);
+    sourceModes.set(mapping.sourceLayer, modes);
+    if (modes.size > 1) {
+      issue(
+        issues,
+        'error',
+        'mixed-source-selection',
+        `${path}/sourceLayer`,
+        `Layer "${mapping.sourceLayer}" cannot mix whole-layer and individual-entity mappings.`,
+      );
+    }
 
     const layer = layerByName.get(mapping.sourceLayer);
     if (!layer) {
@@ -1181,23 +1260,54 @@ export function applyDxfLayerMapping(
       );
       continue;
     }
-    if (
-      !mapping.targetLayer.startsWith('VG$FLOOR$') &&
-      !mapping.targetLayer.startsWith('VG$SPACE$')
-    ) {
+    const polygonTarget =
+      mapping.targetLayer.startsWith('VG$FLOOR$') || mapping.targetLayer.startsWith('VG$SPACE$');
+    const portalTarget = mapping.targetLayer.startsWith('VG$PORTAL$');
+    if (!polygonTarget && !portalTarget) {
       issue(
         issues,
         'error',
         'unsupported-mapping-role',
         `${path}/targetLayer`,
-        'CAD Mapping Workspace v0 Slice 1 supports floor and space targets only.',
+        'CAD Mapping Workspace v0 Slice 3 supports floor, space, and portal targets only.',
       );
     }
+    if (entityKey && !polygonTarget) {
+      issue(
+        issues,
+        'error',
+        'unsupported-entity-mapping-role',
+        `${path}/sourceEntityKey`,
+        'Individual-entity mapping supports closed floor and space polygons only in this slice.',
+      );
+    }
+    if (entityKey && polygonTarget) {
+      const entity = layer.selectableEntities.find((candidate) => candidate.key === entityKey);
+      if (!entity) {
+        issue(
+          issues,
+          'error',
+          'unknown-source-entity',
+          `${path}/sourceEntityKey`,
+          `Entity key does not identify a selectable polygon on layer "${mapping.sourceLayer}".`,
+        );
+      } else if (entity.occurrenceCount !== 1) {
+        issue(
+          issues,
+          'error',
+          'ambiguous-source-entity',
+          `${path}/sourceEntityKey`,
+          `Entity key matches ${entity.occurrenceCount} identical polygons on layer "${mapping.sourceLayer}".`,
+        );
+      }
+    }
     if (
-      layer.entityCount !== 1 ||
-      layer.closedLightweightPolylines !== 1 ||
-      layer.entityTypes.length !== 1 ||
-      layer.entityTypes[0] !== 'LWPOLYLINE'
+      !entityKey &&
+      polygonTarget &&
+      (layer.entityCount !== 1 ||
+        layer.closedLightweightPolylines !== 1 ||
+        layer.entityTypes.length !== 1 ||
+        layer.entityTypes[0] !== 'LWPOLYLINE')
     ) {
       issue(
         issues,
@@ -1207,7 +1317,19 @@ export function applyDxfLayerMapping(
         `Layer "${mapping.sourceLayer}" must contain exactly one closed LWPOLYLINE in this slice.`,
       );
     }
-    mappingBySource.set(mapping.sourceLayer, mapping.targetLayer);
+    if (
+      portalTarget &&
+      (layer.entityCount !== 1 || layer.entityTypes.length !== 1 || layer.entityTypes[0] !== 'LINE')
+    ) {
+      issue(
+        issues,
+        'error',
+        'layer-not-single-line',
+        `${path}/sourceLayer`,
+        `Portal layer "${mapping.sourceLayer}" must contain exactly one LINE in this slice.`,
+      );
+    }
+    mappingBySource.set(selectionKey, mapping.targetLayer);
   }
 
   const finalIssues = sortedIssues(issues);
@@ -1217,9 +1339,22 @@ export function applyDxfLayerMapping(
 
   const parseIssues: DxfImportIssue[] = [];
   const pairs = parsePairs(text, parseIssues);
+  const entities = parseEntities(pairs, parseIssues);
+  const targetByLayerPairLine = new Map<number, string>();
+  for (const entity of entities) {
+    const layerPair = entity.pairs.find((pair) => pair.code === 8);
+    if (!layerPair) continue;
+    const wholeLayerTarget = mappingBySource.get(sourceSelectionKey(layerPair.value));
+    const selectable = selectablePolygonSummary(entity);
+    const entityTarget = selectable
+      ? mappingBySource.get(sourceSelectionKey(layerPair.value, selectable.key))
+      : undefined;
+    const target = entityTarget ?? wholeLayerTarget;
+    if (target) targetByLayerPairLine.set(layerPair.line, target);
+  }
   const mappedText = `${pairs
     .map((pair) => {
-      const value = pair.code === 8 ? (mappingBySource.get(pair.value) ?? pair.value) : pair.value;
+      const value = targetByLayerPairLine.get(pair.line) ?? pair.value;
       return `${pair.code}\n${value}`;
     })
     .join('\n')}\n`;

@@ -11,6 +11,14 @@ const unannotatedFixture = readFileSync(
   new URL('../../buildings/import-fixtures/unannotated-lobby-v0.dxf', import.meta.url),
   'utf8',
 );
+const twoRoomFixture = readFileSync(
+  new URL('../../buildings/import-fixtures/unannotated-two-room-v0.dxf', import.meta.url),
+  'utf8',
+);
+const sharedRoomsFixture = readFileSync(
+  new URL('../../buildings/import-fixtures/unannotated-shared-rooms-v0.dxf', import.meta.url),
+  'utf8',
+);
 
 describe('Studio DXF staging boundary', () => {
   it('replaces the draft only after importer and semantic validation pass', () => {
@@ -101,5 +109,78 @@ describe('Studio DXF staging boundary', () => {
         expect.objectContaining({ code: 'layer-not-single-closed-polyline' }),
       ]),
     );
+  });
+
+  it('stages a mapped portal only after the compiled venue remains semantically valid', () => {
+    const outcome = stageMappedDxfImport(
+      twoRoomFixture,
+      'unannotated-two-room-v0.dxf',
+      'current draft',
+      {
+        profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+        mappings: [
+          {
+            sourceLayer: 'A-FLOOR-OUTLINE',
+            targetLayer: 'VG$FLOOR$g$0$0$3.2$Ground%20Floor',
+          },
+          {
+            sourceLayer: 'A-SPACE-ENTRY',
+            targetLayer: 'VG$SPACE$g$entry$entrance$true$true$Entry%20Lobby',
+          },
+          {
+            sourceLayer: 'A-SPACE-GALLERY',
+            targetLayer: 'VG$SPACE$g$gallery$room$true$true$Gallery',
+          },
+          {
+            sourceLayer: 'A-DOOR-ENTRY-GALLERY',
+            targetLayer: 'VG$PORTAL$g$entry-gallery-door$door$entry$gallery$true$false',
+          },
+        ],
+      },
+    );
+
+    expect(outcome.report.accepted).toBe(true);
+    expect(outcome.report.stats).toMatchObject({ floors: 1, spaces: 2, portals: 1 });
+    expect(JSON.parse(outcome.draftText)).toMatchObject({
+      building: { entrySpaceId: 'entry' },
+      portals: [{ id: 'entry-gallery-door', connects: ['entry', 'gallery'] }],
+    });
+  });
+
+  it('stages two individually selected spaces from one shared CAD layer', () => {
+    const outcome = stageMappedDxfImport(
+      sharedRoomsFixture,
+      'unannotated-shared-rooms-v0.dxf',
+      'current draft',
+      {
+        profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+        mappings: [
+          {
+            sourceLayer: 'A-FLOOR-OUTLINE',
+            targetLayer: 'VG$FLOOR$g$0$0$3.2$Ground%20Floor',
+          },
+          {
+            sourceLayer: 'A-ROOMS',
+            sourceEntityKey: 'lwpolyline:0,0;4,0;4,8;0,8',
+            targetLayer: 'VG$SPACE$g$entry$entrance$true$true$Entry',
+          },
+          {
+            sourceLayer: 'A-ROOMS',
+            sourceEntityKey: 'lwpolyline:4,0;12,0;12,8;4,8',
+            targetLayer: 'VG$SPACE$g$gallery$room$true$true$Gallery',
+          },
+          {
+            sourceLayer: 'A-DOOR-ENTRY-GALLERY',
+            targetLayer: 'VG$PORTAL$g$entry-gallery-door$door$entry$gallery$true$false',
+          },
+        ],
+      },
+    );
+
+    expect(outcome.report.accepted).toBe(true);
+    expect(outcome.report.stats).toMatchObject({ floors: 1, spaces: 2, portals: 1 });
+    expect(JSON.parse(outcome.draftText)).toMatchObject({
+      spaces: [{ id: 'entry' }, { id: 'gallery' }],
+    });
   });
 });

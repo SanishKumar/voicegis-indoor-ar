@@ -8,15 +8,15 @@ importer without renaming layers in a CAD application:
 ```text
 ordinary ASCII DXF
   -> layer inventory
-  -> explicit human-reviewed floor/space mapping profile
+  -> explicit human-reviewed floor/space/portal mapping profile
   -> annotated DXF adapter
   -> BuildingSource validation
   -> staged Studio draft
 ```
 
 The mapping workspace does not infer semantics from layer names or geometry. A
-person chooses which supported layer represents a floor or a space and supplies
-the required canonical metadata.
+person chooses which supported layer represents a floor, space, or portal and
+supplies the required canonical metadata.
 
 ## Profile contract
 
@@ -31,21 +31,42 @@ the required canonical metadata.
     {
       "sourceLayer": "A-SPACE-ENTRY",
       "targetLayer": "VG$SPACE$g$entry$entrance$true$true$Entry%20Lobby"
+    },
+    {
+      "sourceLayer": "A-ROOMS",
+      "sourceEntityKey": "lwpolyline:4,0;12,0;12,8;4,8",
+      "targetLayer": "VG$SPACE$g$gallery$room$true$true$Gallery"
+    },
+    {
+      "sourceLayer": "A-DOOR-ENTRY-GALLERY",
+      "targetLayer": "VG$PORTAL$g$entry-gallery-door$door$entry$gallery$true$false"
     }
   ]
 }
 ```
 
-Mappings are sorted by source-layer name. Reordering the mapping form or DXF
-entities does not change the resulting `BuildingSource` or VenuePackage hash.
+Mappings are sorted by source-layer name and then entity key. A closed polygon
+entity key is derived from canonical geometry, so starting vertex, winding,
+mapping-form order, and DXF entity order do not change the resulting
+`BuildingSource` or VenuePackage hash.
 
 ## Guardrails
 
 - `$INSUNITS` remains mandatory and values are shown in the drawing's declared
   units.
-- A mapped layer must contain exactly one closed `LWPOLYLINE`.
-- Slice 1 accepts only floor and space roles.
+- A whole-layer floor or space mapping must contain exactly one closed
+  `LWPOLYLINE`.
+- When a layer contains multiple entities, each valid closed `LWPOLYLINE` is
+  listed separately and may be mapped using its canonical `sourceEntityKey`.
+- Identical polygons on one layer deliberately share an identity and are
+  rejected as ambiguous rather than selected by unstable file position.
+- A mapped portal layer must contain exactly one `LINE`; its midpoint becomes
+  the portal position and its length becomes the portal width.
+- Slice 3 accepts individual floor/space polygons and whole-layer portal roles
+  only. Individual `LINE` selection is not part of this slice.
 - Public and accessibility policy for spaces must be explicitly selected.
+- Kind, connected spaces, accessibility, and restriction policy for portals
+  must be explicitly selected. A portal cannot connect a space to itself.
 - Invalid profiles, unsupported geometry, schema failures, and semantic failures
   preserve the exact current Studio draft.
 - A mapped import is staged only. Compilation, publishing, and runtime activation
@@ -58,11 +79,20 @@ layers: one floor outline, one entry-space polygon, and one annotation layer.
 Studio inventories all three, allows the two closed polylines to be mapped, and
 keeps the text layer inspection-only.
 
+`buildings/import-fixtures/unannotated-two-room-v0.dxf` adds a second space and
+an ordinary `LINE` on a door layer. Mapping that line as a portal produces a
+semantically validated, routable connection between the entry and gallery.
+
+`buildings/import-fixtures/unannotated-shared-rooms-v0.dxf` places both rooms on
+the same ordinary `A-ROOMS` layer. Studio presents two geometry previews and
+maps each polygon independently while preserving deterministic package identity
+when entity order changes.
+
 ## Remaining CAD mapping work
 
-- multiple semantic objects on one source layer;
-- selecting individual entities instead of whole layers;
-- portal, connector, POI, and localization-anchor mapping;
+- selecting individual portal lines and other non-polygon entities;
+- mixed semantic entity types on one source layer;
+- connector, POI, and localization-anchor mapping;
 - saving, loading, and versioning mapping profiles as artifacts;
 - multi-file floor alignment and georeferencing;
 - blocks, inserts, hatches, splines, holes, DWG, PDF, IFC/BIM, and GeoJSON;
