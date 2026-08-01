@@ -4320,11 +4320,17 @@ body {
   background: #f5f9f7;
 }
 
-.studio-entity-preview polygon {
+.studio-entity-preview polygon,
+.studio-entity-preview line {
   fill: #dbece6;
   stroke: #23816d;
-  stroke-width: 1.5%;
+  stroke-width: 1.5px;
   vector-effect: non-scaling-stroke;
+}
+
+.studio-entity-preview line {
+  stroke-width: 3px;
+  stroke-linecap: round;
 }
 
 .studio-layer-source strong {

@@ -1,6 +1,10 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, Layers3, X } from 'lucide-react';
-import type { DxfInspectionResult, DxfLayerMappingProfile } from '@voicegis/dxf-importer';
+import type {
+  DxfInspectionResult,
+  DxfLayerMappingProfile,
+  DxfSelectableEntitySummary,
+} from '@voicegis/dxf-importer';
 import type { PortalKind, SpaceType } from '@voicegis/spatial-schema';
 import {
   buildDxfLayerMappingProfile,
@@ -28,9 +32,10 @@ function createLayerDrafts(layer: DxfInspectionResult['layers'][number]) {
   return [createDxfLayerMappingDraft(layer)];
 }
 
-function PolygonPreview({ polygon }: { polygon: [number, number][] }) {
-  const xs = polygon.map(([x]) => x);
-  const ys = polygon.map(([, y]) => y);
+function EntityPreview({ entity }: { entity: DxfSelectableEntitySummary }) {
+  const points = entity.type === 'LWPOLYLINE' ? entity.polygon : entity.line;
+  const xs = points.map(([x]) => x);
+  const ys = points.map(([, y]) => y);
   const minX = Math.min(...xs);
   const minY = Math.min(...ys);
   const width = Math.max(0.01, Math.max(...xs) - minX);
@@ -42,7 +47,16 @@ function PolygonPreview({ polygon }: { polygon: [number, number][] }) {
       viewBox={`${minX - padding} ${minY - padding} ${width + padding * 2} ${height + padding * 2}`}
       aria-hidden="true"
     >
-      <polygon points={polygon.map(([x, y]) => `${x},${y}`).join(' ')} />
+      {entity.type === 'LWPOLYLINE' ? (
+        <polygon points={entity.polygon.map(([x, y]) => `${x},${y}`).join(' ')} />
+      ) : (
+        <line
+          x1={entity.line[0][0]}
+          y1={entity.line[0][1]}
+          x2={entity.line[1][0]}
+          y2={entity.line[1][1]}
+        />
+      )}
     </svg>
   );
 }
@@ -98,9 +112,9 @@ export default function DxfLayerMappingPanel({
       <div className="studio-layer-mapper-note">
         <AlertTriangle size={15} />
         <span>
-          Shared-layer closed polygons are listed individually; single closed-polygon layers can
-          still be mapped as a whole. One LINE can become a portal. Accessibility and restriction
-          policies must be reviewed explicitly.
+          Shared-layer closed polygons and portal lines are listed individually; single-entity
+          layers can still be mapped as a whole. Accessibility and restriction policies must be
+          reviewed explicitly.
         </span>
       </div>
 
@@ -116,17 +130,20 @@ export default function DxfLayerMappingPanel({
             ? layer.selectableEntities.findIndex((entity) => entity.key === sourceEntity.key) + 1
             : null;
           const supportsPolygon =
-            (sourceEntity && sourceEntity.occurrenceCount === 1) ||
+            (sourceEntity &&
+              sourceEntity.type === 'LWPOLYLINE' &&
+              sourceEntity.occurrenceCount === 1) ||
             (!sourceEntity &&
               layer.entityCount === 1 &&
               layer.closedLightweightPolylines === 1 &&
               layer.entityTypes.length === 1 &&
               layer.entityTypes[0] === 'LWPOLYLINE');
           const supportsPortal =
-            !sourceEntity &&
-            layer.entityCount === 1 &&
-            layer.entityTypes.length === 1 &&
-            layer.entityTypes[0] === 'LINE';
+            (sourceEntity && sourceEntity.type === 'LINE' && sourceEntity.occurrenceCount === 1) ||
+            (!sourceEntity &&
+              layer.entityCount === 1 &&
+              layer.entityTypes.length === 1 &&
+              layer.entityTypes[0] === 'LINE');
           return (
             <article
               key={`${layer.name}:${draft.sourceEntityKey ?? 'whole'}`}
@@ -134,13 +151,15 @@ export default function DxfLayerMappingPanel({
             >
               <div className="studio-layer-source">
                 <div className="studio-layer-identity">
-                  {sourceEntity && <PolygonPreview polygon={sourceEntity.polygon} />}
+                  {sourceEntity && <EntityPreview entity={sourceEntity} />}
                   <span>
                     <strong>{layer.name}</strong>
                     <small>
-                      {sourceEntity
-                        ? `Polygon ${sourceEntityNumber} of ${layer.selectableEntities.length} · area ${sourceEntity.area}`
-                        : `${layer.entityCount} entities · ${layer.entityTypes.join(', ')} · ${layer.closedLightweightPolylines} closed polylines`}
+                      {sourceEntity?.type === 'LINE'
+                        ? `Line ${sourceEntityNumber} of ${layer.selectableEntities.length} · length ${sourceEntity.length}`
+                        : sourceEntity
+                          ? `Polygon ${sourceEntityNumber} of ${layer.selectableEntities.length} · area ${sourceEntity.area}`
+                          : `${layer.entityCount} entities · ${layer.entityTypes.join(', ')} · ${layer.closedLightweightPolylines} closed polylines`}
                     </small>
                   </span>
                 </div>
@@ -176,7 +195,7 @@ export default function DxfLayerMappingPanel({
               {!supportsPolygon && !supportsPortal && (
                 <p className="studio-layer-unsupported">
                   {sourceEntity?.occurrenceCount && sourceEntity.occurrenceCount > 1
-                    ? `${sourceEntity.occurrenceCount} identical polygons share this geometry identity and cannot be selected safely.`
+                    ? `${sourceEntity.occurrenceCount} identical entities share this geometry identity and cannot be selected safely.`
                     : 'This entity is visible for inspection but cannot be mapped in this slice.'}
                 </p>
               )}

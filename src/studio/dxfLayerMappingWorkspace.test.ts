@@ -58,6 +58,34 @@ const sharedRoomLayer: DxfLayerSummary = {
     },
   ],
 };
+const sharedDoorLayer: DxfLayerSummary = {
+  name: 'A-DOORS',
+  entityCount: 2,
+  entityTypes: ['LINE'],
+  closedLightweightPolylines: 0,
+  selectableEntities: [
+    {
+      key: 'line:4,3.5;4,4.5',
+      type: 'LINE',
+      line: [
+        [4, 3.5],
+        [4, 4.5],
+      ],
+      length: 1,
+      occurrenceCount: 1,
+    },
+    {
+      key: 'line:8,3.5;8,4.5',
+      type: 'LINE',
+      line: [
+        [8, 3.5],
+        [8, 4.5],
+      ],
+      length: 1,
+      occurrenceCount: 1,
+    },
+  ],
+};
 
 describe('Studio CAD layer mapping profile', () => {
   it('builds an explicit deterministic floor and space profile', () => {
@@ -237,6 +265,63 @@ describe('Studio CAD layer mapping profile', () => {
           sourceLayer: 'A-ROOMS',
           sourceEntityKey: 'lwpolyline:4,0;12,0;12,8;4,8',
           targetLayer: 'VG$SPACE$g$gallery$room$true$true$Gallery',
+        },
+      ],
+    );
+  });
+
+  it('preserves stable entity selectors for multiple portals on one CAD layer', () => {
+    const floor = {
+      ...createDxfLayerMappingDraft(floorLayer),
+      role: 'floor' as const,
+      id: 'g',
+    };
+    const space = {
+      ...createDxfLayerMappingDraft(spaceLayer),
+      role: 'space' as const,
+      id: 'entry',
+      floorId: 'g',
+      spaceType: 'entrance' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const firstDoor = {
+      ...createDxfLayerMappingDraft(sharedDoorLayer, sharedDoorLayer.selectableEntities[0], 0),
+      role: 'portal' as const,
+      id: 'entry-gallery-door',
+      floorId: 'g',
+      portalKind: 'door' as const,
+      spaceA: 'entry',
+      spaceB: 'gallery',
+      accessiblePolicy: 'true' as const,
+      restrictedPolicy: 'false' as const,
+    };
+    const secondDoor = {
+      ...createDxfLayerMappingDraft(sharedDoorLayer, sharedDoorLayer.selectableEntities[1], 1),
+      role: 'portal' as const,
+      id: 'gallery-archive-door',
+      floorId: 'g',
+      portalKind: 'door' as const,
+      spaceA: 'gallery',
+      spaceB: 'archive',
+      accessiblePolicy: 'true' as const,
+      restrictedPolicy: 'false' as const,
+    };
+
+    const result = buildDxfLayerMappingProfile([secondDoor, space, floor, firstDoor]);
+
+    expect(result.valid).toBe(true);
+    expect(result.profile?.mappings.filter((mapping) => mapping.sourceLayer === 'A-DOORS')).toEqual(
+      [
+        {
+          sourceLayer: 'A-DOORS',
+          sourceEntityKey: 'line:4,3.5;4,4.5',
+          targetLayer: 'VG$PORTAL$g$entry-gallery-door$door$entry$gallery$true$false',
+        },
+        {
+          sourceLayer: 'A-DOORS',
+          sourceEntityKey: 'line:8,3.5;8,4.5',
+          targetLayer: 'VG$PORTAL$g$gallery-archive-door$door$gallery$archive$true$false',
         },
       ],
     );

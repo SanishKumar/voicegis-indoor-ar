@@ -70,8 +70,7 @@ exercise the browser path.
 
 ## Intentionally remaining
 
-- individual portal-line selection and mixed semantic entity types on one CAD
-  layer;
+- mixed semantic entity types on one CAD layer;
 - legacy `POLYLINE`, blocks, inserts, hatches, splines, and polygon holes;
 - distinct wall-body geometry in `BuildingSource`;
 - multi-file floor alignment and georeferencing;
@@ -83,5 +82,6 @@ canonical source or deterministic compiler.
 
 The implemented human-reviewed
 [CAD Layer Mapping Workspace v0](cad-layer-mapping-v0.md) maps ordinary DXF
-floor and space polygons—including multiple polygons on one layer—and
-single-line portal layers into this annotated profile without guessing.
+floor and space polygons—including multiple polygons on one layer—and portal
+lines—including multiple doors on one layer—into this annotated profile without
+guessing.

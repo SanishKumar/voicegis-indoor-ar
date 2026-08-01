@@ -23,9 +23,15 @@ const sharedRoomsFixture = readFileSync(
   new URL('../../../buildings/import-fixtures/unannotated-shared-rooms-v0.dxf', import.meta.url),
   'utf8',
 );
+const sharedDoorsFixture = readFileSync(
+  new URL('../../../buildings/import-fixtures/unannotated-shared-doors-v0.dxf', import.meta.url),
+  'utf8',
+);
 
 const entryPolygonKey = 'lwpolyline:0,0;4,0;4,8;0,8';
 const galleryPolygonKey = 'lwpolyline:4,0;12,0;12,8;4,8';
+const entryDoorKey = 'line:4,3.5;4,4.5';
+const archiveDoorKey = 'line:8,3.5;8,4.5';
 
 const unannotatedProfile: DxfLayerMappingProfile = {
   profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
@@ -83,6 +89,38 @@ const sharedRoomsProfile: DxfLayerMappingProfile = {
     {
       sourceLayer: 'A-DOOR-ENTRY-GALLERY',
       targetLayer: 'VG$PORTAL$g$entry-gallery-door$door$entry$gallery$true$false',
+    },
+  ],
+};
+
+const sharedDoorsProfile: DxfLayerMappingProfile = {
+  profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+  mappings: [
+    {
+      sourceLayer: 'A-FLOOR-OUTLINE',
+      targetLayer: 'VG$FLOOR$g$0$0$3.2$Ground%20Floor',
+    },
+    {
+      sourceLayer: 'A-SPACE-ENTRY',
+      targetLayer: 'VG$SPACE$g$entry$entrance$true$true$Entry',
+    },
+    {
+      sourceLayer: 'A-SPACE-GALLERY',
+      targetLayer: 'VG$SPACE$g$gallery$room$true$true$Gallery',
+    },
+    {
+      sourceLayer: 'A-SPACE-ARCHIVE',
+      targetLayer: 'VG$SPACE$g$archive$room$true$true$Archive',
+    },
+    {
+      sourceLayer: 'A-DOORS',
+      sourceEntityKey: entryDoorKey,
+      targetLayer: 'VG$PORTAL$g$entry-gallery-door$door$entry$gallery$true$false',
+    },
+    {
+      sourceLayer: 'A-DOORS',
+      sourceEntityKey: archiveDoorKey,
+      targetLayer: 'VG$PORTAL$g$gallery-archive-door$door$gallery$archive$true$false',
     },
   ],
 };
@@ -445,6 +483,114 @@ describe('DXF layer mapping profile v0', () => {
     expect(compileBuilding(secondSource).package?.manifest.contentHash).toBe(
       compileBuilding(firstSource).package?.manifest.contentHash,
     );
+  });
+
+  it('inventories and maps multiple portal lines from one shared CAD layer', () => {
+    const inspected = inspectDxfLayers(sharedDoorsFixture);
+    const doorLayer = inspected.layers.find((layer) => layer.name === 'A-DOORS');
+
+    expect(doorLayer).toMatchObject({
+      entityCount: 2,
+      entityTypes: ['LINE'],
+      closedLightweightPolylines: 0,
+    });
+    expect(doorLayer?.selectableEntities).toEqual([
+      {
+        key: entryDoorKey,
+        type: 'LINE',
+        line: [
+          [4, 3.5],
+          [4, 4.5],
+        ],
+        length: 1,
+        occurrenceCount: 1,
+      },
+      {
+        key: archiveDoorKey,
+        type: 'LINE',
+        line: [
+          [8, 3.5],
+          [8, 4.5],
+        ],
+        length: 1,
+        occurrenceCount: 1,
+      },
+    ]);
+
+    const mapped = applyDxfLayerMapping(sharedDoorsFixture, sharedDoorsProfile);
+    expect(mapped.valid).toBe(true);
+    const imported = importAnnotatedDxf(mapped.text!, {
+      fileName: 'unannotated-shared-doors-v0.dxf',
+    });
+    expect(imported.valid).toBe(true);
+    expect(imported.source?.portals).toEqual([
+      expect.objectContaining({ id: 'entry-gallery-door', position: [4, 4], width: 1 }),
+      expect.objectContaining({ id: 'gallery-archive-door', position: [8, 4], width: 1 }),
+    ]);
+    const compiled = compileBuilding(imported.source);
+    expect(compiled.report.valid).toBe(true);
+    expect(compiled.package?.routing.nodes.filter((node) => node.kind === 'portal')).toHaveLength(
+      2,
+    );
+  });
+
+  it('keeps portal-line selection stable across endpoint, entity, and mapping order', () => {
+    const reversedEndpoints = sharedDoorsFixture.replace(
+      '0\nLINE\n8\nA-DOORS\n10\n4\n20\n3.5\n11\n4\n21\n4.5',
+      '0\nLINE\n8\nA-DOORS\n10\n4\n20\n4.5\n11\n4\n21\n3.5',
+    );
+    const first = applyDxfLayerMapping(sharedDoorsFixture, sharedDoorsProfile);
+    const second = applyDxfLayerMapping(reorderEntities(reversedEndpoints), {
+      ...sharedDoorsProfile,
+      mappings: [...sharedDoorsProfile.mappings].reverse(),
+    });
+    const firstSource = importAnnotatedDxf(first.text!, {
+      fileName: 'unannotated-shared-doors-v0.dxf',
+    }).source;
+    const secondSource = importAnnotatedDxf(second.text!, {
+      fileName: 'unannotated-shared-doors-v0.dxf',
+    }).source;
+
+    expect(secondSource).toEqual(firstSource);
+    expect(compileBuilding(secondSource).package?.manifest.contentHash).toBe(
+      compileBuilding(firstSource).package?.manifest.contentHash,
+    );
+  });
+
+  it('rejects ambiguous portal lines and entity-role mismatches', () => {
+    const duplicateDoorGeometry = sharedDoorsFixture.replace(
+      '10\n8\n20\n3.5\n11\n8\n21\n4.5',
+      '10\n4\n20\n3.5\n11\n4\n21\n4.5',
+    );
+    const ambiguous = applyDxfLayerMapping(duplicateDoorGeometry, {
+      profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+      mappings: [
+        {
+          sourceLayer: 'A-DOORS',
+          sourceEntityKey: entryDoorKey,
+          targetLayer: 'VG$PORTAL$g$door$door$entry$gallery$true$false',
+        },
+      ],
+    });
+    const wrongRole = applyDxfLayerMapping(sharedDoorsFixture, {
+      profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+      mappings: [
+        {
+          sourceLayer: 'A-DOORS',
+          sourceEntityKey: entryDoorKey,
+          targetLayer: 'VG$SPACE$g$entry$entrance$true$true$Entry',
+        },
+      ],
+    });
+
+    expect(ambiguous.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'ambiguous-source-entity' })]),
+    );
+    expect(wrongRole.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'source-entity-type-mismatch' })]),
+    );
+    expect(ambiguous.text).toBeNull();
+    expect(wrongRole.text).toBeNull();
   });
 
   it('rejects unknown and ambiguous geometry selectors instead of guessing', () => {

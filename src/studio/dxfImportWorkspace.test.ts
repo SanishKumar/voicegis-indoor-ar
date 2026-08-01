@@ -19,6 +19,10 @@ const sharedRoomsFixture = readFileSync(
   new URL('../../buildings/import-fixtures/unannotated-shared-rooms-v0.dxf', import.meta.url),
   'utf8',
 );
+const sharedDoorsFixture = readFileSync(
+  new URL('../../buildings/import-fixtures/unannotated-shared-doors-v0.dxf', import.meta.url),
+  'utf8',
+);
 
 describe('Studio DXF staging boundary', () => {
   it('replaces the draft only after importer and semantic validation pass', () => {
@@ -181,6 +185,51 @@ describe('Studio DXF staging boundary', () => {
     expect(outcome.report.stats).toMatchObject({ floors: 1, spaces: 2, portals: 1 });
     expect(JSON.parse(outcome.draftText)).toMatchObject({
       spaces: [{ id: 'entry' }, { id: 'gallery' }],
+    });
+  });
+
+  it('stages two individually selected portals from one shared CAD layer', () => {
+    const outcome = stageMappedDxfImport(
+      sharedDoorsFixture,
+      'unannotated-shared-doors-v0.dxf',
+      'current draft',
+      {
+        profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+        mappings: [
+          {
+            sourceLayer: 'A-FLOOR-OUTLINE',
+            targetLayer: 'VG$FLOOR$g$0$0$3.2$Ground%20Floor',
+          },
+          {
+            sourceLayer: 'A-SPACE-ENTRY',
+            targetLayer: 'VG$SPACE$g$entry$entrance$true$true$Entry',
+          },
+          {
+            sourceLayer: 'A-SPACE-GALLERY',
+            targetLayer: 'VG$SPACE$g$gallery$room$true$true$Gallery',
+          },
+          {
+            sourceLayer: 'A-SPACE-ARCHIVE',
+            targetLayer: 'VG$SPACE$g$archive$room$true$true$Archive',
+          },
+          {
+            sourceLayer: 'A-DOORS',
+            sourceEntityKey: 'line:4,3.5;4,4.5',
+            targetLayer: 'VG$PORTAL$g$entry-gallery-door$door$entry$gallery$true$false',
+          },
+          {
+            sourceLayer: 'A-DOORS',
+            sourceEntityKey: 'line:8,3.5;8,4.5',
+            targetLayer: 'VG$PORTAL$g$gallery-archive-door$door$gallery$archive$true$false',
+          },
+        ],
+      },
+    );
+
+    expect(outcome.report.accepted).toBe(true);
+    expect(outcome.report.stats).toMatchObject({ floors: 1, spaces: 3, portals: 2 });
+    expect(JSON.parse(outcome.draftText)).toMatchObject({
+      portals: [{ id: 'entry-gallery-door' }, { id: 'gallery-archive-door' }],
     });
   });
 });

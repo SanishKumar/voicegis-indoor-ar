@@ -40,15 +40,21 @@ supplies the required canonical metadata.
     {
       "sourceLayer": "A-DOOR-ENTRY-GALLERY",
       "targetLayer": "VG$PORTAL$g$entry-gallery-door$door$entry$gallery$true$false"
+    },
+    {
+      "sourceLayer": "A-DOORS",
+      "sourceEntityKey": "line:8,3.5;8,4.5",
+      "targetLayer": "VG$PORTAL$g$gallery-archive-door$door$gallery$archive$true$false"
     }
   ]
 }
 ```
 
 Mappings are sorted by source-layer name and then entity key. A closed polygon
-entity key is derived from canonical geometry, so starting vertex, winding,
-mapping-form order, and DXF entity order do not change the resulting
-`BuildingSource` or VenuePackage hash.
+entity key is derived from canonical geometry. A line key also sorts its
+endpoints. Starting vertex, winding, line direction, mapping-form order, and DXF
+entity order therefore do not change the resulting `BuildingSource` or
+VenuePackage hash.
 
 ## Guardrails
 
@@ -56,14 +62,16 @@ mapping-form order, and DXF entity order do not change the resulting
   units.
 - A whole-layer floor or space mapping must contain exactly one closed
   `LWPOLYLINE`.
-- When a layer contains multiple entities, each valid closed `LWPOLYLINE` is
-  listed separately and may be mapped using its canonical `sourceEntityKey`.
-- Identical polygons on one layer deliberately share an identity and are
+- When a layer contains multiple entities, each valid closed `LWPOLYLINE` and
+  non-zero `LINE` is listed separately and may be mapped using its canonical
+  `sourceEntityKey`.
+- Identical selectable entities on one layer deliberately share an identity and are
   rejected as ambiguous rather than selected by unstable file position.
-- A mapped portal layer must contain exactly one `LINE`; its midpoint becomes
-  the portal position and its length becomes the portal width.
-- Slice 3 accepts individual floor/space polygons and whole-layer portal roles
-  only. Individual `LINE` selection is not part of this slice.
+- A whole-layer portal mapping must contain exactly one `LINE`. Shared-layer
+  portals select one canonical line identity. Its midpoint becomes the portal
+  position and its length becomes the portal width.
+- Slice 4 accepts individual floor/space polygons and individual portal lines.
+  Entity type and selected semantic role must agree.
 - Public and accessibility policy for spaces must be explicitly selected.
 - Kind, connected spaces, accessibility, and restriction policy for portals
   must be explicitly selected. A portal cannot connect a space to itself.
@@ -88,10 +96,14 @@ the same ordinary `A-ROOMS` layer. Studio presents two geometry previews and
 maps each polygon independently while preserving deterministic package identity
 when entity order changes.
 
+`buildings/import-fixtures/unannotated-shared-doors-v0.dxf` places two door
+lines on one ordinary `A-DOORS` layer. Studio maps each line to a different
+space pair and the compiled graph contains two independently routable portals.
+
 ## Remaining CAD mapping work
 
-- selecting individual portal lines and other non-polygon entities;
 - mixed semantic entity types on one source layer;
+- selecting individual point-based POIs, anchors, and connector stops;
 - connector, POI, and localization-anchor mapping;
 - saving, loading, and versioning mapping profiles as artifacts;
 - multi-file floor alignment and georeferencing;

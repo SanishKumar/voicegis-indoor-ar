@@ -65,13 +65,24 @@ export interface DxfLayerSummary {
   selectableEntities: DxfSelectableEntitySummary[];
 }
 
-export interface DxfSelectableEntitySummary {
+export interface DxfSelectableEntityBase {
   key: string;
+  occurrenceCount: number;
+}
+
+export interface DxfSelectablePolygonSummary extends DxfSelectableEntityBase {
   type: 'LWPOLYLINE';
   polygon: Coordinate2D[];
   area: number;
-  occurrenceCount: number;
 }
+
+export interface DxfSelectableLineSummary extends DxfSelectableEntityBase {
+  type: 'LINE';
+  line: [Coordinate2D, Coordinate2D];
+  length: number;
+}
+
+export type DxfSelectableEntitySummary = DxfSelectablePolygonSummary | DxfSelectableLineSummary;
 
 export interface DxfInspectionResult {
   valid: boolean;
@@ -525,7 +536,7 @@ function polygonEntityKey(polygon: Coordinate2D[]) {
   return `lwpolyline:${polygon.map(([x, y]) => `${x},${y}`).join(';')}`;
 }
 
-function selectablePolygonSummary(entity: DxfEntity): DxfSelectableEntitySummary | null {
+function selectablePolygonSummary(entity: DxfEntity): DxfSelectablePolygonSummary | null {
   if (entity.type !== 'LWPOLYLINE' || (Number(firstValue(entity, 70) ?? 0) & 1) !== 1) {
     return null;
   }
@@ -560,20 +571,51 @@ function parseLine(entity: DxfEntity, scale: number, issues: DxfImportIssue[], p
   const x2 = numericValue(firstValue(entity, 11), issues, `${path}/x2`, 'Line end X');
   const y2 = numericValue(firstValue(entity, 21), issues, `${path}/y2`, 'Line end Y');
   if ([x1, y1, x2, y2].some((value) => value === null)) return null;
-  const start: Coordinate2D = [x1! * scale, y1! * scale];
-  const end: Coordinate2D = [x2! * scale, y2! * scale];
+  const start: Coordinate2D = [roundCoordinate(x1! * scale), roundCoordinate(y1! * scale)];
+  const end: Coordinate2D = [roundCoordinate(x2! * scale), roundCoordinate(y2! * scale)];
   const width = Math.hypot(end[0] - start[0], end[1] - start[1]);
   if (width <= EPSILON) {
     issue(issues, 'error', 'zero-width-portal', path, 'Portal line must have a non-zero length.');
     return null;
   }
   return {
+    start,
+    end,
     position: [
       roundCoordinate((start[0] + end[0]) / 2),
       roundCoordinate((start[1] + end[1]) / 2),
     ] as Coordinate2D,
     width: roundCoordinate(width),
   };
+}
+
+function coordinateOrder(a: Coordinate2D, b: Coordinate2D) {
+  return a[0] - b[0] || a[1] - b[1];
+}
+
+function selectableLineSummary(entity: DxfEntity): DxfSelectableLineSummary | null {
+  if (entity.type !== 'LINE') return null;
+  const summaryIssues: DxfImportIssue[] = [];
+  const path = `/entities/${entity.index}`;
+  if (!assertPlanarEntity(entity, summaryIssues, path)) return null;
+  const parsed = parseLine(entity, 1, summaryIssues, path);
+  if (!parsed || summaryIssues.some((entry) => entry.severity === 'error')) return null;
+  const line = (
+    coordinateOrder(parsed.start, parsed.end) <= 0
+      ? [parsed.start, parsed.end]
+      : [parsed.end, parsed.start]
+  ) as [Coordinate2D, Coordinate2D];
+  return {
+    key: `line:${line.map(([x, y]) => `${x},${y}`).join(';')}`,
+    type: 'LINE',
+    line,
+    length: parsed.width,
+    occurrenceCount: 1,
+  };
+}
+
+function selectableEntitySummary(entity: DxfEntity): DxfSelectableEntitySummary | null {
+  return selectablePolygonSummary(entity) ?? selectableLineSummary(entity);
 }
 
 function inferredBuildingId(fileName: string | undefined) {
@@ -1137,12 +1179,12 @@ export function inspectDxfLayers(text: string): DxfInspectionResult {
     current.entityTypes.add(entity.type);
     if (entity.type === 'LWPOLYLINE' && (Number(firstValue(entity, 70) ?? 0) & 1) === 1) {
       current.closedLightweightPolylines += 1;
-      const selectable = selectablePolygonSummary(entity);
-      if (selectable) {
-        const existing = current.selectableEntities.get(selectable.key);
-        if (existing) existing.occurrenceCount += 1;
-        else current.selectableEntities.set(selectable.key, selectable);
-      }
+    }
+    const selectable = selectableEntitySummary(entity);
+    if (selectable) {
+      const existing = current.selectableEntities.get(selectable.key);
+      if (existing) existing.occurrenceCount += 1;
+      else current.selectableEntities.set(selectable.key, selectable);
     }
     layerState.set(layer, current);
   }
@@ -1173,7 +1215,8 @@ export function inspectDxfLayers(text: string): DxfInspectionResult {
 
 /**
  * Applies an explicit floor/space/portal mapping profile without interpreting
- * layer names. Closed polygons may be selected individually by stable geometry.
+ * layer names. Closed polygons and portal lines may be selected individually by
+ * stable geometry.
  */
 export function applyDxfLayerMapping(
   text: string,
@@ -1269,19 +1312,10 @@ export function applyDxfLayerMapping(
         'error',
         'unsupported-mapping-role',
         `${path}/targetLayer`,
-        'CAD Mapping Workspace v0 Slice 3 supports floor, space, and portal targets only.',
+        'CAD Mapping Workspace v0 Slice 4 supports floor, space, and portal targets only.',
       );
     }
-    if (entityKey && !polygonTarget) {
-      issue(
-        issues,
-        'error',
-        'unsupported-entity-mapping-role',
-        `${path}/sourceEntityKey`,
-        'Individual-entity mapping supports closed floor and space polygons only in this slice.',
-      );
-    }
-    if (entityKey && polygonTarget) {
+    if (entityKey && (polygonTarget || portalTarget)) {
       const entity = layer.selectableEntities.find((candidate) => candidate.key === entityKey);
       if (!entity) {
         issue(
@@ -1289,7 +1323,7 @@ export function applyDxfLayerMapping(
           'error',
           'unknown-source-entity',
           `${path}/sourceEntityKey`,
-          `Entity key does not identify a selectable polygon on layer "${mapping.sourceLayer}".`,
+          `Entity key does not identify a selectable entity on layer "${mapping.sourceLayer}".`,
         );
       } else if (entity.occurrenceCount !== 1) {
         issue(
@@ -1297,7 +1331,23 @@ export function applyDxfLayerMapping(
           'error',
           'ambiguous-source-entity',
           `${path}/sourceEntityKey`,
-          `Entity key matches ${entity.occurrenceCount} identical polygons on layer "${mapping.sourceLayer}".`,
+          `Entity key matches ${entity.occurrenceCount} identical entities on layer "${mapping.sourceLayer}".`,
+        );
+      } else if (polygonTarget && entity.type !== 'LWPOLYLINE') {
+        issue(
+          issues,
+          'error',
+          'source-entity-type-mismatch',
+          `${path}/sourceEntityKey`,
+          'Floor and space targets require a closed LWPOLYLINE entity.',
+        );
+      } else if (portalTarget && entity.type !== 'LINE') {
+        issue(
+          issues,
+          'error',
+          'source-entity-type-mismatch',
+          `${path}/sourceEntityKey`,
+          'Portal targets require a LINE entity.',
         );
       }
     }
@@ -1318,6 +1368,7 @@ export function applyDxfLayerMapping(
       );
     }
     if (
+      !entityKey &&
       portalTarget &&
       (layer.entityCount !== 1 || layer.entityTypes.length !== 1 || layer.entityTypes[0] !== 'LINE')
     ) {
@@ -1345,7 +1396,7 @@ export function applyDxfLayerMapping(
     const layerPair = entity.pairs.find((pair) => pair.code === 8);
     if (!layerPair) continue;
     const wholeLayerTarget = mappingBySource.get(sourceSelectionKey(layerPair.value));
-    const selectable = selectablePolygonSummary(entity);
+    const selectable = selectableEntitySummary(entity);
     const entityTarget = selectable
       ? mappingBySource.get(sourceSelectionKey(layerPair.value, selectable.key))
       : undefined;
