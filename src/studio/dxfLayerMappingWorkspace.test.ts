@@ -135,6 +135,27 @@ const sharedConnectorStopLayer: DxfLayerSummary = {
   ],
 };
 
+const sharedAnchorLayer: DxfLayerSummary = {
+  name: 'A-ANCHORS',
+  entityCount: 2,
+  entityTypes: ['POINT'],
+  closedLightweightPolylines: 0,
+  selectableEntities: [
+    {
+      key: 'point:2,2',
+      type: 'POINT',
+      point: [2, 2],
+      occurrenceCount: 1,
+    },
+    {
+      key: 'point:6,6',
+      type: 'POINT',
+      point: [6, 6],
+      occurrenceCount: 1,
+    },
+  ],
+};
+
 describe('Studio CAD layer mapping profile', () => {
   it('builds an explicit deterministic floor and space profile', () => {
     const floor = {
@@ -463,6 +484,162 @@ describe('Studio CAD layer mapping profile', () => {
         expect.objectContaining({ code: 'missing-public-policy' }),
         expect.objectContaining({ code: 'missing-accessibility-policy' }),
       ]),
+    );
+  });
+
+  it('builds deterministic localization-anchor selectors with surveyed heading and payload', () => {
+    const floor = {
+      ...createDxfLayerMappingDraft(floorLayer),
+      role: 'floor' as const,
+      id: 'g',
+    };
+    const entry = {
+      ...createDxfLayerMappingDraft(spaceLayer),
+      role: 'space' as const,
+      id: 'entry',
+      floorId: 'g',
+      spaceType: 'entrance' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const gallery = {
+      ...createDxfLayerMappingDraft(gallerySpaceLayer),
+      role: 'space' as const,
+      id: 'gallery',
+      floorId: 'g',
+      spaceType: 'room' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const entryAnchor = {
+      ...createDxfLayerMappingDraft(sharedAnchorLayer, sharedAnchorLayer.selectableEntities[0], 0),
+      role: 'anchor' as const,
+      id: 'entry-anchor',
+      floorId: 'g',
+      spaceId: 'entry',
+      anchorKind: 'qr' as const,
+      headingDegrees: '90',
+      anchorPayload: 'vg:entry-anchor',
+    };
+    const galleryAnchor = {
+      ...createDxfLayerMappingDraft(sharedAnchorLayer, sharedAnchorLayer.selectableEntities[1], 1),
+      role: 'anchor' as const,
+      id: 'gallery-anchor',
+      floorId: 'g',
+      spaceId: 'gallery',
+      anchorKind: 'apriltag' as const,
+      headingDegrees: '270',
+      anchorPayload: 'vg:gallery-anchor',
+    };
+
+    const result = buildDxfLayerMappingProfile([galleryAnchor, gallery, floor, entryAnchor, entry]);
+
+    expect(result.valid).toBe(true);
+    expect(
+      result.profile?.mappings.filter((mapping) => mapping.sourceLayer === 'A-ANCHORS'),
+    ).toEqual([
+      {
+        sourceLayer: 'A-ANCHORS',
+        sourceEntityKey: 'point:2,2',
+        targetLayer: 'VG$ANCHOR$g$entry$entry-anchor$qr$90$vg%3Aentry-anchor',
+      },
+      {
+        sourceLayer: 'A-ANCHORS',
+        sourceEntityKey: 'point:6,6',
+        targetLayer: 'VG$ANCHOR$g$gallery$gallery-anchor$apriltag$270$vg%3Agallery-anchor',
+      },
+    ]);
+  });
+
+  it('fails closed for unreviewed, out-of-range, or ambiguous anchor metadata', () => {
+    const floor = {
+      ...createDxfLayerMappingDraft(floorLayer),
+      role: 'floor' as const,
+      id: 'g',
+    };
+    const space = {
+      ...createDxfLayerMappingDraft(spaceLayer),
+      role: 'space' as const,
+      id: 'entry',
+      floorId: 'g',
+      spaceType: 'entrance' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const unreviewed = {
+      ...createDxfLayerMappingDraft(sharedAnchorLayer, sharedAnchorLayer.selectableEntities[0], 0),
+      role: 'anchor' as const,
+      id: 'entry-anchor',
+      floorId: 'g',
+      spaceId: 'entry',
+    };
+    const outOfRange = {
+      ...createDxfLayerMappingDraft(sharedAnchorLayer, sharedAnchorLayer.selectableEntities[1], 1),
+      role: 'anchor' as const,
+      id: 'gallery-anchor',
+      floorId: 'g',
+      spaceId: 'entry',
+      anchorKind: 'qr' as const,
+      headingDegrees: '360',
+      anchorPayload: 'vg:entry-anchor',
+    };
+
+    const result = buildDxfLayerMappingProfile([floor, space, unreviewed, outOfRange]);
+
+    expect(result.valid).toBe(false);
+    expect(result.profile).toBeNull();
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'missing-anchor-kind' }),
+        expect.objectContaining({ code: 'invalid-mapping-number' }),
+        expect.objectContaining({ code: 'missing-anchor-payload' }),
+        expect.objectContaining({ code: 'invalid-anchor-heading' }),
+      ]),
+    );
+  });
+
+  it('rejects two anchors that share one scannable payload', () => {
+    const floor = {
+      ...createDxfLayerMappingDraft(floorLayer),
+      role: 'floor' as const,
+      id: 'g',
+    };
+    const space = {
+      ...createDxfLayerMappingDraft(spaceLayer),
+      role: 'space' as const,
+      id: 'entry',
+      floorId: 'g',
+      spaceType: 'entrance' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const anchor = {
+      ...createDxfLayerMappingDraft(sharedAnchorLayer, sharedAnchorLayer.selectableEntities[0], 0),
+      role: 'anchor' as const,
+      id: 'entry-anchor',
+      floorId: 'g',
+      spaceId: 'entry',
+      anchorKind: 'qr' as const,
+      headingDegrees: '0',
+      anchorPayload: 'vg:shared',
+    };
+    const duplicate = {
+      ...createDxfLayerMappingDraft(sharedAnchorLayer, sharedAnchorLayer.selectableEntities[1], 1),
+      role: 'anchor' as const,
+      id: 'gallery-anchor',
+      floorId: 'g',
+      spaceId: 'entry',
+      anchorKind: 'qr' as const,
+      headingDegrees: '180',
+      anchorPayload: 'vg:shared',
+    };
+
+    const result = buildDxfLayerMappingProfile([floor, space, anchor, duplicate]);
+
+    expect(result.valid).toBe(false);
+    expect(result.profile).toBeNull();
+    expect(result.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'duplicate-anchor-payload' })]),
     );
   });
 

@@ -17,3 +17,7 @@ Thumbs.db
 docs/private/
 docs/drafts/
 *.draft.md
+
+# Local agent/editor tooling
+.claude/
+.agents/

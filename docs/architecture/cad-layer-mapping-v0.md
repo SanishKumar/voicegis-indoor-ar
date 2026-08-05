@@ -8,7 +8,7 @@ importer without renaming layers in a CAD application:
 ```text
 ordinary ASCII DXF
   -> layer inventory
-  -> explicit human-reviewed floor/space/portal/POI/connector-stop mapping profile
+  -> explicit human-reviewed floor/space/portal/POI/connector-stop/anchor mapping profile
   -> annotated DXF adapter
   -> BuildingSource validation
   -> staged Studio draft
@@ -16,7 +16,8 @@ ordinary ASCII DXF
 
 The mapping workspace does not infer semantics from layer names or geometry. A
 person chooses which supported entity represents a floor, space, portal, POI,
-or vertical-connector stop and supplies the required canonical metadata.
+vertical-connector stop, or localization anchor and supplies the required
+canonical metadata.
 
 ## Profile contract
 
@@ -60,6 +61,11 @@ or vertical-connector stop and supplies the required canonical metadata.
       "sourceLayer": "A-RAMP-STOPS",
       "sourceEntityKey": "point:4.2,4",
       "targetLayer": "VG$CONNECTOR$east-ramp$ramp$true$false$l1$gallery$East%20Ramp"
+    },
+    {
+      "sourceLayer": "A-ANCHORS",
+      "sourceEntityKey": "point:2,2",
+      "targetLayer": "VG$ANCHOR$g$entry$entry-anchor$qr$90$vg%3Aentry-anchor"
     }
   ]
 }
@@ -70,6 +76,31 @@ keys use canonical geometry, line keys sort their endpoints, and point keys use
 rounded XY coordinates. Starting vertex, winding, line direction, mapping-form
 order, and DXF entity order therefore do not change the resulting
 `BuildingSource` or VenuePackage hash.
+
+## Reusable profile artifacts
+
+A completed profile can be saved as a JSON artifact and replayed against a later
+revision of the same drawing:
+
+```json
+{
+  "artifactVersion": "0.1.0",
+  "profileVersion": "0.1.0",
+  "sourceFileName": "unannotated-shared-anchors-v0.dxf",
+  "mappings": [{ "sourceLayer": "A-FLOOR-OUTLINE", "targetLayer": "VG$FLOOR$g$0$0$3.2$Ground%20Floor" }]
+}
+```
+
+Artifacts are canonical JSON, so the same profile always produces the same bytes
+and the same SHA-256 artifact hash. `sourceFileName` is provenance only and never
+gates loading — replaying a profile onto a different drawing is the point.
+
+Loading resolves every mapping against the slots the open drawing actually
+offers. A selection that no longer exists, a whole-layer mapping on a layer that
+has since gained entities, a duplicated selection, or a hand-edited target layer
+carrying an unknown role, enum, or unreviewed policy fails the entire restore and
+leaves the current mapping untouched. Only a fully valid mapping can be saved, so
+an artifact never captures a half-reviewed draft.
 
 ## Guardrails
 
@@ -85,10 +116,12 @@ order, and DXF entity order therefore do not change the resulting
 - A whole-layer portal mapping must contain exactly one `LINE`. Shared-layer
   portals select one canonical line identity. Its midpoint becomes the portal
   position and its length becomes the portal width.
-- A whole-layer POI or connector-stop mapping must contain exactly one `POINT`.
-  Shared-layer semantic points select one canonical point identity.
-- Slice 6 accepts individual floor/space polygons, portal lines, POI points, and
-  connector-stop points. Entity type and selected semantic role must agree.
+- A whole-layer POI, connector-stop, or localization-anchor mapping must contain
+  exactly one `POINT`. Shared-layer semantic points select one canonical point
+  identity.
+- Slice 7 accepts individual floor/space polygons, portal lines, POI points,
+  connector-stop points, and localization-anchor points. Entity type and selected
+  semantic role must agree.
 - Public and accessibility policy for spaces must be explicitly selected.
 - Kind, connected spaces, accessibility, and restriction policy for portals
   must be explicitly selected. A portal cannot connect a space to itself.
@@ -98,6 +131,10 @@ order, and DXF entity order therefore do not change the resulting
   space, accessibility policy, and restriction policy. A connector requires at
   least two stops, may have only one stop per floor, and every stop sharing its
   ID must use identical connector metadata.
+- Every localization anchor requires an ID, floor, containing space, kind, a
+  surveyed heading in `[0, 360)`, and a payload of at most 512 characters. Two
+  anchors may not share one payload, because a scanned payload must identify
+  exactly one anchor before frozen guidance is allowed to recover.
 - Invalid profiles, unsupported geometry, schema failures, and semantic failures
   preserve the exact current Studio draft.
 - A mapped import is staged only. Compilation, publishing, and runtime activation
@@ -133,11 +170,17 @@ two floors and two points on one ordinary `A-RAMP-STOPS` layer. Studio groups
 the points into one accessible ramp with explicitly assigned floor and space
 stops; compiler validation proves the upper public space remains reachable.
 
+`buildings/import-fixtures/unannotated-shared-anchors-v0.dxf` places two points on
+one ordinary `A-ANCHORS` layer, plus one entry POI so the compiled draft also
+satisfies the runtime bootstrap contract. Studio maps each anchor point to an
+independently surveyed anchor with its own kind, heading, and payload, and
+refuses two anchors that would answer to the same scanned payload.
+
 ## Remaining CAD mapping work
 
 - explicit mixed-role validation on layers that combine entity types;
-- selecting and mapping individual localization-anchor points;
-- saving, loading, and versioning mapping profiles as artifacts;
+- a stored profile registry with revision history and promotion, beyond the
+  single save/load artifact in this slice;
 - multi-file floor alignment and georeferencing;
 - blocks, inserts, hatches, splines, holes, DWG, PDF, IFC/BIM, and GeoJSON;
 - automatic recognition and every CV/scanning workflow.

@@ -1239,9 +1239,9 @@ export function inspectDxfLayers(text: string): DxfInspectionResult {
 }
 
 /**
- * Applies an explicit floor/space/portal/POI/connector mapping profile without
- * interpreting layer names. Closed polygons, portal lines, and semantic points
- * may be selected individually by stable geometry.
+ * Applies an explicit floor/space/portal/POI/connector/anchor mapping profile
+ * without interpreting layer names. Closed polygons, portal lines, and semantic
+ * points may be selected individually by stable geometry.
  */
 export function applyDxfLayerMapping(
   text: string,
@@ -1333,16 +1333,20 @@ export function applyDxfLayerMapping(
     const portalTarget = mapping.targetLayer.startsWith('VG$PORTAL$');
     const poiTarget = mapping.targetLayer.startsWith('VG$POI$');
     const connectorTarget = mapping.targetLayer.startsWith('VG$CONNECTOR$');
-    if (!polygonTarget && !portalTarget && !poiTarget && !connectorTarget) {
+    const anchorTarget = mapping.targetLayer.startsWith('VG$ANCHOR$');
+    if (!polygonTarget && !portalTarget && !poiTarget && !connectorTarget && !anchorTarget) {
       issue(
         issues,
         'error',
         'unsupported-mapping-role',
         `${path}/targetLayer`,
-        'CAD Mapping Workspace v0 Slice 6 supports floor, space, portal, POI, and connector-stop targets only.',
+        'CAD Mapping Workspace v0 Slice 7 supports floor, space, portal, POI, connector-stop, and localization-anchor targets only.',
       );
     }
-    if (entityKey && (polygonTarget || portalTarget || poiTarget || connectorTarget)) {
+    if (
+      entityKey &&
+      (polygonTarget || portalTarget || poiTarget || connectorTarget || anchorTarget)
+    ) {
       const entity = layer.selectableEntities.find((candidate) => candidate.key === entityKey);
       if (!entity) {
         issue(
@@ -1391,6 +1395,14 @@ export function applyDxfLayerMapping(
           'source-entity-type-mismatch',
           `${path}/sourceEntityKey`,
           'Connector-stop targets require a POINT entity.',
+        );
+      } else if (anchorTarget && entity.type !== 'POINT') {
+        issue(
+          issues,
+          'error',
+          'source-entity-type-mismatch',
+          `${path}/sourceEntityKey`,
+          'Localization-anchor targets require a POINT entity.',
         );
       }
     }
@@ -1451,6 +1463,21 @@ export function applyDxfLayerMapping(
         'layer-not-single-point',
         `${path}/sourceLayer`,
         `Connector-stop layer "${mapping.sourceLayer}" must contain exactly one POINT in this slice.`,
+      );
+    }
+    if (
+      !entityKey &&
+      anchorTarget &&
+      (layer.entityCount !== 1 ||
+        layer.entityTypes.length !== 1 ||
+        layer.entityTypes[0] !== 'POINT')
+    ) {
+      issue(
+        issues,
+        'error',
+        'layer-not-single-point',
+        `${path}/sourceLayer`,
+        `Localization-anchor layer "${mapping.sourceLayer}" must contain exactly one POINT in this slice.`,
       );
     }
     mappingBySource.set(selectionKey, mapping.targetLayer);

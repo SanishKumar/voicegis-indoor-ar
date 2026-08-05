@@ -38,6 +38,10 @@ const sharedConnectorStopsFixture = readFileSync(
   ),
   'utf8',
 );
+const sharedAnchorsFixture = readFileSync(
+  new URL('../../../buildings/import-fixtures/unannotated-shared-anchors-v0.dxf', import.meta.url),
+  'utf8',
+);
 
 const entryPolygonKey = 'lwpolyline:0,0;4,0;4,8;0,8';
 const galleryPolygonKey = 'lwpolyline:4,0;12,0;12,8;4,8';
@@ -47,6 +51,8 @@ const receptionPointKey = 'point:1.5,4';
 const exhibitPointKey = 'point:6,4';
 const groundRampPointKey = 'point:4,4';
 const levelOneRampPointKey = 'point:4.2,4';
+const entryAnchorPointKey = 'point:2,2';
+const galleryAnchorPointKey = 'point:6,6';
 
 const unannotatedProfile: DxfLayerMappingProfile = {
   profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
@@ -153,6 +159,27 @@ const sharedPoisProfile: DxfLayerMappingProfile = {
       sourceLayer: 'A-POIS',
       sourceEntityKey: exhibitPointKey,
       targetLayer: 'VG$POI$g$gallery$featured-exhibit$exhibit$true$true$Featured%20Exhibit',
+    },
+  ],
+};
+
+const sharedAnchorsProfile: DxfLayerMappingProfile = {
+  profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+  mappings: [
+    ...sharedDoorsProfile.mappings,
+    {
+      sourceLayer: 'A-POIS',
+      targetLayer: 'VG$POI$g$entry$reception$service$true$true$Reception',
+    },
+    {
+      sourceLayer: 'A-ANCHORS',
+      sourceEntityKey: entryAnchorPointKey,
+      targetLayer: 'VG$ANCHOR$g$entry$entry-anchor$qr$90$vg%3Aentry-anchor',
+    },
+    {
+      sourceLayer: 'A-ANCHORS',
+      sourceEntityKey: galleryAnchorPointKey,
+      targetLayer: 'VG$ANCHOR$g$gallery$gallery-anchor$apriltag$270$vg%3Agallery-anchor',
     },
   ],
 };
@@ -849,6 +876,107 @@ describe('DXF layer mapping profile v0', () => {
     );
   });
 
+  it('maps multiple localization anchors from one shared CAD layer', () => {
+    const inspected = inspectDxfLayers(sharedAnchorsFixture);
+    const anchorLayer = inspected.layers.find((layer) => layer.name === 'A-ANCHORS');
+
+    expect(anchorLayer).toMatchObject({
+      entityCount: 2,
+      entityTypes: ['POINT'],
+      closedLightweightPolylines: 0,
+    });
+    expect(anchorLayer?.selectableEntities).toEqual([
+      { key: entryAnchorPointKey, type: 'POINT', point: [2, 2], occurrenceCount: 1 },
+      { key: galleryAnchorPointKey, type: 'POINT', point: [6, 6], occurrenceCount: 1 },
+    ]);
+
+    const mapped = applyDxfLayerMapping(sharedAnchorsFixture, sharedAnchorsProfile);
+    expect(mapped.valid).toBe(true);
+    const imported = importAnnotatedDxf(mapped.text!, {
+      fileName: 'unannotated-shared-anchors-v0.dxf',
+    });
+    expect(imported.valid).toBe(true);
+    expect(imported.source?.localizationAnchors).toEqual([
+      {
+        id: 'entry-anchor',
+        floorId: 'g',
+        spaceId: 'entry',
+        kind: 'qr',
+        position: [2, 2],
+        headingDegrees: 90,
+        payload: 'vg:entry-anchor',
+      },
+      {
+        id: 'gallery-anchor',
+        floorId: 'g',
+        spaceId: 'gallery',
+        kind: 'apriltag',
+        position: [6, 6],
+        headingDegrees: 270,
+        payload: 'vg:gallery-anchor',
+      },
+    ]);
+    const compiled = compileBuilding(imported.source);
+    expect(compiled.report.valid).toBe(true);
+    expect(compiled.package?.localizationAnchors).toHaveLength(2);
+  });
+
+  it('keeps localization anchors stable across entity and mapping order', () => {
+    const first = applyDxfLayerMapping(sharedAnchorsFixture, sharedAnchorsProfile);
+    const second = applyDxfLayerMapping(reorderEntities(sharedAnchorsFixture), {
+      ...sharedAnchorsProfile,
+      mappings: [...sharedAnchorsProfile.mappings].reverse(),
+    });
+    const firstSource = importAnnotatedDxf(first.text!, {
+      fileName: 'unannotated-shared-anchors-v0.dxf',
+    }).source;
+    const secondSource = importAnnotatedDxf(second.text!, {
+      fileName: 'unannotated-shared-anchors-v0.dxf',
+    }).source;
+
+    expect(secondSource).toEqual(firstSource);
+    expect(compileBuilding(secondSource).package?.manifest.contentHash).toBe(
+      compileBuilding(firstSource).package?.manifest.contentHash,
+    );
+  });
+
+  it('rejects non-point localization-anchor selections', () => {
+    const mapped = applyDxfLayerMapping(sharedAnchorsFixture, {
+      profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+      mappings: [
+        {
+          sourceLayer: 'A-DOORS',
+          sourceEntityKey: entryDoorKey,
+          targetLayer: 'VG$ANCHOR$g$entry$entry-anchor$qr$90$vg%3Aentry-anchor',
+        },
+      ],
+    });
+
+    expect(mapped.valid).toBe(false);
+    expect(mapped.text).toBeNull();
+    expect(mapped.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'source-entity-type-mismatch' })]),
+    );
+  });
+
+  it('rejects whole-layer anchor mappings on shared point layers', () => {
+    const mapped = applyDxfLayerMapping(sharedAnchorsFixture, {
+      profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+      mappings: [
+        {
+          sourceLayer: 'A-ANCHORS',
+          targetLayer: 'VG$ANCHOR$g$entry$entry-anchor$qr$90$vg%3Aentry-anchor',
+        },
+      ],
+    });
+
+    expect(mapped.valid).toBe(false);
+    expect(mapped.text).toBeNull();
+    expect(mapped.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'layer-not-single-point' })]),
+    );
+  });
+
   it('rejects unknown and ambiguous geometry selectors instead of guessing', () => {
     const unknown = applyDxfLayerMapping(sharedRoomsFixture, {
       profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
@@ -909,7 +1037,7 @@ describe('DXF layer mapping profile v0', () => {
       mappings: [
         {
           sourceLayer: 'A-FLOOR-OUTLINE',
-          targetLayer: 'VG$ANCHOR$g$entry$a1$qr$0$payload',
+          targetLayer: 'VG$ZONE$g$entry$fire-compartment',
         },
       ],
     });
