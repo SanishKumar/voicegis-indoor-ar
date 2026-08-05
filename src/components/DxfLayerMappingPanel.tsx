@@ -94,10 +94,12 @@ export default function DxfLayerMappingPanel({
   const profile = useMemo(() => buildDxfLayerMappingProfile(drafts), [drafts]);
   const floorIds = drafts
     .filter((draft) => draft.role === 'floor' && draft.id)
-    .map((draft) => draft.id);
+    .map((draft) => draft.id)
+    .filter((id, index, all) => all.indexOf(id) === index);
   const spaceIds = drafts
     .filter((draft) => draft.role === 'space' && draft.id)
-    .map((draft) => draft.id);
+    .map((draft) => draft.id)
+    .filter((id, index, all) => all.indexOf(id) === index);
 
   const updateDraft = (index: number, changes: Partial<DxfLayerMappingDraft>) => {
     setDrafts((current) =>
@@ -769,11 +771,23 @@ export default function DxfLayerMappingPanel({
       </div>
 
       <footer>
-        <span className={profile.valid ? 'valid' : ''}>
-          {profile.valid
-            ? `${profile.profile?.mappings.length ?? 0} layers ready to stage`
-            : `${profile.issues.length} mapping fields need attention`}
-        </span>
+        {profile.valid ? (
+          <span className="valid">
+            {profile.profile?.mappings.length ?? 0} layers ready to stage
+          </span>
+        ) : (
+          <details className="studio-layer-mapper-review">
+            <summary>{profile.issues.length} mapping fields need attention</summary>
+            <ul>
+              {profile.issues.map((entry) => (
+                <li key={`${entry.code}:${entry.path}`}>
+                  <strong>{entry.path}</strong>
+                  {entry.message}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
         <button
           type="button"
           disabled={!profile.profile}

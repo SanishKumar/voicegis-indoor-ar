@@ -234,6 +234,15 @@ describe('Studio CAD layer mapping profile', () => {
       publicPolicy: 'true' as const,
       accessiblePolicy: 'true' as const,
     };
+    const gallery = {
+      ...createDxfLayerMappingDraft(gallerySpaceLayer),
+      role: 'space' as const,
+      id: 'gallery',
+      floorId: 'g',
+      spaceType: 'room' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
     const portal = {
       ...createDxfLayerMappingDraft(portalLayer),
       role: 'portal' as const,
@@ -246,7 +255,7 @@ describe('Studio CAD layer mapping profile', () => {
       restrictedPolicy: 'false' as const,
     };
 
-    const result = buildDxfLayerMappingProfile([floor, space, portal]);
+    const result = buildDxfLayerMappingProfile([floor, space, gallery, portal]);
 
     expect(result.valid).toBe(true);
     expect(result.profile?.mappings).toContainEqual({
@@ -376,8 +385,33 @@ describe('Studio CAD layer mapping profile', () => {
       accessiblePolicy: 'true' as const,
       restrictedPolicy: 'false' as const,
     };
+    const gallery = {
+      ...createDxfLayerMappingDraft(gallerySpaceLayer),
+      role: 'space' as const,
+      id: 'gallery',
+      floorId: 'g',
+      spaceType: 'room' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const archive = {
+      ...createDxfLayerMappingDraft(sharedRoomLayer, sharedRoomLayer.selectableEntities[0], 0),
+      role: 'space' as const,
+      id: 'archive',
+      floorId: 'g',
+      spaceType: 'room' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
 
-    const result = buildDxfLayerMappingProfile([secondDoor, space, floor, firstDoor]);
+    const result = buildDxfLayerMappingProfile([
+      secondDoor,
+      space,
+      floor,
+      firstDoor,
+      gallery,
+      archive,
+    ]);
 
     expect(result.valid).toBe(true);
     expect(result.profile?.mappings.filter((mapping) => mapping.sourceLayer === 'A-DOORS')).toEqual(
@@ -640,6 +674,186 @@ describe('Studio CAD layer mapping profile', () => {
     expect(result.profile).toBeNull();
     expect(result.issues).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'duplicate-anchor-payload' })]),
+    );
+  });
+
+  it('rejects two mapped objects that claim the same canonical id', () => {
+    const floor = {
+      ...createDxfLayerMappingDraft(floorLayer),
+      role: 'floor' as const,
+      id: 'g',
+    };
+    const entry = {
+      ...createDxfLayerMappingDraft(spaceLayer),
+      role: 'space' as const,
+      id: 'entry',
+      floorId: 'g',
+      spaceType: 'entrance' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const collidingSpace = {
+      ...createDxfLayerMappingDraft(gallerySpaceLayer),
+      role: 'space' as const,
+      id: 'entry',
+      floorId: 'g',
+      spaceType: 'room' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const collidingFloor = {
+      ...createDxfLayerMappingDraft(levelOneFloorLayer),
+      role: 'floor' as const,
+      id: 'entry',
+      level: '1',
+      elevation: '3.2',
+    };
+
+    const spaceCollision = buildDxfLayerMappingProfile([floor, entry, collidingSpace]);
+    const crossRoleCollision = buildDxfLayerMappingProfile([floor, entry, collidingFloor]);
+
+    expect(spaceCollision.valid).toBe(false);
+    expect(spaceCollision.profile).toBeNull();
+    expect(spaceCollision.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'duplicate-mapping-id' })]),
+    );
+    expect(crossRoleCollision.valid).toBe(false);
+    expect(crossRoleCollision.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'duplicate-mapping-id' })]),
+    );
+  });
+
+  it('still allows connector stops to share one id while grouping', () => {
+    const groundFloor = { ...createDxfLayerMappingDraft(floorLayer), role: 'floor' as const, id: 'g' };
+    const levelOneFloor = {
+      ...createDxfLayerMappingDraft(levelOneFloorLayer),
+      role: 'floor' as const,
+      id: 'l1',
+      name: 'Level 1',
+      level: '1',
+      elevation: '3.2',
+    };
+    const entry = {
+      ...createDxfLayerMappingDraft(spaceLayer),
+      role: 'space' as const,
+      id: 'entry',
+      floorId: 'g',
+      spaceType: 'entrance' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const gallery = {
+      ...createDxfLayerMappingDraft(gallerySpaceLayer),
+      role: 'space' as const,
+      id: 'gallery',
+      floorId: 'l1',
+      spaceType: 'room' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const stop = (entityIndex: number, floorId: string, spaceId: string) => ({
+      ...createDxfLayerMappingDraft(
+        sharedConnectorStopLayer,
+        sharedConnectorStopLayer.selectableEntities[entityIndex],
+        entityIndex,
+      ),
+      role: 'connector' as const,
+      id: 'east-ramp',
+      name: 'East Ramp',
+      floorId,
+      spaceId,
+      connectorKind: 'ramp' as const,
+      accessiblePolicy: 'true' as const,
+      restrictedPolicy: 'false' as const,
+    });
+
+    const result = buildDxfLayerMappingProfile([
+      groundFloor,
+      levelOneFloor,
+      entry,
+      gallery,
+      stop(0, 'g', 'entry'),
+      stop(1, 'l1', 'gallery'),
+    ]);
+
+    expect(result.valid).toBe(true);
+    expect(result.issues).toEqual([]);
+  });
+
+  it('rejects floor and space references no layer in this mapping creates', () => {
+    const floor = { ...createDxfLayerMappingDraft(floorLayer), role: 'floor' as const, id: 'g' };
+    const strandedSpace = {
+      ...createDxfLayerMappingDraft(spaceLayer),
+      role: 'space' as const,
+      id: 'entry',
+      floorId: 'never-mapped-floor',
+      spaceType: 'entrance' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const strandedPortal = {
+      ...createDxfLayerMappingDraft(portalLayer),
+      role: 'portal' as const,
+      id: 'entry-door',
+      floorId: 'g',
+      portalKind: 'door' as const,
+      spaceA: 'entry',
+      spaceB: 'never-mapped-space',
+      accessiblePolicy: 'true' as const,
+      restrictedPolicy: 'false' as const,
+    };
+
+    const result = buildDxfLayerMappingProfile([floor, strandedSpace, strandedPortal]);
+
+    expect(result.valid).toBe(false);
+    expect(result.profile).toBeNull();
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'unknown-mapping-floor', path: '/mappings/1/floorId' }),
+        expect.objectContaining({ code: 'unknown-mapping-space', path: '/mappings/2/spaceB' }),
+      ]),
+    );
+  });
+
+  it('catches a portal stranded by renaming the space it connects', () => {
+    const floor = { ...createDxfLayerMappingDraft(floorLayer), role: 'floor' as const, id: 'g' };
+    const renamedSpace = {
+      ...createDxfLayerMappingDraft(spaceLayer),
+      role: 'space' as const,
+      id: 'lobby',
+      floorId: 'g',
+      spaceType: 'entrance' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const gallery = {
+      ...createDxfLayerMappingDraft(gallerySpaceLayer),
+      role: 'space' as const,
+      id: 'gallery',
+      floorId: 'g',
+      spaceType: 'room' as const,
+      publicPolicy: 'true' as const,
+      accessiblePolicy: 'true' as const,
+    };
+    const portal = {
+      ...createDxfLayerMappingDraft(portalLayer),
+      role: 'portal' as const,
+      id: 'entry-door',
+      floorId: 'g',
+      portalKind: 'door' as const,
+      spaceA: 'entry',
+      spaceB: 'gallery',
+      accessiblePolicy: 'true' as const,
+      restrictedPolicy: 'false' as const,
+    };
+
+    const result = buildDxfLayerMappingProfile([floor, renamedSpace, gallery, portal]);
+
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'unknown-mapping-space', path: '/mappings/3/spaceA' }),
+      ]),
     );
   });
 

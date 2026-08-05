@@ -131,6 +131,14 @@ an artifact never captures a half-reviewed draft.
   space, accessibility policy, and restriction policy. A connector requires at
   least two stops, may have only one stop per floor, and every stop sharing its
   ID must use identical connector metadata.
+- Every mapped object needs its own canonical id. Connector stops are the single
+  exception, because sharing an id is how stops are grouped into one connector;
+  that shared id still may not collide with any other role.
+- Every floor and space reference must resolve against an id this mapping
+  actually creates. Renaming a mapped space after wiring a portal to it is the
+  usual way to strand a reference. The compiler remains authoritative, but the
+  workspace reports these on the field that can be fixed rather than deferring
+  to a compiler path like `/portals/2/connects/0`.
 - Every localization anchor requires an ID, floor, containing space, kind, a
   surveyed heading in `[0, 360)`, and a payload of at most 512 characters. Two
   anchors may not share one payload, because a scanned payload must identify
@@ -178,7 +186,6 @@ refuses two anchors that would answer to the same scanned payload.
 
 ## Remaining CAD mapping work
 
-- explicit mixed-role validation on layers that combine entity types;
 - a stored profile registry with revision history and promotion, beyond the
   single save/load artifact in this slice;
 - multi-file floor alignment and georeferencing;

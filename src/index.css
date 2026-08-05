@@ -4495,6 +4495,43 @@ body {
   color: #17715f;
 }
 
+.studio-layer-mapper-review {
+  min-width: 0;
+  flex: 1;
+}
+
+.studio-layer-mapper-review > summary {
+  cursor: pointer;
+  color: #8a5a4d;
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
+.studio-layer-mapper-review[open] > summary {
+  margin-bottom: 6px;
+}
+
+.studio-layer-mapper-review ul {
+  display: grid;
+  gap: 4px;
+  max-height: 148px;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #8a5a4d;
+  font-size: 0.5625rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.studio-layer-mapper-review strong {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.5rem;
+  opacity: 0.75;
+}
+
 .studio-layer-mapper > footer button {
   min-height: 36px;
   display: inline-flex;
