@@ -6,13 +6,9 @@ import type {
   PortalSource,
   SpaceSource,
 } from '@voicegis/spatial-schema';
-import {
-  buildSpaceWallSegments,
-  getNearestBoundaryAngle,
-  type WallSegment,
-} from './spatialTwinArchitecture';
+import { getNearestBoundaryAngle, type WallSegment } from './spatialTwinArchitecture';
+import { buildFloorWallTopology } from './wallTopology';
 
-const CARTOGRAPHY_PRECISION = 5;
 const FLOOR_BOUNDARY_TOLERANCE_METERS = 0.025;
 const PERSPECTIVE_ROTATION_RADIANS = (-7 * Math.PI) / 180;
 const PERSPECTIVE_DEPTH_SCALE = 0.72;
@@ -96,11 +92,6 @@ export interface FloorplanCartography {
   walls: CartographicWallRun[];
   portals: CartographicPortal[];
   connectorStops: CartographicConnectorStop[];
-}
-
-interface MutableWallRun extends WallSegment {
-  id: string;
-  spaceIds: Set<string>;
 }
 
 export function getCartographicBounds(points: Coordinate2D[]): CartographicBounds {
@@ -275,16 +266,6 @@ export function placeCartographicLabels(
   return placements;
 }
 
-function coordinateKey([x, y]: Coordinate2D) {
-  return `${x.toFixed(CARTOGRAPHY_PRECISION)},${y.toFixed(CARTOGRAPHY_PRECISION)}`;
-}
-
-function wallKey(start: Coordinate2D, end: Coordinate2D) {
-  const startKey = coordinateKey(start);
-  const endKey = coordinateKey(end);
-  return startKey < endKey ? `${startKey}--${endKey}` : `${endKey}--${startKey}`;
-}
-
 function pointToSegmentDistance(point: Coordinate2D, start: Coordinate2D, end: Coordinate2D) {
   const deltaX = end[0] - start[0];
   const deltaY = end[1] - start[1];
@@ -319,31 +300,10 @@ export function deriveCartographicWalls(
   floorOutline: Coordinate2D[],
 ): CartographicWallRun[] {
   const spacesById = new Map(spaces.map((space) => [space.id, space] as const));
-  const wallRuns = new Map<string, MutableWallRun>();
 
-  [...spaces]
-    .sort((left, right) => left.id.localeCompare(right.id))
-    .forEach((space) => {
-      buildSpaceWallSegments(space, portals).forEach((segment) => {
-        const key = wallKey(segment.start, segment.end);
-        const existing = wallRuns.get(key);
-        if (existing) {
-          existing.spaceIds.add(space.id);
-          return;
-        }
-
-        wallRuns.set(key, {
-          ...segment,
-          id: `wall:${key}`,
-          spaceIds: new Set([space.id]),
-        });
-      });
-    });
-
-  return [...wallRuns.values()]
+  return buildFloorWallTopology(spaces, portals)
     .map((wall): CartographicWallRun => {
-      const spaceIds = [...wall.spaceIds].sort();
-      const restricted = spaceIds.some((spaceId) => {
+      const restricted = wall.spaceIds.some((spaceId) => {
         const space = spacesById.get(spaceId);
         return space?.type === 'restricted' || space?.public === false;
       });
@@ -353,7 +313,7 @@ export function deriveCartographicWalls(
         end: wall.end,
         length: wall.length,
         angleRadians: wall.angleRadians,
-        spaceIds,
+        spaceIds: wall.spaceIds,
         kind: segmentFollowsFloorBoundary(wall, floorOutline)
           ? 'exterior'
           : restricted

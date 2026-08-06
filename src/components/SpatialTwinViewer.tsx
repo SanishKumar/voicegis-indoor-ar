@@ -31,11 +31,8 @@ import type { CompiledBuildingRuntime } from '../data/compiledBuilding';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { routeConnectorRuns, routeFloorIds } from '../engine/floorplanModel';
 import type { GraphNode, RouteResult } from '../engine/routingCore';
-import {
-  buildSpaceWallSegments,
-  getNearestBoundaryAngle,
-  getPolygonBounds,
-} from '../engine/spatialTwinArchitecture';
+import { getNearestBoundaryAngle, getPolygonBounds } from '../engine/spatialTwinArchitecture';
+import { buildFloorWallTopology, type WallBody } from '../engine/wallTopology';
 import {
   computeBuildingBounds,
   getGraphSummary,
@@ -93,10 +90,14 @@ interface FloorGeometryProps {
 
 interface SpaceGeometryProps extends FloorGeometryProps {
   space: SpaceSource;
-  portals: PortalSource[];
   selected: boolean;
   showArchitecture: boolean;
   onSelect: (spaceId: string) => void;
+}
+
+interface FloorWallShellProps extends FloorGeometryProps {
+  spaces: SpaceSource[];
+  portals: PortalSource[];
 }
 
 function polygonShape(points: [number, number][], bounds: BuildingBounds) {
@@ -129,7 +130,7 @@ function FloorGeometry({ floor, bounds, exploded }: FloorGeometryProps) {
 }
 
 interface WallRunProps {
-  segment: ReturnType<typeof buildSpaceWallSegments>[number];
+  segment: Pick<WallBody, 'start' | 'end' | 'length' | 'angleRadians'>;
   elevation: number;
   height: number;
   bounds: BuildingBounds;
@@ -341,7 +342,6 @@ function SpaceGeometry({
   floor,
   bounds,
   exploded,
-  portals,
   selected,
   showArchitecture,
   onSelect,
@@ -349,9 +349,6 @@ function SpaceGeometry({
   const shape = useMemo(() => polygonShape(space.polygon, bounds), [bounds, space.polygon]);
   const elevation = visualFloorElevation(floor, exploded);
   const restricted = isSpaceRestricted(space);
-  const wallSegments = useMemo(() => buildSpaceWallSegments(space, portals), [portals, space]);
-  const wallHeight = Math.min(floor.clearHeight * 0.72, 2.45);
-  const glass = space.type === 'entrance';
 
   return (
     <group>
@@ -376,21 +373,47 @@ function SpaceGeometry({
         />
         <Edges color={selected ? '#0ea5e9' : restricted ? '#fb7185' : '#94a3b8'} threshold={20} />
       </mesh>
-      {showArchitecture &&
-        wallSegments.map((segment, index) => (
+      {showArchitecture && (
+        <SemanticProps space={space} bounds={bounds} elevation={elevation + 0.08} />
+      )}
+    </group>
+  );
+}
+
+/**
+ * Builds the wall shell once per floor rather than once per space. Walling each
+ * space separately emitted a slab on both sides of every shared boundary, which
+ * z-fought and read as doubled thickness; wall topology resolves each boundary
+ * to a single body and tells us whether it is interior or exterior.
+ */
+function FloorWallShell({ floor, bounds, exploded, spaces, portals }: FloorWallShellProps) {
+  const walls = useMemo(() => buildFloorWallTopology(spaces, portals), [portals, spaces]);
+  const spacesById = useMemo(() => new Map(spaces.map((space) => [space.id, space])), [spaces]);
+  const elevation = visualFloorElevation(floor, exploded);
+  const wallHeight = Math.min(floor.clearHeight * 0.72, 2.45);
+
+  return (
+    <group>
+      {walls.map((wall) => {
+        const owners = wall.spaceIds
+          .map((spaceId) => spacesById.get(spaceId))
+          .filter((space): space is SpaceSource => Boolean(space));
+        // A boundary is only glazed when every space it separates is an
+        // entrance, and only restricted when some space it touches is.
+        const restricted = owners.some((space) => isSpaceRestricted(space));
+        const glass = owners.length > 0 && owners.every((space) => space.type === 'entrance');
+        return (
           <WallRun
-            key={`${space.id}-wall-${index}`}
-            segment={segment}
+            key={wall.id}
+            segment={wall}
             elevation={elevation + 0.08}
-            height={wallHeight}
+            height={wall.kind === 'exterior' ? wallHeight : wallHeight * 0.94}
             bounds={bounds}
             color={restricted ? RESTRICTED_WALL_COLOR : glass ? GLASS_COLOR : WALL_COLOR}
             glass={glass}
           />
-        ))}
-      {showArchitecture && (
-        <SemanticProps space={space} bounds={bounds} elevation={elevation + 0.08} />
-      )}
+        );
+      })}
     </group>
   );
 }
@@ -931,13 +954,23 @@ function TwinScene({
             floor={floor}
             bounds={bounds}
             exploded={exploded}
-            portals={buildingPackage.portals.filter((portal) => portal.floorId === floor.id)}
             selected={space.id === selectedSpaceId}
             showArchitecture={showArchitecture}
             onSelect={onSelectSpace}
           />
         );
       })}
+      {showArchitecture &&
+        visibleFloors.map((floor) => (
+          <FloorWallShell
+            key={`${floor.id}-walls`}
+            floor={floor}
+            bounds={bounds}
+            exploded={exploded}
+            spaces={visibleSpaces.filter((space) => space.floorId === floor.id)}
+            portals={buildingPackage.portals.filter((portal) => portal.floorId === floor.id)}
+          />
+        ))}
       {showArchitecture &&
         visibleFloors.flatMap((floor) =>
           buildingPackage.portals
