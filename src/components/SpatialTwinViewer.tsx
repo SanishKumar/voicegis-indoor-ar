@@ -34,6 +34,12 @@ import type { GraphNode, RouteResult } from '../engine/routingCore';
 import { getNearestBoundaryAngle, getPolygonBounds } from '../engine/spatialTwinArchitecture';
 import { buildFloorWallTopology, type WallBody } from '../engine/wallTopology';
 import {
+  CARTOGRAPHIC_THEME,
+  spaceSurface,
+  wallSurface,
+  wallSurfaceClass,
+} from '../engine/cartographicTheme';
+import {
   computeBuildingBounds,
   getGraphSummary,
   getVisibleSpaces,
@@ -44,20 +50,7 @@ import {
   type FloorSelection,
 } from '../engine/spatialTwinModel';
 
-const SPACE_COLORS: Record<SpaceSource['type'], string> = {
-  entrance: '#dbeafe',
-  room: '#e2e8f0',
-  corridor: '#ccfbf1',
-  lobby: '#bfdbfe',
-  service: '#ede9fe',
-  restricted: '#fecdd3',
-  'vertical-circulation': '#fef3c7',
-};
-
-const WALL_COLOR = '#d8d6cf';
-const RESTRICTED_WALL_COLOR = '#735061';
-const GLASS_COLOR = '#7dd3fc';
-const WALL_THICKNESS_METERS = 0.12;
+const WALL_THICKNESS_METERS = CARTOGRAPHIC_THEME.wallThicknessMeters;
 const SpatialPackageContext = createContext<CompiledBuildingPackage | null>(null);
 
 function useSpatialPackage() {
@@ -134,11 +127,10 @@ interface WallRunProps {
   elevation: number;
   height: number;
   bounds: BuildingBounds;
-  color: string;
-  glass: boolean;
+  surface: ReturnType<typeof wallSurface>;
 }
 
-function WallRun({ segment, elevation, height, bounds, color, glass }: WallRunProps) {
+function WallRun({ segment, elevation, height, bounds, surface }: WallRunProps) {
   const start = mapCoordinateToWorld(segment.start, elevation, bounds);
   const end = mapCoordinateToWorld(segment.end, elevation, bounds);
   const center: [number, number, number] = [
@@ -151,12 +143,12 @@ function WallRun({ segment, elevation, height, bounds, color, glass }: WallRunPr
     <mesh position={center} rotation={[0, -segment.angleRadians, 0]} castShadow receiveShadow>
       <boxGeometry args={[segment.length, height, WALL_THICKNESS_METERS]} />
       <meshPhysicalMaterial
-        color={color}
-        roughness={glass ? 0.08 : 0.72}
-        metalness={glass ? 0.08 : 0.02}
-        transmission={glass ? 0.58 : 0}
-        transparent={glass}
-        opacity={glass ? 0.68 : 1}
+        color={surface.color}
+        roughness={surface.roughness}
+        metalness={surface.metalness}
+        transmission={surface.transmission}
+        transparent={surface.opacity < 1}
+        opacity={surface.opacity}
       />
     </mesh>
   );
@@ -363,7 +355,7 @@ function SpaceGeometry({
       >
         <extrudeGeometry args={[shape, { depth: selected ? 0.09 : 0.045, bevelEnabled: false }]} />
         <meshStandardMaterial
-          color={SPACE_COLORS[space.type]}
+          color={spaceSurface(space.type).surface}
           emissive={selected ? '#0ea5e9' : '#000000'}
           emissiveIntensity={selected ? 0.42 : 0}
           metalness={0.01}
@@ -398,19 +390,15 @@ function FloorWallShell({ floor, bounds, exploded, spaces, portals }: FloorWallS
         const owners = wall.spaceIds
           .map((spaceId) => spacesById.get(spaceId))
           .filter((space): space is SpaceSource => Boolean(space));
-        // A boundary is only glazed when every space it separates is an
-        // entrance, and only restricted when some space it touches is.
-        const restricted = owners.some((space) => isSpaceRestricted(space));
-        const glass = owners.length > 0 && owners.every((space) => space.type === 'entrance');
+        const surface = wallSurface(wallSurfaceClass(wall.kind, owners));
         return (
           <WallRun
             key={wall.id}
             segment={wall}
             elevation={elevation + 0.08}
-            height={wall.kind === 'exterior' ? wallHeight : wallHeight * 0.94}
+            height={wallHeight * surface.heightScale}
             bounds={bounds}
-            color={restricted ? RESTRICTED_WALL_COLOR : glass ? GLASS_COLOR : WALL_COLOR}
-            glass={glass}
+            surface={surface}
           />
         );
       })}

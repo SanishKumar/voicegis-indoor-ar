@@ -12,6 +12,11 @@ import {
   Map as MapIcon,
   Route,
 } from 'lucide-react';
+import {
+  CARTOGRAPHIC_THEME,
+  spaceSurfaceFills,
+  wallSurface,
+} from '../engine/cartographicTheme';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import type { CompiledBuildingRuntime, VisitorPoiNode } from '../data/compiledBuilding';
 import {
@@ -61,15 +66,7 @@ interface NavigatorContextValue {
   venue: CompiledBuildingRuntime;
 }
 
-const SPACE_COLORS = {
-  entrance: '#dceff0',
-  room: '#f3efe7',
-  corridor: '#ffffff',
-  lobby: '#eef2ed',
-  service: '#e6edf2',
-  restricted: '#f2dfe2',
-  'vertical-circulation': '#e1e8e5',
-} as const;
+const SPACE_COLORS = spaceSurfaceFills();
 
 function safeCategoryGlyph(icon: string | undefined) {
   return icon && /^[\x20-\x7e]{1,3}$/.test(icon) ? icon : '•';
@@ -395,11 +392,11 @@ export default function FloorplanViewer() {
   );
 
   const colors = {
-    background: 'radial-gradient(circle at 48% 42%, #fbfcfa 0%, #eef2ef 54%, #dfe5e1 100%)',
-    paper: '#fdfdf9',
-    floor: '#f7f8f4',
-    wall: '#59645f',
-    partition: '#b9c2bd',
+    background: CARTOGRAPHIC_THEME.plan.background,
+    paper: CARTOGRAPHIC_THEME.plan.paper,
+    floor: CARTOGRAPHIC_THEME.plan.floor,
+    wall: wallSurface('exterior').color,
+    partition: wallSurface('interior').color,
     text: '#17211f',
     muted: '#6f7874',
     spaces: SPACE_COLORS,
