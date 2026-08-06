@@ -54,11 +54,41 @@ export interface CartographicLabelCandidate {
   height: number;
   priority: number;
   required?: boolean;
+  /**
+   * Smallest stage scale at which this label may compete for space. Lower-ranked
+   * labels stay collapsed until the map is zoomed in far enough to carry them.
+   */
+  minScale?: number;
 }
 
 export interface CartographicLabelPlacement extends CartographicLabelCandidate {
   bounds: CartographicBounds;
+  /** Which anchor offset won, so callers can draw a leader if they want one. */
+  anchorIndex: number;
 }
+
+export interface CartographicLabelResolution {
+  placed: CartographicLabelPlacement[];
+  /**
+   * Candidates that could not be drawn as text. They are still real features, so
+   * callers collapse them to a dot rather than dropping them from the map.
+   */
+  collapsed: CartographicLabelCandidate[];
+}
+
+/**
+ * Offsets tried in order before a label gives up, as fractions of its own size.
+ * Centre first, then above and below, then the sides. Each step has to exceed
+ * the label's own extent plus collision padding, otherwise the alternative still
+ * overlaps whatever pushed the label off centre in the first place.
+ */
+const LABEL_ANCHOR_OFFSETS: Array<[number, number]> = [
+  [0, 0],
+  [0, -1.5],
+  [0, 1.5],
+  [1.15, 0],
+  [-1.15, 0],
+];
 
 export interface CartographicWallRun extends WallSegment {
   id: string;
@@ -211,11 +241,18 @@ export function deriveCartographicExtrusionFaces(
   });
 }
 
-function labelBounds(candidate: CartographicLabelCandidate): CartographicBounds {
-  const minX = candidate.center[0] - candidate.width / 2;
-  const minY = candidate.center[1] - candidate.height / 2;
-  const maxX = candidate.center[0] + candidate.width / 2;
-  const maxY = candidate.center[1] + candidate.height / 2;
+function labelBounds(
+  candidate: CartographicLabelCandidate,
+  offset: [number, number] = [0, 0],
+): CartographicBounds {
+  const center: Coordinate2D = [
+    candidate.center[0] + offset[0] * candidate.width,
+    candidate.center[1] + offset[1] * candidate.height,
+  ];
+  const minX = center[0] - candidate.width / 2;
+  const minY = center[1] - candidate.height / 2;
+  const maxX = center[0] + candidate.width / 2;
+  const maxY = center[1] + candidate.height / 2;
   return {
     minX,
     minY,
@@ -223,7 +260,7 @@ function labelBounds(candidate: CartographicLabelCandidate): CartographicBounds 
     maxY,
     width: candidate.width,
     height: candidate.height,
-    center: candidate.center,
+    center,
   };
 }
 
@@ -236,13 +273,23 @@ function boundsOverlap(left: CartographicBounds, right: CartographicBounds, padd
   );
 }
 
-export function placeCartographicLabels(
+/**
+ * Resolves which labels earn drawn text at the current zoom.
+ *
+ * Highest priority wins space first. A label that collides tries a short list of
+ * offsets around its anchor before conceding, and a label that still cannot fit
+ * — or has not reached the zoom its rank requires — is reported as collapsed
+ * rather than discarded, so the caller can keep the feature on the map as a dot.
+ */
+export function resolveCartographicLabels(
   candidates: CartographicLabelCandidate[],
   reservedBounds: CartographicBounds[] = [],
   padding = 8,
-): CartographicLabelPlacement[] {
+  scale = Number.POSITIVE_INFINITY,
+): CartographicLabelResolution {
   const occupied = [...reservedBounds];
-  const placements: CartographicLabelPlacement[] = [];
+  const placed: CartographicLabelPlacement[] = [];
+  const collapsed: CartographicLabelCandidate[] = [];
 
   [...candidates]
     .sort(
@@ -252,18 +299,41 @@ export function placeCartographicLabels(
         left.id.localeCompare(right.id),
     )
     .forEach((candidate) => {
-      const bounds = labelBounds(candidate);
-      if (
-        candidate.required !== true &&
-        occupied.some((occupiedBounds) => boundsOverlap(bounds, occupiedBounds, padding))
-      ) {
+      const required = candidate.required === true;
+      if (!required && candidate.minScale !== undefined && scale < candidate.minScale) {
+        collapsed.push(candidate);
         return;
       }
+      if (required) {
+        const bounds = labelBounds(candidate);
+        occupied.push(bounds);
+        placed.push({ ...candidate, bounds, anchorIndex: 0 });
+        return;
+      }
+      const anchorIndex = LABEL_ANCHOR_OFFSETS.findIndex(
+        (offset) =>
+          !occupied.some((occupiedBounds) =>
+            boundsOverlap(labelBounds(candidate, offset), occupiedBounds, padding),
+          ),
+      );
+      if (anchorIndex < 0) {
+        collapsed.push(candidate);
+        return;
+      }
+      const bounds = labelBounds(candidate, LABEL_ANCHOR_OFFSETS[anchorIndex]);
       occupied.push(bounds);
-      placements.push({ ...candidate, bounds });
+      placed.push({ ...candidate, bounds, anchorIndex });
     });
 
-  return placements;
+  return { placed, collapsed: collapsed.sort((a, b) => a.id.localeCompare(b.id)) };
+}
+
+export function placeCartographicLabels(
+  candidates: CartographicLabelCandidate[],
+  reservedBounds: CartographicBounds[] = [],
+  padding = 8,
+): CartographicLabelPlacement[] {
+  return resolveCartographicLabels(candidates, reservedBounds, padding).placed;
 }
 
 function pointToSegmentDistance(point: Coordinate2D, start: Coordinate2D, end: Coordinate2D) {
