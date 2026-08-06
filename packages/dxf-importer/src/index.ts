@@ -132,6 +132,12 @@ interface PolylineVertex {
   bulge: number;
 }
 
+interface BlockDefinition {
+  name: string;
+  basePoint: Coordinate2D;
+  entities: DxfEntity[];
+}
+
 interface UnitDefinition {
   name: string;
   metersPerUnit: number;
@@ -159,6 +165,7 @@ const CONNECTOR_KINDS = new Set<ConnectorKind>(['elevator', 'stairs', 'ramp', 'e
 const ANCHOR_KINDS = new Set<AnchorKind>(['qr', 'apriltag', 'image', 'nfc']);
 const ID_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
 const ARC_STEP_RADIANS = Math.PI / 18;
+const BLOCK_ENTITY_TYPES = new Set(['LWPOLYLINE', 'LINE', 'POINT']);
 const COORDINATE_PRECISION = 6;
 const EPSILON = 1e-9;
 
@@ -269,6 +276,202 @@ function detectUnit(pairs: DxfPair[], issues: DxfImportIssue[]) {
   return unit;
 }
 
+function parseBlocks(pairs: DxfPair[]) {
+  const blocks = new Map<string, BlockDefinition>();
+  const contents = sectionPairs(pairs, 'BLOCKS');
+  if (!contents) return blocks;
+
+  let inBlock = false;
+  let readingHeader = false;
+  let name: string | null = null;
+  let baseX = 0;
+  let baseY = 0;
+  let entities: DxfEntity[] = [];
+  let current: DxfEntity | null = null;
+
+  const closeBlock = () => {
+    if (current) {
+      entities.push(current);
+      current = null;
+    }
+    if (inBlock && name) {
+      blocks.set(name, { name, basePoint: [baseX, baseY], entities });
+    }
+    inBlock = false;
+    readingHeader = false;
+    name = null;
+    baseX = 0;
+    baseY = 0;
+    entities = [];
+  };
+
+  for (const pair of contents) {
+    if (pair.code === 0) {
+      const type = pair.value.toUpperCase();
+      if (type === 'BLOCK') {
+        closeBlock();
+        inBlock = true;
+        readingHeader = true;
+        continue;
+      }
+      if (type === 'ENDBLK') {
+        closeBlock();
+        continue;
+      }
+      if (!inBlock) continue;
+      if (current) entities.push(current);
+      readingHeader = false;
+      current = { type, pairs: [], index: entities.length };
+      continue;
+    }
+    if (current) {
+      current.pairs.push(pair);
+      continue;
+    }
+    if (!inBlock || !readingHeader) continue;
+    if (pair.code === 2 && name === null) name = pair.value;
+    else if (pair.code === 10) baseX = Number(pair.value);
+    else if (pair.code === 20) baseY = Number(pair.value);
+  }
+  closeBlock();
+  return blocks;
+}
+
+/**
+ * Rewrites one block entity into model space. Paired XY codes are transformed
+ * together; every other group code is carried through untouched. The synthetic
+ * pairs borrow the INSERT's layer line so an expanded entity stays addressable
+ * by the same text rewrite that maps ordinary entities.
+ */
+function transformBlockEntity(
+  entity: DxfEntity,
+  layerPair: DxfPair,
+  index: number,
+  transform: (x: number, y: number) => Coordinate2D,
+): DxfEntity | null {
+  const source = entity.pairs;
+  const transformed: DxfPair[] = [{ code: 8, value: layerPair.value, line: layerPair.line }];
+  for (const [position, pair] of source.entries()) {
+    if (pair.code === 8 || pair.code === 20 || pair.code === 21) continue;
+    if (pair.code === 10 || pair.code === 11) {
+      const partnerCode = pair.code + 10;
+      const partner = source.find(
+        (candidate, candidateIndex) => candidateIndex > position && candidate.code === partnerCode,
+      );
+      if (!partner) return null;
+      const [x, y] = transform(Number(pair.value), Number(partner.value));
+      transformed.push({ code: pair.code, value: String(x), line: layerPair.line });
+      transformed.push({ code: partnerCode, value: String(y), line: layerPair.line });
+      continue;
+    }
+    transformed.push({ ...pair, line: layerPair.line });
+  }
+  return { type: entity.type, pairs: transformed, index };
+}
+
+/**
+ * Resolves an INSERT into the single supported entity its block defines.
+ * A block holding several entities is refused because the mapping workspace
+ * addresses an INSERT through its layer, which cannot name one entity among
+ * many. Arrays, nested blocks, mirroring, and non-uniform scale are refused for
+ * the same fail-closed reason: none of them can be mapped unambiguously yet.
+ */
+function expandInsert(
+  insert: DxfEntity,
+  blocks: Map<string, BlockDefinition>,
+  index: number,
+  issues: DxfImportIssue[],
+): DxfEntity | null {
+  const path = `/entities/${insert.index}`;
+  const refuse = (code: string, message: string) => {
+    issue(issues, 'warning', code, path, message);
+    return null;
+  };
+
+  const layerPair = insert.pairs.find((pair) => pair.code === 8);
+  if (!layerPair) return refuse('unlayered-block-insert', 'INSERT has no layer and cannot be mapped.');
+
+  const blockName = firstValue(insert, 2);
+  const block = blockName ? blocks.get(blockName) : undefined;
+  if (!block) {
+    return refuse(
+      'unknown-block-reference',
+      `INSERT references block "${blockName ?? ''}", which this drawing does not define.`,
+    );
+  }
+  if (Number(firstValue(insert, 67) ?? 0) === 1) {
+    return refuse('paper-space-entity', 'INSERT must be in model space.');
+  }
+  if (Math.abs(Number(firstValue(insert, 30) ?? 0)) > EPSILON) {
+    return refuse('non-planar-entity', 'INSERT must sit at Z=0.');
+  }
+  if (Number(firstValue(insert, 70) ?? 1) > 1 || Number(firstValue(insert, 71) ?? 1) > 1) {
+    return refuse(
+      'block-array-not-supported',
+      `INSERT of block "${block.name}" is an array; expand it in CAD before importing.`,
+    );
+  }
+
+  const scaleX = Number(firstValue(insert, 41) ?? 1);
+  const scaleY = Number(firstValue(insert, 42) ?? 1);
+  if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || scaleX <= 0 || scaleY <= 0) {
+    return refuse(
+      'invalid-block-scale',
+      `INSERT of block "${block.name}" uses a zero, negative, or non-finite scale.`,
+    );
+  }
+  if (Math.abs(scaleX - scaleY) > EPSILON) {
+    return refuse(
+      'non-uniform-block-scale',
+      `INSERT of block "${block.name}" scales X and Y differently, which would distort mapped geometry.`,
+    );
+  }
+
+  if (block.entities.some((entity) => entity.type === 'INSERT')) {
+    return refuse(
+      'nested-block-not-supported',
+      `Block "${block.name}" nests another block; flatten it in CAD before importing.`,
+    );
+  }
+  const supported = block.entities.filter((entity) => BLOCK_ENTITY_TYPES.has(entity.type));
+  if (supported.length !== 1) {
+    return refuse(
+      'block-entity-count-not-one',
+      `Block "${block.name}" defines ${supported.length} supported entities; this slice resolves blocks holding exactly one.`,
+    );
+  }
+  const [definition] = supported;
+  const definitionLayer = firstValue(definition, 8);
+  if (definitionLayer !== undefined && definitionLayer !== '0') {
+    return refuse(
+      'block-entity-layer-not-zero',
+      `Block "${block.name}" draws on layer "${definitionLayer}" instead of layer 0, so its mapped layer would be ambiguous.`,
+    );
+  }
+
+  const insertX = Number(firstValue(insert, 10) ?? 0);
+  const insertY = Number(firstValue(insert, 20) ?? 0);
+  const rotation = Number(firstValue(insert, 50) ?? 0);
+  if (![insertX, insertY, rotation].every((value) => Number.isFinite(value))) {
+    return refuse('invalid-block-insert', `INSERT of block "${block.name}" has non-finite placement.`);
+  }
+  const radians = (rotation * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const expanded = transformBlockEntity(definition, layerPair, index, (x, y) => {
+    const dx = (x - block.basePoint[0]) * scaleX;
+    const dy = (y - block.basePoint[1]) * scaleY;
+    return [insertX + dx * cos - dy * sin, insertY + dx * sin + dy * cos];
+  });
+  if (!expanded) {
+    return refuse(
+      'invalid-block-geometry',
+      `Block "${block.name}" has an unpaired coordinate group and cannot be resolved.`,
+    );
+  }
+  return expanded;
+}
+
 function parseEntities(pairs: DxfPair[], issues: DxfImportIssue[]) {
   const contents = sectionPairs(pairs, 'ENTITIES');
   if (!contents) {
@@ -293,7 +496,19 @@ function parseEntities(pairs: DxfPair[], issues: DxfImportIssue[]) {
     }
   }
   if (current) entities.push(current);
-  return entities;
+
+  if (!entities.some((entity) => entity.type === 'INSERT')) return entities;
+  const blocks = parseBlocks(pairs);
+  const resolved: DxfEntity[] = [];
+  for (const entity of entities) {
+    if (entity.type !== 'INSERT') {
+      resolved.push({ ...entity, index: resolved.length });
+      continue;
+    }
+    const expanded = expandInsert(entity, blocks, resolved.length, issues);
+    if (expanded) resolved.push(expanded);
+  }
+  return resolved;
 }
 
 function firstValue(entity: DxfEntity, code: number) {

@@ -42,6 +42,24 @@ const sharedAnchorsFixture = readFileSync(
   new URL('../../../buildings/import-fixtures/unannotated-shared-anchors-v0.dxf', import.meta.url),
   'utf8',
 );
+const blockInsertsFixture = readFileSync(
+  new URL('../../../buildings/import-fixtures/unannotated-block-inserts-v0.dxf', import.meta.url),
+  'utf8',
+);
+
+const blockInsertsProfile: DxfLayerMappingProfile = {
+  profileVersion: DXF_LAYER_MAPPING_PROFILE_VERSION,
+  mappings: [
+    { sourceLayer: 'A-FLOOR-OUTLINE', targetLayer: 'VG$FLOOR$g$0$0$3.2$Ground%20Floor' },
+    { sourceLayer: 'A-SPACE-ENTRY', targetLayer: 'VG$SPACE$g$entry$entrance$true$true$Entry' },
+    { sourceLayer: 'A-SPACE-GALLERY', targetLayer: 'VG$SPACE$g$gallery$room$true$true$Gallery' },
+    {
+      sourceLayer: 'A-DOORS',
+      targetLayer: 'VG$PORTAL$g$entry-gallery-door$door$entry$gallery$true$false',
+    },
+    { sourceLayer: 'A-POIS', targetLayer: 'VG$POI$g$entry$reception$service$true$true$Reception' },
+  ],
+};
 
 const entryPolygonKey = 'lwpolyline:0,0;4,0;4,8;0,8';
 const galleryPolygonKey = 'lwpolyline:4,0;12,0;12,8;4,8';
@@ -975,6 +993,125 @@ describe('DXF layer mapping profile v0', () => {
     expect(mapped.issues).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'layer-not-single-point' })]),
     );
+  });
+
+  it('resolves single-entity block inserts through translation, rotation, and uniform scale', () => {
+    const inspected = inspectDxfLayers(blockInsertsFixture);
+    const keyFor = (layerName: string) =>
+      inspected.layers.find((layer) => layer.name === layerName)?.selectableEntities.map((e) => e.key);
+
+    expect(inspected.valid).toBe(true);
+    // The block draws a vertical line from (0,-0.5) to (0,0.5) about its base.
+    expect(keyFor('A-DOORS')).toEqual(['line:4,3.5;4,4.5']);
+    // Rotating that leaf 90 degrees must lay it flat.
+    expect(keyFor('A-DOORS-ROTATED')).toEqual(['line:1.5,6;2.5,6']);
+    // Doubling it uniformly must double its length, not move its centre.
+    expect(keyFor('A-DOORS-SCALED')).toEqual(['line:2,1;2,3']);
+    expect(keyFor('A-POIS')).toEqual(['point:1.5,4']);
+
+    const scaled = inspected.layers.find((layer) => layer.name === 'A-DOORS-SCALED');
+    expect(scaled?.selectableEntities[0]).toMatchObject({ type: 'LINE', length: 2 });
+  });
+
+  it('refuses block inserts it cannot resolve unambiguously without failing the drawing', () => {
+    const inspected = inspectDxfLayers(blockInsertsFixture);
+    const codes = inspected.issues.map((entry) => entry.code);
+
+    expect(codes).toEqual(
+      expect.arrayContaining([
+        'block-array-not-supported',
+        'block-entity-count-not-one',
+        'non-uniform-block-scale',
+        'unknown-block-reference',
+      ]),
+    );
+    // Every refusal is a warning: an unresolvable furniture block must not stop
+    // the floor plan around it from importing.
+    expect(inspected.issues.every((entry) => entry.severity === 'warning')).toBe(true);
+    expect(inspected.valid).toBe(true);
+    // A refused insert contributes no geometry, so its layer offers nothing.
+    for (const name of ['A-FURNITURE', 'A-DOORS-ARRAYED', 'A-DOORS-SQUASHED', 'A-MISSING']) {
+      expect(inspected.layers.find((layer) => layer.name === name)).toBeUndefined();
+    }
+  });
+
+  it('compiles a venue whose door and POI exist only as block references', () => {
+    const mapped = applyDxfLayerMapping(blockInsertsFixture, blockInsertsProfile);
+    expect(mapped.valid).toBe(true);
+
+    const imported = importAnnotatedDxf(mapped.text!, {
+      fileName: 'unannotated-block-inserts-v0.dxf',
+    });
+    expect(imported.valid).toBe(true);
+    expect(imported.source?.portals).toEqual([
+      {
+        id: 'entry-gallery-door',
+        floorId: 'g',
+        kind: 'door',
+        connects: ['entry', 'gallery'],
+        position: [4, 4],
+        width: 1,
+        accessible: true,
+        restricted: false,
+      },
+    ]);
+    expect(imported.source?.pois).toEqual([
+      {
+        id: 'reception',
+        floorId: 'g',
+        spaceId: 'entry',
+        name: 'Reception',
+        category: 'service',
+        position: [1.5, 4],
+        public: true,
+        accessible: true,
+      },
+    ]);
+
+    const compiled = compileBuilding(imported.source);
+    expect(compiled.report.valid).toBe(true);
+    expect(compiled.package?.manifest.contentHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('keeps block-backed venues stable across mapping order', () => {
+    const first = applyDxfLayerMapping(blockInsertsFixture, blockInsertsProfile);
+    const second = applyDxfLayerMapping(blockInsertsFixture, {
+      ...blockInsertsProfile,
+      mappings: [...blockInsertsProfile.mappings].reverse(),
+    });
+    const firstSource = importAnnotatedDxf(first.text!, { fileName: 'blocks.dxf' }).source;
+    const secondSource = importAnnotatedDxf(second.text!, { fileName: 'blocks.dxf' }).source;
+
+    expect(secondSource).toEqual(firstSource);
+    expect(compileBuilding(secondSource).package?.manifest.contentHash).toBe(
+      compileBuilding(firstSource).package?.manifest.contentHash,
+    );
+  });
+
+  it('refuses a block whose geometry is drawn off layer 0', () => {
+    const offLayerBlock = blockInsertsFixture.replace(
+      '3\nMARKER\n0\nPOINT\n8\n0\n',
+      '3\nMARKER\n0\nPOINT\n8\nA-INTERNAL\n',
+    );
+    const inspected = inspectDxfLayers(offLayerBlock);
+
+    expect(inspected.issues.map((entry) => entry.code)).toEqual(
+      expect.arrayContaining(['block-entity-layer-not-zero']),
+    );
+    expect(inspected.layers.find((layer) => layer.name === 'A-POIS')).toBeUndefined();
+  });
+
+  it('refuses a block that nests another block', () => {
+    const nestedBlock = blockInsertsFixture.replace(
+      '3\nMARKER\n0\nPOINT\n8\n0\n10\n0\n20\n0\n30\n0\n',
+      '3\nMARKER\n0\nPOINT\n8\n0\n10\n0\n20\n0\n30\n0\n0\nINSERT\n8\n0\n2\nDOOR-LEAF\n10\n0\n20\n0\n30\n0\n',
+    );
+    const inspected = inspectDxfLayers(nestedBlock);
+
+    expect(inspected.issues.map((entry) => entry.code)).toEqual(
+      expect.arrayContaining(['nested-block-not-supported']),
+    );
+    expect(inspected.layers.find((layer) => layer.name === 'A-POIS')).toBeUndefined();
   });
 
   it('rejects unknown and ambiguous geometry selectors instead of guessing', () => {

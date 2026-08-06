@@ -102,6 +102,27 @@ carrying an unknown role, enum, or unreviewed policy fails the entire restore an
 leaves the current mapping untouched. Only a fully valid mapping can be saved, so
 an artifact never captures a half-reviewed draft.
 
+## Block references
+
+Real drawings usually draw doors, markers, and fixtures as `INSERT` block
+references rather than loose geometry. An `INSERT` is resolved into model space
+and then behaves exactly like an ordinary entity: it appears in the layer
+inventory, offers a canonical `sourceEntityKey`, and maps through the same forms.
+
+This slice resolves an `INSERT` only when its block defines **exactly one**
+supported entity (`LWPOLYLINE`, `LINE`, or `POINT`) drawn on layer 0. That limit
+is not arbitrary: the mapping workspace addresses an `INSERT` through its layer,
+which cannot name one entity among several. Placement is applied as base-point
+offset, uniform scale, rotation about Z, then insertion translation.
+
+An `INSERT` is refused, with a warning naming the reason, when it is an array,
+uses non-uniform, zero, or negative scale, nests another block, references an
+undefined block, draws its geometry off layer 0, or resolves to zero or several
+supported entities. Refusals are warnings rather than errors so an unresolvable
+furniture block never stops the floor plan around it from importing; the refused
+insert simply contributes no geometry, and a layer holding nothing else
+disappears from the inventory.
+
 ## Guardrails
 
 - `$INSUNITS` remains mandatory and values are shown in the drawing's declared
@@ -184,10 +205,17 @@ satisfies the runtime bootstrap contract. Studio maps each anchor point to an
 independently surveyed anchor with its own kind, heading, and payload, and
 refuses two anchors that would answer to the same scanned payload.
 
+`buildings/import-fixtures/unannotated-block-inserts-v0.dxf` draws its door and
+its POI marker only as `INSERT` references, placed with translation, a 90-degree
+rotation, and a uniform double scale. It also carries an arrayed insert, a
+non-uniformly scaled insert, a two-entity block, and a reference to an undefined
+block, so the refusal paths stay covered alongside the resolved ones.
+
 ## Remaining CAD mapping work
 
 - a stored profile registry with revision history and promotion, beyond the
   single save/load artifact in this slice;
 - multi-file floor alignment and georeferencing;
-- blocks, inserts, hatches, splines, holes, DWG, PDF, IFC/BIM, and GeoJSON;
+- multi-entity blocks, nested blocks, arrayed and mirrored inserts;
+- hatches, splines, holes, DWG, PDF, IFC/BIM, and GeoJSON;
 - automatic recognition and every CV/scanning workflow.
