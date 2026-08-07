@@ -1,3 +1,5 @@
+export * from './checkpoints';
+export * from './deadReckoning';
 export * from './filter';
 export * from './mapMatching';
 export * from './replay';
