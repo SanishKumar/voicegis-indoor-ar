@@ -8,8 +8,10 @@ import {
   CAPTURE_STREAM_VERSION,
   reduceImuEvent,
   sortCaptureEvents,
+  validateCaptureSession,
   type CaptureDeviceProfile,
   type CaptureEvent,
+  type CaptureIssue,
   type CaptureSession,
   type DeviceOrientationSample,
   type GroundTruthCaptureEvent,
@@ -190,9 +192,51 @@ export interface DeriveOverrides {
   routeSegments?: RouteMatchSegment[];
 }
 
+export type CheckpointExclusionReason =
+  | 'dependent-on-anchor'
+  | 'alignment-crosses-anchor-reset'
+  | 'no-estimate-in-range';
+
+/**
+ * A surveyed mark plus everything needed to defend or discard it.
+ *
+ * The recorded time is never overwritten by the aligned time. A published
+ * number has to be traceable back to the instant someone stood on the mark.
+ */
+export interface EvaluationCheckpoint {
+  id: string;
+  recordedTimeMs: number;
+  alignedTimeMs: number;
+  alignmentDeltaMs: number;
+  position: [number, number];
+  floorId: string;
+  surveyMethod: SurveyMethod;
+  expectedAccuracyMeters: number;
+  independentOfAnchors: boolean;
+  publishable: boolean;
+  exclusionReason: CheckpointExclusionReason | null;
+}
+
 export interface DerivedRecording extends LocalizationRecording {
   checkpointConfig: CheckpointAdapterConfig;
   deadReckoningConfig: DeadReckoningConfig;
+  /** Every surveyed mark, publishable or not, with its provenance intact. */
+  evaluationCheckpoints: EvaluationCheckpoint[];
+  /** Marks excluded from accuracy, kept for diagnosis. */
+  diagnosticCheckpoints: EvaluationCheckpoint[];
+}
+
+export class CaptureValidationError extends Error {
+  readonly issues: CaptureIssue[];
+  constructor(issues: CaptureIssue[]) {
+    super(
+      `Capture session failed validation with ${issues.length} issue(s): ${issues
+        .map((issue) => `${issue.code}@${issue.path}`)
+        .join(', ')}`,
+    );
+    this.name = 'CaptureValidationError';
+    this.issues = issues;
+  }
 }
 
 /**
@@ -209,6 +253,11 @@ export function deriveRecording(
   session: CaptureSession,
   overrides: DeriveOverrides = {},
 ): DerivedRecording {
+  // Nothing may be derived from a session that does not validate. A number
+  // computed from a stream we refused to vouch for is worse than no number.
+  const issues = validateCaptureSession(session);
+  if (issues.length > 0) throw new CaptureValidationError(issues);
+
   const checkpointConfig: CheckpointAdapterConfig = {
     ...DEFAULT_CHECKPOINT_CONFIG,
     ...overrides.checkpointConfig,
@@ -223,7 +272,7 @@ export function deriveRecording(
 
   const collected: Array<{ timeMs: number; order: number; observation: LocalizationObservation }> =
     [];
-  const groundTruth: GroundTruthCheckpoint[] = [];
+  const groundTruth: GroundTruthCaptureEvent[] = [];
   let order = 0;
   let firstFixTimeMs: number | null = null;
 
@@ -255,14 +304,7 @@ export function deriveRecording(
       collect(resolution.observations);
       continue;
     }
-    if (event.type === 'ground-truth') {
-      groundTruth.push({
-        id: event.checkpointId,
-        timeMs: event.timeMs,
-        position: [...event.position] as [number, number],
-        floorId: event.floorId,
-      });
-    }
+    if (event.type === 'ground-truth') groundTruth.push(event);
   }
 
   const observations = collected
@@ -288,22 +330,65 @@ export function deriveRecording(
   const observationTimes = [...new Set(observations.map((entry) => entry.timeMs))].sort(
     (left, right) => left - right,
   );
-  const alignedCheckpoints = groundTruth
-    .map((checkpoint) => {
-      let nearest = checkpoint.timeMs;
+  // Times at which a scan reset the estimate. Aligning a mark across one of
+  // these would measure a different physical moment than the one surveyed.
+  const anchorResetTimes = sortCaptureEvents(session.events)
+    .filter((event) => event.type === 'scan' && event.outcome === 'resolved')
+    .map((event) => event.timeMs);
+
+  const evaluationCheckpoints: EvaluationCheckpoint[] = groundTruth
+    .map((mark) => {
+      let alignedTimeMs = mark.timeMs;
       let best = Number.POSITIVE_INFINITY;
       for (const time of observationTimes) {
-        const distance = Math.abs(time - checkpoint.timeMs);
+        const distance = Math.abs(time - mark.timeMs);
         if (distance < best) {
           best = distance;
-          nearest = time;
+          alignedTimeMs = time;
         }
       }
-      return best <= GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS
-        ? { ...checkpoint, timeMs: nearest }
-        : checkpoint;
+      const aligned = best <= GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS;
+      if (!aligned) alignedTimeMs = mark.timeMs;
+
+      const low = Math.min(mark.timeMs, alignedTimeMs);
+      const high = Math.max(mark.timeMs, alignedTimeMs);
+      const crossesReset = anchorResetTimes.some((time) => time > low && time <= high);
+
+      const exclusionReason: CheckpointExclusionReason | null = !mark.independentOfAnchors
+        ? 'dependent-on-anchor'
+        : !aligned
+          ? 'no-estimate-in-range'
+          : crossesReset
+            ? 'alignment-crosses-anchor-reset'
+            : null;
+
+      return {
+        id: mark.checkpointId,
+        recordedTimeMs: mark.timeMs,
+        alignedTimeMs,
+        alignmentDeltaMs: alignedTimeMs - mark.timeMs,
+        position: [...mark.position] as [number, number],
+        floorId: mark.floorId,
+        surveyMethod: mark.surveyMethod,
+        expectedAccuracyMeters: mark.expectedAccuracyMeters,
+        independentOfAnchors: mark.independentOfAnchors,
+        publishable: exclusionReason === null,
+        exclusionReason,
+      };
     })
-    .sort((left, right) => left.timeMs - right.timeMs);
+    .sort((left, right) => left.alignedTimeMs - right.alignedTimeMs || left.id.localeCompare(right.id));
+
+  // Only publishable marks are handed to the replay evaluator. A dependent or
+  // unalignable mark cannot influence reported accuracy because it is not in
+  // the array the evaluator reads.
+  const alignedCheckpoints: GroundTruthCheckpoint[] = evaluationCheckpoints
+    .filter((checkpoint) => checkpoint.publishable)
+    .map((checkpoint) => ({
+      id: checkpoint.id,
+      timeMs: checkpoint.alignedTimeMs,
+      position: [...checkpoint.position] as [number, number],
+      floorId: checkpoint.floorId,
+    }));
 
   return {
     schemaVersion: LOCALIZATION_RECORDING_VERSION,
@@ -317,5 +402,7 @@ export function deriveRecording(
     checkpoints: alignedCheckpoints,
     checkpointConfig,
     deadReckoningConfig,
+    evaluationCheckpoints,
+    diagnosticCheckpoints: evaluationCheckpoints.filter((checkpoint) => !checkpoint.publishable),
   };
 }

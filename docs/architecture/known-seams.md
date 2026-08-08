@@ -1,5 +1,45 @@
 # Known seams
 
+## Capture chronology and immutability are not yet enforced
+
+Deferred from Recorder Integrity v0.1.1, which hardened only the evaluation
+boundary. Three known holes remain in `captureStream.ts` and `recorder.ts`:
+
+- A sensor timestamp that goes backwards is hidden by sorting rather than
+  reported, so a device with a regressing clock produces a plausible-looking
+  stream.
+- `buildSession` copies the events array but not the event objects, so a caller
+  holding a reference can mutate a session that is described as immutable.
+- Capture order among events sharing a millisecond is preserved in the stored
+  stream but not fully carried through derivation.
+
+None of these can currently alter reported accuracy, because dependent and
+unalignable checkpoints are excluded before the evaluator sees them. They can
+still make a stored walk misleading, so they must close before field capture.
+
+## Inertial integration ignores interruptions
+
+`DeadReckoningIntegrator.push` integrates yaw rate over the gap since the last
+sample. When a session is backgrounded and resumed, the first resumed sample is
+integrated across the entire missing interval and invents a heading change that
+never happened. Lifecycle events are recorded but not consumed.
+
+Deferred to the interruption-recovery slice. Until then, any walk containing a
+`backgrounded` lifecycle event should be treated as heading-unreliable after
+that point.
+
+## Gyroscope axis assumes a flat handset
+
+`reduceImuEvent` takes `gyroscope[2]` as the yaw rate, which is only the world
+vertical when the phone is held flat. Held upright — the natural navigation
+posture — the vertical axis is a different component, so heading drift will be
+wrong in the field.
+
+The agreed fix is orientation-aware projection of the gyroscope vector onto
+world vertical, not a flat-phone requirement. The capture stream already records
+the sensor API, angular-rate units, and coordinate frame needed to do this
+correctly; only the projection maths is outstanding.
+
 Deliberately unfinished work, recorded so it is not rediscovered as a bug. Each
 entry says what is incomplete, why it was left, and what finishing it involves.
 

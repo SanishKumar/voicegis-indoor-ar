@@ -4,6 +4,7 @@ import {
   exportCaptureSession,
   importCaptureSession,
   sortCaptureEvents,
+  summarizeSampling,
   validateCaptureSession,
   type CaptureDeviceProfile,
   type CaptureEvent,
@@ -11,7 +12,12 @@ import {
 } from './captureStream';
 import type { CheckpointAnchor } from './checkpoints';
 import { replayRecording } from './replay';
-import { SessionRecorder, deriveRecording, type SessionRecorderOptions } from './recorder';
+import {
+  CaptureValidationError,
+  SessionRecorder,
+  deriveRecording,
+  type SessionRecorderOptions,
+} from './recorder';
 
 const anchors: CheckpointAnchor[] = [
   {
@@ -263,6 +269,213 @@ describe('capture stream integrity', () => {
     ).toEqual(['session-start', 'backgrounded', 'foregrounded']);
     // The gap must not break derivation.
     expect(deriveRecording(session).observations.length).toBeGreaterThan(0);
+  });
+});
+
+describe('fail-closed evaluation boundary', () => {
+  const anchoredSession = (): CaptureSession => ({
+    captureVersion: CAPTURE_STREAM_VERSION,
+    sessionId: 's',
+    buildingId: 'b',
+    packageHash: 'a'.repeat(64),
+    startedAtIso: '2026-08-07T09:00:00.000Z',
+    device,
+    anchors,
+    events: [
+      {
+        type: 'scan',
+        sequence: 0,
+        timeMs: 100,
+        transport: 'qr',
+        payload: 'vg:corridor-start',
+        outcome: 'resolved',
+        anchorId: 'corridor-start',
+      },
+      {
+        type: 'ground-truth',
+        sequence: 1,
+        timeMs: 100,
+        checkpointId: 'on-anchor',
+        position: [1, 9],
+        floorId: 'g',
+        surveyMethod: 'tape-measure',
+        expectedAccuracyMeters: 0.03,
+        independentOfAnchors: false,
+      },
+    ],
+  });
+
+  it('keeps a dependent checkpoint out of the published metric entirely', () => {
+    const derived = deriveRecording(anchoredSession());
+
+    // The evaluator only ever reads `checkpoints`, so a dependent mark cannot
+    // reach the reported accuracy.
+    expect(derived.checkpoints).toEqual([]);
+    expect(derived.diagnosticCheckpoints.map((c) => [c.id, c.exclusionReason])).toEqual([
+      ['on-anchor', 'dependent-on-anchor'],
+    ]);
+    expect(replayRecording(derived).report.checkpointCount).toBe(0);
+  });
+
+  it('retains full provenance for excluded marks rather than dropping them', () => {
+    const [excluded] = deriveRecording(anchoredSession()).diagnosticCheckpoints;
+
+    expect(excluded).toMatchObject({
+      id: 'on-anchor',
+      recordedTimeMs: 100,
+      surveyMethod: 'tape-measure',
+      expectedAccuracyMeters: 0.03,
+      independentOfAnchors: false,
+      publishable: false,
+    });
+  });
+
+  it('never overwrites the surveyed time with the aligned time', () => {
+    const derived = deriveRecording(recordWalk().buildSession());
+    const mark = derived.evaluationCheckpoints.find((c) => c.id === 'floor-mark-mid')!;
+
+    expect(mark.recordedTimeMs).toBe(3_500);
+    expect(mark.alignedTimeMs).not.toBe(undefined);
+    expect(mark.alignmentDeltaMs).toBe(mark.alignedTimeMs - mark.recordedTimeMs);
+    expect(Math.abs(mark.alignmentDeltaMs)).toBeLessThanOrEqual(1_000);
+    expect(mark.publishable).toBe(true);
+  });
+
+  it('excludes a mark whose alignment would cross an anchor reset', () => {
+    const session = anchoredSession();
+    session.events = [
+      ...session.events.slice(0, 1),
+      {
+        type: 'imu',
+        sequence: 2,
+        timeMs: 50,
+        accelerometer: [0, 0, 9.81],
+        gyroscope: [0, 0, 0],
+        orientation: null,
+      },
+      {
+        type: 'ground-truth',
+        sequence: 3,
+        timeMs: 60,
+        checkpointId: 'just-before-reset',
+        position: [40, 40],
+        floorId: 'g',
+        surveyMethod: 'tape-measure',
+        expectedAccuracyMeters: 0.03,
+        independentOfAnchors: true,
+      },
+      {
+        type: 'imu',
+        sequence: 4,
+        timeMs: 140,
+        accelerometer: [0, 0, 9.81],
+        gyroscope: [0, 0, 0],
+        orientation: null,
+      },
+    ].sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence) as never;
+
+    const derived = deriveRecording(session);
+    const mark = derived.evaluationCheckpoints.find((c) => c.id === 'just-before-reset');
+
+    // The nearest estimate sits on the far side of the scan that reset position.
+    if (mark && mark.alignedTimeMs > 100) {
+      expect(mark.publishable).toBe(false);
+      expect(mark.exclusionReason).toBe('alignment-crosses-anchor-reset');
+      expect(derived.checkpoints.map((c) => c.id)).not.toContain('just-before-reset');
+    }
+  });
+
+  it('refuses to derive anything from a session that does not validate', () => {
+    const broken = { ...recordWalk().buildSession(), startedAtIso: new Date(0).toISOString() };
+
+    expect(() => deriveRecording(broken)).toThrow(CaptureValidationError);
+    try {
+      deriveRecording(broken);
+    } catch (error) {
+      expect((error as CaptureValidationError).issues.map((i) => i.code)).toContain(
+        'implausible-capture-start',
+      );
+    }
+  });
+});
+
+describe('never-throw runtime validation', () => {
+  const base = () => recordWalk().buildSession();
+
+  it('reports malformed events instead of dereferencing them', () => {
+    expect(() =>
+      validateCaptureSession({ ...base(), events: [null, undefined, 7, 'x'] }),
+    ).not.toThrow();
+    expect(
+      validateCaptureSession({ ...base(), events: [null] }).map((i) => i.code),
+    ).toContain('malformed-event');
+  });
+
+  it('rejects a session with no device or sensor profile', () => {
+    expect(validateCaptureSession({ ...base(), device: undefined }).map((i) => i.code)).toContain(
+      'malformed-device',
+    );
+    expect(
+      validateCaptureSession({ ...base(), device: { label: 'd', platform: 'p' } }).map((i) => i.code),
+    ).toContain('malformed-device');
+    expect(
+      validateCaptureSession({
+        ...base(),
+        device: { label: 'd', platform: 'p', sensors: { gyroscopeUnits: 'furlongs' } },
+      }).map((i) => i.code),
+    ).toContain('malformed-sensor-profile');
+  });
+
+  it('rejects malformed anchors rather than trusting them', () => {
+    expect(validateCaptureSession({ ...base(), anchors: [{ id: 1 }] }).map((i) => i.code)).toContain(
+      'malformed-anchor',
+    );
+    expect(validateCaptureSession({ ...base(), anchors: 'nope' }).map((i) => i.code)).toContain(
+      'malformed-anchors',
+    );
+    expect(
+      validateCaptureSession({
+        ...base(),
+        anchors: [{ ...anchors[0], headingDegrees: 361 }],
+      }).map((i) => i.code),
+    ).toContain('malformed-anchor');
+  });
+
+  it('rejects every malformed event variant', () => {
+    const variant = (event: unknown) =>
+      validateCaptureSession({ ...base(), events: [event] }).map((i) => i.code);
+
+    expect(variant({ type: 'imu', sequence: 0, timeMs: 0, accelerometer: [1, 2], gyroscope: null })).toContain(
+      'malformed-imu-event',
+    );
+    expect(
+      variant({ type: 'scan', sequence: 0, timeMs: 0, transport: 'qr', outcome: 'resolved', payload: null, anchorId: null }),
+    ).toContain('malformed-scan-event');
+    expect(
+      variant({ type: 'ground-truth', sequence: 0, timeMs: 0, checkpointId: 'a', position: [0, 0], floorId: 'g', surveyMethod: 'vibes', expectedAccuracyMeters: 1, independentOfAnchors: true }),
+    ).toContain('malformed-ground-truth-event');
+    expect(variant({ type: 'lifecycle', sequence: 0, timeMs: 0, event: 'exploded' })).toContain(
+      'malformed-lifecycle-event',
+    );
+    expect(variant({ type: 'telepathy', sequence: 0, timeMs: 0 })).toContain('unknown-event-type');
+  });
+
+  it('handles hostile top-level input without throwing', () => {
+    for (const hostile of [null, undefined, 42, 'x', [], { events: null }]) {
+      expect(() => validateCaptureSession(hostile)).not.toThrow();
+      expect(validateCaptureSession(hostile).length).toBeGreaterThan(0);
+    }
+    expect(importCaptureSession('null').valid).toBe(false);
+  });
+
+  it('recovers real sampling behaviour instead of trusting the declared rate', () => {
+    const summary = summarizeSampling(recordWalk().buildSession());
+
+    expect(summary.sampleCount).toBeGreaterThan(100);
+    expect(summary.medianIntervalMs).toBe(20);
+    expect(summary.observedHz).toBeCloseTo(50, 1);
+    // The walk has a deliberate gap between the warm-up and the corridor.
+    expect(summary.gaps.length).toBeGreaterThan(0);
   });
 });
 

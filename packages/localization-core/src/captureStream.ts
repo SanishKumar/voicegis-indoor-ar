@@ -106,10 +106,39 @@ export type CaptureEvent =
   | GroundTruthCaptureEvent
   | LifecycleCaptureEvent;
 
+export type SensorApi = 'devicemotion' | 'generic-sensor' | 'native' | 'synthetic';
+export type AngularRateUnits = 'deg/s' | 'rad/s';
+export type SensorFrame = 'device' | 'world';
+
+/**
+ * How the samples were obtained.
+ *
+ * Declared rates are advisory only — actual intervals are recovered from the
+ * timestamps, because browsers throttle and coalesce sensor delivery. The API,
+ * units, and frame are not advisory: DeviceMotion and the Generic Sensor API
+ * disagree on angular-rate units and axis conventions, so a stream without them
+ * cannot be interpreted later.
+ *
+ * See https://www.w3.org/TR/orientation-event/ and https://www.w3.org/TR/gyroscope/.
+ */
 export interface CaptureSensorProfile {
+  /** Nominal rates as advertised by the platform, never trusted for maths. */
   accelerometerHz?: number;
   gyroscopeHz?: number;
   orientationHz?: number;
+  api?: SensorApi;
+  gyroscopeUnits?: AngularRateUnits;
+  frame?: SensorFrame;
+}
+
+export interface SamplingSummary {
+  sampleCount: number;
+  medianIntervalMs: number;
+  /** Median absolute deviation of intervals: how irregular delivery was. */
+  jitterMs: number;
+  observedHz: number;
+  /** Gaps longer than five times the median interval, as [startMs, endMs]. */
+  gaps: Array<[number, number]>;
 }
 
 export interface CaptureDeviceProfile {
@@ -189,59 +218,255 @@ export function reduceImuEvent(event: ImuCaptureEvent): ImuSample {
   };
 }
 
+const SCAN_OUTCOMES = new Set<string>([
+  'resolved',
+  'unknown-payload',
+  'ambiguous-payload',
+  'anchor-kind-mismatch',
+  'decode-failed',
+  'permission-denied',
+  'transport-unavailable',
+]);
+const SURVEY_METHODS = new Set<string>([
+  'tape-measure',
+  'laser-distance',
+  'total-station',
+  'estimated',
+]);
+const LIFECYCLE_EVENTS = new Set<string>([
+  'session-start',
+  'session-end',
+  'backgrounded',
+  'foregrounded',
+  'sensor-interrupted',
+  'sensor-resumed',
+  'permission-granted',
+  'permission-denied',
+]);
+const ANCHOR_KINDS = new Set<string>(['qr', 'apriltag', 'image', 'nfc']);
+
+function isPosition2(value: unknown): value is [number, number] {
+  return Array.isArray(value) && value.length === 2 && value.every((entry) => Number.isFinite(entry));
+}
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
+function optionalOf(value: unknown, check: (candidate: unknown) => boolean) {
+  return value === undefined || check(value);
+}
+
+function add(issues: CaptureIssue[], code: string, path: string, message: string) {
+  issues.push({ code, path, message });
+}
+
 function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
   const path = `/events/${index}`;
   if (!isRecord(event)) {
-    issues.push({ code: 'malformed-event', path, message: 'Every capture event must be an object.' });
+    add(issues, 'malformed-event', path, 'Every capture event must be an object.');
     return false;
   }
   if (!Number.isFinite(event.sequence) || !Number.isFinite(event.timeMs)) {
-    issues.push({
-      code: 'malformed-event',
-      path,
-      message: 'Capture events need a finite sequence and timeMs.',
-    });
+    add(issues, 'malformed-event', path, 'Capture events need a finite sequence and timeMs.');
     return false;
   }
+
   if (event.type === 'imu') {
     if (!isVector3(event.accelerometer) || !isVector3(event.gyroscope)) {
-      issues.push({
-        code: 'malformed-imu-event',
+      add(
+        issues,
+        'malformed-imu-event',
         path,
-        message: 'Inertial events need full accelerometer and gyroscope vectors.',
-      });
+        'Inertial events need full accelerometer and gyroscope vectors.',
+      );
       return false;
+    }
+    if (event.orientation !== null && event.orientation !== undefined) {
+      const orientation = event.orientation;
+      if (
+        !isRecord(orientation) ||
+        !Number.isFinite(orientation.alphaDegrees) ||
+        !Number.isFinite(orientation.betaDegrees) ||
+        !Number.isFinite(orientation.gammaDegrees) ||
+        typeof orientation.absolute !== 'boolean'
+      ) {
+        add(
+          issues,
+          'malformed-imu-event',
+          `${path}/orientation`,
+          'Orientation must carry finite alpha, beta, gamma and an absolute flag.',
+        );
+        return false;
+      }
     }
     return true;
   }
+
   if (event.type === 'scan') {
     if (event.transport !== 'qr' && event.transport !== 'nfc') {
-      issues.push({ code: 'malformed-scan-event', path, message: 'Scan transport must be qr or nfc.' });
+      add(issues, 'malformed-scan-event', path, 'Scan transport must be qr or nfc.');
+      return false;
+    }
+    if (!SCAN_OUTCOMES.has(String(event.outcome))) {
+      add(issues, 'malformed-scan-event', `${path}/outcome`, 'Unknown scan outcome.');
+      return false;
+    }
+    if (event.payload !== null && typeof event.payload !== 'string') {
+      add(issues, 'malformed-scan-event', `${path}/payload`, 'Scan payload must be a string or null.');
+      return false;
+    }
+    if (event.anchorId !== null && typeof event.anchorId !== 'string') {
+      add(issues, 'malformed-scan-event', `${path}/anchorId`, 'Anchor id must be a string or null.');
+      return false;
+    }
+    if (event.outcome === 'resolved' && (!nonEmptyString(event.anchorId) || event.payload === null)) {
+      add(
+        issues,
+        'malformed-scan-event',
+        `${path}/outcome`,
+        'A resolved scan must name the anchor it resolved and the payload it read.',
+      );
       return false;
     }
     return true;
   }
+
   if (event.type === 'ground-truth') {
-    if (
-      typeof event.checkpointId !== 'string' ||
-      !Array.isArray(event.position) ||
-      event.position.length !== 2 ||
-      typeof event.independentOfAnchors !== 'boolean' ||
-      !Number.isFinite(event.expectedAccuracyMeters)
-    ) {
-      issues.push({
-        code: 'malformed-ground-truth-event',
-        path,
-        message:
-          'Ground truth needs a checkpoint id, position, survey accuracy, and an independence claim.',
-      });
+    let ok = true;
+    if (!nonEmptyString(event.checkpointId)) {
+      add(issues, 'malformed-ground-truth-event', `${path}/checkpointId`, 'Checkpoint id is required.');
+      ok = false;
+    }
+    if (!isPosition2(event.position)) {
+      add(issues, 'malformed-ground-truth-event', `${path}/position`, 'Position must be two finite numbers.');
+      ok = false;
+    }
+    if (!nonEmptyString(event.floorId)) {
+      add(issues, 'malformed-ground-truth-event', `${path}/floorId`, 'Floor id is required.');
+      ok = false;
+    }
+    if (!SURVEY_METHODS.has(String(event.surveyMethod))) {
+      add(
+        issues,
+        'malformed-ground-truth-event',
+        `${path}/surveyMethod`,
+        'Survey method must be recorded so the mark can be trusted.',
+      );
+      ok = false;
+    }
+    if (!Number.isFinite(event.expectedAccuracyMeters) || Number(event.expectedAccuracyMeters) < 0) {
+      add(
+        issues,
+        'malformed-ground-truth-event',
+        `${path}/expectedAccuracyMeters`,
+        'Expected survey accuracy must be a non-negative number.',
+      );
+      ok = false;
+    }
+    if (typeof event.independentOfAnchors !== 'boolean') {
+      add(
+        issues,
+        'malformed-ground-truth-event',
+        `${path}/independentOfAnchors`,
+        'Independence from anchors must be claimed explicitly.',
+      );
+      ok = false;
+    }
+    return ok;
+  }
+
+  if (event.type === 'lifecycle') {
+    if (!LIFECYCLE_EVENTS.has(String(event.event))) {
+      add(issues, 'malformed-lifecycle-event', `${path}/event`, 'Unknown lifecycle event.');
       return false;
     }
     return true;
   }
-  if (event.type === 'lifecycle') return true;
-  issues.push({ code: 'unknown-event-type', path, message: `Unsupported event type.` });
+
+  add(issues, 'unknown-event-type', path, 'Unsupported event type.');
   return false;
+}
+
+function validateDevice(device: unknown, issues: CaptureIssue[]) {
+  if (!isRecord(device)) {
+    add(issues, 'malformed-device', '/device', 'Capture must record the device it came from.');
+    return;
+  }
+  if (!nonEmptyString(device.label)) {
+    add(issues, 'malformed-device', '/device/label', 'Device label is required.');
+  }
+  if (!nonEmptyString(device.platform)) {
+    add(issues, 'malformed-device', '/device/platform', 'Device platform is required.');
+  }
+  if (!isRecord(device.sensors)) {
+    add(issues, 'malformed-device', '/device/sensors', 'Sensor profile is required.');
+    return;
+  }
+  const sensors = device.sensors;
+  const finiteOrAbsent = (value: unknown) => Number.isFinite(value) && Number(value) > 0;
+  for (const key of ['accelerometerHz', 'gyroscopeHz', 'orientationHz']) {
+    if (!optionalOf(sensors[key], finiteOrAbsent)) {
+      add(issues, 'malformed-sensor-profile', `/device/sensors/${key}`, 'Declared rate must be positive.');
+    }
+  }
+  if (!optionalOf(sensors.api, (value) => ['devicemotion', 'generic-sensor', 'native', 'synthetic'].includes(String(value)))) {
+    add(issues, 'malformed-sensor-profile', '/device/sensors/api', 'Unknown sensor API.');
+  }
+  if (!optionalOf(sensors.gyroscopeUnits, (value) => value === 'deg/s' || value === 'rad/s')) {
+    add(
+      issues,
+      'malformed-sensor-profile',
+      '/device/sensors/gyroscopeUnits',
+      'Angular rate units must be deg/s or rad/s.',
+    );
+  }
+  if (!optionalOf(sensors.frame, (value) => value === 'device' || value === 'world')) {
+    add(issues, 'malformed-sensor-profile', '/device/sensors/frame', 'Sensor frame must be device or world.');
+  }
+}
+
+function validateAnchors(anchors: unknown, issues: CaptureIssue[]) {
+  if (!Array.isArray(anchors)) {
+    add(issues, 'malformed-anchors', '/anchors', 'Capture must carry the anchor set it resolved against.');
+    return [];
+  }
+  const valid: CheckpointAnchor[] = [];
+  anchors.forEach((anchor, index) => {
+    const path = `/anchors/${index}`;
+    if (!isRecord(anchor)) {
+      add(issues, 'malformed-anchor', path, 'Each anchor must be an object.');
+      return;
+    }
+    let ok = true;
+    if (!nonEmptyString(anchor.id)) {
+      add(issues, 'malformed-anchor', `${path}/id`, 'Anchor id is required.');
+      ok = false;
+    }
+    if (!nonEmptyString(anchor.floorId)) {
+      add(issues, 'malformed-anchor', `${path}/floorId`, 'Anchor floor id is required.');
+      ok = false;
+    }
+    if (!nonEmptyString(anchor.payload)) {
+      add(issues, 'malformed-anchor', `${path}/payload`, 'Anchor payload is required.');
+      ok = false;
+    }
+    if (!ANCHOR_KINDS.has(String(anchor.kind))) {
+      add(issues, 'malformed-anchor', `${path}/kind`, 'Unknown anchor kind.');
+      ok = false;
+    }
+    if (!isPosition2(anchor.position)) {
+      add(issues, 'malformed-anchor', `${path}/position`, 'Anchor position must be two finite numbers.');
+      ok = false;
+    }
+    const heading = anchor.headingDegrees;
+    if (!Number.isFinite(heading) || Number(heading) < 0 || Number(heading) >= 360) {
+      add(issues, 'malformed-anchor', `${path}/headingDegrees`, 'Anchor heading must be in [0, 360).');
+      ok = false;
+    }
+    if (ok) valid.push(anchor as unknown as CheckpointAnchor);
+  });
+  return valid;
 }
 
 /**
@@ -251,8 +476,25 @@ function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
  * behaviour: a ground-truth mark claiming independence while sitting on the
  * anchor that just reset the estimate would report the reset as accuracy.
  */
-export function validateCaptureSession(session: CaptureSession): CaptureIssue[] {
+export function validateCaptureSession(value: unknown): CaptureIssue[] {
   const issues: CaptureIssue[] = [];
+
+  if (!isRecord(value)) {
+    return [{ code: 'malformed-capture', path: '/', message: 'Capture must be an object.' }];
+  }
+  for (const key of ['sessionId', 'buildingId', 'packageHash']) {
+    if (!nonEmptyString(value[key])) {
+      add(issues, 'malformed-capture', `/${key}`, `${key} is required.`);
+    }
+  }
+  validateDevice(value.device, issues);
+  validateAnchors(value.anchors, issues);
+  if (!Array.isArray(value.events)) {
+    add(issues, 'malformed-capture', '/events', 'Capture must carry an events array.');
+    return issues.sort((a, b) => a.code.localeCompare(b.code) || a.path.localeCompare(b.path));
+  }
+
+  const session = value as unknown as CaptureSession;
 
   if (session.captureVersion !== CAPTURE_STREAM_VERSION) {
     issues.push({
@@ -277,7 +519,12 @@ export function validateCaptureSession(session: CaptureSession): CaptureIssue[] 
     });
   }
 
-  session.events.forEach((event, index) => validateEvent(event, index, issues));
+  // Only structurally sound events are ordered, so a malformed entry is
+  // reported rather than dereferenced.
+  const wellFormed: Array<{ event: CaptureEvent; index: number }> = [];
+  session.events.forEach((event, index) => {
+    if (validateEvent(event, index, issues)) wellFormed.push({ event: event as CaptureEvent, index });
+  });
 
   // Sequence records the order events were captured; the stream is stored in
   // time order. Those differ legitimately — a floor mark is often noted a
@@ -287,7 +534,7 @@ export function validateCaptureSession(session: CaptureSession): CaptureIssue[] 
   let previousTimeMs = Number.NEGATIVE_INFINITY;
   let previousSequenceAtTime = -1;
   const seenSequences = new Set<number>();
-  session.events.forEach((event, index) => {
+  wellFormed.forEach(({ event, index }) => {
     if (seenSequences.has(event.sequence)) {
       issues.push({
         code: 'duplicate-event-sequence',
@@ -319,7 +566,7 @@ export function validateCaptureSession(session: CaptureSession): CaptureIssue[] 
     list.push(anchor);
     anchorsByFloor.set(anchor.floorId, list);
   }
-  session.events.forEach((event, index) => {
+  wellFormed.forEach(({ event, index }) => {
     if (event.type !== 'ground-truth' || !event.independentOfAnchors) return;
     const nearby = (anchorsByFloor.get(event.floorId) ?? []).find(
       (anchor) =>
@@ -336,6 +583,44 @@ export function validateCaptureSession(session: CaptureSession): CaptureIssue[] 
   });
 
   return issues.sort((a, b) => a.code.localeCompare(b.code) || a.path.localeCompare(b.path));
+}
+
+/**
+ * Recovers how the sensors actually behaved from the timestamps.
+ *
+ * A declared rate describes what the platform intended; browsers throttle,
+ * coalesce, and stop delivering entirely when backgrounded. Anything that
+ * depends on sample spacing should read this rather than the declared rate.
+ */
+export function summarizeSampling(session: CaptureSession): SamplingSummary {
+  const times = session.events
+    .filter((event): event is ImuCaptureEvent => event.type === 'imu')
+    .map((event) => event.timeMs)
+    .sort((left, right) => left - right);
+  if (times.length < 2) {
+    return { sampleCount: times.length, medianIntervalMs: 0, jitterMs: 0, observedHz: 0, gaps: [] };
+  }
+
+  const intervals: number[] = [];
+  for (let index = 1; index < times.length; index += 1) intervals.push(times[index] - times[index - 1]);
+  const sorted = [...intervals].sort((left, right) => left - right);
+  const medianIntervalMs = sorted[Math.floor(sorted.length / 2)];
+  const deviations = intervals.map((interval) => Math.abs(interval - medianIntervalMs)).sort((a, b) => a - b);
+  const jitterMs = deviations[Math.floor(deviations.length / 2)];
+
+  const gaps: Array<[number, number]> = [];
+  const gapThreshold = Math.max(medianIntervalMs * 5, medianIntervalMs + 1);
+  for (let index = 1; index < times.length; index += 1) {
+    if (times[index] - times[index - 1] > gapThreshold) gaps.push([times[index - 1], times[index]]);
+  }
+
+  return {
+    sampleCount: times.length,
+    medianIntervalMs,
+    jitterMs,
+    observedHz: medianIntervalMs > 0 ? Number((1_000 / medianIntervalMs).toFixed(3)) : 0,
+    gaps,
+  };
 }
 
 function canonicalize(value: unknown): unknown {
@@ -373,21 +658,10 @@ export function importCaptureSession(text: string): CaptureImportResult {
       issues: [{ code: 'invalid-capture-json', path: '/', message: 'Capture must be valid JSON.' }],
     };
   }
-  if (!isRecord(parsed) || !Array.isArray(parsed.events) || !Array.isArray(parsed.anchors)) {
-    return {
-      valid: false,
-      session: null,
-      issues: [
-        {
-          code: 'malformed-capture',
-          path: '/',
-          message: 'Capture needs an events array and an anchors array.',
-        },
-      ],
-    };
-  }
-
-  const session = parsed as unknown as CaptureSession;
-  const issues = validateCaptureSession(session);
-  return { valid: issues.length === 0, session: issues.length === 0 ? session : null, issues };
+  const issues = validateCaptureSession(parsed);
+  return {
+    valid: issues.length === 0,
+    session: issues.length === 0 ? (parsed as unknown as CaptureSession) : null,
+    issues,
+  };
 }
