@@ -1,3 +1,4 @@
+export * from './captureStream';
 export * from './checkpoints';
 export * from './deadReckoning';
 export * from './filter';

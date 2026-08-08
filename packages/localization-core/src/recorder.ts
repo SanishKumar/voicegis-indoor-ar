@@ -3,14 +3,26 @@ import {
   DEFAULT_CHECKPOINT_CONFIG,
   type CheckpointAdapterConfig,
   type CheckpointAnchor,
-  type CheckpointRejectionReason,
-  type CheckpointScan,
 } from './checkpoints';
+import {
+  CAPTURE_STREAM_VERSION,
+  reduceImuEvent,
+  sortCaptureEvents,
+  type CaptureDeviceProfile,
+  type CaptureEvent,
+  type CaptureSession,
+  type DeviceOrientationSample,
+  type GroundTruthCaptureEvent,
+  type LifecycleEvent,
+  type ScanCaptureEvent,
+  type ScanOutcome,
+  type SurveyMethod,
+  type Vector3,
+} from './captureStream';
 import {
   DEFAULT_DEAD_RECKONING_CONFIG,
   DeadReckoningIntegrator,
   type DeadReckoningConfig,
-  type ImuSample,
 } from './deadReckoning';
 import {
   LOCALIZATION_RECORDING_VERSION,
@@ -20,247 +32,290 @@ import {
   type RouteMatchSegment,
 } from './types';
 
-export const LOCALIZATION_CAPTURE_VERSION = '0.1.0' as const;
-
-/**
- * Everything known about the handset that produced a walk. A field trip is
- * expensive and a recording is cheap, so this is recorded generously: sensor
- * behaviour differs enough between models and OS versions that a number without
- * provenance is hard to defend later.
- */
-export interface CaptureDevice {
-  label: string;
-  platform: string;
-  model?: string;
-  osVersion?: string;
-  appVersion?: string;
-  imuSampleRateHz?: number;
-  notes?: string;
-}
-
-export interface RecordedScan extends CheckpointScan {
-  accepted: boolean;
-  reason: CheckpointRejectionReason | 'resolved';
-  anchorId: string | null;
-}
-
-/**
- * The raw walk, kept alongside the derived observations.
- *
- * Storing only observations would freeze the walk against whichever step
- * detector and resolution policy happened to be running that day. Keeping every
- * sample and every scan means an improved filter can be re-run against the same
- * building six months later without going back to it.
- */
-export interface RawCapture {
-  captureVersion: typeof LOCALIZATION_CAPTURE_VERSION;
-  startedAtIso: string;
-  imuSamples: ImuSample[];
-  scans: RecordedScan[];
-  anchors: CheckpointAnchor[];
-  checkpointConfig: CheckpointAdapterConfig;
-  deadReckoningConfig: DeadReckoningConfig;
-}
-
-export interface CapturedRecording extends LocalizationRecording {
-  device: CaptureDevice;
-  capture: RawCapture;
-}
-
 export interface SessionRecorderOptions {
   sessionId: string;
   buildingId: string;
   packageHash: string;
-  device: CaptureDevice;
+  device: CaptureDeviceProfile;
   anchors: CheckpointAnchor[];
-  startedAtIso?: string;
-  routeSegments?: RouteMatchSegment[];
-  checkpointConfig?: Partial<CheckpointAdapterConfig>;
-  deadReckoningConfig?: Partial<DeadReckoningConfig>;
+  /** Required. A walk with no wall clock cannot be dated afterwards. */
+  startedAtIso: string;
 }
 
-interface TimedObservation {
+export interface ImuReading {
   timeMs: number;
-  order: number;
-  observation: LocalizationObservation;
+  accelerometer: Vector3;
+  gyroscope: Vector3;
+  orientation?: DeviceOrientationSample | null;
+}
+
+export interface ScanAttempt {
+  timeMs: number;
+  transport: 'qr' | 'nfc';
+  /** Null when the camera or reader produced nothing decodable. */
+  payload: string | null;
+  /** Set when acquisition itself failed rather than resolution. */
+  failure?: Extract<
+    ScanOutcome,
+    'decode-failed' | 'permission-denied' | 'transport-unavailable'
+  >;
+}
+
+export interface GroundTruthMark {
+  timeMs: number;
+  checkpointId: string;
+  position: [number, number];
+  floorId: string;
+  surveyMethod: SurveyMethod;
+  expectedAccuracyMeters: number;
+  independentOfAnchors: boolean;
 }
 
 /**
- * Captures a real walk into a replayable recording.
+ * Accumulates a chronological capture stream from a walk.
  *
- * Live behaviour and recorded behaviour are the same code path: the caller
- * pushes sensor events as they arrive, gets observations back to drive the
- * filter on the handset, and the recorder retains both the raw events and the
- * derived observations. A resolved scan re-seeds integrated heading, which is
- * what stops inertial drift accumulating across the whole walk.
+ * The stream is the record of what happened and nothing is derived into it.
+ * Observations are produced separately by `deriveRecording`, so re-running an
+ * improved step detector against a stored walk cannot disturb the evidence it
+ * is being measured against.
  */
 export class SessionRecorder {
   private readonly options: SessionRecorderOptions;
-  private readonly checkpoints: CheckpointAdapter;
-  private readonly deadReckoning: DeadReckoningIntegrator;
-  private readonly checkpointConfig: CheckpointAdapterConfig;
-  private readonly deadReckoningConfig: DeadReckoningConfig;
-  private readonly imuSamples: ImuSample[] = [];
-  private readonly scans: RecordedScan[] = [];
-  private readonly groundTruth: GroundTruthCheckpoint[] = [];
-  private readonly observations: TimedObservation[] = [];
-  private readonly startedAtIso: string;
-  private order = 0;
-  private firstFixTimeMs: number | null = null;
+  private readonly events: CaptureEvent[] = [];
+  private sequence = 0;
 
   constructor(options: SessionRecorderOptions) {
     this.options = options;
-    this.startedAtIso = options.startedAtIso ?? new Date(0).toISOString();
-    this.checkpointConfig = { ...DEFAULT_CHECKPOINT_CONFIG, ...options.checkpointConfig };
-    this.deadReckoningConfig = { ...DEFAULT_DEAD_RECKONING_CONFIG, ...options.deadReckoningConfig };
-    this.checkpoints = new CheckpointAdapter(options.anchors, this.checkpointConfig);
-    this.deadReckoning = new DeadReckoningIntegrator(this.deadReckoningConfig);
+    this.recordLifecycle('session-start', 0);
   }
 
-  get scanCount() {
-    return this.scans.length;
+  get eventCount() {
+    return this.events.length;
   }
 
-  get sampleCount() {
-    return this.imuSamples.length;
+  private nextSequence() {
+    return this.sequence++;
   }
 
-  get hasFix() {
-    return this.checkpoints.hasFix;
-  }
-
-  private collect(observations: LocalizationObservation[]) {
-    for (const observation of observations) {
-      if (observation.kind === 'initial-fix' && this.firstFixTimeMs === null) {
-        this.firstFixTimeMs = observation.timeMs;
-      }
-      this.observations.push({
-        timeMs: observation.timeMs,
-        order: this.order++,
-        observation,
-      });
-    }
-    return observations;
-  }
-
-  /** Records one inertial sample and returns whatever it derived. */
-  pushImuSample(sample: ImuSample): LocalizationObservation[] {
-    this.imuSamples.push({ ...sample });
-    return this.collect(this.deadReckoning.push(sample));
-  }
-
-  /** Records one scan, including scans that were refused. */
-  pushScan(scan: CheckpointScan) {
-    const resolution = this.checkpoints.resolve(scan);
-    this.scans.push({
-      ...scan,
-      accepted: resolution.accepted,
-      reason: resolution.reason,
-      anchorId: resolution.anchorId,
+  recordImu(reading: ImuReading) {
+    this.events.push({
+      type: 'imu',
+      sequence: this.nextSequence(),
+      timeMs: reading.timeMs,
+      accelerometer: [...reading.accelerometer] as Vector3,
+      gyroscope: [...reading.gyroscope] as Vector3,
+      orientation: reading.orientation ? { ...reading.orientation } : null,
     });
-    if (resolution.accepted) {
-      const anchor = this.options.anchors.find((candidate) => candidate.id === resolution.anchorId);
-      if (anchor) this.deadReckoning.syncHeading(anchor.headingDegrees);
-    }
-    this.collect(resolution.observations);
-    return resolution;
-  }
-
-  /** Notes standing on a surveyed floor mark, which is what error is measured against. */
-  markGroundTruth(checkpoint: GroundTruthCheckpoint) {
-    this.groundTruth.push({ ...checkpoint });
   }
 
   /**
-   * Assembles the recording.
-   *
-   * Observations are ordered by time and renumbered so replay sees a strictly
-   * increasing sequence. Anything derived before the first checkpoint is
-   * dropped from the observation stream, because nothing can be localized
-   * before the first fix — but those samples stay in the raw capture, since
-   * they are still evidence about how the device behaves.
+   * Records an acquisition attempt. Resolution against the anchor set happens
+   * here so the stored outcome reflects what the device actually knew at the
+   * time, including refusals.
    */
-  build(): CapturedRecording {
-    const firstFixTimeMs = this.firstFixTimeMs;
-    const ordered = [...this.observations]
-      .filter((entry) =>
-        firstFixTimeMs === null
-          ? false
-          : entry.observation.kind === 'initial-fix' || entry.timeMs >= firstFixTimeMs,
-      )
-      .sort(
-        (left, right) =>
-          Number(right.observation.kind === 'initial-fix') -
-            Number(left.observation.kind === 'initial-fix') ||
-          left.timeMs - right.timeMs ||
-          left.order - right.order,
-      )
-      .map((entry, index) => ({ ...entry.observation, sequence: index }));
+  recordScan(attempt: ScanAttempt) {
+    let outcome: ScanOutcome = attempt.failure ?? 'decode-failed';
+    let anchorId: string | null = null;
 
+    if (!attempt.failure && attempt.payload !== null) {
+      const adapter = new CheckpointAdapter(this.options.anchors);
+      const resolution = adapter.resolve({
+        timeMs: attempt.timeMs,
+        kind: attempt.transport,
+        payload: attempt.payload,
+      });
+      outcome = resolution.accepted ? 'resolved' : resolution.reason;
+      anchorId = resolution.anchorId;
+    }
+
+    const event: ScanCaptureEvent = {
+      type: 'scan',
+      sequence: this.nextSequence(),
+      timeMs: attempt.timeMs,
+      transport: attempt.transport,
+      payload: attempt.payload,
+      outcome,
+      anchorId,
+    };
+    this.events.push(event);
+    return event;
+  }
+
+  recordGroundTruth(mark: GroundTruthMark) {
+    const event: GroundTruthCaptureEvent = {
+      type: 'ground-truth',
+      sequence: this.nextSequence(),
+      timeMs: mark.timeMs,
+      checkpointId: mark.checkpointId,
+      position: [...mark.position] as [number, number],
+      floorId: mark.floorId,
+      surveyMethod: mark.surveyMethod,
+      expectedAccuracyMeters: mark.expectedAccuracyMeters,
+      independentOfAnchors: mark.independentOfAnchors,
+    };
+    this.events.push(event);
+    return event;
+  }
+
+  recordLifecycle(event: LifecycleEvent, timeMs: number, detail?: string) {
+    this.events.push({
+      type: 'lifecycle',
+      sequence: this.nextSequence(),
+      timeMs,
+      event,
+      ...(detail === undefined ? {} : { detail }),
+    });
+  }
+
+  buildSession(): CaptureSession {
     return {
-      schemaVersion: LOCALIZATION_RECORDING_VERSION,
+      captureVersion: CAPTURE_STREAM_VERSION,
       sessionId: this.options.sessionId,
       buildingId: this.options.buildingId,
       packageHash: this.options.packageHash,
-      device: { ...this.options.device },
-      privacy: { cameraFramesStored: false },
-      ...(this.options.routeSegments ? { routeSegments: this.options.routeSegments } : {}),
-      observations: ordered,
-      checkpoints: [...this.groundTruth].sort((left, right) => left.timeMs - right.timeMs),
-      capture: {
-        captureVersion: LOCALIZATION_CAPTURE_VERSION,
-        startedAtIso: this.startedAtIso,
-        imuSamples: [...this.imuSamples],
-        scans: [...this.scans],
-        anchors: this.options.anchors.map((anchor) => ({ ...anchor })),
-        checkpointConfig: this.checkpointConfig,
-        deadReckoningConfig: this.deadReckoningConfig,
-      },
+      startedAtIso: this.options.startedAtIso,
+      device: { ...this.options.device, sensors: { ...this.options.device.sensors } },
+      anchors: this.options.anchors.map((anchor) => ({ ...anchor })),
+      events: sortCaptureEvents(this.events),
     };
   }
 }
 
-export interface RebuildOverrides {
+/** How far a surveyed mark may sit from the nearest estimate and still be measured. */
+export const GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS = 1_000;
+
+export interface DeriveOverrides {
   checkpointConfig?: Partial<CheckpointAdapterConfig>;
   deadReckoningConfig?: Partial<DeadReckoningConfig>;
+  routeSegments?: RouteMatchSegment[];
+}
+
+export interface DerivedRecording extends LocalizationRecording {
+  checkpointConfig: CheckpointAdapterConfig;
+  deadReckoningConfig: DeadReckoningConfig;
 }
 
 /**
- * Replays a raw capture through the adapters again, optionally with different
- * tuning. This is the reason raw samples are stored: an improved step detector
- * or a retuned stride length can be measured against a walk that was collected
- * once, without another visit to the building.
+ * Replays a capture stream through the adapters to produce a recording the
+ * existing replay pipeline understands.
+ *
+ * Events are consumed in total order — time then capture sequence — so two
+ * events sharing a millisecond always process the same way round. Observations
+ * derived before the first checkpoint are dropped, because nothing can be
+ * localized before the first fix, while the raw events that produced them stay
+ * untouched in the session.
  */
-export function rebuildRecording(
-  recording: CapturedRecording,
-  overrides: RebuildOverrides = {},
-): CapturedRecording {
-  const recorder = new SessionRecorder({
-    sessionId: recording.sessionId,
-    buildingId: recording.buildingId,
-    packageHash: recording.packageHash,
-    device: recording.device,
-    anchors: recording.capture.anchors,
-    startedAtIso: recording.capture.startedAtIso,
-    routeSegments: recording.routeSegments,
-    checkpointConfig: { ...recording.capture.checkpointConfig, ...overrides.checkpointConfig },
-    deadReckoningConfig: {
-      ...recording.capture.deadReckoningConfig,
-      ...overrides.deadReckoningConfig,
-    },
-  });
+export function deriveRecording(
+  session: CaptureSession,
+  overrides: DeriveOverrides = {},
+): DerivedRecording {
+  const checkpointConfig: CheckpointAdapterConfig = {
+    ...DEFAULT_CHECKPOINT_CONFIG,
+    ...overrides.checkpointConfig,
+  };
+  const deadReckoningConfig: DeadReckoningConfig = {
+    ...DEFAULT_DEAD_RECKONING_CONFIG,
+    ...overrides.deadReckoningConfig,
+  };
+  const checkpoints = new CheckpointAdapter(session.anchors, checkpointConfig);
+  const deadReckoning = new DeadReckoningIntegrator(deadReckoningConfig);
+  const anchorsById = new Map(session.anchors.map((anchor) => [anchor.id, anchor]));
 
-  // Merge both raw streams back into the order they physically happened.
-  const events = [
-    ...recording.capture.imuSamples.map((sample) => ({ timeMs: sample.timeMs, sample, scan: null })),
-    ...recording.capture.scans.map((scan) => ({ timeMs: scan.timeMs, sample: null, scan })),
-  ].sort((left, right) => left.timeMs - right.timeMs);
+  const collected: Array<{ timeMs: number; order: number; observation: LocalizationObservation }> =
+    [];
+  const groundTruth: GroundTruthCheckpoint[] = [];
+  let order = 0;
+  let firstFixTimeMs: number | null = null;
 
-  for (const event of events) {
-    if (event.sample) recorder.pushImuSample(event.sample);
-    else if (event.scan) recorder.pushScan(event.scan);
+  const collect = (observations: LocalizationObservation[]) => {
+    for (const observation of observations) {
+      if (observation.kind === 'initial-fix' && firstFixTimeMs === null) {
+        firstFixTimeMs = observation.timeMs;
+      }
+      collected.push({ timeMs: observation.timeMs, order: order++, observation });
+    }
+  };
+
+  for (const event of sortCaptureEvents(session.events)) {
+    if (event.type === 'imu') {
+      collect(deadReckoning.push(reduceImuEvent(event)));
+      continue;
+    }
+    if (event.type === 'scan') {
+      if (event.outcome !== 'resolved' || event.payload === null) continue;
+      const resolution = checkpoints.resolve({
+        timeMs: event.timeMs,
+        kind: event.transport,
+        payload: event.payload,
+      });
+      if (resolution.accepted) {
+        const anchor = anchorsById.get(resolution.anchorId ?? '');
+        if (anchor) deadReckoning.syncHeading(anchor.headingDegrees);
+      }
+      collect(resolution.observations);
+      continue;
+    }
+    if (event.type === 'ground-truth') {
+      groundTruth.push({
+        id: event.checkpointId,
+        timeMs: event.timeMs,
+        position: [...event.position] as [number, number],
+        floorId: event.floorId,
+      });
+    }
   }
-  for (const checkpoint of recording.checkpoints) recorder.markGroundTruth(checkpoint);
 
-  return recorder.build();
+  const observations = collected
+    .filter((entry) =>
+      firstFixTimeMs === null
+        ? false
+        : entry.observation.kind === 'initial-fix' || entry.timeMs >= firstFixTimeMs,
+    )
+    .sort(
+      (left, right) =>
+        Number(right.observation.kind === 'initial-fix') -
+          Number(left.observation.kind === 'initial-fix') ||
+        left.timeMs - right.timeMs ||
+        left.order - right.order,
+    )
+    .map((entry, index) => ({ ...entry.observation, sequence: index }));
+
+  // The estimate timeline is discrete, but a surveyor stands on a floor mark
+  // and notes the clock, which will not land on a sample boundary. Each mark is
+  // therefore measured against the nearest estimate. A mark with no estimate
+  // near it keeps its own time and fails loudly downstream, because that means
+  // the device produced nothing while it was being stood on.
+  const observationTimes = [...new Set(observations.map((entry) => entry.timeMs))].sort(
+    (left, right) => left - right,
+  );
+  const alignedCheckpoints = groundTruth
+    .map((checkpoint) => {
+      let nearest = checkpoint.timeMs;
+      let best = Number.POSITIVE_INFINITY;
+      for (const time of observationTimes) {
+        const distance = Math.abs(time - checkpoint.timeMs);
+        if (distance < best) {
+          best = distance;
+          nearest = time;
+        }
+      }
+      return best <= GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS
+        ? { ...checkpoint, timeMs: nearest }
+        : checkpoint;
+    })
+    .sort((left, right) => left.timeMs - right.timeMs);
+
+  return {
+    schemaVersion: LOCALIZATION_RECORDING_VERSION,
+    sessionId: session.sessionId,
+    buildingId: session.buildingId,
+    packageHash: session.packageHash,
+    device: { label: session.device.label, platform: session.device.platform },
+    privacy: { cameraFramesStored: false },
+    ...(overrides.routeSegments ? { routeSegments: overrides.routeSegments } : {}),
+    observations,
+    checkpoints: alignedCheckpoints,
+    checkpointConfig,
+    deadReckoningConfig,
+  };
 }
