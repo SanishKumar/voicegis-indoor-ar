@@ -8,7 +8,9 @@ import {
   CAPTURE_STREAM_VERSION,
   reduceImuEvent,
   sortCaptureEvents,
+  summarizeSampling,
   validateCaptureSession,
+  type SamplingSummary,
   type CaptureDeviceProfile,
   type CaptureEvent,
   type CaptureIssue,
@@ -26,11 +28,13 @@ import {
   DeadReckoningIntegrator,
   type DeadReckoningConfig,
 } from './deadReckoning';
+import { replayRecording } from './replay';
 import {
   LOCALIZATION_RECORDING_VERSION,
   type GroundTruthCheckpoint,
   type LocalizationObservation,
   type LocalizationRecording,
+  type ReplayReport,
   type RouteMatchSegment,
 } from './types';
 
@@ -186,6 +190,87 @@ export class SessionRecorder {
 /** How far a surveyed mark may sit from the nearest estimate and still be measured. */
 export const GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS = 1_000;
 
+export interface EvidenceReport {
+  report: ReplayReport;
+  /** Every mark considered, whether it counted or not. */
+  evaluationCheckpoints: EvaluationCheckpoint[];
+  eligibility: {
+    surveyed: number;
+    publishable: number;
+    excluded: number;
+    exclusionCounts: Record<CheckpointExclusionReason, number>;
+  };
+  survey: {
+    methods: Record<string, number>;
+    worstExpectedAccuracyMeters: number | null;
+  };
+  alignment: {
+    /** Always <= 0: evaluation never reads forward in time. */
+    worstAlignmentDeltaMs: number | null;
+    toleranceMs: number;
+  };
+  sampling: SamplingSummary;
+}
+
+/**
+ * The only supported way to produce a quotable accuracy figure.
+ *
+ * It starts from a capture session so validation, checkpoint eligibility, and
+ * provenance cannot be skipped. Handing a hand-written `LocalizationRecording`
+ * straight to `replayRecording` bypasses all three, which is why that path is
+ * treated as diagnostic rather than evidential.
+ */
+export function buildEvidenceReport(
+  session: CaptureSession,
+  overrides: DeriveOverrides = {},
+): EvidenceReport {
+  const derived = deriveRecording(session, overrides);
+  const { report } = replayRecording(derived);
+
+  const exclusionCounts = {
+    'dependent-on-anchor': 0,
+    'alignment-crosses-anchor-reset': 0,
+    'no-causal-estimate-in-range': 0,
+    'survey-method-not-publishable': 0,
+    'survey-accuracy-out-of-policy': 0,
+  } as Record<CheckpointExclusionReason, number>;
+  for (const checkpoint of derived.diagnosticCheckpoints) {
+    if (checkpoint.exclusionReason) exclusionCounts[checkpoint.exclusionReason] += 1;
+  }
+
+  const methods: Record<string, number> = {};
+  for (const checkpoint of derived.evaluationCheckpoints) {
+    methods[checkpoint.surveyMethod] = (methods[checkpoint.surveyMethod] ?? 0) + 1;
+  }
+  const publishable = derived.evaluationCheckpoints.filter((entry) => entry.publishable);
+
+  return {
+    report,
+    evaluationCheckpoints: derived.evaluationCheckpoints,
+    eligibility: {
+      surveyed: derived.evaluationCheckpoints.length,
+      publishable: publishable.length,
+      excluded: derived.diagnosticCheckpoints.length,
+      exclusionCounts,
+    },
+    survey: {
+      methods,
+      worstExpectedAccuracyMeters:
+        publishable.length === 0
+          ? null
+          : Math.max(...publishable.map((entry) => entry.expectedAccuracyMeters)),
+    },
+    alignment: {
+      worstAlignmentDeltaMs:
+        publishable.length === 0
+          ? null
+          : Math.min(...publishable.map((entry) => entry.alignmentDeltaMs)),
+      toleranceMs: GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS,
+    },
+    sampling: summarizeSampling(session),
+  };
+}
+
 export interface DeriveOverrides {
   checkpointConfig?: Partial<CheckpointAdapterConfig>;
   deadReckoningConfig?: Partial<DeadReckoningConfig>;
@@ -195,7 +280,22 @@ export interface DeriveOverrides {
 export type CheckpointExclusionReason =
   | 'dependent-on-anchor'
   | 'alignment-crosses-anchor-reset'
-  | 'no-estimate-in-range';
+  | 'no-causal-estimate-in-range'
+  | 'survey-method-not-publishable'
+  | 'survey-accuracy-out-of-policy';
+
+/** Survey methods whose marks may back a published accuracy figure. */
+export const PUBLISHABLE_SURVEY_METHODS: ReadonlySet<SurveyMethod> = new Set<SurveyMethod>([
+  'tape-measure',
+  'laser-distance',
+  'total-station',
+]);
+
+/**
+ * Coarsest survey a published mark may rest on. Error is being measured in
+ * metres, so a mark known only to half a metre cannot support the claim.
+ */
+export const MAX_PUBLISHABLE_SURVEY_ACCURACY_METERS = 0.25;
 
 /**
  * A surveyed mark plus everything needed to defend or discard it.
@@ -270,24 +370,36 @@ export function deriveRecording(
   const deadReckoning = new DeadReckoningIntegrator(deadReckoningConfig);
   const anchorsById = new Map(session.anchors.map((anchor) => [anchor.id, anchor]));
 
-  const collected: Array<{ timeMs: number; order: number; observation: LocalizationObservation }> =
-    [];
+  // Each observation remembers the capture event that produced it, so
+  // evaluation can order against the stream rather than against wall time
+  // alone.
+  const collected: Array<{
+    timeMs: number;
+    order: number;
+    sourceSequence: number;
+    observation: LocalizationObservation;
+  }> = [];
   const groundTruth: GroundTruthCaptureEvent[] = [];
   let order = 0;
   let firstFixTimeMs: number | null = null;
 
-  const collect = (observations: LocalizationObservation[]) => {
+  const collect = (observations: LocalizationObservation[], sourceSequence: number) => {
     for (const observation of observations) {
       if (observation.kind === 'initial-fix' && firstFixTimeMs === null) {
         firstFixTimeMs = observation.timeMs;
       }
-      collected.push({ timeMs: observation.timeMs, order: order++, observation });
+      collected.push({
+        timeMs: observation.timeMs,
+        order: order++,
+        sourceSequence,
+        observation,
+      });
     }
   };
 
   for (const event of sortCaptureEvents(session.events)) {
     if (event.type === 'imu') {
-      collect(deadReckoning.push(reduceImuEvent(event)));
+      collect(deadReckoning.push(reduceImuEvent(event)), event.sequence);
       continue;
     }
     if (event.type === 'scan') {
@@ -301,7 +413,7 @@ export function deriveRecording(
         const anchor = anchorsById.get(resolution.anchorId ?? '');
         if (anchor) deadReckoning.syncHeading(anchor.headingDegrees);
       }
-      collect(resolution.observations);
+      collect(resolution.observations, event.sequence);
       continue;
     }
     if (event.type === 'ground-truth') groundTruth.push(event);
@@ -327,40 +439,57 @@ export function deriveRecording(
   // therefore measured against the nearest estimate. A mark with no estimate
   // near it keeps its own time and fails loudly downstream, because that means
   // the device produced nothing while it was being stood on.
-  const observationTimes = [...new Set(observations.map((entry) => entry.timeMs))].sort(
-    (left, right) => left - right,
-  );
-  // Times at which a scan reset the estimate. Aligning a mark across one of
-  // these would measure a different physical moment than the one surveyed.
-  const anchorResetTimes = sortCaptureEvents(session.events)
+  // Evaluation is strictly causal. A mark is scored against the most recent
+  // estimate that existed at the instant it was surveyed, ordered by time and
+  // then capture sequence. Interpolating toward a later estimate would score
+  // the mark against information the system did not have, and taking the
+  // nearest estimate in absolute time does exactly that whenever the next
+  // sample is closer than the previous one.
+  const causalPoints = collected
+    .filter((entry) => observations.some((observation) => observation.timeMs === entry.timeMs))
+    .map((entry) => ({ timeMs: entry.timeMs, sequence: entry.sourceSequence }))
+    .sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence);
+
+  const anchorResets = sortCaptureEvents(session.events)
     .filter((event) => event.type === 'scan' && event.outcome === 'resolved')
-    .map((event) => event.timeMs);
+    .map((event) => ({ timeMs: event.timeMs, sequence: event.sequence }));
+
+  const notAfter = (
+    candidate: { timeMs: number; sequence: number },
+    mark: { timeMs: number; sequence: number },
+  ) => candidate.timeMs < mark.timeMs || (candidate.timeMs === mark.timeMs && candidate.sequence <= mark.sequence);
 
   const evaluationCheckpoints: EvaluationCheckpoint[] = groundTruth
     .map((mark) => {
-      let alignedTimeMs = mark.timeMs;
-      let best = Number.POSITIVE_INFINITY;
-      for (const time of observationTimes) {
-        const distance = Math.abs(time - mark.timeMs);
-        if (distance < best) {
-          best = distance;
-          alignedTimeMs = time;
-        }
+      const markPoint = { timeMs: mark.timeMs, sequence: mark.sequence };
+      let causal: { timeMs: number; sequence: number } | null = null;
+      for (const point of causalPoints) {
+        if (notAfter(point, markPoint)) causal = point;
+        else break;
       }
-      const aligned = best <= GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS;
-      if (!aligned) alignedTimeMs = mark.timeMs;
+      const withinTolerance =
+        causal !== null && mark.timeMs - causal.timeMs <= GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS;
+      const alignedTimeMs = withinTolerance ? causal!.timeMs : mark.timeMs;
 
-      const low = Math.min(mark.timeMs, alignedTimeMs);
-      const high = Math.max(mark.timeMs, alignedTimeMs);
-      const crossesReset = anchorResetTimes.some((time) => time > low && time <= high);
+      // A reset strictly between the chosen estimate and the mark means the
+      // estimate predates a correction the mark was taken after.
+      const crossesReset =
+        withinTolerance &&
+        anchorResets.some(
+          (reset) => !notAfter(reset, causal!) && notAfter(reset, markPoint),
+        );
 
       const exclusionReason: CheckpointExclusionReason | null = !mark.independentOfAnchors
         ? 'dependent-on-anchor'
-        : !aligned
-          ? 'no-estimate-in-range'
-          : crossesReset
-            ? 'alignment-crosses-anchor-reset'
-            : null;
+        : !PUBLISHABLE_SURVEY_METHODS.has(mark.surveyMethod)
+          ? 'survey-method-not-publishable'
+          : mark.expectedAccuracyMeters > MAX_PUBLISHABLE_SURVEY_ACCURACY_METERS
+            ? 'survey-accuracy-out-of-policy'
+            : !withinTolerance
+              ? 'no-causal-estimate-in-range'
+              : crossesReset
+                ? 'alignment-crosses-anchor-reset'
+                : null;
 
       return {
         id: mark.checkpointId,

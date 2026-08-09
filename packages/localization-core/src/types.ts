@@ -123,17 +123,28 @@ export interface CheckpointError {
   horizontalErrorMeters: number;
 }
 
+/**
+ * Whether a report may be quoted as accuracy evidence.
+ *
+ * `insufficient-ground-truth` exists because zero eligible marks previously
+ * produced a median and p95 of zero, which reads as perfect accuracy rather
+ * than as no measurement at all.
+ */
+export type EvidenceStatus = 'ok' | 'insufficient-ground-truth' | 'unofficial-recording';
+
 export interface ReplayReport {
   recordingVersion: typeof LOCALIZATION_RECORDING_VERSION;
   sessionId: string;
   buildingId: string;
   packageHash: string;
+  evidenceStatus: EvidenceStatus;
   observationCount: number;
   checkpointCount: number;
   qualityFrameCounts: Record<LocalizationQuality, number>;
-  medianHorizontalErrorMeters: number;
-  p95HorizontalErrorMeters: number;
-  floorAccuracy: number;
+  /** Null whenever no eligible mark backs the figure. */
+  medianHorizontalErrorMeters: number | null;
+  p95HorizontalErrorMeters: number | null;
+  floorAccuracy: number | null;
   mapMatching: {
     acceptedCount: number;
     rejectedCount: number;

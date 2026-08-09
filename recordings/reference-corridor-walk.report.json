@@ -3,6 +3,7 @@
   "sessionId": "synthetic-reference-corridor-001",
   "buildingId": "reference-medical-centre",
   "packageHash": "5be7c952924d796b39ca065311d662cd24da0a18ae20bee0fd6ee962636cd00b",
+  "evidenceStatus": "unofficial-recording",
   "observationCount": 7,
   "checkpointCount": 3,
   "qualityFrameCounts": {
@@ -10,9 +11,9 @@
     "degraded": 3,
     "lost": 0
   },
-  "medianHorizontalErrorMeters": 0.053,
-  "p95HorizontalErrorMeters": 0.056,
-  "floorAccuracy": 1,
+  "medianHorizontalErrorMeters": null,
+  "p95HorizontalErrorMeters": null,
+  "floorAccuracy": null,
   "mapMatching": {
     "acceptedCount": 7,
     "rejectedCount": 0,

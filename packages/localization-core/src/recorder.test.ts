@@ -15,6 +15,7 @@ import { replayRecording } from './replay';
 import {
   CaptureValidationError,
   SessionRecorder,
+  buildEvidenceReport,
   deriveRecording,
   type SessionRecorderOptions,
 } from './recorder';
@@ -47,7 +48,14 @@ const device: CaptureDeviceProfile = {
   browserVersion: '141',
   appVersion: '0.1.0',
   timezone: 'Asia/Kolkata',
-  sensors: { accelerometerHz: 50, gyroscopeHz: 50, orientationHz: 25 },
+  sensors: {
+    accelerometerHz: 50,
+    gyroscopeHz: 50,
+    orientationHz: 25,
+    api: 'devicemotion',
+    gyroscopeUnits: 'deg/s',
+    frame: 'device',
+  },
 };
 
 const baseOptions: SessionRecorderOptions = {
@@ -341,48 +349,134 @@ describe('fail-closed evaluation boundary', () => {
     expect(mark.publishable).toBe(true);
   });
 
-  it('excludes a mark whose alignment would cross an anchor reset', () => {
-    const session = anchoredSession();
-    session.events = [
-      ...session.events.slice(0, 1),
-      {
-        type: 'imu',
-        sequence: 2,
-        timeMs: 50,
-        accelerometer: [0, 0, 9.81],
-        gyroscope: [0, 0, 0],
-        orientation: null,
-      },
-      {
-        type: 'ground-truth',
-        sequence: 3,
-        timeMs: 60,
-        checkpointId: 'just-before-reset',
-        position: [40, 40],
-        floorId: 'g',
-        surveyMethod: 'tape-measure',
-        expectedAccuracyMeters: 0.03,
-        independentOfAnchors: true,
-      },
-      {
-        type: 'imu',
-        sequence: 4,
-        timeMs: 140,
-        accelerometer: [0, 0, 9.81],
-        gyroscope: [0, 0, 0],
-        orientation: null,
-      },
-    ].sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence) as never;
+  /**
+   * Two scans and one mark, all at the same millisecond. Only the sequence
+   * distinguishes a mark taken before the second reset from one taken after.
+   */
+  const sameMillisecondSession = (markSequence: number): CaptureSession => ({
+    captureVersion: CAPTURE_STREAM_VERSION,
+    sessionId: 's',
+    buildingId: 'b',
+    packageHash: 'a'.repeat(64),
+    startedAtIso: '2026-08-07T09:00:00.000Z',
+    device,
+    anchors,
+    events: (
+      [
+        {
+          type: 'scan',
+          sequence: 0,
+          timeMs: 100,
+          transport: 'qr',
+          payload: 'vg:corridor-start',
+          outcome: 'resolved',
+          anchorId: 'corridor-start',
+        },
+        {
+          type: 'ground-truth',
+          sequence: markSequence,
+          timeMs: 500,
+          checkpointId: 'tie-mark',
+          position: [40, 40],
+          floorId: 'g',
+          surveyMethod: 'tape-measure',
+          expectedAccuracyMeters: 0.03,
+          independentOfAnchors: true,
+        },
+        {
+          type: 'scan',
+          sequence: 2,
+          timeMs: 500,
+          transport: 'qr',
+          payload: 'vg:corridor-end',
+          outcome: 'resolved',
+          anchorId: 'corridor-end',
+        },
+      ] as CaptureEvent[]
+    ).sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence),
+  });
+
+  it('scores a mark captured before a same-millisecond reset against pre-reset state', () => {
+    // sequence 1 puts the mark ahead of the reset at sequence 2.
+    const derived = deriveRecording(sameMillisecondSession(1));
+    const mark = derived.evaluationCheckpoints.find((c) => c.id === 'tie-mark')!;
+
+    expect(mark.alignedTimeMs).toBeLessThanOrEqual(mark.recordedTimeMs);
+    expect(mark.alignmentDeltaMs).toBeLessThanOrEqual(0);
+    // The estimate used must predate the second reset, never follow it.
+    expect(mark.exclusionReason).not.toBe('alignment-crosses-anchor-reset');
+  });
+
+  it('never scores any mark against a future estimate', () => {
+    for (const markSequence of [1, 3]) {
+      const derived = deriveRecording(sameMillisecondSession(markSequence));
+      for (const mark of derived.evaluationCheckpoints) {
+        expect(mark.alignedTimeMs).toBeLessThanOrEqual(mark.recordedTimeMs);
+        expect(mark.alignmentDeltaMs).toBeLessThanOrEqual(0);
+      }
+    }
+  });
+
+  it('excludes a mark with no causal estimate behind it', () => {
+    const session = sameMillisecondSession(1);
+    // Move the mark before any observation exists.
+    session.events = sortCaptureEvents(
+      session.events.map((event) =>
+        event.type === 'ground-truth' ? { ...event, timeMs: 1, sequence: 5 } : event,
+      ),
+    );
 
     const derived = deriveRecording(session);
-    const mark = derived.evaluationCheckpoints.find((c) => c.id === 'just-before-reset');
+    const mark = derived.evaluationCheckpoints.find((c) => c.id === 'tie-mark')!;
 
-    // The nearest estimate sits on the far side of the scan that reset position.
-    if (mark && mark.alignedTimeMs > 100) {
-      expect(mark.publishable).toBe(false);
-      expect(mark.exclusionReason).toBe('alignment-crosses-anchor-reset');
-      expect(derived.checkpoints.map((c) => c.id)).not.toContain('just-before-reset');
-    }
+    expect(mark.publishable).toBe(false);
+    expect(mark.exclusionReason).toBe('no-causal-estimate-in-range');
+    expect(derived.checkpoints).toEqual([]);
+  });
+
+  it('keeps estimated and coarse survey marks diagnostic only', () => {
+    const build = (surveyMethod: string, expectedAccuracyMeters: number) => {
+      const session = sameMillisecondSession(1);
+      session.events = session.events.map((event) =>
+        event.type === 'ground-truth'
+          ? ({ ...event, surveyMethod, expectedAccuracyMeters } as CaptureEvent)
+          : event,
+      );
+      return deriveRecording(session).evaluationCheckpoints[0];
+    };
+
+    expect(build('estimated', 0.03)).toMatchObject({
+      publishable: false,
+      exclusionReason: 'survey-method-not-publishable',
+    });
+    expect(build('tape-measure', 0.9)).toMatchObject({
+      publishable: false,
+      exclusionReason: 'survey-accuracy-out-of-policy',
+    });
+    expect(build('tape-measure', 0.03).publishable).toBe(true);
+  });
+
+  it('reports no evidence rather than zero error when nothing is eligible', () => {
+    const evidence = buildEvidenceReport(anchoredSession());
+
+    expect(evidence.report.evidenceStatus).toBe('insufficient-ground-truth');
+    expect(evidence.report.medianHorizontalErrorMeters).toBeNull();
+    expect(evidence.report.p95HorizontalErrorMeters).toBeNull();
+    expect(evidence.report.floorAccuracy).toBeNull();
+    expect(evidence.eligibility).toMatchObject({ surveyed: 1, publishable: 0, excluded: 1 });
+    expect(evidence.eligibility.exclusionCounts['dependent-on-anchor']).toBe(1);
+  });
+
+  it('publishes eligibility, survey and alignment provenance alongside the figure', () => {
+    const evidence = buildEvidenceReport(recordWalk().buildSession());
+
+    expect(evidence.report.evidenceStatus).toBe('ok');
+    expect(evidence.eligibility.publishable).toBeGreaterThan(0);
+    expect(evidence.survey.methods['tape-measure']).toBeGreaterThan(0);
+    expect(evidence.survey.worstExpectedAccuracyMeters).toBeLessThanOrEqual(0.25);
+    expect(evidence.alignment.worstAlignmentDeltaMs).toBeLessThanOrEqual(0);
+    expect(evidence.alignment.toleranceMs).toBeGreaterThan(0);
+    expect(evidence.sampling.observedHz).toBeCloseTo(50, 1);
   });
 
   it('refuses to derive anything from a session that does not validate', () => {

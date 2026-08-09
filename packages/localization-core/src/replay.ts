@@ -134,15 +134,23 @@ export function replayRecording(recording: LocalizationRecording): ReplayResult 
       sessionId: recording.sessionId,
       buildingId: recording.buildingId,
       packageHash: recording.packageHash,
+      // No eligible mark means no measurement. Reporting zero here would read
+      // as perfect accuracy for a walk that proved nothing.
+      evidenceStatus: checkpointErrors.length === 0 ? 'insufficient-ground-truth' : 'ok',
       observationCount: recording.observations.length,
       checkpointCount: recording.checkpoints.length,
       qualityFrameCounts,
-      medianHorizontalErrorMeters: round(median(sortedErrors)),
-      p95HorizontalErrorMeters: round(percentile(sortedErrors, 0.95)),
-      floorAccuracy: round(
-        checkpointErrors.filter((checkpoint) => checkpoint.floorCorrect).length /
-          Math.max(1, checkpointErrors.length),
-      ),
+      medianHorizontalErrorMeters:
+        checkpointErrors.length === 0 ? null : round(median(sortedErrors)),
+      p95HorizontalErrorMeters:
+        checkpointErrors.length === 0 ? null : round(percentile(sortedErrors, 0.95)),
+      floorAccuracy:
+        checkpointErrors.length === 0
+          ? null
+          : round(
+              checkpointErrors.filter((checkpoint) => checkpoint.floorCorrect).length /
+                checkpointErrors.length,
+            ),
       mapMatching: {
         acceptedCount: mapMatches.filter((match) => match.accepted).length,
         rejectedCount: mapMatches.filter((match) => !match.accepted).length,

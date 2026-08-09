@@ -13,9 +13,12 @@ boundary. Three known holes remain in `captureStream.ts` and `recorder.ts`:
 - Capture order among events sharing a millisecond is preserved in the stored
   stream but not fully carried through derivation.
 
-None of these can currently alter reported accuracy, because dependent and
-unalignable checkpoints are excluded before the evaluator sees them. They can
-still make a stored walk misleading, so they must close before field capture.
+An earlier version of this file claimed these could not alter reported accuracy.
+That was wrong and was disproved by review: an interruption was shown to move a
+published checkpoint error from 2.828 m to 0.776 m. Excluding ineligible
+checkpoints bounds *which* marks are scored; it does not bound the correctness
+of the estimate they are scored against. Treat any figure produced before these
+close as provisional.
 
 ## Inertial integration ignores interruptions
 
@@ -26,7 +29,8 @@ never happened. Lifecycle events are recorded but not consumed.
 
 Deferred to the interruption-recovery slice. Until then, any walk containing a
 `backgrounded` lifecycle event should be treated as heading-unreliable after
-that point.
+that point, and **its accuracy figures must not be published** — this is the
+defect that was shown to move a checkpoint error from 2.828 m to 0.776 m.
 
 ## Gyroscope axis assumes a flat handset
 

@@ -126,9 +126,12 @@ export interface CaptureSensorProfile {
   accelerometerHz?: number;
   gyroscopeHz?: number;
   orientationHz?: number;
-  api?: SensorApi;
-  gyroscopeUnits?: AngularRateUnits;
-  frame?: SensorFrame;
+  /** Required: the platform API the samples came from. */
+  api: SensorApi;
+  /** Required: DeviceMotion and Generic Sensor disagree on units. */
+  gyroscopeUnits: AngularRateUnits;
+  /** Required: axis conventions differ per API. */
+  frame: SensorFrame;
 }
 
 export interface SamplingSummary {
@@ -267,8 +270,15 @@ function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
     add(issues, 'malformed-event', path, 'Every capture event must be an object.');
     return false;
   }
-  if (!Number.isFinite(event.sequence) || !Number.isFinite(event.timeMs)) {
-    add(issues, 'malformed-event', path, 'Capture events need a finite sequence and timeMs.');
+  // Sequence counts events, so it must be a whole non-negative number. Time is
+  // allowed to be fractional because high-resolution timers report sub-
+  // millisecond values, but it may never be negative or non-finite.
+  if (!Number.isInteger(event.sequence) || Number(event.sequence) < 0) {
+    add(issues, 'malformed-event', `${path}/sequence`, 'Sequence must be a non-negative integer.');
+    return false;
+  }
+  if (!Number.isFinite(event.timeMs) || Number(event.timeMs) < 0) {
+    add(issues, 'malformed-event', `${path}/timeMs`, 'Time must be a non-negative finite number.');
     return false;
   }
 
@@ -410,19 +420,27 @@ function validateDevice(device: unknown, issues: CaptureIssue[]) {
       add(issues, 'malformed-sensor-profile', `/device/sensors/${key}`, 'Declared rate must be positive.');
     }
   }
-  if (!optionalOf(sensors.api, (value) => ['devicemotion', 'generic-sensor', 'native', 'synthetic'].includes(String(value)))) {
-    add(issues, 'malformed-sensor-profile', '/device/sensors/api', 'Unknown sensor API.');
+  // API, units, and frame are required, not optional. DeviceMotion and the
+  // Generic Sensor API disagree on angular-rate units and axis conventions, so
+  // a stream that omits them cannot be interpreted after the fact.
+  if (!['devicemotion', 'generic-sensor', 'native', 'synthetic'].includes(String(sensors.api))) {
+    add(issues, 'malformed-sensor-profile', '/device/sensors/api', 'Sensor API must be recorded.');
   }
-  if (!optionalOf(sensors.gyroscopeUnits, (value) => value === 'deg/s' || value === 'rad/s')) {
+  if (sensors.gyroscopeUnits !== 'deg/s' && sensors.gyroscopeUnits !== 'rad/s') {
     add(
       issues,
       'malformed-sensor-profile',
       '/device/sensors/gyroscopeUnits',
-      'Angular rate units must be deg/s or rad/s.',
+      'Angular rate units must be recorded as deg/s or rad/s.',
     );
   }
-  if (!optionalOf(sensors.frame, (value) => value === 'device' || value === 'world')) {
-    add(issues, 'malformed-sensor-profile', '/device/sensors/frame', 'Sensor frame must be device or world.');
+  if (sensors.frame !== 'device' && sensors.frame !== 'world') {
+    add(
+      issues,
+      'malformed-sensor-profile',
+      '/device/sensors/frame',
+      'Sensor coordinate frame must be recorded as device or world.',
+    );
   }
 }
 
@@ -488,7 +506,9 @@ export function validateCaptureSession(value: unknown): CaptureIssue[] {
     }
   }
   validateDevice(value.device, issues);
-  validateAnchors(value.anchors, issues);
+  // Only anchors that passed structural validation are used below. Reading the
+  // raw array would crash on a null anchor set or a null entry.
+  const validAnchors = validateAnchors(value.anchors, issues);
   if (!Array.isArray(value.events)) {
     add(issues, 'malformed-capture', '/events', 'Capture must carry an events array.');
     return issues.sort((a, b) => a.code.localeCompare(b.code) || a.path.localeCompare(b.path));
@@ -503,11 +523,20 @@ export function validateCaptureSession(value: unknown): CaptureIssue[] {
       message: `Expected capture stream ${CAPTURE_STREAM_VERSION}.`,
     });
   }
-  if (typeof session.startedAtIso !== 'string' || !ISO_INSTANT.test(session.startedAtIso)) {
+  const startMs =
+    typeof session.startedAtIso === 'string' ? Date.parse(session.startedAtIso) : Number.NaN;
+  if (
+    typeof session.startedAtIso !== 'string' ||
+    !ISO_INSTANT.test(session.startedAtIso) ||
+    Number.isNaN(startMs) ||
+    // A date such as 2026-02-30 matches the shape but is not a real instant;
+    // re-serialising catches it.
+    new Date(startMs).toISOString().slice(0, 19) !== session.startedAtIso.slice(0, 19)
+  ) {
     issues.push({
       code: 'invalid-capture-start',
       path: '/startedAtIso',
-      message: 'Capture start must be a UTC ISO instant.',
+      message: 'Capture start must be a real UTC ISO instant.',
     });
   } else if (new Date(session.startedAtIso).getUTCFullYear() < 2000) {
     // A missing clock previously defaulted to the epoch, which silently dated
@@ -561,7 +590,7 @@ export function validateCaptureSession(value: unknown): CaptureIssue[] {
   });
 
   const anchorsByFloor = new Map<string, CheckpointAnchor[]>();
-  for (const anchor of session.anchors) {
+  for (const anchor of validAnchors) {
     const list = anchorsByFloor.get(anchor.floorId) ?? [];
     list.push(anchor);
     anchorsByFloor.set(anchor.floorId, list);
