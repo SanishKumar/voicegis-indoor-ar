@@ -190,6 +190,24 @@ export class SessionRecorder {
 /** How far a surveyed mark may sit from the nearest estimate and still be measured. */
 export const GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS = 1_000;
 
+/**
+ * Identifies one derived observation, and therefore one estimate.
+ *
+ * `timeMs` alone is ambiguous, and so is `(timeMs, sequence)` — a single scan
+ * emits several observations at one instant from one capture event. The ordinal
+ * separates them.
+ */
+export interface ObservationKey {
+  timeMs: number;
+  sequence: number;
+  ordinal: number;
+}
+
+/** Lexicographic order over observation keys. */
+export function compareObservationKeys(left: ObservationKey, right: ObservationKey) {
+  return left.timeMs - right.timeMs || left.sequence - right.sequence || left.ordinal - right.ordinal;
+}
+
 export interface EvidenceReport {
   report: ReplayReport;
   /** Every mark considered, whether it counted or not. */
@@ -306,8 +324,13 @@ export const MAX_PUBLISHABLE_SURVEY_ACCURACY_METERS = 0.25;
 export interface EvaluationCheckpoint {
   id: string;
   recordedTimeMs: number;
+  recordedSequence: number;
   alignedTimeMs: number;
   alignmentDeltaMs: number;
+  /** The exact derived observation this mark is scored against. */
+  estimateKey: ObservationKey | null;
+  /** Index of that observation, and therefore of its estimate. */
+  observationIndex: number | null;
   position: [number, number];
   floorId: string;
   surveyMethod: SurveyMethod;
@@ -373,28 +396,25 @@ export function deriveRecording(
   // Each observation remembers the capture event that produced it, so
   // evaluation can order against the stream rather than against wall time
   // alone.
+  // Every derived observation keeps the identity of the capture event that
+  // produced it, plus which of that event's observations it was. One scan emits
+  // a position fix, a heading, and a floor at the same millisecond, so time and
+  // source sequence alone still do not name one of them.
   const collected: Array<{
-    timeMs: number;
+    key: ObservationKey;
     order: number;
-    sourceSequence: number;
     observation: LocalizationObservation;
   }> = [];
   const groundTruth: GroundTruthCaptureEvent[] = [];
   let order = 0;
-  let firstFixTimeMs: number | null = null;
+  let firstFixKey: ObservationKey | null = null;
 
   const collect = (observations: LocalizationObservation[], sourceSequence: number) => {
-    for (const observation of observations) {
-      if (observation.kind === 'initial-fix' && firstFixTimeMs === null) {
-        firstFixTimeMs = observation.timeMs;
-      }
-      collected.push({
-        timeMs: observation.timeMs,
-        order: order++,
-        sourceSequence,
-        observation,
-      });
-    }
+    observations.forEach((observation, ordinal) => {
+      const key: ObservationKey = { timeMs: observation.timeMs, sequence: sourceSequence, ordinal };
+      if (observation.kind === 'initial-fix' && firstFixKey === null) firstFixKey = key;
+      collected.push({ key, order: order++, observation });
+    });
   };
 
   for (const event of sortCaptureEvents(session.events)) {
@@ -419,20 +439,25 @@ export function deriveRecording(
     if (event.type === 'ground-truth') groundTruth.push(event);
   }
 
-  const observations = collected
+  // Pre-fix observations are dropped by the whole key, not by timestamp. An
+  // observation sharing the fix's millisecond but captured before it must still
+  // go, because nothing can be localized until the fix exists.
+  const fixKey = firstFixKey as ObservationKey | null;
+  const retained = collected
     .filter((entry) =>
-      firstFixTimeMs === null
+      fixKey === null
         ? false
-        : entry.observation.kind === 'initial-fix' || entry.timeMs >= firstFixTimeMs,
+        : entry.observation.kind === 'initial-fix' || compareObservationKeys(entry.key, fixKey) >= 0,
     )
     .sort(
       (left, right) =>
         Number(right.observation.kind === 'initial-fix') -
           Number(left.observation.kind === 'initial-fix') ||
-        left.timeMs - right.timeMs ||
+        compareObservationKeys(left.key, right.key) ||
         left.order - right.order,
-    )
-    .map((entry, index) => ({ ...entry.observation, sequence: index }));
+    );
+
+  const observations = retained.map((entry, index) => ({ ...entry.observation, sequence: index }));
 
   // The estimate timeline is discrete, but a surveyor stands on a floor mark
   // and notes the clock, which will not land on a sample boundary. Each mark is
@@ -445,38 +470,50 @@ export function deriveRecording(
   // the mark against information the system did not have, and taking the
   // nearest estimate in absolute time does exactly that whenever the next
   // sample is closer than the previous one.
-  const causalPoints = collected
-    .filter((entry) => observations.some((observation) => observation.timeMs === entry.timeMs))
-    .map((entry) => ({ timeMs: entry.timeMs, sequence: entry.sourceSequence }))
-    .sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence);
+  // Candidate estimates, in the exact order replay will produce them. The index
+  // is the join: estimate[i] comes from observation[i].
+  const causalPoints = retained.map((entry, index) => ({ key: entry.key, index }));
 
   const anchorResets = sortCaptureEvents(session.events)
     .filter((event) => event.type === 'scan' && event.outcome === 'resolved')
     .map((event) => ({ timeMs: event.timeMs, sequence: event.sequence }));
 
+  // A capture event is at or before a mark when it precedes it in the stream.
+  // Equal timestamps are separated by capture sequence, which is what makes a
+  // mark taken just before a same-millisecond reset score against pre-reset
+  // state.
   const notAfter = (
     candidate: { timeMs: number; sequence: number },
     mark: { timeMs: number; sequence: number },
-  ) => candidate.timeMs < mark.timeMs || (candidate.timeMs === mark.timeMs && candidate.sequence <= mark.sequence);
+  ) =>
+    candidate.timeMs < mark.timeMs ||
+    (candidate.timeMs === mark.timeMs && candidate.sequence <= mark.sequence);
 
   const evaluationCheckpoints: EvaluationCheckpoint[] = groundTruth
     .map((mark) => {
       const markPoint = { timeMs: mark.timeMs, sequence: mark.sequence };
-      let causal: { timeMs: number; sequence: number } | null = null;
+      let causal: { key: ObservationKey; index: number } | null = null;
       for (const point of causalPoints) {
-        if (notAfter(point, markPoint)) causal = point;
-        else break;
+        // A mark and the observations of an earlier event may share a
+        // millisecond; sequence decides, and the mark's own sequence is
+        // strictly greater than any event that preceded it.
+        if (notAfter({ timeMs: point.key.timeMs, sequence: point.key.sequence }, markPoint)) {
+          causal = point;
+        } else break;
       }
       const withinTolerance =
-        causal !== null && mark.timeMs - causal.timeMs <= GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS;
-      const alignedTimeMs = withinTolerance ? causal!.timeMs : mark.timeMs;
+        causal !== null && mark.timeMs - causal.key.timeMs <= GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS;
+      const alignedTimeMs = withinTolerance ? causal!.key.timeMs : mark.timeMs;
+      const observationIndex = withinTolerance ? causal!.index : null;
 
       // A reset strictly between the chosen estimate and the mark means the
       // estimate predates a correction the mark was taken after.
       const crossesReset =
         withinTolerance &&
         anchorResets.some(
-          (reset) => !notAfter(reset, causal!) && notAfter(reset, markPoint),
+          (reset) =>
+            !notAfter(reset, { timeMs: causal!.key.timeMs, sequence: causal!.key.sequence }) &&
+            notAfter(reset, markPoint),
         );
 
       const exclusionReason: CheckpointExclusionReason | null = !mark.independentOfAnchors
@@ -494,8 +531,11 @@ export function deriveRecording(
       return {
         id: mark.checkpointId,
         recordedTimeMs: mark.timeMs,
+        recordedSequence: mark.sequence,
         alignedTimeMs,
         alignmentDeltaMs: alignedTimeMs - mark.timeMs,
+        estimateKey: withinTolerance ? { ...causal!.key } : null,
+        observationIndex,
         position: [...mark.position] as [number, number],
         floorId: mark.floorId,
         surveyMethod: mark.surveyMethod,
@@ -511,12 +551,15 @@ export function deriveRecording(
   // unalignable mark cannot influence reported accuracy because it is not in
   // the array the evaluator reads.
   const alignedCheckpoints: GroundTruthCheckpoint[] = evaluationCheckpoints
-    .filter((checkpoint) => checkpoint.publishable)
+    .filter((checkpoint) => checkpoint.publishable && checkpoint.observationIndex !== null)
     .map((checkpoint) => ({
       id: checkpoint.id,
       timeMs: checkpoint.alignedTimeMs,
       position: [...checkpoint.position] as [number, number],
       floorId: checkpoint.floorId,
+      // Names the estimate exactly, so scoring cannot drift to another
+      // observation that happens to share the millisecond.
+      observationIndex: checkpoint.observationIndex!,
     }));
 
   return {

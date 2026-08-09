@@ -396,6 +396,149 @@ describe('fail-closed evaluation boundary', () => {
     ).sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence),
   });
 
+  /**
+   * The reproduction that defeated key-less alignment: a step, a mark, and a
+   * reset all in one millisecond. Scoring by time alone selects whichever
+   * estimate was written last, which is the reset.
+   */
+  const tieBreakSession = (markSequence: number): CaptureSession => ({
+    captureVersion: CAPTURE_STREAM_VERSION,
+    sessionId: 's',
+    buildingId: 'b',
+    packageHash: 'a'.repeat(64),
+    startedAtIso: '2026-08-07T09:00:00.000Z',
+    device,
+    anchors: [
+      { id: 'origin', floorId: 'g', kind: 'qr', position: [0, 0], headingDegrees: 0, payload: 'p:origin' },
+      { id: 'far', floorId: 'g', kind: 'qr', position: [80, 80], headingDegrees: 0, payload: 'p:far' },
+    ],
+    events: (
+      [
+        {
+          type: 'scan',
+          sequence: 0,
+          timeMs: 0,
+          transport: 'qr',
+          payload: 'p:origin',
+          outcome: 'resolved',
+          anchorId: 'origin',
+        },
+        {
+          type: 'imu',
+          sequence: 3,
+          timeMs: 500,
+          accelerometer: [0, 0, 13.5],
+          gyroscope: [0, 0, 0],
+          orientation: null,
+        },
+        {
+          type: 'ground-truth',
+          sequence: markSequence,
+          timeMs: 500,
+          checkpointId: 'tie-mark',
+          position: [0, 2],
+          floorId: 'g',
+          surveyMethod: 'tape-measure',
+          expectedAccuracyMeters: 0.03,
+          independentOfAnchors: true,
+        },
+        {
+          type: 'scan',
+          sequence: 5,
+          timeMs: 500,
+          transport: 'qr',
+          payload: 'p:far',
+          outcome: 'resolved',
+          anchorId: 'far',
+        },
+      ] as CaptureEvent[]
+    ).sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence),
+  });
+
+  it('scores a mark before a same-millisecond reset against the pre-reset estimate', () => {
+    const session = tieBreakSession(4);
+    const derived = deriveRecording(session);
+    const mark = derived.evaluationCheckpoints.find((c) => c.id === 'tie-mark')!;
+    const { estimates, report } = replayRecording(derived);
+
+    expect(mark.publishable).toBe(true);
+    expect(mark.observationIndex).not.toBeNull();
+    // The chosen estimate must come from the step at sequence 3, not the reset
+    // at sequence 5.
+    expect(mark.estimateKey!.sequence).toBe(3);
+
+    const scored = estimates[mark.observationIndex!];
+    expect(scored.position[0]).toBeLessThan(10);
+    expect(scored.position[1]).toBeLessThan(10);
+    // Scoring by time alone selected the far anchor and published ~110 m.
+    expect(report.medianHorizontalErrorMeters).toBeLessThan(5);
+  });
+
+  it('scores a mark after a same-millisecond reset against the post-reset estimate', () => {
+    const session = tieBreakSession(6);
+    const derived = deriveRecording(session);
+    const mark = derived.evaluationCheckpoints.find((c) => c.id === 'tie-mark')!;
+    const { estimates } = replayRecording(derived);
+
+    expect(mark.publishable).toBe(true);
+    // The mark now follows the reset, so the reset is legitimately causal.
+    expect(mark.estimateKey!.sequence).toBe(5);
+    expect(estimates[mark.observationIndex!].position[0]).toBeGreaterThan(50);
+  });
+
+  it('never scores a mark against a first fix captured after it', () => {
+    const session: CaptureSession = {
+      ...tieBreakSession(4),
+      events: (
+        [
+          {
+            type: 'ground-truth',
+            sequence: 0,
+            timeMs: 500,
+            checkpointId: 'before-fix',
+            position: [0, 2],
+            floorId: 'g',
+            surveyMethod: 'tape-measure',
+            expectedAccuracyMeters: 0.03,
+            independentOfAnchors: true,
+          },
+          {
+            type: 'scan',
+            sequence: 1,
+            timeMs: 500,
+            transport: 'qr',
+            payload: 'p:far',
+            outcome: 'resolved',
+            anchorId: 'far',
+          },
+        ] as CaptureEvent[]
+      ).sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence),
+    };
+
+    const derived = deriveRecording(session);
+    const mark = derived.evaluationCheckpoints.find((c) => c.id === 'before-fix')!;
+
+    expect(mark.publishable).toBe(false);
+    expect(mark.exclusionReason).toBe('no-causal-estimate-in-range');
+    expect(mark.observationIndex).toBeNull();
+    expect(derived.checkpoints).toEqual([]);
+    expect(replayRecording(derived).report.evidenceStatus).toBe('insufficient-ground-truth');
+  });
+
+  it('distinguishes the several observations one scan emits at a single instant', () => {
+    const session = tieBreakSession(6);
+    const derived = deriveRecording(session);
+    const mark = derived.evaluationCheckpoints.find((c) => c.id === 'tie-mark')!;
+
+    // A resolved scan after the first fix emits position, heading, and floor.
+    const fromReset = derived.observations.filter((o) => o.timeMs === 500);
+    expect(fromReset.length).toBeGreaterThan(1);
+    // The key must name which of them was used, not merely the millisecond.
+    expect(mark.estimateKey).toMatchObject({ timeMs: 500, sequence: 5 });
+    expect(typeof mark.estimateKey!.ordinal).toBe('number');
+    expect(derived.checkpoints[0].observationIndex).toBe(mark.observationIndex);
+  });
+
   it('scores a mark captured before a same-millisecond reset against pre-reset state', () => {
     // sequence 1 puts the mark ahead of the reset at sequence 2.
     const derived = deriveRecording(sameMillisecondSession(1));

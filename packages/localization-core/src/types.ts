@@ -73,6 +73,16 @@ export interface GroundTruthCheckpoint {
   timeMs: number;
   position: [number, number];
   floorId: string;
+  /**
+   * Index of the exact estimate this mark is scored against.
+   *
+   * Estimates are produced one per observation, so the index identifies one
+   * estimate unambiguously. Looking an estimate up by time cannot: several
+   * observations routinely share a millisecond — a single scan alone emits a
+   * position fix, a heading, and a floor — and the last one written would win,
+   * which is how a mark could be scored against a reset that happened after it.
+   */
+  observationIndex?: number;
 }
 
 export interface RouteMatchSegment {

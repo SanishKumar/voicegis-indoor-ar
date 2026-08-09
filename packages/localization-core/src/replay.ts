@@ -76,7 +76,13 @@ export function replayRecording(recording: LocalizationRecording): ReplayResult 
   const estimatesByTime = new Map(estimates.map((estimate) => [estimate.timeMs, estimate]));
 
   const checkpointErrors: CheckpointError[] = recording.checkpoints.map((checkpoint) => {
-    const estimate = estimatesByTime.get(checkpoint.timeMs);
+    // An index names one estimate exactly. Falling back to time is only for
+    // legacy recordings that carry no index, and such recordings are never
+    // publishable as evidence.
+    const estimate =
+      checkpoint.observationIndex === undefined
+        ? estimatesByTime.get(checkpoint.timeMs)
+        : estimates[checkpoint.observationIndex];
     if (!estimate) {
       throw new Error(`Checkpoint ${checkpoint.id} has no estimate at ${checkpoint.timeMs} ms.`);
     }
