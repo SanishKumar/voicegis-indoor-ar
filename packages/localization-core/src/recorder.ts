@@ -28,7 +28,7 @@ import {
   DeadReckoningIntegrator,
   type DeadReckoningConfig,
 } from './deadReckoning';
-import { replayCore } from './replay';
+import { replayCore } from './internalReplay';
 import {
   LOCALIZATION_RECORDING_VERSION,
   type EvidenceStatus,
@@ -192,6 +192,14 @@ export class SessionRecorder {
 export const GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS = 1_000;
 
 /**
+ * Inertial silence long enough to matter.
+ *
+ * At walking pace a second of missing samples is over a metre of unmodelled
+ * motion, which is larger than the accuracy being claimed.
+ */
+export const MATERIAL_SENSOR_GAP_MS = 1_000;
+
+/**
  * Identifies one derived observation, and therefore one estimate.
  *
  * `timeMs` alone is ambiguous, and so is `(timeMs, sequence)` — a single scan
@@ -251,14 +259,48 @@ export function buildEvidenceReport(
   // which is only correct for degrees per second in the device frame. Anything
   // else would be silently misread.
   const sensors = session.device.sensors;
-  const unsupportedSensors = sensors.gyroscopeUnits !== 'deg/s' || sensors.frame !== 'device';
-  const interrupted = session.events.some(
-    (event) =>
-      event.type === 'lifecycle' &&
-      (event.event === 'backgrounded' || event.event === 'sensor-interrupted'),
-  );
+  // Yaw is currently taken as the gyroscope's Z component, which is only the
+  // world vertical for a handset held flat. Until orientation-aware projection
+  // exists, only data already resolved into the world frame is eligible, and a
+  // synthetic capture is never evidence about a real building.
+  const unsupportedSensors =
+    sensors.api === 'synthetic' || sensors.gyroscopeUnits !== 'deg/s' || sensors.frame !== 'world';
+
   const localized =
     derived.observations.length > 0 && derived.observations[0].kind === 'initial-fix';
+
+  // Any lifecycle event in the interruption family counts, including a resume
+  // with no recorded start: a stream that reports coming back without ever
+  // reporting that it left has already lost events.
+  const interruptedByLifecycle = session.events.some(
+    (event) =>
+      event.type === 'lifecycle' &&
+      (event.event === 'backgrounded' ||
+        event.event === 'foregrounded' ||
+        event.event === 'sensor-interrupted' ||
+        event.event === 'sensor-resumed'),
+  );
+
+  // A silent gap is an interruption the device never announced. Only gaps after
+  // the first fix and before the last mark being scored can affect a figure.
+  const firstFixTimeMs = localized ? derived.observations[0].timeMs : null;
+  const lastScoredTimeMs = derived.checkpoints.reduce<number | null>(
+    (latest, checkpoint) => (latest === null ? checkpoint.timeMs : Math.max(latest, checkpoint.timeMs)),
+    null,
+  );
+  const imuTimes = sortCaptureEvents(session.events)
+    .filter((event) => event.type === 'imu')
+    .map((event) => event.timeMs);
+  let interruptedByGap = false;
+  if (firstFixTimeMs !== null && lastScoredTimeMs !== null) {
+    for (let index = 1; index < imuTimes.length; index += 1) {
+      const from = imuTimes[index - 1];
+      const to = imuTimes[index];
+      if (to <= firstFixTimeMs || from >= lastScoredTimeMs) continue;
+      if (to - from >= MATERIAL_SENSOR_GAP_MS) interruptedByGap = true;
+    }
+  }
+  const interrupted = interruptedByLifecycle || interruptedByGap;
 
   const blockingStatus: EvidenceStatus | null = unsupportedSensors
     ? 'unsupported-sensor-model'
@@ -273,7 +315,10 @@ export function buildEvidenceReport(
   // Replay is only run when the walk could produce a figure. Without a first
   // fix it would throw, and that is an expected field outcome rather than a
   // defect.
-  const core = blockingStatus === 'insufficient-localization' ? null : replayCore(derived);
+  // Replay is driven by whether localization exists, not by which status was
+  // selected. Gating on the status meant an unsupported-sensor walk that also
+  // never localized still reached replay and threw.
+  const core = localized ? replayCore(derived) : null;
   const status: EvidenceStatus = blockingStatus ?? 'ok';
   const isPublishable = status === 'ok';
 

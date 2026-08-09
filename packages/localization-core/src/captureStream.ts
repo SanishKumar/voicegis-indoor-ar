@@ -30,9 +30,9 @@ interface CaptureEventBase {
  */
 export interface ImuCaptureEvent extends CaptureEventBase {
   type: 'imu';
-  /** Includes gravity, in m/s^2, device frame. */
+  /** Includes gravity, in m/s^2, expressed in the profile's declared frame. */
   accelerometer: Vector3;
-  /** Rate of turn in degrees/second, device frame. */
+  /** Rate of turn in the profile's declared units and frame. */
   gyroscope: Vector3;
   orientation: DeviceOrientationSample | null;
 }
@@ -215,8 +215,9 @@ export function reduceImuEvent(event: ImuCaptureEvent): ImuSample {
   return {
     timeMs: event.timeMs,
     accelerationMagnitude: Math.hypot(ax, ay, az),
-    // Z is the device's vertical axis when the handset is held flat, which is
-    // the axis a walking turn shows up on.
+    // Takes Z as yaw, which is only the world vertical when the samples are
+    // already in the world frame. The evidence path refuses anything else until
+    // orientation-aware projection exists.
     yawRateDegreesPerSecond: event.gyroscope[2],
   };
 }
@@ -688,7 +689,101 @@ export class CaptureExportError extends Error {
 export function exportCaptureSession(session: CaptureSession): string {
   const issues = validateCaptureSession(session);
   if (issues.length > 0) throw new CaptureExportError(issues);
-  return serializeCaptureSession(session);
+  return serializeCaptureSession(projectCaptureSession(session));
+}
+
+/**
+ * Projects a session onto the capture schema.
+ *
+ * Only known fields survive. Anything a caller attached — notably camera or
+ * media payloads — is dropped rather than serialised, so an export cannot carry
+ * data the format never promised to hold.
+ */
+function projectCaptureSession(session: CaptureSession): CaptureSession {
+  const { sensors } = session.device;
+  return {
+    captureVersion: session.captureVersion,
+    sessionId: session.sessionId,
+    buildingId: session.buildingId,
+    packageHash: session.packageHash,
+    startedAtIso: session.startedAtIso,
+    device: {
+      label: session.device.label,
+      platform: session.device.platform,
+      model: session.device.model,
+      osVersion: session.device.osVersion,
+      browser: session.device.browser,
+      browserVersion: session.device.browserVersion,
+      userAgent: session.device.userAgent,
+      appVersion: session.device.appVersion,
+      timezone: session.device.timezone,
+      sensors: {
+        accelerometerHz: sensors.accelerometerHz,
+        gyroscopeHz: sensors.gyroscopeHz,
+        orientationHz: sensors.orientationHz,
+        api: sensors.api,
+        gyroscopeUnits: sensors.gyroscopeUnits,
+        frame: sensors.frame,
+      },
+    },
+    anchors: session.anchors.map((anchor) => ({
+      id: anchor.id,
+      floorId: anchor.floorId,
+      kind: anchor.kind,
+      position: [anchor.position[0], anchor.position[1]] as [number, number],
+      headingDegrees: anchor.headingDegrees,
+      payload: anchor.payload,
+    })),
+    events: sortCaptureEvents(session.events).map(projectCaptureEvent),
+  };
+}
+
+function projectCaptureEvent(event: CaptureEvent): CaptureEvent {
+  const base = { sequence: event.sequence, timeMs: event.timeMs };
+  if (event.type === 'imu') {
+    return {
+      ...base,
+      type: 'imu',
+      accelerometer: [...event.accelerometer] as Vector3,
+      gyroscope: [...event.gyroscope] as Vector3,
+      orientation: event.orientation
+        ? {
+            alphaDegrees: event.orientation.alphaDegrees,
+            betaDegrees: event.orientation.betaDegrees,
+            gammaDegrees: event.orientation.gammaDegrees,
+            absolute: event.orientation.absolute,
+          }
+        : null,
+    };
+  }
+  if (event.type === 'scan') {
+    return {
+      ...base,
+      type: 'scan',
+      transport: event.transport,
+      payload: event.payload,
+      outcome: event.outcome,
+      anchorId: event.anchorId,
+    };
+  }
+  if (event.type === 'ground-truth') {
+    return {
+      ...base,
+      type: 'ground-truth',
+      checkpointId: event.checkpointId,
+      position: [event.position[0], event.position[1]] as [number, number],
+      floorId: event.floorId,
+      surveyMethod: event.surveyMethod,
+      expectedAccuracyMeters: event.expectedAccuracyMeters,
+      independentOfAnchors: event.independentOfAnchors,
+    };
+  }
+  return {
+    ...base,
+    type: 'lifecycle',
+    event: event.event,
+    ...(event.detail === undefined ? {} : { detail: event.detail }),
+  };
 }
 
 function serializeCaptureSession(session: CaptureSession): string {

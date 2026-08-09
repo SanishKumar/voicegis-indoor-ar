@@ -54,7 +54,7 @@ const device: CaptureDeviceProfile = {
     orientationHz: 25,
     api: 'devicemotion',
     gyroscopeUnits: 'deg/s',
-    frame: 'device',
+    frame: 'world',
   },
 };
 
@@ -695,17 +695,86 @@ describe('fail-closed evaluation boundary', () => {
     expect(report.checkpointErrors).toEqual([]);
   });
 
-  it('refuses to publish sensor units or frames it cannot interpret', () => {
-    const radians = recordWalk({
-      device: { ...device, sensors: { ...device.sensors, gyroscopeUnits: 'rad/s' } },
-    }).buildSession();
-    const world = recordWalk({
-      device: { ...device, sensors: { ...device.sensors, frame: 'world' } },
-    }).buildSession();
+  it('refuses to publish sensor models current processing cannot interpret', () => {
+    const withSensors = (overrides: Record<string, unknown>) =>
+      buildEvidenceReport(
+        recordWalk({
+          device: { ...device, sensors: { ...device.sensors, ...overrides } },
+        }).buildSession(),
+      ).report;
 
-    expect(buildEvidenceReport(radians).report.evidenceStatus).toBe('unsupported-sensor-model');
-    expect(buildEvidenceReport(world).report.evidenceStatus).toBe('unsupported-sensor-model');
-    expect(buildEvidenceReport(radians).report.medianHorizontalErrorMeters).toBeNull();
+    expect(withSensors({ gyroscopeUnits: 'rad/s' }).evidenceStatus).toBe('unsupported-sensor-model');
+    // Yaw is read off Z, which is only the world vertical for a flat handset,
+    // so device-frame data is not eligible until projection exists.
+    expect(withSensors({ frame: 'device' }).evidenceStatus).toBe('unsupported-sensor-model');
+    // Synthetic data is never evidence about a real building.
+    expect(withSensors({ api: 'synthetic' }).evidenceStatus).toBe('unsupported-sensor-model');
+    expect(withSensors({ api: 'synthetic' }).medianHorizontalErrorMeters).toBeNull();
+  });
+
+  it('stays non-throwing for every combination of blocking conditions', () => {
+    const noFixNoSensors = new SessionRecorder({
+      ...baseOptions,
+      device: { ...device, sensors: { ...device.sensors, frame: 'device' } },
+    });
+    noFixNoSensors.recordImu({ timeMs: 10, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+
+    const noFixInterrupted = new SessionRecorder(baseOptions);
+    noFixInterrupted.recordImu({ timeMs: 10, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+    noFixInterrupted.recordLifecycle('backgrounded', 20);
+
+    for (const recorder of [noFixNoSensors, noFixInterrupted]) {
+      const session = recorder.buildSession();
+      expect(() => buildEvidenceReport(session)).not.toThrow();
+      const { report } = buildEvidenceReport(session);
+      expect(report.evidenceStatus).not.toBe('ok');
+      expect(report.medianHorizontalErrorMeters).toBeNull();
+      expect(report.checkpointErrors).toEqual([]);
+    }
+  });
+
+  it('treats a silent inertial gap as an interruption', () => {
+    const recorder = new SessionRecorder(baseOptions);
+    recorder.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
+    recorder.recordImu({ timeMs: 200, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+    // Nothing announced the loss; the stream simply goes quiet.
+    recorder.recordImu({ timeMs: 5_000, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+    recorder.recordGroundTruth({
+      timeMs: 5_000,
+      checkpointId: 'after-gap',
+      position: [3.5, 9],
+      floorId: 'g',
+      surveyMethod: 'tape-measure',
+      expectedAccuracyMeters: 0.03,
+      independentOfAnchors: true,
+    });
+
+    const { report } = buildEvidenceReport(recorder.buildSession());
+    expect(report.evidenceStatus).toBe('interrupted-capture');
+    expect(report.medianHorizontalErrorMeters).toBeNull();
+  });
+
+  it('treats a resume with no recorded start as an interruption', () => {
+    const recorder = recordWalk();
+    // Coming back without ever reporting leaving means events were lost.
+    recorder.recordLifecycle('sensor-resumed', 4_000);
+
+    expect(buildEvidenceReport(recorder.buildSession()).report.evidenceStatus).toBe(
+      'interrupted-capture',
+    );
+  });
+
+  it('never serialises payloads the capture schema does not define', () => {
+    const session = recordWalk().buildSession() as CaptureSession & {
+      unversionedPayload?: { cameraFrames: string[] };
+    };
+    session.unversionedPayload = { cameraFrames: ['frame-a', 'frame-b'] };
+
+    const exported = exportCaptureSession(session);
+
+    expect(exported).not.toContain('unversionedPayload');
+    expect(exported).not.toContain('cameraFrames');
+    expect(importCaptureSession(exported).valid).toBe(true);
   });
 
   it('refuses to export an invalid capture', () => {
