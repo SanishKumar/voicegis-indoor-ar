@@ -423,11 +423,29 @@ describe('fail-closed evaluation boundary', () => {
           outcome: 'resolved',
           anchorId: 'origin',
         },
+        // A real footfall: baseline, then a peak above threshold, then the
+        // falling edge that completes the step at (500 ms, sequence 3).
+        {
+          type: 'imu',
+          sequence: 1,
+          timeMs: 300,
+          accelerometer: [0, 0, 9.81],
+          gyroscope: [0, 0, 0],
+          orientation: null,
+        },
+        {
+          type: 'imu',
+          sequence: 2,
+          timeMs: 400,
+          accelerometer: [0, 0, 13.5],
+          gyroscope: [0, 0, 0],
+          orientation: null,
+        },
         {
           type: 'imu',
           sequence: 3,
           timeMs: 500,
-          accelerometer: [0, 0, 13.5],
+          accelerometer: [0, 0, 9.0],
           gyroscope: [0, 0, 0],
           orientation: null,
         },
@@ -459,7 +477,8 @@ describe('fail-closed evaluation boundary', () => {
     const session = tieBreakSession(4);
     const derived = deriveRecording(session);
     const mark = derived.evaluationCheckpoints.find((c) => c.id === 'tie-mark')!;
-    const { estimates, report } = replayRecording(derived);
+    const { estimates } = replayRecording(derived);
+    const { report } = buildEvidenceReport(session);
 
     expect(mark.publishable).toBe(true);
     expect(mark.observationIndex).not.toBeNull();
@@ -467,11 +486,14 @@ describe('fail-closed evaluation boundary', () => {
     // at sequence 5.
     expect(mark.estimateKey!.sequence).toBe(3);
 
+    // The completed step advances one 0.72 m stride from the origin anchor, so
+    // the estimate is exactly [0, 0.72] and the mark at [0, 2] is exactly
+    // 1.28 m away. Scoring by time alone chose the far anchor instead.
     const scored = estimates[mark.observationIndex!];
-    expect(scored.position[0]).toBeLessThan(10);
-    expect(scored.position[1]).toBeLessThan(10);
-    // Scoring by time alone selected the far anchor and published ~110 m.
-    expect(report.medianHorizontalErrorMeters).toBeLessThan(5);
+    expect(scored.position[0]).toBeCloseTo(0, 9);
+    expect(scored.position[1]).toBeCloseTo(0.72, 9);
+    expect(report.medianHorizontalErrorMeters).toBe(1.28);
+    expect(report.p95HorizontalErrorMeters).toBe(1.28);
   });
 
   it('scores a mark after a same-millisecond reset against the post-reset estimate', () => {
@@ -482,8 +504,15 @@ describe('fail-closed evaluation boundary', () => {
 
     expect(mark.publishable).toBe(true);
     // The mark now follows the reset, so the reset is legitimately causal.
-    expect(mark.estimateKey!.sequence).toBe(5);
-    expect(estimates[mark.observationIndex!].position[0]).toBeGreaterThan(50);
+    // Ordinal 2 is the third observation the scan emits (position, heading,
+    // floor); the mark follows all three, so the last is causal.
+    expect(mark.estimateKey).toEqual({ timeMs: 500, sequence: 5, ordinal: 2 });
+    // A fix corrects toward the anchor in proportion to relative uncertainty
+    // rather than snapping onto it, so the estimate lands short of [80, 80].
+    const scored = estimates[mark.observationIndex!];
+    expect(scored.position[0]).toBeCloseTo(63.282728403721265, 9);
+    expect(scored.position[1]).toBeCloseTo(63.43318384808777, 9);
+    expect(buildEvidenceReport(tieBreakSession(6)).report.medianHorizontalErrorMeters).toBe(88.197);
   });
 
   it('never scores a mark against a first fix captured after it', () => {
@@ -522,7 +551,7 @@ describe('fail-closed evaluation boundary', () => {
     expect(mark.exclusionReason).toBe('no-causal-estimate-in-range');
     expect(mark.observationIndex).toBeNull();
     expect(derived.checkpoints).toEqual([]);
-    expect(replayRecording(derived).report.evidenceStatus).toBe('insufficient-ground-truth');
+    expect(buildEvidenceReport(session).report.evidenceStatus).toBe('insufficient-ground-truth');
   });
 
   it('distinguishes the several observations one scan emits at a single instant', () => {
@@ -534,8 +563,8 @@ describe('fail-closed evaluation boundary', () => {
     const fromReset = derived.observations.filter((o) => o.timeMs === 500);
     expect(fromReset.length).toBeGreaterThan(1);
     // The key must name which of them was used, not merely the millisecond.
-    expect(mark.estimateKey).toMatchObject({ timeMs: 500, sequence: 5 });
-    expect(typeof mark.estimateKey!.ordinal).toBe('number');
+    // The key names which of them was used, not merely the millisecond.
+    expect(mark.estimateKey).toEqual({ timeMs: 500, sequence: 5, ordinal: 2 });
     expect(derived.checkpoints[0].observationIndex).toBe(mark.observationIndex);
   });
 
@@ -620,6 +649,69 @@ describe('fail-closed evaluation boundary', () => {
     expect(evidence.alignment.worstAlignmentDeltaMs).toBeLessThanOrEqual(0);
     expect(evidence.alignment.toleranceMs).toBeGreaterThan(0);
     expect(evidence.sampling.observedHz).toBeCloseTo(50, 1);
+  });
+
+  it('reports insufficient localization when a walk never obtains a fix', () => {
+    const recorder = new SessionRecorder(baseOptions);
+    // Sensors run, but no marker is ever read, so nothing is ever localized.
+    for (let elapsed = 0; elapsed <= 2_000; elapsed += 20) {
+      recorder.recordImu({
+        timeMs: elapsed,
+        accelerometer: [0, 0, 9.81 + 3 * Math.sin((2 * Math.PI * elapsed) / 500)],
+        gyroscope: [0, 0, 0],
+      });
+    }
+    recorder.recordGroundTruth({
+      timeMs: 1_000,
+      checkpointId: 'mark',
+      position: [3.5, 9],
+      floorId: 'g',
+      surveyMethod: 'tape-measure',
+      expectedAccuracyMeters: 0.03,
+      independentOfAnchors: true,
+    });
+    const session = recorder.buildSession();
+
+    // A walk that never localized is an expected field outcome, not a defect.
+    expect(() => buildEvidenceReport(session)).not.toThrow();
+    const { report } = buildEvidenceReport(session);
+    expect(report.evidenceStatus).toBe('insufficient-localization');
+    expect(report.medianHorizontalErrorMeters).toBeNull();
+    expect(report.p95HorizontalErrorMeters).toBeNull();
+    expect(report.checkpointErrors).toEqual([]);
+  });
+
+  it('refuses to publish a capture that was interrupted', () => {
+    const recorder = recordWalk();
+    recorder.recordLifecycle('backgrounded', 4_000, 'screen locked');
+    const session = recorder.buildSession();
+
+    expect(() => buildEvidenceReport(session)).not.toThrow();
+    const { report } = buildEvidenceReport(session);
+    // Inertial integration across the gap invents heading, so any figure from
+    // this walk is untrustworthy regardless of how good it looks.
+    expect(report.evidenceStatus).toBe('interrupted-capture');
+    expect(report.medianHorizontalErrorMeters).toBeNull();
+    expect(report.checkpointErrors).toEqual([]);
+  });
+
+  it('refuses to publish sensor units or frames it cannot interpret', () => {
+    const radians = recordWalk({
+      device: { ...device, sensors: { ...device.sensors, gyroscopeUnits: 'rad/s' } },
+    }).buildSession();
+    const world = recordWalk({
+      device: { ...device, sensors: { ...device.sensors, frame: 'world' } },
+    }).buildSession();
+
+    expect(buildEvidenceReport(radians).report.evidenceStatus).toBe('unsupported-sensor-model');
+    expect(buildEvidenceReport(world).report.evidenceStatus).toBe('unsupported-sensor-model');
+    expect(buildEvidenceReport(radians).report.medianHorizontalErrorMeters).toBeNull();
+  });
+
+  it('refuses to export an invalid capture', () => {
+    const invalid = { ...recordWalk().buildSession(), startedAtIso: new Date(0).toISOString() };
+
+    expect(() => exportCaptureSession(invalid)).toThrow('Refusing to export');
   });
 
   it('refuses to derive anything from a session that does not validate', () => {
@@ -734,8 +826,9 @@ describe('capture export and derivation', () => {
   });
 
   it('replays a derived recording through the existing pipeline', () => {
-    const recording = deriveRecording(recordWalk().buildSession());
-    const { report } = replayRecording(recording);
+    const session = recordWalk().buildSession();
+    const recording = deriveRecording(session);
+    const { report } = buildEvidenceReport(session);
 
     expect(recording.observations[0].kind).toBe('initial-fix');
     expect(report.checkpointCount).toBe(1);

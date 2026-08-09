@@ -32,17 +32,10 @@ function buildReport(parsed: unknown) {
         .join(', ')}`,
     );
   }
+  // replayRecording is permanently diagnostic: it already withholds aggregate
+  // and per-checkpoint accuracy, so nothing further needs stripping here.
   const { report } = replayRecording(recording);
-  return {
-    kind: 'recording' as const,
-    report: {
-      ...report,
-      evidenceStatus: 'unofficial-recording' as const,
-      medianHorizontalErrorMeters: null,
-      p95HorizontalErrorMeters: null,
-      floorAccuracy: null,
-    },
-  };
+  return { kind: 'recording' as const, report };
 }
 
 async function main() {

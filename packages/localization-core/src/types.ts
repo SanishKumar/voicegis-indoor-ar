@@ -140,7 +140,18 @@ export interface CheckpointError {
  * produced a median and p95 of zero, which reads as perfect accuracy rather
  * than as no measurement at all.
  */
-export type EvidenceStatus = 'ok' | 'insufficient-ground-truth' | 'unofficial-recording';
+export type EvidenceStatus =
+  | 'ok'
+  /** Anything replayed from a bare recording rather than a capture session. */
+  | 'unofficial-recording'
+  /** The walk never obtained a first fix, so nothing was ever localized. */
+  | 'insufficient-localization'
+  /** Backgrounding or sensor loss makes the estimate untrustworthy afterwards. */
+  | 'interrupted-capture'
+  /** No surveyed mark survived eligibility. */
+  | 'insufficient-ground-truth'
+  /** Current processing cannot interpret the recorded units or frame. */
+  | 'unsupported-sensor-model';
 
 export interface ReplayReport {
   recordingVersion: typeof LOCALIZATION_RECORDING_VERSION;

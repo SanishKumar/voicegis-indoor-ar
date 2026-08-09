@@ -12,6 +12,20 @@ import {
   type ReplayReport,
 } from './types';
 
+/** Unredacted replay output. Only the evidence builder may consume this. */
+export interface ReplayCoreResult {
+  estimates: LocalizationEstimate[];
+  mapMatches: MapMatchResult[];
+  runtimeSnapshots: RuntimeSnapshot[];
+  checkpointErrors: CheckpointError[];
+  medianHorizontalErrorMeters: number | null;
+  p95HorizontalErrorMeters: number | null;
+  floorAccuracy: number | null;
+  qualityFrameCounts: Record<LocalizationQuality, number>;
+  mapMatching: ReplayReport['mapMatching'];
+  runtime: ReplayReport['runtime'];
+}
+
 export interface ReplayResult {
   estimates: LocalizationEstimate[];
   mapMatches: MapMatchResult[];
@@ -59,7 +73,16 @@ export function validateRecording(recording: LocalizationRecording) {
   }
 }
 
-export function replayRecording(recording: LocalizationRecording): ReplayResult {
+/**
+ * Raw replay, including per-checkpoint errors.
+ *
+ * Internal to the evidence path. `buildEvidenceReport` is the only caller
+ * permitted to turn these numbers into a published figure; the public
+ * `replayRecording` wrapper redacts them, because a bare recording carries no
+ * survey provenance, no independence claims, and no checkpoint eligibility, so
+ * any accuracy computed from one is not evidence.
+ */
+export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
   validateRecording(recording);
   const filter = new LocalizationFilter();
   const estimates = recording.observations.map((observation) => filter.apply(observation));
@@ -79,10 +102,15 @@ export function replayRecording(recording: LocalizationRecording): ReplayResult 
     // An index names one estimate exactly. Falling back to time is only for
     // legacy recordings that carry no index, and such recordings are never
     // publishable as evidence.
-    const estimate =
-      checkpoint.observationIndex === undefined
-        ? estimatesByTime.get(checkpoint.timeMs)
-        : estimates[checkpoint.observationIndex];
+    const index = checkpoint.observationIndex;
+    if (index !== undefined && (!Number.isInteger(index) || index < 0 || index >= estimates.length)) {
+      // A forged or stale index must not silently select a neighbouring
+      // estimate, or wrap, or read undefined.
+      throw new Error(
+        `Checkpoint ${checkpoint.id} references observation index ${index}, which is out of range for ${estimates.length} estimates.`,
+      );
+    }
+    const estimate = index === undefined ? estimatesByTime.get(checkpoint.timeMs) : estimates[index];
     if (!estimate) {
       throw new Error(`Checkpoint ${checkpoint.id} has no estimate at ${checkpoint.timeMs} ms.`);
     }
@@ -135,40 +163,64 @@ export function replayRecording(recording: LocalizationRecording): ReplayResult 
     estimates,
     mapMatches,
     runtimeSnapshots,
+    checkpointErrors,
+    medianHorizontalErrorMeters:
+      checkpointErrors.length === 0 ? null : round(median(sortedErrors)),
+    p95HorizontalErrorMeters:
+      checkpointErrors.length === 0 ? null : round(percentile(sortedErrors, 0.95)),
+    floorAccuracy:
+      checkpointErrors.length === 0
+        ? null
+        : round(
+            checkpointErrors.filter((checkpoint) => checkpoint.floorCorrect).length /
+              checkpointErrors.length,
+          ),
+    qualityFrameCounts,
+    mapMatching: {
+      acceptedCount: mapMatches.filter((match) => match.accepted).length,
+      rejectedCount: mapMatches.filter((match) => !match.accepted).length,
+      reasonCounts,
+    },
+    runtime: {
+      stateCounts: runtimeStateCounts,
+      guidanceFrozenFrames: runtimeSnapshots.filter(
+        (snapshot) => snapshot.guidanceState === 'frozen',
+      ).length,
+    },
+  };
+}
+
+/**
+ * Public replay. Permanently diagnostic.
+ *
+ * This never returns an evidential status and never carries accuracy, whether
+ * aggregate or per checkpoint. A `LocalizationRecording` can be hand-written,
+ * so numbers derived from one describe a computation rather than a measurement.
+ * Use `buildEvidenceReport` on a capture session to obtain a figure that may be
+ * quoted.
+ */
+export function replayRecording(recording: LocalizationRecording): ReplayResult {
+  const core = replayCore(recording);
+  return {
+    estimates: core.estimates,
+    mapMatches: core.mapMatches,
+    runtimeSnapshots: core.runtimeSnapshots,
     report: {
       recordingVersion: LOCALIZATION_RECORDING_VERSION,
       sessionId: recording.sessionId,
       buildingId: recording.buildingId,
       packageHash: recording.packageHash,
-      // No eligible mark means no measurement. Reporting zero here would read
-      // as perfect accuracy for a walk that proved nothing.
-      evidenceStatus: checkpointErrors.length === 0 ? 'insufficient-ground-truth' : 'ok',
+      evidenceStatus: 'unofficial-recording',
       observationCount: recording.observations.length,
       checkpointCount: recording.checkpoints.length,
-      qualityFrameCounts,
-      medianHorizontalErrorMeters:
-        checkpointErrors.length === 0 ? null : round(median(sortedErrors)),
-      p95HorizontalErrorMeters:
-        checkpointErrors.length === 0 ? null : round(percentile(sortedErrors, 0.95)),
-      floorAccuracy:
-        checkpointErrors.length === 0
-          ? null
-          : round(
-              checkpointErrors.filter((checkpoint) => checkpoint.floorCorrect).length /
-                checkpointErrors.length,
-            ),
-      mapMatching: {
-        acceptedCount: mapMatches.filter((match) => match.accepted).length,
-        rejectedCount: mapMatches.filter((match) => !match.accepted).length,
-        reasonCounts,
-      },
-      runtime: {
-        stateCounts: runtimeStateCounts,
-        guidanceFrozenFrames: runtimeSnapshots.filter(
-          (snapshot) => snapshot.guidanceState === 'frozen',
-        ).length,
-      },
-      checkpointErrors,
+      qualityFrameCounts: core.qualityFrameCounts,
+      medianHorizontalErrorMeters: null,
+      p95HorizontalErrorMeters: null,
+      floorAccuracy: null,
+      mapMatching: core.mapMatching,
+      runtime: core.runtime,
+      // Redacted: individual errors would let an aggregate be reconstructed.
+      checkpointErrors: [],
     },
   };
 }

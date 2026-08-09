@@ -665,8 +665,33 @@ function canonicalize(value: unknown): unknown {
   return value;
 }
 
-/** Canonical JSON: identical sessions always produce identical bytes. */
+export class CaptureExportError extends Error {
+  readonly issues: CaptureIssue[];
+  constructor(issues: CaptureIssue[]) {
+    super(
+      `Refusing to export an invalid capture (${issues.length} issue(s)): ${issues
+        .map((issue) => `${issue.code}@${issue.path}`)
+        .join(', ')}`,
+    );
+    this.name = 'CaptureExportError';
+    this.issues = issues;
+  }
+}
+
+/**
+ * Canonical JSON: identical sessions always produce identical bytes.
+ *
+ * Validates first. Writing an invalid capture to disk would create a file that
+ * looks like evidence and cannot be read back, and the failure would surface far
+ * from the walk that produced it.
+ */
 export function exportCaptureSession(session: CaptureSession): string {
+  const issues = validateCaptureSession(session);
+  if (issues.length > 0) throw new CaptureExportError(issues);
+  return serializeCaptureSession(session);
+}
+
+function serializeCaptureSession(session: CaptureSession): string {
   return `${JSON.stringify(canonicalize({ ...session, events: sortCaptureEvents(session.events) }), null, 2)}\n`;
 }
 

@@ -28,9 +28,10 @@ import {
   DeadReckoningIntegrator,
   type DeadReckoningConfig,
 } from './deadReckoning';
-import { replayRecording } from './replay';
+import { replayCore } from './replay';
 import {
   LOCALIZATION_RECORDING_VERSION,
+  type EvidenceStatus,
   type GroundTruthCheckpoint,
   type LocalizationObservation,
   type LocalizationRecording,
@@ -242,8 +243,70 @@ export function buildEvidenceReport(
   session: CaptureSession,
   overrides: DeriveOverrides = {},
 ): EvidenceReport {
+  // Structurally invalid captures still throw: bad data is a different problem
+  // from a valid walk that simply did not produce usable evidence.
   const derived = deriveRecording(session, overrides);
-  const { report } = replayRecording(derived);
+
+  // Current processing reduces the gyroscope by taking its Z component as yaw,
+  // which is only correct for degrees per second in the device frame. Anything
+  // else would be silently misread.
+  const sensors = session.device.sensors;
+  const unsupportedSensors = sensors.gyroscopeUnits !== 'deg/s' || sensors.frame !== 'device';
+  const interrupted = session.events.some(
+    (event) =>
+      event.type === 'lifecycle' &&
+      (event.event === 'backgrounded' || event.event === 'sensor-interrupted'),
+  );
+  const localized =
+    derived.observations.length > 0 && derived.observations[0].kind === 'initial-fix';
+
+  const blockingStatus: EvidenceStatus | null = unsupportedSensors
+    ? 'unsupported-sensor-model'
+    : !localized
+      ? 'insufficient-localization'
+      : interrupted
+        ? 'interrupted-capture'
+        : derived.checkpoints.length === 0
+          ? 'insufficient-ground-truth'
+          : null;
+
+  // Replay is only run when the walk could produce a figure. Without a first
+  // fix it would throw, and that is an expected field outcome rather than a
+  // defect.
+  const core = blockingStatus === 'insufficient-localization' ? null : replayCore(derived);
+  const status: EvidenceStatus = blockingStatus ?? 'ok';
+  const isPublishable = status === 'ok';
+
+  const report: ReplayReport = {
+    recordingVersion: LOCALIZATION_RECORDING_VERSION,
+    sessionId: derived.sessionId,
+    buildingId: derived.buildingId,
+    packageHash: derived.packageHash,
+    evidenceStatus: status,
+    observationCount: derived.observations.length,
+    checkpointCount: derived.checkpoints.length,
+    qualityFrameCounts: core?.qualityFrameCounts ?? { high: 0, degraded: 0, lost: 0 },
+    medianHorizontalErrorMeters: isPublishable ? core!.medianHorizontalErrorMeters : null,
+    p95HorizontalErrorMeters: isPublishable ? core!.p95HorizontalErrorMeters : null,
+    floorAccuracy: isPublishable ? core!.floorAccuracy : null,
+    mapMatching: core?.mapMatching ?? {
+      acceptedCount: 0,
+      rejectedCount: 0,
+      reasonCounts: {
+        matched: 0,
+        'no-route': 0,
+        'quality-lost': 0,
+        'wrong-floor': 0,
+        'outside-gate': 0,
+        'backward-progress': 0,
+      },
+    },
+    runtime: core?.runtime ?? {
+      stateCounts: { initializing: 0, tracking: 0, degraded: 0, lost: 0, relocalizing: 0 },
+      guidanceFrozenFrames: 0,
+    },
+    checkpointErrors: isPublishable ? core!.checkpointErrors : [],
+  };
 
   const exclusionCounts = {
     'dependent-on-anchor': 0,

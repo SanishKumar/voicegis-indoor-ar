@@ -15,7 +15,6 @@ describe('localization replay', () => {
       sessionId: 'synthetic-reference-corridor-001',
       observationCount: 7,
       checkpointCount: 3,
-      floorAccuracy: 1,
       mapMatching: {
         acceptedCount: 7,
         rejectedCount: 0,
@@ -24,7 +23,26 @@ describe('localization replay', () => {
         guidanceFrozenFrames: 0,
       },
     });
-    expect(first.report.p95HorizontalErrorMeters).toBeLessThan(0.25);
+  });
+
+  it('never reports accuracy from a bare recording', () => {
+    // A recording can be hand-written, so anything computed from one describes
+    // a computation rather than a measurement.
+    const { report } = replayRecording(recording);
+
+    expect(report.evidenceStatus).toBe('unofficial-recording');
+    expect(report.medianHorizontalErrorMeters).toBeNull();
+    expect(report.p95HorizontalErrorMeters).toBeNull();
+    expect(report.floorAccuracy).toBeNull();
+    // Individual errors would let the aggregate be reconstructed.
+    expect(report.checkpointErrors).toEqual([]);
+  });
+
+  it('refuses a checkpoint whose observation index is out of range', () => {
+    const forged = structuredClone(recording) as LocalizationRecording;
+    forged.checkpoints[0].observationIndex = 9_999;
+
+    expect(() => replayRecording(forged)).toThrow('out of range');
   });
 
   it('rejects recordings that claim to retain camera frames', () => {

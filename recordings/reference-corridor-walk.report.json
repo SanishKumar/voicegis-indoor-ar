@@ -36,24 +36,5 @@
     },
     "guidanceFrozenFrames": 0
   },
-  "checkpointErrors": [
-    {
-      "checkpointId": "entry",
-      "timeMs": 0,
-      "floorCorrect": true,
-      "horizontalErrorMeters": 0
-    },
-    {
-      "checkpointId": "anchor-correction",
-      "timeMs": 3000,
-      "floorCorrect": true,
-      "horizontalErrorMeters": 0.053
-    },
-    {
-      "checkpointId": "corridor-end",
-      "timeMs": 5000,
-      "floorCorrect": true,
-      "horizontalErrorMeters": 0.056
-    }
-  ]
+  "checkpointErrors": []
 }
