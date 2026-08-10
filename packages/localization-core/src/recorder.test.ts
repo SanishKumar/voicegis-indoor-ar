@@ -17,6 +17,7 @@ import {
   SessionRecorder,
   buildEvidenceReport,
   deriveRecording,
+  worstCoverageGapMs,
   type SessionRecorderOptions,
 } from './recorder';
 
@@ -52,7 +53,7 @@ const device: CaptureDeviceProfile = {
     accelerometerHz: 50,
     gyroscopeHz: 50,
     orientationHz: 25,
-    api: 'devicemotion',
+    api: 'native',
     gyroscopeUnits: 'deg/s',
     frame: 'world',
   },
@@ -710,6 +711,12 @@ describe('fail-closed evaluation boundary', () => {
     // Synthetic data is never evidence about a real building.
     expect(withSensors({ api: 'synthetic' }).evidenceStatus).toBe('unsupported-sensor-model');
     expect(withSensors({ api: 'synthetic' }).medianHorizontalErrorMeters).toBeNull();
+    // A browser reports in the device frame, so claiming the world frame means
+    // an unrecorded transform or a relabel. Neither is evidence.
+    expect(withSensors({ api: 'devicemotion' }).evidenceStatus).toBe('unsupported-sensor-model');
+    expect(withSensors({ api: 'generic-sensor' }).evidenceStatus).toBe('unsupported-sensor-model');
+    // Only the explicitly supported native world-frame path publishes.
+    expect(withSensors({}).evidenceStatus).toBe('ok');
   });
 
   it('stays non-throwing for every combination of blocking conditions', () => {
@@ -752,6 +759,42 @@ describe('fail-closed evaluation boundary', () => {
     const { report } = buildEvidenceReport(recorder.buildSession());
     expect(report.evidenceStatus).toBe('interrupted-capture');
     expect(report.medianHorizontalErrorMeters).toBeNull();
+  });
+
+  it('measures coverage across the window, independently of alignment', () => {
+    // Samples resume just before the mark so it stays alignable; the silence
+    // being judged sits earlier in the window.
+    const build = (resumeMs: number) => {
+      const recorder = new SessionRecorder(baseOptions);
+      recorder.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
+      recorder.recordImu({ timeMs: 100, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+      recorder.recordImu({ timeMs: resumeMs, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+      recorder.recordImu({ timeMs: resumeMs + 1, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+      recorder.recordGroundTruth({
+        timeMs: resumeMs + 10,
+        checkpointId: 'mark',
+        position: [3.5, 9],
+        floorId: 'g',
+        surveyMethod: 'tape-measure',
+        expectedAccuracyMeters: 0.03,
+        independentOfAnchors: true,
+      });
+      return buildEvidenceReport(recorder.buildSession()).report.evidenceStatus;
+    };
+
+    // A 999 ms silence is tolerated; 1000 ms is not.
+    expect(build(1_099)).toBe('ok');
+    expect(build(1_100)).toBe('interrupted-capture');
+  });
+
+  it('counts leading, trailing and empty-window silence', () => {
+    expect(worstCoverageGapMs([], 0, 5_000)).toBe(5_000);
+    // One sample leaves silence on both sides; the larger side wins.
+    expect(worstCoverageGapMs([100], 0, 5_000)).toBe(4_900);
+    expect(worstCoverageGapMs([4_900], 0, 5_000)).toBe(4_900);
+    // A long silence that merely clips the window contributes only the overlap.
+    expect(worstCoverageGapMs([0, 10_000], 100, 200)).toBe(100);
+    expect(worstCoverageGapMs([0, 100, 200, 300], 0, 300)).toBe(100);
   });
 
   it('treats a resume with no recorded start as an interruption', () => {

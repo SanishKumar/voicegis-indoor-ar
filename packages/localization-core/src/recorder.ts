@@ -12,6 +12,7 @@ import {
   validateCaptureSession,
   type SamplingSummary,
   type CaptureDeviceProfile,
+  type CaptureSensorProfile,
   type CaptureEvent,
   type CaptureIssue,
   type CaptureSession,
@@ -240,6 +241,57 @@ export interface EvidenceReport {
 }
 
 /**
+ * Sensor models current processing can interpret as evidence.
+ *
+ * World-frame data is required because yaw is read from the gyroscope's Z
+ * component, which is the world vertical only for a handset held flat. Browser
+ * APIs report in the device frame, so a browser capture claiming the world
+ * frame has either been transformed by something unrecorded or simply
+ * relabelled; neither is evidence. Until a deterministic, versioned orientation
+ * transform exists, only a native pipeline that resolves to the world frame
+ * itself qualifies.
+ */
+export const EVIDENTIAL_SENSOR_MODEL = {
+  api: 'native',
+  frame: 'world',
+  gyroscopeUnits: 'deg/s',
+} as const;
+
+export function isEvidentialSensorModel(sensors: CaptureSensorProfile) {
+  return (
+    sensors.api === EVIDENTIAL_SENSOR_MODEL.api &&
+    sensors.frame === EVIDENTIAL_SENSOR_MODEL.frame &&
+    sensors.gyroscopeUnits === EVIDENTIAL_SENSOR_MODEL.gyroscopeUnits
+  );
+}
+
+/**
+ * Longest stretch of inertial silence inside an evidence window.
+ *
+ * Gaps are clipped to the window, so a long silence that only clips its edge
+ * contributes only the overlapping milliseconds. Silence before the first
+ * sample and after the last one counts too: a window with no samples at all is
+ * entirely a gap, and a single sample leaves silence on both sides.
+ */
+export function worstCoverageGapMs(
+  sampleTimesMs: number[],
+  windowStartMs: number,
+  windowEndMs: number,
+) {
+  if (windowEndMs <= windowStartMs) return 0;
+  const inside = sampleTimesMs
+    .filter((time) => time >= windowStartMs && time <= windowEndMs)
+    .sort((left, right) => left - right);
+  if (inside.length === 0) return windowEndMs - windowStartMs;
+
+  let worst = inside[0] - windowStartMs;
+  for (let index = 1; index < inside.length; index += 1) {
+    worst = Math.max(worst, inside[index] - inside[index - 1]);
+  }
+  return Math.max(worst, windowEndMs - inside[inside.length - 1]);
+}
+
+/**
  * The only supported way to produce a quotable accuracy figure.
  *
  * It starts from a capture session so validation, checkpoint eligibility, and
@@ -263,8 +315,7 @@ export function buildEvidenceReport(
   // world vertical for a handset held flat. Until orientation-aware projection
   // exists, only data already resolved into the world frame is eligible, and a
   // synthetic capture is never evidence about a real building.
-  const unsupportedSensors =
-    sensors.api === 'synthetic' || sensors.gyroscopeUnits !== 'deg/s' || sensors.frame !== 'world';
+  const unsupportedSensors = !isEvidentialSensorModel(sensors);
 
   const localized =
     derived.observations.length > 0 && derived.observations[0].kind === 'initial-fix';
@@ -284,22 +335,22 @@ export function buildEvidenceReport(
   // A silent gap is an interruption the device never announced. Only gaps after
   // the first fix and before the last mark being scored can affect a figure.
   const firstFixTimeMs = localized ? derived.observations[0].timeMs : null;
-  const lastScoredTimeMs = derived.checkpoints.reduce<number | null>(
-    (latest, checkpoint) => (latest === null ? checkpoint.timeMs : Math.max(latest, checkpoint.timeMs)),
-    null,
-  );
   const imuTimes = sortCaptureEvents(session.events)
     .filter((event) => event.type === 'imu')
     .map((event) => event.timeMs);
-  let interruptedByGap = false;
-  if (firstFixTimeMs !== null && lastScoredTimeMs !== null) {
-    for (let index = 1; index < imuTimes.length; index += 1) {
-      const from = imuTimes[index - 1];
-      const to = imuTimes[index];
-      if (to <= firstFixTimeMs || from >= lastScoredTimeMs) continue;
-      if (to - from >= MATERIAL_SENSOR_GAP_MS) interruptedByGap = true;
-    }
-  }
+
+  // Each mark is only defensible if inertial coverage was continuous from the
+  // first fix up to the moment it was surveyed. The window ends at the recorded
+  // time rather than the aligned estimate time, because the recorded time is
+  // when someone actually stood on the mark.
+  const interruptedByGap =
+    firstFixTimeMs !== null &&
+    derived.evaluationCheckpoints.some(
+      (checkpoint) =>
+        checkpoint.publishable &&
+        worstCoverageGapMs(imuTimes, firstFixTimeMs, checkpoint.recordedTimeMs) >=
+          MATERIAL_SENSOR_GAP_MS,
+    );
   const interrupted = interruptedByLifecycle || interruptedByGap;
 
   const blockingStatus: EvidenceStatus | null = unsupportedSensors
