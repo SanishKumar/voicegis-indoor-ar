@@ -1,6 +1,6 @@
 import {
   CheckpointAdapter,
-  DEFAULT_CHECKPOINT_CONFIG,
+  resolveCheckpointConfig,
   type CheckpointAdapterConfig,
   type CheckpointAnchor,
 } from './checkpoints';
@@ -24,11 +24,16 @@ import {
   type Vector3,
 } from './captureStream';
 import {
-  DEFAULT_DEAD_RECKONING_CONFIG,
   DeadReckoningIntegrator,
+  resolveDeadReckoningConfig,
   type DeadReckoningConfig,
 } from './deadReckoning';
-import { isEvidentialSensorModel, worstCoverageGapMs } from './internalEvidencePolicy';
+import {
+  isEvidentialSensorModel,
+  isPublishableSurveyAccuracy,
+  isPublishableSurveyMethod,
+  worstCoverageGapMs,
+} from './internalEvidencePolicy';
 import { replayCore } from './internalReplay';
 import {
   LOCALIZATION_RECORDING_VERSION,
@@ -414,18 +419,6 @@ export type CheckpointExclusionReason =
   | 'survey-method-not-publishable'
   | 'survey-accuracy-out-of-policy';
 
-/** Survey methods whose marks may back a published accuracy figure. */
-export const PUBLISHABLE_SURVEY_METHODS: ReadonlySet<SurveyMethod> = new Set<SurveyMethod>([
-  'tape-measure',
-  'laser-distance',
-  'total-station',
-]);
-
-/**
- * Coarsest survey a published mark may rest on. Error is being measured in
- * metres, so a mark known only to half a metre cannot support the claim.
- */
-export const MAX_PUBLISHABLE_SURVEY_ACCURACY_METERS = 0.25;
 
 /**
  * A surveyed mark plus everything needed to defend or discard it.
@@ -495,14 +488,12 @@ export function deriveRecording(
   const issues = validateCaptureSession(session);
   if (issues.length > 0) throw new CaptureValidationError(issues);
 
-  const checkpointConfig: CheckpointAdapterConfig = {
-    ...DEFAULT_CHECKPOINT_CONFIG,
-    ...overrides.checkpointConfig,
-  };
-  const deadReckoningConfig: DeadReckoningConfig = {
-    ...DEFAULT_DEAD_RECKONING_CONFIG,
-    ...overrides.deadReckoningConfig,
-  };
+  const checkpointConfig: CheckpointAdapterConfig = resolveCheckpointConfig(
+    overrides.checkpointConfig,
+  );
+  const deadReckoningConfig: DeadReckoningConfig = resolveDeadReckoningConfig(
+    overrides.deadReckoningConfig,
+  );
   const checkpoints = new CheckpointAdapter(session.anchors, checkpointConfig);
   const deadReckoning = new DeadReckoningIntegrator(deadReckoningConfig);
   const anchorsById = new Map(session.anchors.map((anchor) => [anchor.id, anchor]));
@@ -634,14 +625,14 @@ export function deriveRecording(
       // whether an estimate could be found for it.
       const surveyEligible =
         mark.independentOfAnchors &&
-        PUBLISHABLE_SURVEY_METHODS.has(mark.surveyMethod) &&
-        mark.expectedAccuracyMeters <= MAX_PUBLISHABLE_SURVEY_ACCURACY_METERS;
+        isPublishableSurveyMethod(mark.surveyMethod) &&
+        isPublishableSurveyAccuracy(mark.expectedAccuracyMeters);
 
       const exclusionReason: CheckpointExclusionReason | null = !mark.independentOfAnchors
         ? 'dependent-on-anchor'
-        : !PUBLISHABLE_SURVEY_METHODS.has(mark.surveyMethod)
+        : !isPublishableSurveyMethod(mark.surveyMethod)
           ? 'survey-method-not-publishable'
-          : mark.expectedAccuracyMeters > MAX_PUBLISHABLE_SURVEY_ACCURACY_METERS
+          : !isPublishableSurveyAccuracy(mark.expectedAccuracyMeters)
             ? 'survey-accuracy-out-of-policy'
             : !withinTolerance
               ? 'no-causal-estimate-in-range'

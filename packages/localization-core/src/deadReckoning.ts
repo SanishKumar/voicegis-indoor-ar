@@ -29,7 +29,13 @@ export interface DeadReckoningConfig {
   baselineSmoothing: number;
 }
 
-export const DEFAULT_DEAD_RECKONING_CONFIG: DeadReckoningConfig = {
+/**
+ * The authoritative tuning. Private and frozen.
+ *
+ * An exported mutable default is consumed on every derivation, so editing one
+ * field of it changed a published metric while the report still said ok.
+ */
+const AUTHORITATIVE_DEAD_RECKONING_CONFIG: DeadReckoningConfig = Object.freeze({
   stepThresholdMetersPerSecond2: 1.6,
   minimumStepIntervalMs: 260,
   maximumStepIntervalMs: 2_000,
@@ -38,7 +44,19 @@ export const DEFAULT_DEAD_RECKONING_CONFIG: DeadReckoningConfig = {
   headingAccuracyDegrees: 12,
   headingEmitIntervalMs: 500,
   baselineSmoothing: 0.05,
-};
+});
+
+/** Frozen copy for diagnostics. The evidence path never reads this. */
+export const DEFAULT_DEAD_RECKONING_CONFIG: Readonly<DeadReckoningConfig> = Object.freeze({
+  ...AUTHORITATIVE_DEAD_RECKONING_CONFIG,
+});
+
+/** Resolves caller tuning against the private authority. */
+export function resolveDeadReckoningConfig(
+  overrides: Partial<DeadReckoningConfig> = {},
+): DeadReckoningConfig {
+  return { ...AUTHORITATIVE_DEAD_RECKONING_CONFIG, ...overrides };
+}
 
 function normalizeHeading(degrees: number) {
   const wrapped = degrees % 360;
@@ -75,7 +93,7 @@ export class DeadReckoningIntegrator {
     startSequence = 0,
     initialHeadingDegrees = 0,
   ) {
-    this.config = { ...DEFAULT_DEAD_RECKONING_CONFIG, ...config };
+    this.config = resolveDeadReckoningConfig(config);
     this.sequence = startSequence;
     this.headingDegrees = normalizeHeading(initialHeadingDegrees);
   }

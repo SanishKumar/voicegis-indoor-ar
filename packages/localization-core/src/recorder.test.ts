@@ -853,8 +853,9 @@ describe('fail-closed evaluation boundary', () => {
       return buildEvidenceReport(recorder.buildSession()).report;
     };
 
-    expect(build([]).evidenceStatus).not.toBe('ok');
-    expect(build([120]).evidenceStatus).not.toBe('ok');
+    // Zero samples: the whole window is silence. One sample: silence both sides.
+    expect(build([]).evidenceStatus).toBe('interrupted-capture');
+    expect(build([120]).evidenceStatus).toBe('interrupted-capture');
   });
 
   it('tolerates exactly 1000 ms between the causal estimate and the recorded mark', () => {
@@ -875,9 +876,14 @@ describe('fail-closed evaluation boundary', () => {
 
     const mark = deriveRecording(recorder.buildSession()).evaluationCheckpoints[0];
 
-    // Stale by exactly the tolerance, which is the boundary case that must pass.
+    // Stale by exactly the tolerance: alignment accepts it, and coverage then
+    // rejects the walk for the same 1000 ms of silence. The two limits share a
+    // value but answer different questions.
     expect(mark.recordedTimeMs - mark.alignedTimeMs).toBe(1_000);
     expect(mark.exclusionReason).not.toBe('no-causal-estimate-in-range');
+    expect(buildEvidenceReport(recorder.buildSession()).report.evidenceStatus).toBe(
+      'interrupted-capture',
+    );
   });
 
   it('keeps the sensor policy beyond reach of mutation', () => {

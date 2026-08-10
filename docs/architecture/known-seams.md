@@ -1,5 +1,24 @@
 # Known seams
 
+## Checkpoint eligibility is self-declared
+
+Every rule that decides whether a surveyed mark counts reads a property the
+capture itself asserts: whether the mark is independent of anchors, how it was
+surveyed, and how accurate that survey was. All three are declared after the
+walk, by whoever writes the capture.
+
+That means a mark can disappear from the denominator by being labelled
+`estimated`, marked dependent, or given an expected accuracy outside policy —
+and a late mark that would have failed is exactly the one most tempting to
+relabel. The eligibility rules are sound; what is missing is that nothing binds
+them to a decision made *before* the walk.
+
+Real field evidence will need a predeclared checkpoint and evaluation manifest:
+the marks, their surveyed positions, and their intended role fixed and hashed
+before capture begins, so the denominator is chosen in advance rather than
+discovered afterwards. That belongs with the sealed evidence artifact and the
+field protocol, not with the evaluation code.
+
 ## Capture chronology and immutability are not yet enforced
 
 Deferred from Recorder Integrity v0.1.1, which hardened only the evaluation

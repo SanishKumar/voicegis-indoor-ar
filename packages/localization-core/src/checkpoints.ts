@@ -33,13 +33,39 @@ export interface CheckpointAdapterConfig {
   elevationByFloorId: Record<string, number>;
 }
 
-export const DEFAULT_CHECKPOINT_CONFIG: CheckpointAdapterConfig = {
+/** The authoritative policy. Private and frozen, including the nested map. */
+const AUTHORITATIVE_CHECKPOINT_CONFIG: CheckpointAdapterConfig = Object.freeze({
   qrAccuracyMeters: 0.35,
   nfcAccuracyMeters: 0.15,
   headingAccuracyDegrees: 22,
   floorConfidence: 0.99,
-  elevationByFloorId: {},
-};
+  elevationByFloorId: Object.freeze({}) as Record<string, number>,
+});
+
+/** Frozen copy for diagnostics. The evidence path never reads this. */
+export const DEFAULT_CHECKPOINT_CONFIG: Readonly<CheckpointAdapterConfig> = Object.freeze({
+  ...AUTHORITATIVE_CHECKPOINT_CONFIG,
+  elevationByFloorId: Object.freeze({ ...AUTHORITATIVE_CHECKPOINT_CONFIG.elevationByFloorId }),
+});
+
+/**
+ * Resolves caller policy against the private authority.
+ *
+ * The nested elevation map is copied rather than shared, so a caller holding a
+ * reference to it cannot alter a later derivation.
+ */
+export function resolveCheckpointConfig(
+  overrides: Partial<CheckpointAdapterConfig> = {},
+): CheckpointAdapterConfig {
+  return {
+    ...AUTHORITATIVE_CHECKPOINT_CONFIG,
+    ...overrides,
+    elevationByFloorId: {
+      ...AUTHORITATIVE_CHECKPOINT_CONFIG.elevationByFloorId,
+      ...overrides.elevationByFloorId,
+    },
+  };
+}
 
 export type CheckpointRejectionReason =
   | 'unknown-payload'
@@ -80,7 +106,7 @@ export class CheckpointAdapter {
     config: Partial<CheckpointAdapterConfig> = {},
     startSequence = 0,
   ) {
-    this.config = { ...DEFAULT_CHECKPOINT_CONFIG, ...config };
+    this.config = resolveCheckpointConfig(config);
     this.sequence = startSequence;
     this.anchorsByPayload = new Map();
     for (const anchor of anchors) {

@@ -1,4 +1,4 @@
-import type { CaptureSensorProfile } from './captureStream';
+import type { CaptureSensorProfile, SurveyMethod } from './captureStream';
 
 /**
  * Evidence policy. Internal on purpose.
@@ -71,4 +71,31 @@ export function worstCoverageGapMs(
     worst = Math.max(worst, inside[index] - inside[index - 1]);
   }
   return Math.max(worst, windowEndMs - inside[inside.length - 1]);
+}
+
+/**
+ * Survey methods whose marks may back a published figure.
+ *
+ * Written as a value predicate rather than a set. A `ReadonlySet` is a
+ * compile-time assertion only, and `Object.freeze` does not disable `add`, so
+ * an exported set could be widened at runtime — adding `estimated` was enough
+ * to turn a refused walk into a published metric.
+ */
+export function isPublishableSurveyMethod(method: SurveyMethod) {
+  return (
+    method === 'tape-measure' || method === 'laser-distance' || method === 'total-station'
+  );
+}
+
+/**
+ * Coarsest survey a published mark may rest on. Error is measured in metres, so
+ * a mark known only to half a metre cannot support the claim.
+ */
+export function isPublishableSurveyAccuracy(expectedAccuracyMeters: number) {
+  return expectedAccuracyMeters <= 0.25;
+}
+
+/** Read-only view of the accuracy threshold, for reports. */
+export function maxPublishableSurveyAccuracyMeters() {
+  return 0.25;
 }
