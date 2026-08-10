@@ -17,9 +17,9 @@ import {
   SessionRecorder,
   buildEvidenceReport,
   deriveRecording,
-  worstCoverageGapMs,
   type SessionRecorderOptions,
 } from './recorder';
+import { isEvidentialSensorModel, worstCoverageGapMs } from './internalEvidencePolicy';
 
 const anchors: CheckpointAnchor[] = [
   {
@@ -795,6 +795,118 @@ describe('fail-closed evaluation boundary', () => {
     // A long silence that merely clips the window contributes only the overlap.
     expect(worstCoverageGapMs([0, 10_000], 100, 200)).toBe(100);
     expect(worstCoverageGapMs([0, 100, 200, 300], 0, 300)).toBe(100);
+  });
+
+  it('detects an outage that stranded a later mark, not just surviving ones', () => {
+    const recorder = new SessionRecorder(baseOptions);
+    recorder.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
+    for (let t = 100; t <= 400; t += 20) {
+      recorder.recordImu({ timeMs: t, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+    }
+    recorder.recordGroundTruth({
+      timeMs: 400,
+      checkpointId: 'before-outage',
+      position: [3.5, 9],
+      floorId: 'g',
+      surveyMethod: 'tape-measure',
+      expectedAccuracyMeters: 0.03,
+      independentOfAnchors: true,
+    });
+    // A long outage, then a mark far beyond any causal estimate.
+    recorder.recordGroundTruth({
+      timeMs: 60_000,
+      checkpointId: 'after-outage',
+      position: [3, 9],
+      floorId: 'g',
+      surveyMethod: 'tape-measure',
+      expectedAccuracyMeters: 0.03,
+      independentOfAnchors: true,
+    });
+
+    const evidence = buildEvidenceReport(recorder.buildSession());
+    const stranded = evidence.evaluationCheckpoints.find((c) => c.id === 'after-outage')!;
+
+    // Gating on publishability would skip the stranded mark and let the
+    // surviving early one report ok.
+    expect(stranded.publishable).toBe(false);
+    expect(stranded.surveyEligible).toBe(true);
+    expect(evidence.report.evidenceStatus).toBe('interrupted-capture');
+    expect(evidence.report.medianHorizontalErrorMeters).toBeNull();
+  });
+
+  it('rejects a walk with no inertial samples, and one with a single sample', () => {
+    const build = (sampleTimes: number[]) => {
+      const recorder = new SessionRecorder(baseOptions);
+      recorder.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
+      for (const t of sampleTimes) {
+        recorder.recordImu({ timeMs: t, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+      }
+      recorder.recordGroundTruth({
+        timeMs: 5_000,
+        checkpointId: 'mark',
+        position: [3.5, 9],
+        floorId: 'g',
+        surveyMethod: 'tape-measure',
+        expectedAccuracyMeters: 0.03,
+        independentOfAnchors: true,
+      });
+      return buildEvidenceReport(recorder.buildSession()).report;
+    };
+
+    expect(build([]).evidenceStatus).not.toBe('ok');
+    expect(build([120]).evidenceStatus).not.toBe('ok');
+  });
+
+  it('tolerates exactly 1000 ms between the causal estimate and the recorded mark', () => {
+    const recorder = new SessionRecorder(baseOptions);
+    recorder.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
+    for (let t = 100; t <= 1_100; t += 20) {
+      recorder.recordImu({ timeMs: t, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+    }
+    recorder.recordGroundTruth({
+      timeMs: 2_100,
+      checkpointId: 'mark',
+      position: [3.5, 9],
+      floorId: 'g',
+      surveyMethod: 'tape-measure',
+      expectedAccuracyMeters: 0.03,
+      independentOfAnchors: true,
+    });
+
+    const mark = deriveRecording(recorder.buildSession()).evaluationCheckpoints[0];
+
+    // Stale by exactly the tolerance, which is the boundary case that must pass.
+    expect(mark.recordedTimeMs - mark.alignedTimeMs).toBe(1_000);
+    expect(mark.exclusionReason).not.toBe('no-causal-estimate-in-range');
+  });
+
+  it('keeps the sensor policy beyond reach of mutation', () => {
+    const browserSensors = { ...device.sensors, api: 'devicemotion' as const };
+
+    expect(isEvidentialSensorModel(browserSensors)).toBe(false);
+    expect(isEvidentialSensorModel(device.sensors)).toBe(true);
+    // The policy is frozen and unexported, so no caller can rewrite it to
+    // approve a source it refuses.
+    expect(isEvidentialSensorModel({ ...device.sensors, frame: 'device' })).toBe(false);
+  });
+
+  it('rejects sensor vectors that reduce to a non-finite magnitude', () => {
+    const recorder = new SessionRecorder(baseOptions);
+    recorder.recordImu({
+      timeMs: 10,
+      // Each component is finite, but together they hypot to Infinity.
+      accelerometer: [Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE],
+      gyroscope: [0, 0, 0],
+    });
+    expect(validateCaptureSession(recorder.buildSession()).map((i) => i.code)).toContain(
+      'implausible-imu-event',
+    );
+
+    const spinning = new SessionRecorder(baseOptions);
+    spinning.recordImu({ timeMs: 10, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 1e9] });
+    expect(validateCaptureSession(spinning.buildSession()).map((i) => i.code)).toContain(
+      'implausible-imu-event',
+    );
   });
 
   it('treats a resume with no recorded start as an interruption', () => {

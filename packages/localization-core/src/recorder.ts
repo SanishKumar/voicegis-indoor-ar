@@ -12,7 +12,6 @@ import {
   validateCaptureSession,
   type SamplingSummary,
   type CaptureDeviceProfile,
-  type CaptureSensorProfile,
   type CaptureEvent,
   type CaptureIssue,
   type CaptureSession,
@@ -29,6 +28,7 @@ import {
   DeadReckoningIntegrator,
   type DeadReckoningConfig,
 } from './deadReckoning';
+import { isEvidentialSensorModel, worstCoverageGapMs } from './internalEvidencePolicy';
 import { replayCore } from './internalReplay';
 import {
   LOCALIZATION_RECORDING_VERSION,
@@ -241,57 +241,6 @@ export interface EvidenceReport {
 }
 
 /**
- * Sensor models current processing can interpret as evidence.
- *
- * World-frame data is required because yaw is read from the gyroscope's Z
- * component, which is the world vertical only for a handset held flat. Browser
- * APIs report in the device frame, so a browser capture claiming the world
- * frame has either been transformed by something unrecorded or simply
- * relabelled; neither is evidence. Until a deterministic, versioned orientation
- * transform exists, only a native pipeline that resolves to the world frame
- * itself qualifies.
- */
-export const EVIDENTIAL_SENSOR_MODEL = {
-  api: 'native',
-  frame: 'world',
-  gyroscopeUnits: 'deg/s',
-} as const;
-
-export function isEvidentialSensorModel(sensors: CaptureSensorProfile) {
-  return (
-    sensors.api === EVIDENTIAL_SENSOR_MODEL.api &&
-    sensors.frame === EVIDENTIAL_SENSOR_MODEL.frame &&
-    sensors.gyroscopeUnits === EVIDENTIAL_SENSOR_MODEL.gyroscopeUnits
-  );
-}
-
-/**
- * Longest stretch of inertial silence inside an evidence window.
- *
- * Gaps are clipped to the window, so a long silence that only clips its edge
- * contributes only the overlapping milliseconds. Silence before the first
- * sample and after the last one counts too: a window with no samples at all is
- * entirely a gap, and a single sample leaves silence on both sides.
- */
-export function worstCoverageGapMs(
-  sampleTimesMs: number[],
-  windowStartMs: number,
-  windowEndMs: number,
-) {
-  if (windowEndMs <= windowStartMs) return 0;
-  const inside = sampleTimesMs
-    .filter((time) => time >= windowStartMs && time <= windowEndMs)
-    .sort((left, right) => left - right);
-  if (inside.length === 0) return windowEndMs - windowStartMs;
-
-  let worst = inside[0] - windowStartMs;
-  for (let index = 1; index < inside.length; index += 1) {
-    worst = Math.max(worst, inside[index] - inside[index - 1]);
-  }
-  return Math.max(worst, windowEndMs - inside[inside.length - 1]);
-}
-
-/**
  * The only supported way to produce a quotable accuracy figure.
  *
  * It starts from a capture session so validation, checkpoint eligibility, and
@@ -343,11 +292,15 @@ export function buildEvidenceReport(
   // first fix up to the moment it was surveyed. The window ends at the recorded
   // time rather than the aligned estimate time, because the recorded time is
   // when someone actually stood on the mark.
+  // Survey eligibility, not publishability, decides which marks are checked.
+  // An outage long enough to strand a later mark would otherwise remove that
+  // mark from consideration and hide the very outage that stranded it, leaving
+  // an earlier surviving mark to report ok.
   const interruptedByGap =
     firstFixTimeMs !== null &&
     derived.evaluationCheckpoints.some(
       (checkpoint) =>
-        checkpoint.publishable &&
+        checkpoint.surveyEligible &&
         worstCoverageGapMs(imuTimes, firstFixTimeMs, checkpoint.recordedTimeMs) >=
           MATERIAL_SENSOR_GAP_MS,
     );
@@ -495,6 +448,8 @@ export interface EvaluationCheckpoint {
   surveyMethod: SurveyMethod;
   expectedAccuracyMeters: number;
   independentOfAnchors: boolean;
+  /** The mark qualifies on its own terms, before any estimate is sought. */
+  surveyEligible: boolean;
   publishable: boolean;
   exclusionReason: CheckpointExclusionReason | null;
 }
@@ -675,6 +630,13 @@ export function deriveRecording(
             notAfter(reset, markPoint),
         );
 
+      // True when the mark itself qualifies as evidence, independently of
+      // whether an estimate could be found for it.
+      const surveyEligible =
+        mark.independentOfAnchors &&
+        PUBLISHABLE_SURVEY_METHODS.has(mark.surveyMethod) &&
+        mark.expectedAccuracyMeters <= MAX_PUBLISHABLE_SURVEY_ACCURACY_METERS;
+
       const exclusionReason: CheckpointExclusionReason | null = !mark.independentOfAnchors
         ? 'dependent-on-anchor'
         : !PUBLISHABLE_SURVEY_METHODS.has(mark.surveyMethod)
@@ -700,6 +662,7 @@ export function deriveRecording(
         surveyMethod: mark.surveyMethod,
         expectedAccuracyMeters: mark.expectedAccuracyMeters,
         independentOfAnchors: mark.independentOfAnchors,
+        surveyEligible,
         publishable: exclusionReason === null,
         exclusionReason,
       };

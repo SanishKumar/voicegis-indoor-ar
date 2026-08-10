@@ -222,6 +222,18 @@ export function reduceImuEvent(event: ImuCaptureEvent): ImuSample {
   };
 }
 
+/**
+ * Conservative physical bounds for a handset.
+ *
+ * Individually finite components can still reduce to a non-finite magnitude —
+ * three Number.MAX_VALUE axes pass a finiteness check and then hypot to
+ * Infinity — and such a sample would otherwise count as inertial coverage. A
+ * phone in normal use stays far inside these limits; consumer MEMS parts
+ * saturate well below them.
+ */
+const MAX_ACCELERATION_MAGNITUDE_M_S2 = 200;
+const MAX_ANGULAR_RATE_DEG_S = 2_000;
+
 const SCAN_OUTCOMES = new Set<string>([
   'resolved',
   'unknown-payload',
@@ -290,6 +302,31 @@ function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
         'malformed-imu-event',
         path,
         'Inertial events need full accelerometer and gyroscope vectors.',
+      );
+      return false;
+    }
+    // The reduction the pipeline will perform must itself be finite and
+    // physically possible, not merely each raw component.
+    const magnitude = Math.hypot(...(event.accelerometer as Vector3));
+    if (!Number.isFinite(magnitude) || magnitude > MAX_ACCELERATION_MAGNITUDE_M_S2) {
+      add(
+        issues,
+        'implausible-imu-event',
+        `${path}/accelerometer`,
+        'Acceleration must reduce to a finite magnitude within handset limits.',
+      );
+      return false;
+    }
+    if (
+      (event.gyroscope as Vector3).some(
+        (rate) => !Number.isFinite(rate) || Math.abs(rate) > MAX_ANGULAR_RATE_DEG_S,
+      )
+    ) {
+      add(
+        issues,
+        'implausible-imu-event',
+        `${path}/gyroscope`,
+        'Angular rate must be finite and within handset limits.',
       );
       return false;
     }
