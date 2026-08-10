@@ -907,6 +907,8 @@ describe('fail-closed evaluation boundary', () => {
     expect(validateCaptureSession(recorder.buildSession()).map((i) => i.code)).toContain(
       'implausible-imu-event',
     );
+    // An invalid capture must not reach the evidence path at all.
+    expect(() => buildEvidenceReport(recorder.buildSession())).toThrow(CaptureValidationError);
 
     const spinning = new SessionRecorder(baseOptions);
     spinning.recordImu({ timeMs: 10, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 1e9] });
