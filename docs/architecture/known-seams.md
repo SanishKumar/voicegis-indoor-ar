@@ -1,5 +1,8 @@
 # Known seams
 
+Deliberately unfinished work, recorded so it is not rediscovered as a bug. Each
+entry says what is incomplete, why it was left, and what finishing it involves.
+
 ## Checkpoint eligibility is self-declared
 
 Every rule that decides whether a surveyed mark counts reads a property the
@@ -62,9 +65,6 @@ The agreed fix is orientation-aware projection of the gyroscope vector onto
 world vertical, not a flat-phone requirement. The capture stream already records
 the sensor API, angular-rate units, and coordinate frame needed to do this
 correctly; only the projection maths is outstanding.
-
-Deliberately unfinished work, recorded so it is not rediscovered as a bug. Each
-entry says what is incomplete, why it was left, and what finishing it involves.
 
 ## Collapsed map labels are computed but not drawn
 
