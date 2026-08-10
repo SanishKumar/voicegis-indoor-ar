@@ -260,6 +260,15 @@ const LIFECYCLE_EVENTS = new Set<string>([
   'permission-denied',
 ]);
 const ANCHOR_KINDS = new Set<string>(['qr', 'apriltag', 'image', 'nfc']);
+/** The complete anchor schema. `spaceId` is deliberately not part of it. */
+const CAPTURE_ANCHOR_KEYS = new Set<string>([
+  'id',
+  'floorId',
+  'kind',
+  'position',
+  'headingDegrees',
+  'payload',
+]);
 
 function isPosition2(value: unknown): value is [number, number] {
   return Array.isArray(value) && value.length === 2 && value.every((entry) => Number.isFinite(entry));
@@ -495,6 +504,19 @@ function validateAnchors(anchors: unknown, issues: CaptureIssue[]) {
       return;
     }
     let ok = true;
+    // Unknown properties are refused rather than dropped. Export validates
+    // first, so a session that gained a field after authorship fails loudly
+    // instead of being quietly sanitised into something that looks authored.
+    const unknown = Object.keys(anchor).filter((key) => !CAPTURE_ANCHOR_KEYS.has(key));
+    if (unknown.length > 0) {
+      add(
+        issues,
+        'unknown-anchor-property',
+        `${path}/${unknown[0]}`,
+        `Anchors carry only the fields the capture schema defines; "${unknown[0]}" is not one of them.`,
+      );
+      ok = false;
+    }
     if (!nonEmptyString(anchor.id)) {
       add(issues, 'malformed-anchor', `${path}/id`, 'Anchor id is required.');
       ok = false;

@@ -94,11 +94,18 @@ export interface GroundTruthMark {
  */
 export class SessionRecorder {
   private readonly options: SessionRecorderOptions;
+  private readonly anchors: CaptureAnchorSnapshot[];
   private readonly events: CaptureEvent[] = [];
   private sequence = 0;
 
   constructor(options: SessionRecorderOptions) {
     this.options = options;
+    // Anchors are normalised once, here, rather than at build time. A caller
+    // may hand over anchors straight from a compiled VenuePackage, which carry
+    // fields the capture schema does not define; the snapshot is what this
+    // session resolves against and what it later serialises, so a later edit to
+    // the caller's own anchor objects cannot change either.
+    this.anchors = options.anchors.map(captureAnchorSnapshot);
     this.recordLifecycle('session-start', 0);
   }
 
@@ -131,7 +138,7 @@ export class SessionRecorder {
     let anchorId: string | null = null;
 
     if (!attempt.failure && attempt.payload !== null) {
-      const adapter = new CheckpointAdapter(this.options.anchors);
+      const adapter = new CheckpointAdapter(this.anchors);
       const resolution = adapter.resolve({
         timeMs: attempt.timeMs,
         kind: attempt.transport,
@@ -188,10 +195,32 @@ export class SessionRecorder {
       packageHash: this.options.packageHash,
       startedAtIso: this.options.startedAtIso,
       device: { ...this.options.device, sensors: { ...this.options.device.sensors } },
-      anchors: this.options.anchors.map((anchor) => ({ ...anchor })),
+      anchors: this.anchors.map(captureAnchorSnapshot),
       events: sortCaptureEvents(this.events),
     };
   }
+}
+
+/**
+ * An anchor reduced to what the capture schema defines.
+ *
+ * A VenuePackage anchor also carries `spaceId`, which anchor resolution,
+ * localization and replay never read. Storing it would duplicate a fact the
+ * package already owns and create a second thing that can disagree with it; the
+ * capture records `packageHash` and the anchor `id`, so venue semantics remain
+ * recoverable by looking them up rather than by copying them.
+ */
+export type CaptureAnchorSnapshot = CheckpointAnchor;
+
+function captureAnchorSnapshot(anchor: CheckpointAnchor): CaptureAnchorSnapshot {
+  return {
+    id: anchor.id,
+    floorId: anchor.floorId,
+    kind: anchor.kind,
+    position: [anchor.position[0], anchor.position[1]],
+    headingDegrees: anchor.headingDegrees,
+    payload: anchor.payload,
+  };
 }
 
 /** How far a surveyed mark may sit from the nearest estimate and still be measured. */
