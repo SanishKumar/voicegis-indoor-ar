@@ -195,10 +195,66 @@ export function sortCaptureEvents(events: CaptureEvent[]): CaptureEvent[] {
   return [...events].sort(compareCaptureEvents);
 }
 
+/**
+ * An array that is dense and carries nothing but its elements.
+ *
+ * `Array.prototype.every` and `forEach` skip holes, so `[1, , 3]` passed an
+ * element check and then serialised its hole as null, which no longer
+ * re-imports. Named properties are invisible to both, so `events.secret = 1n`
+ * survived a schema that claimed to be closed.
+ */
+function isPlainArray(value: unknown, expectedLength?: number): value is unknown[] {
+  if (!Array.isArray(value)) return false;
+  if (expectedLength !== undefined && value.length !== expectedLength) return false;
+  // Own enumerable keys must be exactly the indices, so a hole (missing key) or
+  // a named property (extra key) both fail.
+  const keys = Object.keys(value);
+  if (keys.length !== value.length) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    if (!Object.prototype.hasOwnProperty.call(value, index)) return false;
+  }
+  return true;
+}
+
+function hasOwn(record: object, key: string) {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+/**
+ * Requires declared fields to be the object's own. An inherited `sessionId`
+ * satisfied a read but was skipped by serialisation, producing a capture that
+ * validated and then exported without it.
+ */
+function requireOwnKeys(
+  record: Record<string, unknown>,
+  required: readonly string[],
+  path: string,
+  code: string,
+  issues: CaptureIssue[],
+) {
+  let ok = true;
+  for (const key of required) {
+    if (!hasOwn(record, key)) {
+      add(issues, code, `${path}/${key}`, `"${key}" must be an own property.`);
+      ok = false;
+    }
+  }
+  return ok;
+}
+
+/**
+ * Ordinal ordering by UTF-16 code unit.
+ *
+ * `localeCompare` follows the host locale, so the same session serialised under
+ * English and Czech collation produced different bytes. Canonical output cannot
+ * depend on where it was produced.
+ */
+function compareOrdinal(left: string, right: string) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function isVector3(value: unknown): value is Vector3 {
-  return (
-    Array.isArray(value) && value.length === 3 && value.every((entry) => Number.isFinite(entry))
-  );
+  return isPlainArray(value, 3) && value.every((entry) => Number.isFinite(entry));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -306,7 +362,7 @@ const ORIENTATION_KEYS = new Set<string>([
   'gammaDegrees',
   'absolute',
 ]);
-const EVENT_KEYS_BY_TYPE: Record<string, ReadonlySet<string>> = {
+const EVENT_KEYS_BY_TYPE = new Map<string, ReadonlySet<string>>(Object.entries({
   imu: new Set(['type', 'sequence', 'timeMs', 'accelerometer', 'gyroscope', 'orientation']),
   scan: new Set(['type', 'sequence', 'timeMs', 'transport', 'payload', 'outcome', 'anchorId']),
   'ground-truth': new Set([
@@ -321,7 +377,7 @@ const EVENT_KEYS_BY_TYPE: Record<string, ReadonlySet<string>> = {
     'independentOfAnchors',
   ]),
   lifecycle: new Set(['type', 'sequence', 'timeMs', 'event', 'detail']),
-};
+}));
 
 /**
  * Reports every property the schema does not declare, in sorted order so the
@@ -336,7 +392,7 @@ function rejectUnknownKeys(
 ) {
   const unknown = Object.keys(value)
     .filter((key) => !allowed.has(key))
-    .sort();
+    .sort(compareOrdinal);
   for (const key of unknown) {
     add(issues, code, `${path}/${key}`, `"${key}" is not part of the capture schema.`);
   }
@@ -354,7 +410,7 @@ const CAPTURE_ANCHOR_KEYS = new Set<string>([
 ]);
 
 function isPosition2(value: unknown): value is [number, number] {
-  return Array.isArray(value) && value.length === 2 && value.every((entry) => Number.isFinite(entry));
+  return isPlainArray(value, 2) && value.every((entry) => Number.isFinite(entry));
 }
 
 /**
@@ -444,7 +500,13 @@ function validateEvent(
     return false;
   }
 
-  const allowedKeys = EVENT_KEYS_BY_TYPE[String(event.type)];
+  // A Map lookup, not a property read. Indexing a plain object with a type of
+  // "constructor" or "__proto__" returned an inherited value and threw.
+  const allowedKeys =
+    typeof event.type === 'string' ? EVENT_KEYS_BY_TYPE.get(event.type) : undefined;
+  if (allowedKeys && !requireOwnKeys(event, ['type', 'sequence', 'timeMs'], path, 'malformed-event', issues)) {
+    return false;
+  }
   if (allowedKeys && !rejectUnknownKeys(event, allowedKeys, path, 'unknown-event-property', issues)) {
     return false;
   }
@@ -511,6 +573,13 @@ function validateEvent(
           ORIENTATION_KEYS,
           `${path}/orientation`,
           'unknown-event-property',
+          issues,
+        );
+        requireOwnKeys(
+          orientation,
+          ['alphaDegrees', 'betaDegrees', 'gammaDegrees', 'absolute'],
+          `${path}/orientation`,
+          'malformed-imu-event',
           issues,
         );
       }
@@ -633,6 +702,7 @@ function validateDevice(device: unknown, issues: CaptureIssue[]) {
     return;
   }
   rejectUnknownKeys(device, DEVICE_KEYS, '/device', 'unknown-device-property', issues);
+  requireOwnKeys(device, ['label', 'platform', 'sensors'], '/device', 'malformed-device', issues);
   for (const [field, limit] of Object.entries(REQUIRED_DEVICE_FIELD_LIMITS)) {
     if (!boundedString(device[field], limit)) {
       add(
@@ -659,6 +729,13 @@ function validateDevice(device: unknown, issues: CaptureIssue[]) {
   }
   const sensors = device.sensors;
   rejectUnknownKeys(sensors, SENSOR_KEYS, '/device/sensors', 'unknown-device-property', issues);
+  requireOwnKeys(
+    sensors,
+    ['api', 'gyroscopeUnits', 'frame'],
+    '/device/sensors',
+    'malformed-sensor-profile',
+    issues,
+  );
   const finiteOrAbsent = (value: unknown) => Number.isFinite(value) && Number(value) > 0;
   for (const key of ['accelerometerHz', 'gyroscopeHz', 'orientationHz']) {
     if (!optionalOf(sensors[key], finiteOrAbsent)) {
@@ -690,8 +767,13 @@ function validateDevice(device: unknown, issues: CaptureIssue[]) {
 }
 
 function validateAnchors(anchors: unknown, issues: CaptureIssue[]) {
-  if (!Array.isArray(anchors)) {
-    add(issues, 'malformed-anchors', '/anchors', 'Capture must carry the anchor set it resolved against.');
+  if (!isPlainArray(anchors)) {
+    add(
+      issues,
+      'malformed-anchors',
+      '/anchors',
+      'Anchors must be a dense array carrying nothing but anchors.',
+    );
     return [];
   }
   const valid: CheckpointAnchor[] = [];
@@ -705,14 +787,20 @@ function validateAnchors(anchors: unknown, issues: CaptureIssue[]) {
     // Unknown properties are refused rather than dropped. Export validates
     // first, so a session that gained a field after authorship fails loudly
     // instead of being quietly sanitised into something that looks authored.
-    const unknown = Object.keys(anchor).filter((key) => !CAPTURE_ANCHOR_KEYS.has(key));
-    if (unknown.length > 0) {
-      add(
+    // Every undeclared key, sorted, so diagnostics do not depend on the order
+    // the object happened to be built in.
+    if (!rejectUnknownKeys(anchor, CAPTURE_ANCHOR_KEYS, path, 'unknown-anchor-property', issues)) {
+      ok = false;
+    }
+    if (
+      !requireOwnKeys(
+        anchor,
+        ['id', 'floorId', 'kind', 'position', 'headingDegrees', 'payload'],
+        path,
+        'malformed-anchor',
         issues,
-        'unknown-anchor-property',
-        `${path}/${unknown[0]}`,
-        `Anchors carry only the fields the capture schema defines; "${unknown[0]}" is not one of them.`,
-      );
+      )
+    ) {
       ok = false;
     }
     if (!nonEmptyString(anchor.id)) {
@@ -764,13 +852,27 @@ export function validateCaptureSession(value: unknown): CaptureIssue[] {
     }
   }
   rejectUnknownKeys(value, CAPTURE_ROOT_KEYS, '', 'unknown-capture-property', issues);
+  requireOwnKeys(
+    value,
+    ['captureVersion', 'sessionId', 'buildingId', 'packageHash', 'startedAtIso', 'device', 'anchors', 'events'],
+    '',
+    'malformed-capture',
+    issues,
+  );
   validateDevice(value.device, issues);
   // Only anchors that passed structural validation are used below. Reading the
   // raw array would crash on a null anchor set or a null entry.
   const validAnchors = validateAnchors(value.anchors, issues);
-  if (!Array.isArray(value.events)) {
-    add(issues, 'malformed-capture', '/events', 'Capture must carry an events array.');
-    return issues.sort((a, b) => a.code.localeCompare(b.code) || a.path.localeCompare(b.path));
+  if (!isPlainArray(value.events)) {
+    add(
+      issues,
+      'malformed-capture',
+      '/events',
+      'Events must be a dense array carrying nothing but events.',
+    );
+    return issues.sort(
+    (a, b) => compareOrdinal(a.code, b.code) || compareOrdinal(a.path, b.path),
+  );
   }
 
   const session = value as unknown as CaptureSession;
@@ -885,7 +987,9 @@ export function validateCaptureSession(value: unknown): CaptureIssue[] {
     }
   });
 
-  return issues.sort((a, b) => a.code.localeCompare(b.code) || a.path.localeCompare(b.path));
+  return issues.sort(
+    (a, b) => compareOrdinal(a.code, b.code) || compareOrdinal(a.path, b.path),
+  );
 }
 
 /**
@@ -932,7 +1036,7 @@ function canonicalize(value: unknown): unknown {
     return Object.fromEntries(
       Object.entries(value)
         .filter(([, entry]) => entry !== undefined)
-        .sort(([a], [b]) => a.localeCompare(b))
+        .sort(([a], [b]) => compareOrdinal(a, b))
         .map(([key, entry]) => [key, canonicalize(entry)]),
     );
   }

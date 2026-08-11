@@ -256,3 +256,114 @@ describe('gyroscope bounds follow the declared units', () => {
     expect(withGyro('rad/s', 100)).toContain('implausible-imu-event');
   });
 });
+
+
+describe('adversarial JSON shapes cannot pass as canonical', () => {
+  /** Never throws, and never returns something export cannot handle. */
+  const check = (session: CaptureSession) => {
+    const issues = validateCaptureSession(session);
+    return { issues: issues.map((issue) => issue.code), paths: issues.map((issue) => issue.path) };
+  };
+
+  it('survives event types that name prototype members', () => {
+    for (const hostile of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+      const session = walk();
+      (eventOfType(session, 'imu') as Record<string, unknown>).type = hostile;
+
+      // Indexing a plain object with these returned an inherited value and threw.
+      expect(() => validateCaptureSession(session), hostile).not.toThrow();
+      expect(check(session).issues, hostile).toContain('unknown-event-type');
+      expect(() => exportCaptureSession(session), hostile).toThrow(CaptureExportError);
+    }
+  });
+
+  it('refuses sparse arrays wherever the schema expects elements', () => {
+    const sparseEvents = walk();
+    (sparseEvents as unknown as { events: unknown }).events = [, ...sparseEvents.events];
+    expect(check(sparseEvents).issues).toContain('malformed-capture');
+
+    const sparseAnchors = walk();
+    (sparseAnchors as unknown as { anchors: unknown }).anchors = [, ...sparseAnchors.anchors];
+    expect(check(sparseAnchors).issues).toContain('malformed-anchors');
+
+    const sparseVector = walk();
+    const imu = eventOfType(sparseVector, 'imu');
+    imu.accelerometer = [1, , 3];
+    expect(check(sparseVector).issues).toContain('malformed-imu-event');
+
+    const sparsePosition = walk();
+    (eventOfType(sparsePosition, 'ground-truth') as Record<string, unknown>).position = [1, ,];
+    expect(check(sparsePosition).issues).toContain('malformed-ground-truth-event');
+  });
+
+  it('refuses named properties hidden on arrays', () => {
+    const session = walk();
+    (session.events as unknown as Record<string, unknown>).secret = BigInt(1n);
+
+    // Object.keys sees the name; every() and forEach() never did.
+    expect(check(session).issues).toContain('malformed-capture');
+    expect(() => exportCaptureSession(session)).toThrow(CaptureExportError);
+  });
+
+  it('refuses inherited values standing in for own properties', () => {
+    const session = walk();
+    const inherited = Object.create({ sessionId: 'inherited-walk' }) as CaptureSession;
+    Object.assign(inherited, { ...session });
+    delete (inherited as unknown as Record<string, unknown>).sessionId;
+
+    // It reads fine and then serialises to nothing, so the export would lose it.
+    expect((inherited as CaptureSession).sessionId).toBe('inherited-walk');
+    expect(check(inherited).issues).toContain('malformed-capture');
+    expect(check(inherited).paths).toContain('/sessionId');
+  });
+
+  it('reports every undeclared anchor key, sorted', () => {
+    const session = walk();
+    const anchor = session.anchors[0] as unknown as Record<string, unknown>;
+    anchor.zeta = 1;
+    anchor.alpha = 2;
+
+    const paths = validateCaptureSession(session)
+      .filter((issue) => issue.code === 'unknown-anchor-property')
+      .map((issue) => issue.path);
+
+    expect(paths).toEqual(['/anchors/0/alpha', '/anchors/0/zeta']);
+  });
+
+  it('orders keys by code unit rather than host collation', () => {
+    // Czech collation sorts "ch" after "h"; ordinal ordering does not.
+    const bytes = exportCaptureSession(walk());
+    const keys = [...bytes.matchAll(/^\s*"([a-zA-Z]+)":/gm)].map((match) => match[1]);
+    const atRoot = keys.slice(0, 3);
+
+    expect(atRoot).toEqual([...atRoot].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
+  });
+});
+
+describe('validation and serialisation agree', () => {
+  it('exports, re-imports and re-exports identically for every accepted session', () => {
+    const accepted: CaptureSession[] = [
+      walk(),
+      (() => {
+        const session = walk();
+        session.device = { ...session.device, userAgent: 'x'.repeat(512) };
+        return session;
+      })(),
+      (() => {
+        const session = walk();
+        (eventOfType(session, 'imu') as Record<string, unknown>).orientation = null;
+        return session;
+      })(),
+    ];
+
+    for (const session of accepted) {
+      expect(validateCaptureSession(session)).toEqual([]);
+
+      const first = exportCaptureSession(session);
+      const reimported = importCaptureSession(first);
+
+      expect(reimported.valid).toBe(true);
+      expect(exportCaptureSession(reimported.session!)).toBe(first);
+    }
+  });
+});
