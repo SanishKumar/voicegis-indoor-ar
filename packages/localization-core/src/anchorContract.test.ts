@@ -18,7 +18,13 @@ import {
  * define as an error rather than something to quietly remove.
  */
 
-/** Shaped like a compiled VenuePackage anchor, including the extra field. */
+/**
+ * Shaped like a compiled VenuePackage anchor, including the extra field.
+ *
+ * `satisfies` proves the shape is structurally a CheckpointAnchor plus spaceId,
+ * rather than forcing it through `unknown` and asserting compatibility that was
+ * never checked.
+ */
 const packageAnchor = {
   id: 'corridor-start',
   floorId: 'g',
@@ -27,7 +33,7 @@ const packageAnchor = {
   position: [1, 9] as [number, number],
   headingDegrees: 90,
   payload: 'vg:corridor-start',
-};
+} satisfies CheckpointAnchor & { spaceId: string };
 
 const device: CaptureDeviceProfile = {
   label: 'field handset',
@@ -48,7 +54,7 @@ function recorderWith(anchors: CheckpointAnchor[]) {
 
 describe('capture anchor contract', () => {
   it('accepts a VenuePackage anchor that carries spaceId', () => {
-    const recorder = recorderWith([packageAnchor as unknown as CheckpointAnchor]);
+    const recorder = recorderWith([packageAnchor]);
     // Resolution still works against the normalised snapshot.
     const scan = recorder.recordScan({
       timeMs: 100,
@@ -61,9 +67,7 @@ describe('capture anchor contract', () => {
   });
 
   it('authors a session with no spaceId, and that session validates', () => {
-    const session = recorderWith([
-      packageAnchor as unknown as CheckpointAnchor,
-    ]).buildSession();
+    const session = recorderWith([packageAnchor]).buildSession();
 
     expect(Object.keys(session.anchors[0]).sort()).toEqual([
       'floorId',
@@ -79,9 +83,7 @@ describe('capture anchor contract', () => {
   });
 
   it('rejects imported JSON whose anchor carries spaceId', () => {
-    const session = recorderWith([
-      packageAnchor as unknown as CheckpointAnchor,
-    ]).buildSession();
+    const session = recorderWith([packageAnchor]).buildSession();
     const smuggled = JSON.parse(exportCaptureSession(session)) as CaptureSession;
     (smuggled.anchors[0] as unknown as { spaceId: string }).spaceId = 'g-corridor';
 
@@ -93,9 +95,7 @@ describe('capture anchor contract', () => {
   });
 
   it('fails export rather than sanitising an anchor field added after authorship', () => {
-    const session = recorderWith([
-      packageAnchor as unknown as CheckpointAnchor,
-    ]).buildSession();
+    const session = recorderWith([packageAnchor]).buildSession();
     (session.anchors[0] as unknown as { spaceId: string }).spaceId = 'g-corridor';
 
     // Silently dropping it would produce a file that looks authored but is not
@@ -111,7 +111,7 @@ describe('capture anchor contract', () => {
       ...packageAnchor,
       position: [1, 9] as [number, number],
     };
-    const recorder = recorderWith([mutable as unknown as CheckpointAnchor]);
+    const recorder = recorderWith([mutable]);
 
     // The caller edits its own anchor after handing it over.
     mutable.payload = 'vg:something-else';

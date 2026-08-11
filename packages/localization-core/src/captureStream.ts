@@ -278,6 +278,46 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
+/**
+ * A string field within its own declared limit.
+ *
+ * The type check is what refuses objects, arrays, and BigInt in fields the
+ * schema declares as scalar; a nested object here is how media payloads have
+ * previously travelled inside an otherwise ordinary-looking capture.
+ */
+function boundedString(value: unknown, maxLength: number): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= maxLength;
+}
+
+/**
+ * Per-field limits, named individually rather than sharing one opaque number.
+ *
+ * The sizes differ because the fields do: a user agent is a long vendor string,
+ * a platform name is a word, and an IANA timezone has a known upper bound.
+ */
+const REQUIRED_DEVICE_FIELD_LIMITS: Record<string, number> = {
+  /** Human label for the handset, chosen by whoever ran the walk. */
+  label: 120,
+  /** Operating system family, such as android or ios. */
+  platform: 60,
+};
+
+const OPTIONAL_DEVICE_FIELD_LIMITS: Record<string, number> = {
+  /** Marketing model name, such as Pixel 8. */
+  model: 120,
+  osVersion: 60,
+  browser: 60,
+  browserVersion: 60,
+  /** Vendor UA strings are long; this is the one field that needs room. */
+  userAgent: 512,
+  appVersion: 60,
+  /** Longest IANA zone names sit well inside this. */
+  timezone: 64,
+};
+
+/** Free text attached to a lifecycle event, such as why the app backgrounded. */
+const LIFECYCLE_DETAIL_MAX_LENGTH = 256;
+
 function optionalOf(value: unknown, check: (candidate: unknown) => boolean) {
   return value === undefined || check(value);
 }
@@ -339,7 +379,20 @@ function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
       );
       return false;
     }
-    if (event.orientation !== null && event.orientation !== undefined) {
+    // Presence is required, not merely validity. An imported event with no
+    // orientation key is indistinguishable from one whose orientation was lost
+    // in transit, and silently reading it as null would invent the claim that
+    // the device reported no orientation.
+    if (!Object.prototype.hasOwnProperty.call(event, 'orientation')) {
+      add(
+        issues,
+        'malformed-imu-event',
+        `${path}/orientation`,
+        'Inertial events must state orientation explicitly as null or an orientation object.',
+      );
+      return false;
+    }
+    if (event.orientation !== null) {
       const orientation = event.orientation;
       if (
         !isRecord(orientation) ||
@@ -438,6 +491,15 @@ function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
       add(issues, 'malformed-lifecycle-event', `${path}/event`, 'Unknown lifecycle event.');
       return false;
     }
+    if (event.detail !== undefined && !boundedString(event.detail, LIFECYCLE_DETAIL_MAX_LENGTH)) {
+      add(
+        issues,
+        'malformed-lifecycle-event',
+        `${path}/detail`,
+        `Lifecycle detail must be a string of 1 to ${LIFECYCLE_DETAIL_MAX_LENGTH} characters when present.`,
+      );
+      return false;
+    }
     return true;
   }
 
@@ -450,11 +512,25 @@ function validateDevice(device: unknown, issues: CaptureIssue[]) {
     add(issues, 'malformed-device', '/device', 'Capture must record the device it came from.');
     return;
   }
-  if (!nonEmptyString(device.label)) {
-    add(issues, 'malformed-device', '/device/label', 'Device label is required.');
+  for (const [field, limit] of Object.entries(REQUIRED_DEVICE_FIELD_LIMITS)) {
+    if (!boundedString(device[field], limit)) {
+      add(
+        issues,
+        'malformed-device',
+        `/device/${field}`,
+        `Device ${field} is required and must be a string of 1 to ${limit} characters.`,
+      );
+    }
   }
-  if (!nonEmptyString(device.platform)) {
-    add(issues, 'malformed-device', '/device/platform', 'Device platform is required.');
+  for (const [field, limit] of Object.entries(OPTIONAL_DEVICE_FIELD_LIMITS)) {
+    if (device[field] !== undefined && !boundedString(device[field], limit)) {
+      add(
+        issues,
+        'malformed-device',
+        `/device/${field}`,
+        `Device ${field} must be a string of 1 to ${limit} characters when present.`,
+      );
+    }
   }
   if (!isRecord(device.sensors)) {
     add(issues, 'malformed-device', '/device/sensors', 'Sensor profile is required.');
