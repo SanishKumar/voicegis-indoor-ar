@@ -260,6 +260,7 @@ const LIFECYCLE_EVENTS = new Set<string>([
   'permission-denied',
 ]);
 const ANCHOR_KINDS = new Set<string>(['qr', 'apriltag', 'image', 'nfc']);
+const SENSOR_APIS = new Set<string>(['devicemotion', 'generic-sensor', 'native', 'synthetic']);
 /** The complete anchor schema. `spaceId` is deliberately not part of it. */
 const CAPTURE_ANCHOR_KEYS = new Set<string>([
   'id',
@@ -272,6 +273,18 @@ const CAPTURE_ANCHOR_KEYS = new Set<string>([
 
 function isPosition2(value: unknown): value is [number, number] {
   return Array.isArray(value) && value.length === 2 && value.every((entry) => Number.isFinite(entry));
+}
+
+/**
+ * Membership without coercion.
+ *
+ * `SET.has(String(value))` accepted `['backgrounded']`, because an array of one
+ * string stringifies to that string. Validation passed, and every consumer then
+ * compared the real value with strict equality and saw no match — so an
+ * interruption declared as an array simply disappeared and the walk published.
+ */
+function isMemberOf(value: unknown, allowed: ReadonlySet<string>): value is string {
+  return typeof value === 'string' && allowed.has(value);
 }
 
 function nonEmptyString(value: unknown): value is string {
@@ -418,7 +431,7 @@ function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
       add(issues, 'malformed-scan-event', path, 'Scan transport must be qr or nfc.');
       return false;
     }
-    if (!SCAN_OUTCOMES.has(String(event.outcome))) {
+    if (!isMemberOf(event.outcome, SCAN_OUTCOMES)) {
       add(issues, 'malformed-scan-event', `${path}/outcome`, 'Unknown scan outcome.');
       return false;
     }
@@ -456,7 +469,7 @@ function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
       add(issues, 'malformed-ground-truth-event', `${path}/floorId`, 'Floor id is required.');
       ok = false;
     }
-    if (!SURVEY_METHODS.has(String(event.surveyMethod))) {
+    if (!isMemberOf(event.surveyMethod, SURVEY_METHODS)) {
       add(
         issues,
         'malformed-ground-truth-event',
@@ -487,7 +500,7 @@ function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
   }
 
   if (event.type === 'lifecycle') {
-    if (!LIFECYCLE_EVENTS.has(String(event.event))) {
+    if (!isMemberOf(event.event, LIFECYCLE_EVENTS)) {
       add(issues, 'malformed-lifecycle-event', `${path}/event`, 'Unknown lifecycle event.');
       return false;
     }
@@ -546,7 +559,7 @@ function validateDevice(device: unknown, issues: CaptureIssue[]) {
   // API, units, and frame are required, not optional. DeviceMotion and the
   // Generic Sensor API disagree on angular-rate units and axis conventions, so
   // a stream that omits them cannot be interpreted after the fact.
-  if (!['devicemotion', 'generic-sensor', 'native', 'synthetic'].includes(String(sensors.api))) {
+  if (!isMemberOf(sensors.api, SENSOR_APIS)) {
     add(issues, 'malformed-sensor-profile', '/device/sensors/api', 'Sensor API must be recorded.');
   }
   if (sensors.gyroscopeUnits !== 'deg/s' && sensors.gyroscopeUnits !== 'rad/s') {
@@ -605,7 +618,7 @@ function validateAnchors(anchors: unknown, issues: CaptureIssue[]) {
       add(issues, 'malformed-anchor', `${path}/payload`, 'Anchor payload is required.');
       ok = false;
     }
-    if (!ANCHOR_KINDS.has(String(anchor.kind))) {
+    if (!isMemberOf(anchor.kind, ANCHOR_KINDS)) {
       add(issues, 'malformed-anchor', `${path}/kind`, 'Unknown anchor kind.');
       ok = false;
     }

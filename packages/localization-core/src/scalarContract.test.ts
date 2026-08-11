@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   CaptureExportError,
+  CaptureValidationError,
   SessionRecorder,
+  buildEvidenceReport,
   exportCaptureSession,
   validateCaptureSession,
   type CaptureDeviceProfile,
@@ -13,10 +15,13 @@ import {
 /**
  * The known-field scalar contract.
  *
- * Every field the schema declares as a string is typed and bounded, so an
- * object, array or BigInt in one of them is a validation issue rather than
- * something that travels quietly into an exported capture. This covers the
- * declared fields only; structural strictness elsewhere is a later slice.
+ * Device metadata and lifecycle detail are typed and bounded, so an object,
+ * array or BigInt in one of them is a validation issue rather than something
+ * that travels quietly into an exported capture. Limits are measured in
+ * JavaScript string length, which is UTF-16 code units rather than bytes.
+ *
+ * This covers those fields only. Ids, anchor and scan payloads, and other
+ * strings are outside this slice, as is structural strictness elsewhere.
  */
 
 const anchors: CheckpointAnchor[] = [
@@ -75,7 +80,7 @@ describe('device metadata scalar bounds', () => {
     }
   });
 
-  it('rejects every field one byte beyond its limit', () => {
+  it('rejects every field one code unit beyond its limit', () => {
     for (const [field, limit] of [...REQUIRED_LIMITS, ...OPTIONAL_LIMITS]) {
       const session = sessionWith({ [field]: 'x'.repeat(limit + 1) });
       const issues = validateCaptureSession(session);
@@ -127,7 +132,7 @@ describe('lifecycle detail bounds', () => {
     return session;
   };
 
-  it('accepts detail at exactly its limit and rejects one byte beyond', () => {
+  it('accepts detail at exactly its limit and rejects one code unit beyond', () => {
     expect(validateCaptureSession(withDetail('x'.repeat(256)))).toEqual([]);
     expect(codesFor(withDetail('x'.repeat(257)))).toContain('malformed-lifecycle-event');
   });
@@ -173,5 +178,128 @@ describe('inertial orientation presence', () => {
     };
 
     expect(validateCaptureSession(session)).toEqual([]);
+  });
+});
+
+
+describe('enum scalars do not coerce', () => {
+  /**
+   * `SET.has(String(value))` accepted an array of one string, because it
+   * stringifies to that string. Validation passed and every consumer then
+   * compared with strict equality and saw no match, so a declared interruption
+   * vanished and the walk published a figure.
+   */
+  const mutate = (path: (session: CaptureSession) => void) => {
+    const session = sessionWith();
+    path(session);
+    return session;
+  };
+
+  const lifecycleOf = (session: CaptureSession) =>
+    session.events.find((event) => event.type === 'lifecycle') as unknown as {
+      event: unknown;
+      detail?: unknown;
+    };
+  const imuIndexOf = (session: CaptureSession) =>
+    session.events.findIndex((event) => event.type === 'imu');
+
+  it('refuses a non-string lifecycle event, whatever it stringifies to', () => {
+    for (const hostile of [['backgrounded'], { toString: () => 'backgrounded' }, 7]) {
+      const session = mutate((s) => {
+        lifecycleOf(s).event = hostile;
+      });
+      const issues = validateCaptureSession(session);
+      expect(issues.map((issue) => issue.code)).toContain('malformed-lifecycle-event');
+      expect(issues.some((issue) => issue.path.endsWith('/event'))).toBe(true);
+    }
+  });
+
+  it('refuses non-string values in every other enum field', () => {
+    const cases: Array<[string, (session: CaptureSession) => void, string]> = [
+      [
+        'scan outcome',
+        (s) => {
+          const scan = { ...s.events[0], type: 'scan', transport: 'qr', payload: 'p', outcome: ['resolved'], anchorId: 'a' };
+          s.events = [scan as unknown as CaptureEvent, ...s.events.slice(1)];
+        },
+        'malformed-scan-event',
+      ],
+      [
+        'sensor api',
+        (s) => {
+          (s.device.sensors as unknown as { api: unknown }).api = ['native'];
+        },
+        'malformed-sensor-profile',
+      ],
+      [
+        'anchor kind',
+        (s) => {
+          (s.anchors[0] as unknown as { kind: unknown }).kind = ['qr'];
+        },
+        'malformed-anchor',
+      ],
+    ];
+
+    for (const [label, apply, code] of cases) {
+      const session = mutate(apply);
+      expect(validateCaptureSession(session).map((issue) => issue.code), label).toContain(code);
+    }
+  });
+
+  it('refuses a non-string ground-truth survey method', () => {
+    const session = sessionWith();
+    session.events = [
+      ...session.events,
+      {
+        type: 'ground-truth',
+        sequence: 99,
+        timeMs: 5_000,
+        checkpointId: 'mark',
+        position: [3, 9],
+        floorId: 'g',
+        surveyMethod: ['tape-measure'],
+        expectedAccuracyMeters: 0.03,
+        independentOfAnchors: true,
+      } as unknown as CaptureEvent,
+    ];
+
+    const issues = validateCaptureSession(session);
+    expect(issues.map((issue) => issue.code)).toContain('malformed-ground-truth-event');
+    expect(issues.some((issue) => issue.path.endsWith('/surveyMethod'))).toBe(true);
+  });
+
+  it('cannot hide an interruption behind an array', () => {
+    // A walk that localizes, so interruption is the status under test rather
+    // than the absence of a fix.
+    const localizedWalk = () => {
+      const recorder = new SessionRecorder({
+        sessionId: 'coercion',
+        buildingId: 'reference-medical-centre',
+        packageHash: 'a'.repeat(64),
+        device,
+        anchors,
+        startedAtIso: '2026-08-07T09:00:00.000Z',
+      });
+      recorder.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
+      recorder.recordImu({ timeMs: 100, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+      recorder.recordLifecycle('session-end', 200);
+      return recorder.buildSession();
+    };
+
+    const genuine = localizedWalk();
+    lifecycleOf(genuine).event = 'backgrounded';
+    expect(imuIndexOf(genuine)).toBeGreaterThanOrEqual(0);
+
+    expect(validateCaptureSession(genuine)).toEqual([]);
+    expect(buildEvidenceReport(genuine).report.evidenceStatus).toBe('interrupted-capture');
+
+    const smuggled = localizedWalk();
+    lifecycleOf(smuggled).event = ['backgrounded'] as unknown as string;
+
+    // The array no longer validates, so it can never reach the point where
+    // strict equality would quietly ignore it.
+    expect(validateCaptureSession(smuggled).length).toBeGreaterThan(0);
+    expect(() => buildEvidenceReport(smuggled)).toThrow(CaptureValidationError);
+    expect(() => exportCaptureSession(smuggled)).toThrow(CaptureExportError);
   });
 });
