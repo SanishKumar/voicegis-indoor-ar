@@ -620,6 +620,24 @@ const MAX_ANGULAR_RATE_RAD_S = (2_000 * Math.PI) / 180;
  */
 export const MAX_BUILDING_FRAME_COORDINATE_METERS = 100_000;
 
+/**
+ * Shortest gap that can separate two distinct inertial samples, in metres of
+ * clock rather than space — one microsecond.
+ *
+ * A positive interval had no lower bound, and the summary divides by it. An
+ * interval of `5e-324` is a finite, non-negative, strictly increasing timestamp
+ * that passes every check and then makes `observedHz` overflow to `Infinity`,
+ * which `JSON.stringify` writes as `null` — so the recorded sampling rate of a
+ * capture became a hole rather than a number.
+ *
+ * A microsecond is a megahertz sample rate. Handset inertial sensors run at
+ * hundreds of hertz and the fastest MEMS parts are orders of magnitude below
+ * this, so the bound refuses only intervals that no clock produced, and caps
+ * `observedHz` at 1e6. Samples sharing a timestamp are still allowed: coalesced
+ * delivery is real, and a zero interval never reaches the division.
+ */
+export const MIN_SAMPLE_INTERVAL_MS = 0.001;
+
 const SCAN_OUTCOMES = new Set<string>([
   'resolved',
   'unknown-payload',
@@ -1382,6 +1400,51 @@ function validateCaptureSessionSchema(value: unknown): CaptureIssue[] {
     previousTimeMs = event.timeMs;
   });
 
+  // Everything above validates *stored* order, which `buildSession` produces by
+  // sorting on time. Sorting is what erases a regressing clock: a sample that
+  // arrived late carrying an earlier timestamp is simply moved earlier in the
+  // array, and the result reads as a flawless chronology.
+  //
+  // Inertial samples are the one stream where capture order is clock order.
+  // They come from a single device clock and are recorded as they arrive, so a
+  // later-captured sample carrying an earlier time means the clock went
+  // backwards. Ground-truth marks are deliberately exempt: a floor mark is
+  // hand-annotated and often noted a moment after it was stood on, which is the
+  // legitimate divergence the stored-order rules above already allow for.
+  const inertialByCaptureOrder = wellFormed
+    .filter(({ event }) => event.type === 'imu')
+    .sort((left, right) => left.event.sequence - right.event.sequence);
+
+  for (let position = 1; position < inertialByCaptureOrder.length; position += 1) {
+    const previous = inertialByCaptureOrder[position - 1].event;
+    const current = inertialByCaptureOrder[position];
+    if (current.event.timeMs < previous.timeMs) {
+      issues.push({
+        code: 'regressing-sensor-clock',
+        path: `/events/${current.index}/timeMs`,
+        message: `Inertial sample ${current.event.sequence} was captured after sample ${previous.sequence} but carries an earlier time, so the device clock went backwards.`,
+      });
+    }
+  }
+
+  // Distinct samples must be far enough apart to be two samples. The summary
+  // divides by the interval, so an interval below the clock's own resolution
+  // produces a sampling rate no device could have observed.
+  const inertialByTime = wellFormed
+    .filter(({ event }) => event.type === 'imu')
+    .sort((left, right) => left.event.timeMs - right.event.timeMs);
+
+  for (let position = 1; position < inertialByTime.length; position += 1) {
+    const interval = inertialByTime[position].event.timeMs - inertialByTime[position - 1].event.timeMs;
+    if (interval > 0 && interval < MIN_SAMPLE_INTERVAL_MS) {
+      issues.push({
+        code: 'unresolvable-sample-interval',
+        path: `/events/${inertialByTime[position].index}/timeMs`,
+        message: `Inertial samples must share a timestamp or differ by at least ${MIN_SAMPLE_INTERVAL_MS} ms.`,
+      });
+    }
+  }
+
   const anchorsByFloor = new Map<string, CheckpointAnchor[]>();
   for (const anchor of validAnchors) {
     const list = anchorsByFloor.get(anchor.floorId) ?? [];
@@ -1449,7 +1512,13 @@ export function summarizeSampling(session: CaptureSession): SamplingSummary {
     sampleCount: times.length,
     medianIntervalMs,
     jitterMs,
-    observedHz: medianIntervalMs > 0 ? Number((1_000 / medianIntervalMs).toFixed(3)) : 0,
+    // Validation refuses a sub-resolution interval, but this is exported and
+    // runs on unvalidated sessions too. 0 already means "not determinable"
+    // here, which is the honest answer for a rate no clock could produce.
+    observedHz:
+      medianIntervalMs >= MIN_SAMPLE_INTERVAL_MS
+        ? Number((1_000 / medianIntervalMs).toFixed(3))
+        : 0,
     gaps,
   };
 }

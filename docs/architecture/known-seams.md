@@ -58,28 +58,33 @@ packages. Before accepting georeferenced or unusually offset source geometry,
 the coordinate-frame contract and its bound must move to the shared spatial
 schema so compiler, package verification, runtime and capture agree.
 
-## Capture chronology and immutability are not yet enforced
+## Same-millisecond capture order is not fully carried through derivation
 
 Deferred from Recorder Integrity v0.1.1, which hardened only the evaluation
-boundary. Three known holes remain in `captureStream.ts` and `recorder.ts`:
+boundary. Three of the four holes recorded here closed on 2026-08-11: a
+regressing sensor clock is now reported rather than sorted away, distinct
+inertial samples must differ by at least `MIN_SAMPLE_INTERVAL_MS`, and both
+`buildSession` and the events returned by `recordScan` and `recordGroundTruth`
+are snapshots, so a reference a caller kept can no longer rewrite a session.
 
-- A sensor timestamp that goes backwards is hidden by sorting rather than
-  reported, so a device with a regressing clock produces a plausible-looking
-  stream.
-- Positive timestamp intervals have no minimum resolution. An interval smaller
-  than `1000 / Number.MAX_VALUE` remains finite in the capture but makes the
-  derived `observedHz` sampling summary overflow to `Infinity`.
-- `buildSession` copies the events array but not the event objects, so a caller
-  holding a reference can mutate a session that is described as immutable.
-- Capture order among events sharing a millisecond is preserved in the stored
-  stream but not fully carried through derivation.
+What remains: capture order among events sharing a millisecond is preserved in
+the stored stream, but not fully carried through derivation.
+
+The regressing-clock rule is deliberately scoped to inertial samples. They come
+from one device clock and are recorded as they arrive, so their capture order is
+their clock order. Ground-truth marks are exempt because a floor mark is
+hand-annotated and often noted a moment after it was stood on — that divergence
+is legitimate, and the stored-order rules already allow for it. Scan and
+lifecycle events are unscoped rather than exempt: their recording discipline is
+not yet established, and inventing a rule for them ahead of the handset recorder
+would likely have to be revised.
 
 An earlier version of this file claimed these could not alter reported accuracy.
 That was wrong and was disproved by review: an interruption was shown to move a
 published checkpoint error from 2.828 m to 0.776 m. Excluding ineligible
 checkpoints bounds *which* marks are scored; it does not bound the correctness
-of the estimate they are scored against. Treat any figure produced before these
-close as provisional.
+of the estimate they are scored against. Treat any figure produced before this
+closes as provisional.
 
 ## Inertial integration ignores interruptions
 

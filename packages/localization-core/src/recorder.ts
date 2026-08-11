@@ -158,7 +158,9 @@ export class SessionRecorder {
       anchorId,
     };
     this.events.push(event);
-    return event;
+    // The caller gets its own copy. Handing back the stored object let a scan
+    // outcome be rewritten after the fact.
+    return captureEventSnapshot(event) as ScanCaptureEvent;
   }
 
   recordGroundTruth(mark: GroundTruthMark) {
@@ -174,7 +176,7 @@ export class SessionRecorder {
       independentOfAnchors: mark.independentOfAnchors,
     };
     this.events.push(event);
-    return event;
+    return captureEventSnapshot(event) as GroundTruthCaptureEvent;
   }
 
   recordLifecycle(event: LifecycleEvent, timeMs: number, detail?: string) {
@@ -196,7 +198,9 @@ export class SessionRecorder {
       startedAtIso: this.options.startedAtIso,
       device: { ...this.options.device, sensors: { ...this.options.device.sensors } },
       anchors: this.anchors.map(captureAnchorSnapshot),
-      events: sortCaptureEvents(this.events),
+      // Snapshot per call, so two sessions built from one recorder never share
+      // an event, and mutating either cannot reach back into the recorder.
+      events: sortCaptureEvents(this.events.map(captureEventSnapshot)),
     };
   }
 }
@@ -211,6 +215,63 @@ export class SessionRecorder {
  * recoverable by looking them up rather than by copying them.
  */
 export type CaptureAnchorSnapshot = CheckpointAnchor;
+
+/**
+ * A capture event detached from every reference the caller can still reach.
+ *
+ * `buildSession` copied the events array but not the events, and `recordScan`
+ * and `recordGroundTruth` handed back the very object they had stored. A caller
+ * could therefore build a session, read its report, then reach through the
+ * returned mark and rewrite the position and survey method the figure rested
+ * on — and every session already built from that recorder changed with it.
+ *
+ * Written per event type rather than as a generic clone so the snapshot stays
+ * tied to the closed schema: a field the schema does not define cannot travel
+ * into a session by being present on the object that was passed in.
+ */
+function captureEventSnapshot(event: CaptureEvent): CaptureEvent {
+  if (event.type === 'imu') {
+    return {
+      type: 'imu',
+      sequence: event.sequence,
+      timeMs: event.timeMs,
+      accelerometer: [...event.accelerometer] as Vector3,
+      gyroscope: [...event.gyroscope] as Vector3,
+      orientation: event.orientation ? { ...event.orientation } : null,
+    };
+  }
+  if (event.type === 'scan') {
+    return {
+      type: 'scan',
+      sequence: event.sequence,
+      timeMs: event.timeMs,
+      transport: event.transport,
+      payload: event.payload,
+      outcome: event.outcome,
+      anchorId: event.anchorId,
+    };
+  }
+  if (event.type === 'ground-truth') {
+    return {
+      type: 'ground-truth',
+      sequence: event.sequence,
+      timeMs: event.timeMs,
+      checkpointId: event.checkpointId,
+      position: [event.position[0], event.position[1]],
+      floorId: event.floorId,
+      surveyMethod: event.surveyMethod,
+      expectedAccuracyMeters: event.expectedAccuracyMeters,
+      independentOfAnchors: event.independentOfAnchors,
+    };
+  }
+  return {
+    type: 'lifecycle',
+    sequence: event.sequence,
+    timeMs: event.timeMs,
+    event: event.event,
+    ...(event.detail === undefined ? {} : { detail: event.detail }),
+  };
+}
 
 function captureAnchorSnapshot(anchor: CheckpointAnchor): CaptureAnchorSnapshot {
   return {
