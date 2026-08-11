@@ -601,6 +601,24 @@ const MAX_ANGULAR_RATE_DEG_S = 2_000;
 /** The same ceiling expressed in radians per second. */
 const MAX_ANGULAR_RATE_RAD_S = (2_000 * Math.PI) / 180;
 
+/**
+ * How far a building-frame coordinate may sit from the origin, in metres.
+ *
+ * Finiteness alone does not make a coordinate measurable. A mark declared at
+ * `1e308` passed every check and published a median error of `1e308` metres
+ * with a status of `ok`; pair it with an opposite extreme and the subtraction
+ * overflows before `Math.hypot` ever runs, so the figure becomes `Infinity`.
+ *
+ * This is a sanity bound, not a tight plausibility filter. Compiled venues use
+ * a local frame measured in tens to hundreds of metres, and the largest
+ * building complexes are a few kilometres across, so 100 km leaves room for an
+ * offset origin or an unusually large campus while refusing a coordinate that
+ * cannot describe a building. Bounding both operands is also what makes the
+ * arithmetic safe by construction: the widest possible separation is 2e5, and
+ * `Math.hypot(2e5, 2e5)` is nowhere near overflow.
+ */
+export const MAX_BUILDING_FRAME_COORDINATE_METERS = 100_000;
+
 const SCAN_OUTCOMES = new Set<string>([
   'resolved',
   'unknown-payload',
@@ -766,9 +784,18 @@ const CAPTURE_ANCHOR_KEYS = new Set<string>([
   'payload',
 ]);
 
-function isPosition2(value: unknown): value is [number, number] {
+/** A coordinate that is finite and inside the building frame. NaN fails both. */
+export function isBuildingFrameCoordinate(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    Math.abs(value) <= MAX_BUILDING_FRAME_COORDINATE_METERS
+  );
+}
+
+function isBuildingFramePosition(value: unknown): value is [number, number] {
   if (!isPlainArray(value, 2)) return false;
-  return Number.isFinite(value[0]) && Number.isFinite(value[1]);
+  return isBuildingFrameCoordinate(value[0]) && isBuildingFrameCoordinate(value[1]);
 }
 
 /**
@@ -1008,8 +1035,13 @@ function validateEvent(
       add(issues, 'malformed-ground-truth-event', `${path}/checkpointId`, 'Checkpoint id is required.');
       ok = false;
     }
-    if (!isPosition2(event.position)) {
-      add(issues, 'malformed-ground-truth-event', `${path}/position`, 'Position must be two finite numbers.');
+    if (!isBuildingFramePosition(event.position)) {
+      add(
+        issues,
+        'malformed-ground-truth-event',
+        `${path}/position`,
+        `Position must be two numbers within ${MAX_BUILDING_FRAME_COORDINATE_METERS} m of the building origin.`,
+      );
       ok = false;
     }
     if (!nonEmptyString(event.floorId)) {
@@ -1190,8 +1222,13 @@ function validateAnchors(anchors: unknown, issues: CaptureIssue[]) {
       add(issues, 'malformed-anchor', `${path}/kind`, 'Unknown anchor kind.');
       ok = false;
     }
-    if (!isPosition2(anchor.position)) {
-      add(issues, 'malformed-anchor', `${path}/position`, 'Anchor position must be two finite numbers.');
+    if (!isBuildingFramePosition(anchor.position)) {
+      add(
+        issues,
+        'malformed-anchor',
+        `${path}/position`,
+        `Anchor position must be two numbers within ${MAX_BUILDING_FRAME_COORDINATE_METERS} m of the building origin.`,
+      );
       ok = false;
     }
     const heading = anchor.headingDegrees;

@@ -151,7 +151,14 @@ export type EvidenceStatus =
   /** No surveyed mark survived eligibility. */
   | 'insufficient-ground-truth'
   /** Current processing cannot interpret the recorded units or frame. */
-  | 'unsupported-sensor-model';
+  | 'unsupported-sensor-model'
+  /**
+   * A mark or the estimate it is scored against sits outside the building
+   * frame, so the distance between them is not a measurement. Kept separate
+   * from `insufficient-ground-truth`: the marks are present and eligible, it is
+   * the geometry that cannot be measured.
+   */
+  | 'implausible-geometry';
 
 export interface ReplayReport {
   recordingVersion: typeof LOCALIZATION_RECORDING_VERSION;

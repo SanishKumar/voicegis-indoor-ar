@@ -3,19 +3,6 @@
 Deliberately unfinished work, recorded so it is not rediscovered as a bug. Each
 entry says what is incomplete, why it was left, and what finishing it involves.
 
-## Extreme finite coordinates can reduce to an infinite error
-
-Positions are validated as finite numbers, but the error between two of them is
-a subtraction followed by `Math.hypot`. Two finite coordinates far enough apart
-overflow: the difference between `1e308` and `-1e308` is already `Infinity`, so
-a checkpoint error can be non-finite even though every input passed validation.
-
-Found during descriptor-safety review on 2026-08-11 and deliberately left out of
-that slice. It needs its own fail-closed correction — bounding coordinates to a
-plausible building extent, and refusing a non-finite error rather than carrying
-it into a percentile — and that should land before sealed-artifact hashing, since
-hashing a report containing `Infinity` would seal a meaningless number.
-
 ## Checkpoint eligibility is self-declared
 
 Every rule that decides whether a surveyed mark counts reads a property the
@@ -34,6 +21,29 @@ the marks, their surveyed positions, and their intended role fixed and hashed
 before capture begins, so the denominator is chosen in advance rather than
 discovered afterwards. That belongs with the sealed evidence artifact and the
 field protocol, not with the evaluation code.
+
+## Derivation tuning is caller-supplied and unrecorded
+
+`buildEvidenceReport(session, overrides)` accepts checkpoint and dead-reckoning
+tuning that is applied to the derivation and then not written down anywhere in
+the report. One capture can therefore report different figures while every one
+of them claims `ok`.
+
+Verified on 2026-08-11 against the walk in `coordinateBounds.test.ts`: it reports
+a median of 3.688 m with the authoritative tuning, and 8591.346 m — still `ok` —
+with `strideLengthMeters` overridden to 1000.
+
+The building-frame coordinate bound refuses only the far end of this. Tuning
+extreme enough to throw filter state outside the frame now reports
+`implausible-geometry` instead of a number, which is why an override of 1e300 is
+refused. Any override that keeps the estimate inside the frame still moves the
+figure silently.
+
+Bounding the reported error itself was considered and rejected. A walk with
+genuinely poor accuracy is still a real measurement, and refusing it would
+suppress the results most worth publishing honestly. The fix belongs with the
+sealed evidence artifact: the resolved configuration has to be fingerprinted
+into the report, so a figure names the tuning that produced it.
 
 ## Capture chronology and immutability are not yet enforced
 

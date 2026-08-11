@@ -341,6 +341,19 @@ export function buildEvidenceReport(
     );
   const interrupted = interruptedByLifecycle || interruptedByGap;
 
+  // Replay is only run when the walk could produce a figure. Without a first
+  // fix it would throw, and that is an expected field outcome rather than a
+  // defect.
+  // Replay is driven by whether localization exists, not by which status was
+  // selected. Gating on the status meant an unsupported-sensor walk that also
+  // never localized still reached replay and threw.
+  const core = localized ? replayCore(derived) : null;
+
+  // Only knowable after replay: the mark is bounded by capture validation, but
+  // the estimate it is scored against is derived, so an unmeasurable pair only
+  // appears once the filter has run.
+  const implausibleGeometry = (core?.unmeasurableCheckpointIds.length ?? 0) > 0;
+
   const blockingStatus: EvidenceStatus | null = unsupportedSensors
     ? 'unsupported-sensor-model'
     : !localized
@@ -349,15 +362,10 @@ export function buildEvidenceReport(
         ? 'interrupted-capture'
         : derived.checkpoints.length === 0
           ? 'insufficient-ground-truth'
-          : null;
+          : implausibleGeometry
+            ? 'implausible-geometry'
+            : null;
 
-  // Replay is only run when the walk could produce a figure. Without a first
-  // fix it would throw, and that is an expected field outcome rather than a
-  // defect.
-  // Replay is driven by whether localization exists, not by which status was
-  // selected. Gating on the status meant an unsupported-sensor walk that also
-  // never localized still reached replay and threw.
-  const core = localized ? replayCore(derived) : null;
   const status: EvidenceStatus = blockingStatus ?? 'ok';
   const isPublishable = status === 'ok';
 

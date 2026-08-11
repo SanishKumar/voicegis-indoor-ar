@@ -1,3 +1,4 @@
+import { isBuildingFrameCoordinate } from './captureStream';
 import { LocalizationFilter } from './filter';
 import { matchEstimateToRoute } from './mapMatching';
 import { LocalizationRuntimeController, type RuntimeSnapshot } from './runtimeState';
@@ -18,6 +19,12 @@ export interface ReplayCoreResult {
   mapMatches: MapMatchResult[];
   runtimeSnapshots: RuntimeSnapshot[];
   checkpointErrors: CheckpointError[];
+  /**
+   * Marks whose geometry could not be measured, so no error was produced for
+   * them. A single entry here voids every aggregate: dropping the mark and
+   * scoring the rest would shrink the denominator and hide the reason.
+   */
+  unmeasurableCheckpointIds: string[];
   medianHorizontalErrorMeters: number | null;
   p95HorizontalErrorMeters: number | null;
   floorAccuracy: number | null;
@@ -98,7 +105,10 @@ export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
   });
   const estimatesByTime = new Map(estimates.map((estimate) => [estimate.timeMs, estimate]));
 
-  const checkpointErrors: CheckpointError[] = recording.checkpoints.map((checkpoint) => {
+  const checkpointErrors: CheckpointError[] = [];
+  const unmeasurableCheckpointIds: string[] = [];
+
+  for (const checkpoint of recording.checkpoints) {
     // An index names one estimate exactly. Falling back to time is only for
     // legacy recordings that carry no index, and such recordings are never
     // publishable as evidence.
@@ -114,7 +124,25 @@ export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
     if (!estimate) {
       throw new Error(`Checkpoint ${checkpoint.id} has no estimate at ${checkpoint.timeMs} ms.`);
     }
-    return {
+
+    // Both operands must lie inside the building frame before they are
+    // subtracted. Capture validation bounds the mark, but the estimate is
+    // derived rather than declared: filter state runs away on an implausible
+    // stride length or a long uncorrected gap, and an unbounded estimate
+    // published a median of 8.6e300 metres while the report still said ok.
+    // Refusing here is what keeps the subtraction, and so the percentile,
+    // meaningful — a bounded pair cannot overflow.
+    if (
+      !isBuildingFrameCoordinate(estimate.position[0]) ||
+      !isBuildingFrameCoordinate(estimate.position[1]) ||
+      !isBuildingFrameCoordinate(checkpoint.position[0]) ||
+      !isBuildingFrameCoordinate(checkpoint.position[1])
+    ) {
+      unmeasurableCheckpointIds.push(checkpoint.id);
+      continue;
+    }
+
+    checkpointErrors.push({
       checkpointId: checkpoint.id,
       timeMs: checkpoint.timeMs,
       floorCorrect: estimate.floorId === checkpoint.floorId,
@@ -124,8 +152,12 @@ export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
           estimate.position[1] - checkpoint.position[1],
         ),
       ),
-    };
-  });
+    });
+  }
+
+  // One unmeasurable mark voids every aggregate. Scoring the survivors would
+  // report a figure from a walk that partly could not be measured.
+  const measurable = unmeasurableCheckpointIds.length === 0 && checkpointErrors.length > 0;
   const sortedErrors = checkpointErrors
     .map((checkpoint) => checkpoint.horizontalErrorMeters)
     .sort((a, b) => a - b);
@@ -164,17 +196,15 @@ export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
     mapMatches,
     runtimeSnapshots,
     checkpointErrors,
-    medianHorizontalErrorMeters:
-      checkpointErrors.length === 0 ? null : round(median(sortedErrors)),
-    p95HorizontalErrorMeters:
-      checkpointErrors.length === 0 ? null : round(percentile(sortedErrors, 0.95)),
-    floorAccuracy:
-      checkpointErrors.length === 0
-        ? null
-        : round(
-            checkpointErrors.filter((checkpoint) => checkpoint.floorCorrect).length /
-              checkpointErrors.length,
-          ),
+    unmeasurableCheckpointIds,
+    medianHorizontalErrorMeters: measurable ? round(median(sortedErrors)) : null,
+    p95HorizontalErrorMeters: measurable ? round(percentile(sortedErrors, 0.95)) : null,
+    floorAccuracy: measurable
+      ? round(
+          checkpointErrors.filter((checkpoint) => checkpoint.floorCorrect).length /
+            checkpointErrors.length,
+        )
+      : null,
     qualityFrameCounts,
     mapMatching: {
       acceptedCount: mapMatches.filter((match) => match.accepted).length,
