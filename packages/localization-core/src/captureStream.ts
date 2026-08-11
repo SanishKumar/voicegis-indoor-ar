@@ -602,7 +602,7 @@ const MAX_ANGULAR_RATE_DEG_S = 2_000;
 const MAX_ANGULAR_RATE_RAD_S = (2_000 * Math.PI) / 180;
 
 /**
- * How far a building-frame coordinate may sit from the origin, in metres.
+ * Absolute bound for each building-frame coordinate component, in metres.
  *
  * Finiteness alone does not make a coordinate measurable. A mark declared at
  * `1e308` passed every check and published a median error of `1e308` metres
@@ -611,10 +611,11 @@ const MAX_ANGULAR_RATE_RAD_S = (2_000 * Math.PI) / 180;
  *
  * This is a sanity bound, not a tight plausibility filter. Compiled venues use
  * a local frame measured in tens to hundreds of metres, and the largest
- * building complexes are a few kilometres across, so 100 km leaves room for an
- * offset origin or an unusually large campus while refusing a coordinate that
- * cannot describe a building. Bounding both operands is also what makes the
- * arithmetic safe by construction: the widest possible separation is 2e5, and
+ * building complexes are a few kilometres across, so the axis-aligned
+ * -100 km..100 km frame leaves room for an offset origin or an unusually large
+ * campus while refusing a coordinate that cannot describe a building.
+ * Bounding both operands is also what makes the arithmetic safe by
+ * construction: the widest possible separation is 2e5 on either axis, and
  * `Math.hypot(2e5, 2e5)` is nowhere near overflow.
  */
 export const MAX_BUILDING_FRAME_COORDINATE_METERS = 100_000;
@@ -1040,7 +1041,7 @@ function validateEvent(
         issues,
         'malformed-ground-truth-event',
         `${path}/position`,
-        `Position must be two numbers within ${MAX_BUILDING_FRAME_COORDINATE_METERS} m of the building origin.`,
+        `Each position component must be between -${MAX_BUILDING_FRAME_COORDINATE_METERS} and ${MAX_BUILDING_FRAME_COORDINATE_METERS} m.`,
       );
       ok = false;
     }
@@ -1227,7 +1228,7 @@ function validateAnchors(anchors: unknown, issues: CaptureIssue[]) {
         issues,
         'malformed-anchor',
         `${path}/position`,
-        `Anchor position must be two numbers within ${MAX_BUILDING_FRAME_COORDINATE_METERS} m of the building origin.`,
+        `Each anchor position component must be between -${MAX_BUILDING_FRAME_COORDINATE_METERS} and ${MAX_BUILDING_FRAME_COORDINATE_METERS} m.`,
       );
       ok = false;
     }

@@ -349,10 +349,14 @@ export function buildEvidenceReport(
   // never localized still reached replay and threw.
   const core = localized ? replayCore(derived) : null;
 
-  // Only knowable after replay: the mark is bounded by capture validation, but
-  // the estimate it is scored against is derived, so an unmeasurable pair only
-  // appears once the filter has run.
-  const implausibleGeometry = (core?.unmeasurableCheckpointIds.length ?? 0) > 0;
+  // Only knowable after replay: capture validation bounds declared anchors and
+  // marks, but estimates, covariance and map matches are derived. Every frame
+  // is checked, not only the estimate selected by a checkpoint; a later QR
+  // correction must not hide a trajectory that previously left the frame.
+  const invalidLocalizationState =
+    (core?.invalidEstimateIndices.length ?? 0) > 0 ||
+    (core?.invalidMapMatchIndices.length ?? 0) > 0 ||
+    (core?.unmeasurableCheckpointIds.length ?? 0) > 0;
 
   const blockingStatus: EvidenceStatus | null = unsupportedSensors
     ? 'unsupported-sensor-model'
@@ -360,14 +364,18 @@ export function buildEvidenceReport(
       ? 'insufficient-localization'
       : interrupted
         ? 'interrupted-capture'
-        : derived.checkpoints.length === 0
-          ? 'insufficient-ground-truth'
-          : implausibleGeometry
-            ? 'implausible-geometry'
+        : invalidLocalizationState
+          ? 'invalid-localization-state'
+          : derived.checkpoints.length === 0
+            ? 'insufficient-ground-truth'
             : null;
 
   const status: EvidenceStatus = blockingStatus ?? 'ok';
   const isPublishable = status === 'ok';
+  // Counts computed from a numerically invalid trajectory are not diagnostic
+  // evidence either: a NaN route projection previously counted as an accepted
+  // match, and a NaN position could still be labelled a high-quality frame.
+  const reportCore = invalidLocalizationState ? null : core;
 
   const report: ReplayReport = {
     recordingVersion: LOCALIZATION_RECORDING_VERSION,
@@ -377,11 +385,11 @@ export function buildEvidenceReport(
     evidenceStatus: status,
     observationCount: derived.observations.length,
     checkpointCount: derived.checkpoints.length,
-    qualityFrameCounts: core?.qualityFrameCounts ?? { high: 0, degraded: 0, lost: 0 },
-    medianHorizontalErrorMeters: isPublishable ? core!.medianHorizontalErrorMeters : null,
-    p95HorizontalErrorMeters: isPublishable ? core!.p95HorizontalErrorMeters : null,
-    floorAccuracy: isPublishable ? core!.floorAccuracy : null,
-    mapMatching: core?.mapMatching ?? {
+    qualityFrameCounts: reportCore?.qualityFrameCounts ?? { high: 0, degraded: 0, lost: 0 },
+    medianHorizontalErrorMeters: isPublishable ? reportCore!.medianHorizontalErrorMeters : null,
+    p95HorizontalErrorMeters: isPublishable ? reportCore!.p95HorizontalErrorMeters : null,
+    floorAccuracy: isPublishable ? reportCore!.floorAccuracy : null,
+    mapMatching: reportCore?.mapMatching ?? {
       acceptedCount: 0,
       rejectedCount: 0,
       reasonCounts: {
@@ -393,11 +401,11 @@ export function buildEvidenceReport(
         'backward-progress': 0,
       },
     },
-    runtime: core?.runtime ?? {
+    runtime: reportCore?.runtime ?? {
       stateCounts: { initializing: 0, tracking: 0, degraded: 0, lost: 0, relocalizing: 0 },
       guidanceFrozenFrames: 0,
     },
-    checkpointErrors: isPublishable ? core!.checkpointErrors : [],
+    checkpointErrors: isPublishable ? reportCore!.checkpointErrors : [],
   };
 
   const exclusionCounts = {

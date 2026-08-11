@@ -18,6 +18,10 @@ export interface ReplayCoreResult {
   estimates: LocalizationEstimate[];
   mapMatches: MapMatchResult[];
   runtimeSnapshots: RuntimeSnapshot[];
+  /** Every estimate whose numeric state cannot describe a localization result. */
+  invalidEstimateIndices: number[];
+  /** Every map match whose geometry or numeric output cannot be represented safely. */
+  invalidMapMatchIndices: number[];
   checkpointErrors: CheckpointError[];
   /**
    * Marks whose geometry could not be measured, so no error was produced for
@@ -56,6 +60,45 @@ function median(sortedValues: number[]) {
   return sortedValues.length % 2 === 0
     ? (sortedValues[middle - 1] + sortedValues[middle]) / 2
     : sortedValues[middle];
+}
+
+function isFiniteNonNegative(value: number) {
+  return Number.isFinite(value) && value >= 0;
+}
+
+function isValidEstimate(estimate: LocalizationEstimate) {
+  return (
+    Number.isFinite(estimate.timeMs) &&
+    estimate.position.every(isBuildingFrameCoordinate) &&
+    estimate.velocity.every(Number.isFinite) &&
+    Number.isFinite(estimate.headingDegrees) &&
+    estimate.covariance.every((row) => row.every(Number.isFinite)) &&
+    isFiniteNonNegative(estimate.positionSigmaMeters) &&
+    isFiniteNonNegative(estimate.headingSigmaDegrees) &&
+    Number.isFinite(estimate.lastCorrectionTimeMs)
+  );
+}
+
+function isValidMapMatch(result: MapMatchResult) {
+  const matchedPositionValid =
+    result.matchedPosition === null || result.matchedPosition.every(isBuildingFrameCoordinate);
+  const nullableFinite = (value: number | null) => value === null || Number.isFinite(value);
+  const acceptedFieldsPresent =
+    !result.accepted ||
+    (result.matchedPosition !== null &&
+      result.segmentId !== null &&
+      result.distanceFromRouteMeters !== null &&
+      result.progressMeters !== null);
+
+  return (
+    Number.isFinite(result.timeMs) &&
+    result.rawPosition.every(isBuildingFrameCoordinate) &&
+    matchedPositionValid &&
+    nullableFinite(result.distanceFromRouteMeters) &&
+    nullableFinite(result.progressMeters) &&
+    isFiniteNonNegative(result.gateMeters) &&
+    acceptedFieldsPresent
+  );
 }
 
 export function validateRecording(recording: LocalizationRecording) {
@@ -103,6 +146,12 @@ export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
     if (result.accepted) previousProgressMeters = result.progressMeters;
     return result;
   });
+  const invalidEstimateIndices = estimates.flatMap((estimate, index) =>
+    isValidEstimate(estimate) ? [] : [index],
+  );
+  const invalidMapMatchIndices = mapMatches.flatMap((result, index) =>
+    isValidMapMatch(result) ? [] : [index],
+  );
   const estimatesByTime = new Map(estimates.map((estimate) => [estimate.timeMs, estimate]));
 
   const checkpointErrors: CheckpointError[] = [];
@@ -155,9 +204,14 @@ export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
     });
   }
 
-  // One unmeasurable mark voids every aggregate. Scoring the survivors would
-  // report a figure from a walk that partly could not be measured.
-  const measurable = unmeasurableCheckpointIds.length === 0 && checkpointErrors.length > 0;
+  // One invalid frame, map match, or unmeasurable mark voids every aggregate.
+  // Scoring the survivors would report a figure from a walk that partly could
+  // not be represented or measured.
+  const measurable =
+    invalidEstimateIndices.length === 0 &&
+    invalidMapMatchIndices.length === 0 &&
+    unmeasurableCheckpointIds.length === 0 &&
+    checkpointErrors.length > 0;
   const sortedErrors = checkpointErrors
     .map((checkpoint) => checkpoint.horizontalErrorMeters)
     .sort((a, b) => a - b);
@@ -195,6 +249,8 @@ export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
     estimates,
     mapMatches,
     runtimeSnapshots,
+    invalidEstimateIndices,
+    invalidMapMatchIndices,
     checkpointErrors,
     unmeasurableCheckpointIds,
     medianHorizontalErrorMeters: measurable ? round(median(sortedErrors)) : null,

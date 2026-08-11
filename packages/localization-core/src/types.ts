@@ -153,12 +153,12 @@ export type EvidenceStatus =
   /** Current processing cannot interpret the recorded units or frame. */
   | 'unsupported-sensor-model'
   /**
-   * A mark or the estimate it is scored against sits outside the building
-   * frame, so the distance between them is not a measurement. Kept separate
-   * from `insufficient-ground-truth`: the marks are present and eligible, it is
-   * the geometry that cannot be measured.
+   * Replay produced a non-finite or out-of-frame estimate, uncertainty value,
+   * or map match. Kept separate from `insufficient-ground-truth`: the marks are
+   * present, but the localization state used to evaluate them is not numeric
+   * evidence.
    */
-  | 'implausible-geometry';
+  | 'invalid-localization-state';
 
 export interface ReplayReport {
   recordingVersion: typeof LOCALIZATION_RECORDING_VERSION;

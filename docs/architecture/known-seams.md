@@ -22,28 +22,41 @@ before capture begins, so the denominator is chosen in advance rather than
 discovered afterwards. That belongs with the sealed evidence artifact and the
 field protocol, not with the evaluation code.
 
-## Derivation tuning is caller-supplied and unrecorded
+## Derivation configuration is caller-supplied and unrecorded
 
-`buildEvidenceReport(session, overrides)` accepts checkpoint and dead-reckoning
-tuning that is applied to the derivation and then not written down anywhere in
-the report. One capture can therefore report different figures while every one
-of them claims `ok`.
+`buildEvidenceReport(session, overrides)` accepts checkpoint tuning,
+dead-reckoning tuning and route geometry that are applied to the derivation and
+then not written down anywhere in the report. One capture can therefore report
+different figures or map-matching counts while every result claims `ok`.
 
 Verified on 2026-08-11 against the walk in `coordinateBounds.test.ts`: it reports
 a median of 3.688 m with the authoritative tuning, and 8591.346 m — still `ok` —
 with `strideLengthMeters` overridden to 1000.
 
 The building-frame coordinate bound refuses only the far end of this. Tuning
-extreme enough to throw filter state outside the frame now reports
-`implausible-geometry` instead of a number, which is why an override of 1e300 is
-refused. Any override that keeps the estimate inside the frame still moves the
-figure silently.
+extreme enough to make any derived estimate or map match non-numeric or leave
+the frame now reports `invalid-localization-state` instead of a number, which
+is why an override of 1e300 is refused. Any override that keeps the complete
+derived state inside the frame still moves the figure silently.
 
 Bounding the reported error itself was considered and rejected. A walk with
 genuinely poor accuracy is still a real measurement, and refusing it would
 suppress the results most worth publishing honestly. The fix belongs with the
 sealed evidence artifact: the resolved configuration has to be fingerprinted
 into the report, so a figure names the tuning that produced it.
+
+## The capture frame bound is not yet a shared spatial-schema rule
+
+Capture anchors and ground-truth marks use an axis-aligned local-metre frame
+whose components are limited to -100 km..100 km. The compiler and VenuePackage
+validator still require finite coordinates but do not yet enforce the same
+bound. A package with geometry outside it could therefore compile and activate,
+then be refused when its anchors are authored into a capture session.
+
+Current venues are tens of metres across, so this does not affect shipped
+packages. Before accepting georeferenced or unusually offset source geometry,
+the coordinate-frame contract and its bound must move to the shared spatial
+schema so compiler, package verification, runtime and capture agree.
 
 ## Capture chronology and immutability are not yet enforced
 
@@ -53,6 +66,9 @@ boundary. Three known holes remain in `captureStream.ts` and `recorder.ts`:
 - A sensor timestamp that goes backwards is hidden by sorting rather than
   reported, so a device with a regressing clock produces a plausible-looking
   stream.
+- Positive timestamp intervals have no minimum resolution. An interval smaller
+  than `1000 / Number.MAX_VALUE` remains finite in the capture but makes the
+  derived `observedHz` sampling summary overflow to `Infinity`.
 - `buildSession` copies the events array but not the event objects, so a caller
   holding a reference can mutate a session that is described as immutable.
 - Capture order among events sharing a millisecond is preserved in the stored
