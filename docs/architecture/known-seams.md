@@ -3,6 +3,19 @@
 Deliberately unfinished work, recorded so it is not rediscovered as a bug. Each
 entry says what is incomplete, why it was left, and what finishing it involves.
 
+## Extreme finite coordinates can reduce to an infinite error
+
+Positions are validated as finite numbers, but the error between two of them is
+a subtraction followed by `Math.hypot`. Two finite coordinates far enough apart
+overflow: the difference between `1e308` and `-1e308` is already `Infinity`, so
+a checkpoint error can be non-finite even though every input passed validation.
+
+Found during descriptor-safety review on 2026-08-11 and deliberately left out of
+that slice. It needs its own fail-closed correction — bounding coordinates to a
+plausible building extent, and refusing a non-finite error rather than carrying
+it into a percentile — and that should land before sealed-artifact hashing, since
+hashing a report containing `Infinity` would seal a meaningless number.
+
 ## Checkpoint eligibility is self-declared
 
 Every rule that decides whether a surveyed mark counts reads a property the

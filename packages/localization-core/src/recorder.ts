@@ -6,10 +6,10 @@ import {
 } from './checkpoints';
 import {
   CAPTURE_STREAM_VERSION,
+  inspectCaptureSession,
   reduceImuEvent,
   sortCaptureEvents,
   summarizeSampling,
-  validateCaptureSession,
   type SamplingSummary,
   type CaptureDeviceProfile,
   type CaptureEvent,
@@ -288,12 +288,13 @@ export function buildEvidenceReport(
 ): EvidenceReport {
   // Structurally invalid captures still throw: bad data is a different problem
   // from a valid walk that simply did not produce usable evidence.
-  const derived = deriveRecording(session, overrides);
+  const captured = requireCaptureSnapshot(session);
+  const derived = deriveValidatedRecording(captured, overrides);
 
   // Current processing reduces the gyroscope by taking its Z component as yaw,
   // which is only correct for degrees per second in the device frame. Anything
   // else would be silently misread.
-  const sensors = session.device.sensors;
+  const sensors = captured.device.sensors;
   // Yaw is currently taken as the gyroscope's Z component, which is only the
   // world vertical for a handset held flat. Until orientation-aware projection
   // exists, only data already resolved into the world frame is eligible, and a
@@ -306,7 +307,7 @@ export function buildEvidenceReport(
   // Any lifecycle event in the interruption family counts, including a resume
   // with no recorded start: a stream that reports coming back without ever
   // reporting that it left has already lost events.
-  const interruptedByLifecycle = session.events.some(
+  const interruptedByLifecycle = captured.events.some(
     (event) =>
       event.type === 'lifecycle' &&
       (event.event === 'backgrounded' ||
@@ -318,7 +319,7 @@ export function buildEvidenceReport(
   // A silent gap is an interruption the device never announced. Only gaps after
   // the first fix and before the last mark being scored can affect a figure.
   const firstFixTimeMs = localized ? derived.observations[0].timeMs : null;
-  const imuTimes = sortCaptureEvents(session.events)
+  const imuTimes = sortCaptureEvents(captured.events)
     .filter((event) => event.type === 'imu')
     .map((event) => event.timeMs);
 
@@ -431,7 +432,7 @@ export function buildEvidenceReport(
           : Math.min(...publishable.map((entry) => entry.alignmentDeltaMs)),
       toleranceMs: GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS,
     },
-    sampling: summarizeSampling(session),
+    sampling: summarizeSampling(captured),
   };
 }
 
@@ -498,6 +499,14 @@ export class CaptureValidationError extends Error {
   }
 }
 
+function requireCaptureSnapshot(session: CaptureSession) {
+  const inspection = inspectCaptureSession(session);
+  if (inspection.issues.length > 0 || inspection.session === null) {
+    throw new CaptureValidationError(inspection.issues);
+  }
+  return inspection.session;
+}
+
 /**
  * Replays a capture stream through the adapters to produce a recording the
  * existing replay pipeline understands.
@@ -512,11 +521,13 @@ export function deriveRecording(
   session: CaptureSession,
   overrides: DeriveOverrides = {},
 ): DerivedRecording {
-  // Nothing may be derived from a session that does not validate. A number
-  // computed from a stream we refused to vouch for is worse than no number.
-  const issues = validateCaptureSession(session);
-  if (issues.length > 0) throw new CaptureValidationError(issues);
+  return deriveValidatedRecording(requireCaptureSnapshot(session), overrides);
+}
 
+function deriveValidatedRecording(
+  session: CaptureSession,
+  overrides: DeriveOverrides,
+): DerivedRecording {
   const checkpointConfig: CheckpointAdapterConfig = resolveCheckpointConfig(
     overrides.checkpointConfig,
   );
@@ -687,7 +698,11 @@ export function deriveRecording(
         exclusionReason,
       };
     })
-    .sort((left, right) => left.alignedTimeMs - right.alignedTimeMs || left.id.localeCompare(right.id));
+    .sort(
+      (left, right) =>
+        left.alignedTimeMs - right.alignedTimeMs ||
+        (left.id < right.id ? -1 : left.id > right.id ? 1 : 0),
+    );
 
   // Only publishable marks are handed to the replay evaluator. A dependent or
   // unalignable mark cannot influence reported accuracy because it is not in

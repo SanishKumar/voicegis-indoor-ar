@@ -192,7 +192,9 @@ export function compareCaptureEvents(left: CaptureEvent, right: CaptureEvent) {
 }
 
 export function sortCaptureEvents(events: CaptureEvent[]): CaptureEvent[] {
-  return [...events].sort(compareCaptureEvents);
+  const copy: CaptureEvent[] = [];
+  for (let index = 0; index < events.length; index += 1) copy.push(events[index]);
+  return copy.sort(compareCaptureEvents);
 }
 
 /**
@@ -204,26 +206,42 @@ export function sortCaptureEvents(events: CaptureEvent[]): CaptureEvent[] {
  * survived a schema that claimed to be closed.
  */
 function isPlainArray(value: unknown, expectedLength?: number): value is unknown[] {
-  if (!Array.isArray(value)) return false;
-  if (expectedLength !== undefined && value.length !== expectedLength) return false;
-  // Own enumerable keys must be exactly the indices, so a hole (missing key) or
-  // a named property (extra key) both fail.
-  const keys = Object.keys(value);
-  if (keys.length !== value.length) return false;
-  for (let index = 0; index < value.length; index += 1) {
-    if (!Object.prototype.hasOwnProperty.call(value, index)) return false;
+  try {
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return false;
+    if (expectedLength !== undefined && value.length !== expectedLength) return false;
+
+    // A real array owns `length` plus one enumerable data property per index.
+    // Reflecting every key also catches symbols and non-enumerable names that
+    // Object.keys silently omitted.
+    const keys = Reflect.ownKeys(value);
+    if (keys.length !== value.length + 1 || !keys.includes('length')) return false;
+    for (let index = 0; index < value.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return false;
+    }
+    for (const key of keys) {
+      if (key === 'length') continue;
+      if (typeof key !== 'string') return false;
+      const index = Number(key);
+      if (!Number.isInteger(index) || index < 0 || index >= value.length || String(index) !== key) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
   }
-  return true;
 }
 
-function hasOwn(record: object, key: string) {
-  return Object.prototype.hasOwnProperty.call(record, key);
+function hasOwnEnumerableDataProperty(record: object, key: string) {
+  const descriptor = Object.getOwnPropertyDescriptor(record, key);
+  return descriptor !== undefined && descriptor.enumerable && 'value' in descriptor;
 }
 
 /**
- * Requires declared fields to be the object's own. An inherited `sessionId`
- * satisfied a read but was skipped by serialisation, producing a capture that
- * validated and then exported without it.
+ * Requires declared fields to be own enumerable data. Inherited,
+ * non-enumerable and accessor values can satisfy a read while disappearing or
+ * changing during serialisation.
  */
 function requireOwnKeys(
   record: Record<string, unknown>,
@@ -234,8 +252,13 @@ function requireOwnKeys(
 ) {
   let ok = true;
   for (const key of required) {
-    if (!hasOwn(record, key)) {
-      add(issues, code, `${path}/${key}`, `"${key}" must be an own property.`);
+    if (!hasOwnEnumerableDataProperty(record, key)) {
+      add(
+        issues,
+        code,
+        appendJsonPointer(path, key),
+        `"${key}" must be an own enumerable data property.`,
+      );
       ok = false;
     }
   }
@@ -253,12 +276,298 @@ function compareOrdinal(left: string, right: string) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function escapeJsonPointerSegment(segment: string) {
+  return segment.replace(/~/g, '~0').replace(/\//g, '~1');
+}
+
+function appendJsonPointer(path: string, segment: string | number) {
+  return `${path}/${escapeJsonPointerSegment(String(segment))}`;
+}
+
 function isVector3(value: unknown): value is Vector3 {
-  return isPlainArray(value, 3) && value.every((entry) => Number.isFinite(entry));
+  if (!isPlainArray(value, 3)) return false;
+  for (let index = 0; index < 3; index += 1) {
+    if (!Number.isFinite(value[index])) return false;
+  }
+  return true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+const INVALID_JSON_DATA = Symbol('invalid-json-data');
+
+function sortCaptureIssues(issues: CaptureIssue[]) {
+  return issues.sort(
+    (left, right) =>
+      compareOrdinal(left.code, right.code) || compareOrdinal(left.path, right.path),
+  );
+}
+
+/**
+ * Copies caller-owned input into inert JSON data without invoking getters,
+ * array methods or iterators.
+ *
+ * Validation and export both consume this exact snapshot. That removes the
+ * gap where an accessor or proxy could present one value during validation and
+ * another during serialisation, and it gives non-JSON values nowhere to hide.
+ * Own data descriptors are deliberately authoritative; ordinary property reads
+ * are never consulted. A proxy can claim arbitrary descriptor values just as a
+ * plain object can claim arbitrary field values, while capture authenticity is
+ * the later sealed-artifact concern rather than something shape validation can
+ * infer.
+ */
+function snapshotJsonData(
+  value: unknown,
+  path: string,
+  issues: CaptureIssue[],
+  ancestors: WeakSet<object>,
+): unknown | typeof INVALID_JSON_DATA {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (Number.isFinite(value)) {
+      // JSON has one numeric zero. Treat IEEE-754 negative zero as the same
+      // canonical value explicitly instead of letting JSON.stringify change it
+      // invisibly after validation.
+      return Object.is(value, -0) ? 0 : value;
+    }
+    add(
+      issues,
+      'non-json-capture-value',
+      path || '/',
+      'Capture numbers must be finite JSON numbers.',
+    );
+    return value;
+  }
+  if (typeof value !== 'object') {
+    add(
+      issues,
+      'non-json-capture-value',
+      path || '/',
+      'Capture values must be JSON data; undefined, bigint, symbols and functions are refused.',
+    );
+    return value;
+  }
+
+  if (ancestors.has(value)) {
+    add(
+      issues,
+      'circular-capture-value',
+      path || '/',
+      'Capture data must not contain circular references.',
+    );
+    // Null is an inert placeholder that lets schema validation add its more
+    // specific field issue while the circular-data issue still blocks export.
+    return null;
+  }
+
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      let arrayShapeInvalid = false;
+      if (Object.getPrototypeOf(value) !== Array.prototype) {
+        add(
+          issues,
+          'non-json-capture-array',
+          path || '/',
+          'Capture arrays must use the ordinary Array prototype.',
+        );
+        arrayShapeInvalid = true;
+      }
+
+      const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+      const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : null;
+      if (!Number.isSafeInteger(length) || length < 0) {
+        add(issues, 'non-json-capture-array', path || '/', 'Capture array length is invalid.');
+        return INVALID_JSON_DATA;
+      }
+
+      const keys = Reflect.ownKeys(value);
+      const indexKeys = new Set<string>();
+      const elementValues = new Map<number, unknown>();
+      for (const key of keys) {
+        if (key === 'length') continue;
+        if (typeof key !== 'string') {
+          add(
+            issues,
+            'non-json-capture-property',
+            appendJsonPointer(path, '<symbol>'),
+            'Symbol properties are not part of JSON capture data.',
+          );
+          arrayShapeInvalid = true;
+          continue;
+        }
+        const index = Number(key);
+        if (!Number.isInteger(index) || index < 0 || index >= length || String(index) !== key) {
+          add(
+            issues,
+            'non-json-capture-property',
+            appendJsonPointer(path, key),
+            'Capture arrays may carry only their indexed elements.',
+          );
+          arrayShapeInvalid = true;
+          continue;
+        }
+        indexKeys.add(key);
+        const descriptor = Object.getOwnPropertyDescriptor(value, key);
+        if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) {
+          add(
+            issues,
+            'non-json-capture-property',
+            appendJsonPointer(path, key),
+            'Capture array elements must be own enumerable data properties.',
+          );
+          arrayShapeInvalid = true;
+        } else {
+          elementValues.set(index, descriptor.value);
+        }
+      }
+      if (indexKeys.size !== length) {
+        add(
+          issues,
+          'non-json-capture-array',
+          path || '/',
+          'Capture arrays must be dense.',
+        );
+        arrayShapeInvalid = true;
+      }
+      // Do not allocate or walk `length` after structural failure. A sparse
+      // hostile array can advertise billions of elements while owning almost
+      // none; one array-level issue is enough to refuse it.
+      if (
+        arrayShapeInvalid ||
+        indexKeys.size !== length ||
+        elementValues.size !== length
+      ) {
+        return INVALID_JSON_DATA;
+      }
+
+      const snapshot = new Array<unknown>(length);
+      for (let index = 0; index < length; index += 1) {
+        const child = snapshotJsonData(
+          elementValues.get(index),
+          appendJsonPointer(path, index),
+          issues,
+          ancestors,
+        );
+        snapshot[index] = child === INVALID_JSON_DATA ? null : child;
+      }
+      return snapshot;
+    }
+
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      add(
+        issues,
+        'non-json-capture-object',
+        path || '/',
+        'Capture objects must use the ordinary Object prototype or a null prototype.',
+      );
+    }
+
+    const keys = Reflect.ownKeys(value);
+    const stringKeys: string[] = [];
+    for (const key of keys) {
+      if (typeof key === 'string') stringKeys.push(key);
+      else {
+        add(
+          issues,
+          'non-json-capture-property',
+          appendJsonPointer(path, '<symbol>'),
+          'Symbol properties are not part of JSON capture data.',
+        );
+      }
+    }
+
+    // Null-prototype snapshots prevent inherited getters (for example an
+    // Object.prototype.model hook) from becoming values for absent optional
+    // schema fields during validation or downstream processing.
+    const snapshot: Record<string, unknown> = Object.create(null);
+    for (const key of stringKeys.sort(compareOrdinal)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) {
+        add(
+          issues,
+          'non-json-capture-property',
+          appendJsonPointer(path, key),
+          'Capture fields must be own enumerable data properties.',
+        );
+        continue;
+      }
+      const child = snapshotJsonData(
+        descriptor.value,
+        appendJsonPointer(path, key),
+        issues,
+        ancestors,
+      );
+      if (child === INVALID_JSON_DATA) {
+        Object.defineProperty(snapshot, key, {
+          value: null,
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+        continue;
+      }
+      Object.defineProperty(snapshot, key, {
+        value: child,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+    }
+    return snapshot;
+  } catch {
+    add(
+      issues,
+      'uninspectable-capture-value',
+      path || '/',
+      'Capture data could not be inspected without invoking caller-controlled behaviour.',
+    );
+    return INVALID_JSON_DATA;
+  } finally {
+    ancestors.delete(value);
+  }
+}
+
+export interface CaptureInspection {
+  issues: CaptureIssue[];
+  session: CaptureSession | null;
+}
+
+export function inspectCaptureSession(value: unknown): CaptureInspection {
+  const dataIssues: CaptureIssue[] = [];
+  let snapshot: unknown | typeof INVALID_JSON_DATA;
+  try {
+    snapshot = snapshotJsonData(value, '', dataIssues, new WeakSet<object>());
+  } catch {
+    dataIssues.push({
+      code: 'uninspectable-capture',
+      path: '/',
+      message: 'Capture data could not be inspected safely.',
+    });
+    snapshot = INVALID_JSON_DATA;
+  }
+  if (snapshot === INVALID_JSON_DATA) {
+    if (dataIssues.length === 0) {
+      dataIssues.push({
+        code: 'uninspectable-capture',
+        path: '/',
+        message: 'Capture data changed while it was being inspected.',
+      });
+    }
+    return { issues: sortCaptureIssues(dataIssues), session: null };
+  }
+
+  const issues = sortCaptureIssues([
+    ...dataIssues,
+    ...validateCaptureSessionSchema(snapshot),
+  ]);
+  return {
+    issues,
+    session: issues.length === 0 ? (snapshot as CaptureSession) : null,
+  };
 }
 
 /**
@@ -378,6 +687,49 @@ const EVENT_KEYS_BY_TYPE = new Map<string, ReadonlySet<string>>(Object.entries({
   ]),
   lifecycle: new Set(['type', 'sequence', 'timeMs', 'event', 'detail']),
 }));
+const EVENT_REQUIRED_KEYS_BY_TYPE = new Map<
+  string,
+  { keys: readonly string[]; issueCode: string }
+>([
+  [
+    'imu',
+    {
+      keys: ['type', 'sequence', 'timeMs', 'accelerometer', 'gyroscope', 'orientation'],
+      issueCode: 'malformed-imu-event',
+    },
+  ],
+  [
+    'scan',
+    {
+      keys: ['type', 'sequence', 'timeMs', 'transport', 'payload', 'outcome', 'anchorId'],
+      issueCode: 'malformed-scan-event',
+    },
+  ],
+  [
+    'ground-truth',
+    {
+      keys: [
+        'type',
+        'sequence',
+        'timeMs',
+        'checkpointId',
+        'position',
+        'floorId',
+        'surveyMethod',
+        'expectedAccuracyMeters',
+        'independentOfAnchors',
+      ],
+      issueCode: 'malformed-ground-truth-event',
+    },
+  ],
+  [
+    'lifecycle',
+    {
+      keys: ['type', 'sequence', 'timeMs', 'event'],
+      issueCode: 'malformed-lifecycle-event',
+    },
+  ],
+]);
 
 /**
  * Reports every property the schema does not declare, in sorted order so the
@@ -394,7 +746,12 @@ function rejectUnknownKeys(
     .filter((key) => !allowed.has(key))
     .sort(compareOrdinal);
   for (const key of unknown) {
-    add(issues, code, `${path}/${key}`, `"${key}" is not part of the capture schema.`);
+    add(
+      issues,
+      code,
+      appendJsonPointer(path, key),
+      `"${key}" is not part of the capture schema.`,
+    );
   }
   return unknown.length === 0;
 }
@@ -410,7 +767,8 @@ const CAPTURE_ANCHOR_KEYS = new Set<string>([
 ]);
 
 function isPosition2(value: unknown): value is [number, number] {
-  return isPlainArray(value, 2) && value.every((entry) => Number.isFinite(entry));
+  if (!isPlainArray(value, 2)) return false;
+  return Number.isFinite(value[0]) && Number.isFinite(value[1]);
 }
 
 /**
@@ -488,6 +846,23 @@ function validateEvent(
     add(issues, 'malformed-event', path, 'Every capture event must be an object.');
     return false;
   }
+
+  if (!requireOwnKeys(event, ['type', 'sequence', 'timeMs'], path, 'malformed-event', issues)) {
+    return false;
+  }
+  // A Map lookup, not a property read. Indexing a plain object with a type of
+  // "constructor" or "__proto__" returned an inherited value and threw.
+  const allowedKeys =
+    typeof event.type === 'string' ? EVENT_KEYS_BY_TYPE.get(event.type) : undefined;
+  const required =
+    typeof event.type === 'string' ? EVENT_REQUIRED_KEYS_BY_TYPE.get(event.type) : undefined;
+  if (!allowedKeys || !required) {
+    add(issues, 'unknown-event-type', path, 'Unsupported event type.');
+    return false;
+  }
+  if (!requireOwnKeys(event, required.keys, path, required.issueCode, issues)) return false;
+  if (!rejectUnknownKeys(event, allowedKeys, path, 'unknown-event-property', issues)) return false;
+
   // Sequence counts events, so it must be a whole non-negative number. Time is
   // allowed to be fractional because high-resolution timers report sub-
   // millisecond values, but it may never be negative or non-finite.
@@ -497,17 +872,6 @@ function validateEvent(
   }
   if (!Number.isFinite(event.timeMs) || Number(event.timeMs) < 0) {
     add(issues, 'malformed-event', `${path}/timeMs`, 'Time must be a non-negative finite number.');
-    return false;
-  }
-
-  // A Map lookup, not a property read. Indexing a plain object with a type of
-  // "constructor" or "__proto__" returned an inherited value and threw.
-  const allowedKeys =
-    typeof event.type === 'string' ? EVENT_KEYS_BY_TYPE.get(event.type) : undefined;
-  if (allowedKeys && !requireOwnKeys(event, ['type', 'sequence', 'timeMs'], path, 'malformed-event', issues)) {
-    return false;
-  }
-  if (allowedKeys && !rejectUnknownKeys(event, allowedKeys, path, 'unknown-event-property', issues)) {
     return false;
   }
 
@@ -523,7 +887,8 @@ function validateEvent(
     }
     // The reduction the pipeline will perform must itself be finite and
     // physically possible, not merely each raw component.
-    const magnitude = Math.hypot(...(event.accelerometer as Vector3));
+    const acceleration = event.accelerometer as Vector3;
+    const magnitude = Math.hypot(acceleration[0], acceleration[1], acceleration[2]);
     if (!Number.isFinite(magnitude) || magnitude > MAX_ACCELERATION_MAGNITUDE_M_S2) {
       add(
         issues,
@@ -540,9 +905,15 @@ function validateEvent(
       gyroscopeUnits === 'rad/s' ? MAX_ANGULAR_RATE_RAD_S : MAX_ANGULAR_RATE_DEG_S;
     if (
       gyroscopeUnits !== null &&
-      (event.gyroscope as Vector3).some(
-        (rate) => !Number.isFinite(rate) || Math.abs(rate) > angularLimit,
-      )
+      (() => {
+        const gyroscope = event.gyroscope as Vector3;
+        for (let axis = 0; axis < 3; axis += 1) {
+          if (!Number.isFinite(gyroscope[axis]) || Math.abs(gyroscope[axis]) > angularLimit) {
+            return true;
+          }
+        }
+        return false;
+      })()
     ) {
       add(
         issues,
@@ -556,7 +927,7 @@ function validateEvent(
     // orientation key is indistinguishable from one whose orientation was lost
     // in transit, and silently reading it as null would invent the claim that
     // the device reported no orientation.
-    if (!Object.prototype.hasOwnProperty.call(event, 'orientation')) {
+    if (!hasOwnEnumerableDataProperty(event, 'orientation')) {
       add(
         issues,
         'malformed-imu-event',
@@ -692,7 +1063,6 @@ function validateEvent(
     return true;
   }
 
-  add(issues, 'unknown-event-type', path, 'Unsupported event type.');
   return false;
 }
 
@@ -777,11 +1147,12 @@ function validateAnchors(anchors: unknown, issues: CaptureIssue[]) {
     return [];
   }
   const valid: CheckpointAnchor[] = [];
-  anchors.forEach((anchor, index) => {
+  for (let index = 0; index < anchors.length; index += 1) {
+    const anchor = anchors[index];
     const path = `/anchors/${index}`;
     if (!isRecord(anchor)) {
       add(issues, 'malformed-anchor', path, 'Each anchor must be an object.');
-      return;
+      continue;
     }
     let ok = true;
     // Unknown properties are refused rather than dropped. Export validates
@@ -829,7 +1200,7 @@ function validateAnchors(anchors: unknown, issues: CaptureIssue[]) {
       ok = false;
     }
     if (ok) valid.push(anchor as unknown as CheckpointAnchor);
-  });
+  }
   return valid;
 }
 
@@ -840,25 +1211,34 @@ function validateAnchors(anchors: unknown, issues: CaptureIssue[]) {
  * behaviour: a ground-truth mark claiming independence while sitting on the
  * anchor that just reset the estimate would report the reset as accuracy.
  */
-export function validateCaptureSession(value: unknown): CaptureIssue[] {
+function validateCaptureSessionSchema(value: unknown): CaptureIssue[] {
   const issues: CaptureIssue[] = [];
 
   if (!isRecord(value)) {
     return [{ code: 'malformed-capture', path: '/', message: 'Capture must be an object.' }];
   }
+  requireOwnKeys(
+    value,
+    [
+      'captureVersion',
+      'sessionId',
+      'buildingId',
+      'packageHash',
+      'startedAtIso',
+      'device',
+      'anchors',
+      'events',
+    ],
+    '',
+    'malformed-capture',
+    issues,
+  );
   for (const key of ['sessionId', 'buildingId', 'packageHash']) {
     if (!nonEmptyString(value[key])) {
       add(issues, 'malformed-capture', `/${key}`, `${key} is required.`);
     }
   }
   rejectUnknownKeys(value, CAPTURE_ROOT_KEYS, '', 'unknown-capture-property', issues);
-  requireOwnKeys(
-    value,
-    ['captureVersion', 'sessionId', 'buildingId', 'packageHash', 'startedAtIso', 'device', 'anchors', 'events'],
-    '',
-    'malformed-capture',
-    issues,
-  );
   validateDevice(value.device, issues);
   // Only anchors that passed structural validation are used below. Reading the
   // raw array would crash on a null anchor set or a null entry.
@@ -870,9 +1250,7 @@ export function validateCaptureSession(value: unknown): CaptureIssue[] {
       '/events',
       'Events must be a dense array carrying nothing but events.',
     );
-    return issues.sort(
-    (a, b) => compareOrdinal(a.code, b.code) || compareOrdinal(a.path, b.path),
-  );
+    return sortCaptureIssues(issues);
   }
 
   const session = value as unknown as CaptureSession;
@@ -925,11 +1303,12 @@ export function validateCaptureSession(value: unknown): CaptureIssue[] {
     : null;
 
   const wellFormed: Array<{ event: CaptureEvent; index: number }> = [];
-  session.events.forEach((event, index) => {
+  for (let index = 0; index < session.events.length; index += 1) {
+    const event = session.events[index];
     if (validateEvent(event, index, issues, declaredUnits)) {
       wellFormed.push({ event: event as CaptureEvent, index });
     }
-  });
+  }
 
   // Sequence records the order events were captured; the stream is stored in
   // time order. Those differ legitimately — a floor mark is often noted a
@@ -987,9 +1366,16 @@ export function validateCaptureSession(value: unknown): CaptureIssue[] {
     }
   });
 
-  return issues.sort(
-    (a, b) => compareOrdinal(a.code, b.code) || compareOrdinal(a.path, b.path),
-  );
+  return sortCaptureIssues(issues);
+}
+
+/**
+ * Validates unknown input without ever trusting caller-owned accessors,
+ * prototypes, iterators or methods. Schema checks run against the inert snapshot
+ * that export will use, so accepted input cannot change shape at the boundary.
+ */
+export function validateCaptureSession(value: unknown): CaptureIssue[] {
+  return inspectCaptureSession(value).issues;
 }
 
 /**
@@ -1031,14 +1417,23 @@ export function summarizeSampling(session: CaptureSession): SamplingSummary {
 }
 
 function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalize);
+  if (Array.isArray(value)) {
+    const result = new Array<unknown>(value.length);
+    for (let index = 0; index < value.length; index += 1) {
+      result[index] = canonicalize(value[index]);
+    }
+    // JSON.stringify consults inherited `toJSON`. A polluted Array prototype
+    // must not be able to replace the validated event stream at write time.
+    Object.setPrototypeOf(result, null);
+    return result;
+  }
   if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([, entry]) => entry !== undefined)
-        .sort(([a], [b]) => compareOrdinal(a, b))
-        .map(([key, entry]) => [key, canonicalize(entry)]),
-    );
+    const result: Record<string, unknown> = Object.create(null);
+    const entries = Object.entries(value)
+      .filter(([, entry]) => entry !== undefined)
+      .sort(([left], [right]) => compareOrdinal(left, right));
+    for (const [key, entry] of entries) result[key] = canonicalize(entry);
+    return result;
   }
   return value;
 }
@@ -1064,11 +1459,13 @@ export class CaptureExportError extends Error {
  * from the walk that produced it.
  */
 export function exportCaptureSession(session: CaptureSession): string {
-  const issues = validateCaptureSession(session);
-  if (issues.length > 0) throw new CaptureExportError(issues);
+  const inspection = inspectCaptureSession(session);
+  if (inspection.issues.length > 0 || inspection.session === null) {
+    throw new CaptureExportError(inspection.issues);
+  }
   try {
-    return serializeCaptureSession(session);
-  } catch (error) {
+    return serializeCaptureSession(inspection.session);
+  } catch {
     // The closed schema should already have refused anything unserialisable.
     // This converts whatever slipped through into the same typed failure rather
     // than letting a raw TypeError escape from a serialiser.
@@ -1076,9 +1473,9 @@ export function exportCaptureSession(session: CaptureSession): string {
       {
         code: 'unserializable-capture',
         path: '/',
-        message: `Capture could not be serialised: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        // Never format a caller-controlled thrown value here: its toString can
+        // itself throw and escape the typed boundary.
+        message: 'Capture could not be serialised after validation.',
       },
     ]);
   }
@@ -1112,10 +1509,10 @@ export function importCaptureSession(text: string): CaptureImportResult {
       issues: [{ code: 'invalid-capture-json', path: '/', message: 'Capture must be valid JSON.' }],
     };
   }
-  const issues = validateCaptureSession(parsed);
+  const inspection = inspectCaptureSession(parsed);
   return {
-    valid: issues.length === 0,
-    session: issues.length === 0 ? (parsed as unknown as CaptureSession) : null,
-    issues,
+    valid: inspection.issues.length === 0,
+    session: inspection.session,
+    issues: inspection.issues,
   };
 }
