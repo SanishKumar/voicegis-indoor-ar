@@ -233,6 +233,8 @@ export function reduceImuEvent(event: ImuCaptureEvent): ImuSample {
  */
 const MAX_ACCELERATION_MAGNITUDE_M_S2 = 200;
 const MAX_ANGULAR_RATE_DEG_S = 2_000;
+/** The same ceiling expressed in radians per second. */
+const MAX_ANGULAR_RATE_RAD_S = (2_000 * Math.PI) / 180;
 
 const SCAN_OUTCOMES = new Set<string>([
   'resolved',
@@ -261,6 +263,86 @@ const LIFECYCLE_EVENTS = new Set<string>([
 ]);
 const ANCHOR_KINDS = new Set<string>(['qr', 'apriltag', 'image', 'nfc']);
 const SENSOR_APIS = new Set<string>(['devicemotion', 'generic-sensor', 'native', 'synthetic']);
+/**
+ * The complete schema, level by level.
+ *
+ * Anything outside these sets is reported rather than dropped. Closing the
+ * schema is also what removes the places a BigInt or a circular reference could
+ * hide: every surviving field is one the validator already types.
+ */
+const CAPTURE_ROOT_KEYS = new Set<string>([
+  'captureVersion',
+  'sessionId',
+  'buildingId',
+  'packageHash',
+  'startedAtIso',
+  'device',
+  'anchors',
+  'events',
+]);
+const DEVICE_KEYS = new Set<string>([
+  'label',
+  'platform',
+  'model',
+  'osVersion',
+  'browser',
+  'browserVersion',
+  'userAgent',
+  'appVersion',
+  'timezone',
+  'sensors',
+]);
+const SENSOR_KEYS = new Set<string>([
+  'accelerometerHz',
+  'gyroscopeHz',
+  'orientationHz',
+  'api',
+  'gyroscopeUnits',
+  'frame',
+]);
+const ORIENTATION_KEYS = new Set<string>([
+  'alphaDegrees',
+  'betaDegrees',
+  'gammaDegrees',
+  'absolute',
+]);
+const EVENT_KEYS_BY_TYPE: Record<string, ReadonlySet<string>> = {
+  imu: new Set(['type', 'sequence', 'timeMs', 'accelerometer', 'gyroscope', 'orientation']),
+  scan: new Set(['type', 'sequence', 'timeMs', 'transport', 'payload', 'outcome', 'anchorId']),
+  'ground-truth': new Set([
+    'type',
+    'sequence',
+    'timeMs',
+    'checkpointId',
+    'position',
+    'floorId',
+    'surveyMethod',
+    'expectedAccuracyMeters',
+    'independentOfAnchors',
+  ]),
+  lifecycle: new Set(['type', 'sequence', 'timeMs', 'event', 'detail']),
+};
+
+/**
+ * Reports every property the schema does not declare, in sorted order so the
+ * issue list is identical run to run.
+ */
+function rejectUnknownKeys(
+  value: Record<string, unknown>,
+  allowed: ReadonlySet<string>,
+  path: string,
+  code: string,
+  issues: CaptureIssue[],
+) {
+  const unknown = Object.keys(value)
+    .filter((key) => !allowed.has(key))
+    .sort();
+  for (const key of unknown) {
+    add(issues, code, `${path}/${key}`, `"${key}" is not part of the capture schema.`);
+  }
+  return unknown.length === 0;
+}
+
 /** The complete anchor schema. `spaceId` is deliberately not part of it. */
 const CAPTURE_ANCHOR_KEYS = new Set<string>([
   'id',
@@ -339,7 +421,12 @@ function add(issues: CaptureIssue[], code: string, path: string, message: string
   issues.push({ code, path, message });
 }
 
-function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
+function validateEvent(
+  event: unknown,
+  index: number,
+  issues: CaptureIssue[],
+  gyroscopeUnits: AngularRateUnits | null,
+) {
   const path = `/events/${index}`;
   if (!isRecord(event)) {
     add(issues, 'malformed-event', path, 'Every capture event must be an object.');
@@ -354,6 +441,11 @@ function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
   }
   if (!Number.isFinite(event.timeMs) || Number(event.timeMs) < 0) {
     add(issues, 'malformed-event', `${path}/timeMs`, 'Time must be a non-negative finite number.');
+    return false;
+  }
+
+  const allowedKeys = EVENT_KEYS_BY_TYPE[String(event.type)];
+  if (allowedKeys && !rejectUnknownKeys(event, allowedKeys, path, 'unknown-event-property', issues)) {
     return false;
   }
 
@@ -379,16 +471,22 @@ function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
       );
       return false;
     }
+    // The same physical limit, expressed in whichever units the capture
+    // declares. Applying the degree bound to radians would let a rate roughly
+    // fifty-seven times too large through.
+    const angularLimit =
+      gyroscopeUnits === 'rad/s' ? MAX_ANGULAR_RATE_RAD_S : MAX_ANGULAR_RATE_DEG_S;
     if (
+      gyroscopeUnits !== null &&
       (event.gyroscope as Vector3).some(
-        (rate) => !Number.isFinite(rate) || Math.abs(rate) > MAX_ANGULAR_RATE_DEG_S,
+        (rate) => !Number.isFinite(rate) || Math.abs(rate) > angularLimit,
       )
     ) {
       add(
         issues,
         'implausible-imu-event',
         `${path}/gyroscope`,
-        'Angular rate must be finite and within handset limits.',
+        `Angular rate must be finite and within ${angularLimit} ${gyroscopeUnits}.`,
       );
       return false;
     }
@@ -407,6 +505,15 @@ function validateEvent(event: unknown, index: number, issues: CaptureIssue[]) {
     }
     if (event.orientation !== null) {
       const orientation = event.orientation;
+      if (isRecord(orientation)) {
+        rejectUnknownKeys(
+          orientation,
+          ORIENTATION_KEYS,
+          `${path}/orientation`,
+          'unknown-event-property',
+          issues,
+        );
+      }
       if (
         !isRecord(orientation) ||
         !Number.isFinite(orientation.alphaDegrees) ||
@@ -525,6 +632,7 @@ function validateDevice(device: unknown, issues: CaptureIssue[]) {
     add(issues, 'malformed-device', '/device', 'Capture must record the device it came from.');
     return;
   }
+  rejectUnknownKeys(device, DEVICE_KEYS, '/device', 'unknown-device-property', issues);
   for (const [field, limit] of Object.entries(REQUIRED_DEVICE_FIELD_LIMITS)) {
     if (!boundedString(device[field], limit)) {
       add(
@@ -550,6 +658,7 @@ function validateDevice(device: unknown, issues: CaptureIssue[]) {
     return;
   }
   const sensors = device.sensors;
+  rejectUnknownKeys(sensors, SENSOR_KEYS, '/device/sensors', 'unknown-device-property', issues);
   const finiteOrAbsent = (value: unknown) => Number.isFinite(value) && Number(value) > 0;
   for (const key of ['accelerometerHz', 'gyroscopeHz', 'orientationHz']) {
     if (!optionalOf(sensors[key], finiteOrAbsent)) {
@@ -654,6 +763,7 @@ export function validateCaptureSession(value: unknown): CaptureIssue[] {
       add(issues, 'malformed-capture', `/${key}`, `${key} is required.`);
     }
   }
+  rejectUnknownKeys(value, CAPTURE_ROOT_KEYS, '', 'unknown-capture-property', issues);
   validateDevice(value.device, issues);
   // Only anchors that passed structural validation are used below. Reading the
   // raw array would crash on a null anchor set or a null entry.
@@ -699,9 +809,24 @@ export function validateCaptureSession(value: unknown): CaptureIssue[] {
 
   // Only structurally sound events are ordered, so a malformed entry is
   // reported rather than dereferenced.
+  // Gyro plausibility depends on the units the capture declares. When the
+  // profile is unusable the device errors already fire, so the magnitude check
+  // is skipped rather than applied against a guess.
+  const declaredUnits: AngularRateUnits | null = isRecord(value.device)
+    && isRecord((value.device as Record<string, unknown>).sensors)
+    && (((value.device as Record<string, unknown>).sensors as Record<string, unknown>)
+      .gyroscopeUnits === 'deg/s'
+      || ((value.device as Record<string, unknown>).sensors as Record<string, unknown>)
+        .gyroscopeUnits === 'rad/s')
+    ? (((value.device as Record<string, unknown>).sensors as Record<string, unknown>)
+        .gyroscopeUnits as AngularRateUnits)
+    : null;
+
   const wellFormed: Array<{ event: CaptureEvent; index: number }> = [];
   session.events.forEach((event, index) => {
-    if (validateEvent(event, index, issues)) wellFormed.push({ event: event as CaptureEvent, index });
+    if (validateEvent(event, index, issues, declaredUnits)) {
+      wellFormed.push({ event: event as CaptureEvent, index });
+    }
   });
 
   // Sequence records the order events were captured; the stream is stored in
@@ -837,103 +962,31 @@ export class CaptureExportError extends Error {
 export function exportCaptureSession(session: CaptureSession): string {
   const issues = validateCaptureSession(session);
   if (issues.length > 0) throw new CaptureExportError(issues);
-  return serializeCaptureSession(projectCaptureSession(session));
+  try {
+    return serializeCaptureSession(session);
+  } catch (error) {
+    // The closed schema should already have refused anything unserialisable.
+    // This converts whatever slipped through into the same typed failure rather
+    // than letting a raw TypeError escape from a serialiser.
+    throw new CaptureExportError([
+      {
+        code: 'unserializable-capture',
+        path: '/',
+        message: `Capture could not be serialised: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      },
+    ]);
+  }
 }
 
 /**
- * Projects a session onto the capture schema.
+ * Canonical bytes: keys sorted at every level, events in stream order.
  *
- * Only known fields survive. Anything a caller attached — notably camera or
- * media payloads — is dropped rather than serialised, so an export cannot carry
- * data the format never promised to hold.
+ * No projection happens here. Silently removing an undeclared property would
+ * write a file that looks authored but is not what the caller handed over, so
+ * validation refuses it before serialisation is reached.
  */
-function projectCaptureSession(session: CaptureSession): CaptureSession {
-  const { sensors } = session.device;
-  return {
-    captureVersion: session.captureVersion,
-    sessionId: session.sessionId,
-    buildingId: session.buildingId,
-    packageHash: session.packageHash,
-    startedAtIso: session.startedAtIso,
-    device: {
-      label: session.device.label,
-      platform: session.device.platform,
-      model: session.device.model,
-      osVersion: session.device.osVersion,
-      browser: session.device.browser,
-      browserVersion: session.device.browserVersion,
-      userAgent: session.device.userAgent,
-      appVersion: session.device.appVersion,
-      timezone: session.device.timezone,
-      sensors: {
-        accelerometerHz: sensors.accelerometerHz,
-        gyroscopeHz: sensors.gyroscopeHz,
-        orientationHz: sensors.orientationHz,
-        api: sensors.api,
-        gyroscopeUnits: sensors.gyroscopeUnits,
-        frame: sensors.frame,
-      },
-    },
-    anchors: session.anchors.map((anchor) => ({
-      id: anchor.id,
-      floorId: anchor.floorId,
-      kind: anchor.kind,
-      position: [anchor.position[0], anchor.position[1]] as [number, number],
-      headingDegrees: anchor.headingDegrees,
-      payload: anchor.payload,
-    })),
-    events: sortCaptureEvents(session.events).map(projectCaptureEvent),
-  };
-}
-
-function projectCaptureEvent(event: CaptureEvent): CaptureEvent {
-  const base = { sequence: event.sequence, timeMs: event.timeMs };
-  if (event.type === 'imu') {
-    return {
-      ...base,
-      type: 'imu',
-      accelerometer: [...event.accelerometer] as Vector3,
-      gyroscope: [...event.gyroscope] as Vector3,
-      orientation: event.orientation
-        ? {
-            alphaDegrees: event.orientation.alphaDegrees,
-            betaDegrees: event.orientation.betaDegrees,
-            gammaDegrees: event.orientation.gammaDegrees,
-            absolute: event.orientation.absolute,
-          }
-        : null,
-    };
-  }
-  if (event.type === 'scan') {
-    return {
-      ...base,
-      type: 'scan',
-      transport: event.transport,
-      payload: event.payload,
-      outcome: event.outcome,
-      anchorId: event.anchorId,
-    };
-  }
-  if (event.type === 'ground-truth') {
-    return {
-      ...base,
-      type: 'ground-truth',
-      checkpointId: event.checkpointId,
-      position: [event.position[0], event.position[1]] as [number, number],
-      floorId: event.floorId,
-      surveyMethod: event.surveyMethod,
-      expectedAccuracyMeters: event.expectedAccuracyMeters,
-      independentOfAnchors: event.independentOfAnchors,
-    };
-  }
-  return {
-    ...base,
-    type: 'lifecycle',
-    event: event.event,
-    ...(event.detail === undefined ? {} : { detail: event.detail }),
-  };
-}
-
 function serializeCaptureSession(session: CaptureSession): string {
   return `${JSON.stringify(canonicalize({ ...session, events: sortCaptureEvents(session.events) }), null, 2)}\n`;
 }

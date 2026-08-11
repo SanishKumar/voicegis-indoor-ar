@@ -219,8 +219,18 @@ describe('enum scalars do not coerce', () => {
       [
         'scan outcome',
         (s) => {
-          const scan = { ...s.events[0], type: 'scan', transport: 'qr', payload: 'p', outcome: ['resolved'], anchorId: 'a' };
-          s.events = [scan as unknown as CaptureEvent, ...s.events.slice(1)];
+          s.events = [
+            ...s.events,
+            {
+              type: 'scan',
+              sequence: 90,
+              timeMs: 900,
+              transport: 'qr',
+              payload: 'vg:corridor-start',
+              outcome: ['resolved'],
+              anchorId: 'corridor-start',
+            } as unknown as CaptureEvent,
+          ];
         },
         'malformed-scan-event',
       ],

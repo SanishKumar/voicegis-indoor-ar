@@ -933,11 +933,15 @@ describe('fail-closed evaluation boundary', () => {
     };
     session.unversionedPayload = { cameraFrames: ['frame-a', 'frame-b'] };
 
-    const exported = exportCaptureSession(session);
-
-    expect(exported).not.toContain('unversionedPayload');
-    expect(exported).not.toContain('cameraFrames');
-    expect(importCaptureSession(exported).valid).toBe(true);
+    // Previously this was projected away during export, which wrote a file that
+    // looked authored but was not what the caller handed over. It now refuses.
+    expect(() => exportCaptureSession(session)).toThrow('Refusing to export');
+    expect(validateCaptureSession(session).map((issue) => issue.code)).toContain(
+      'unknown-capture-property',
+    );
+    expect(validateCaptureSession(session).map((issue) => issue.path)).toContain(
+      '/unversionedPayload',
+    );
   });
 
   it('refuses to export an invalid capture', () => {
