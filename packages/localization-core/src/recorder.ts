@@ -93,19 +93,37 @@ export interface GroundTruthMark {
  * is being measured against.
  */
 export class SessionRecorder {
-  private readonly options: SessionRecorderOptions;
+  private readonly sessionId: string;
+  private readonly buildingId: string;
+  private readonly packageHash: string;
+  private readonly startedAtIso: string;
+  private readonly device: CaptureDeviceProfile;
   private readonly anchors: CaptureAnchorSnapshot[];
   private readonly events: CaptureEvent[] = [];
   private sequence = 0;
 
+  /**
+   * Everything the session claims about itself is copied out of `options` here
+   * and never read from it again.
+   *
+   * Holding the options object meant `buildSession` read the caller's live
+   * fields on every call. Reaching through that reference after the walk turned
+   * a capture refused as `unsupported-sensor-model` into a publishable `ok` by
+   * rewriting the declared sensor frame, and rewrote `packageHash` so the same
+   * recording claimed a different venue.
+   */
   constructor(options: SessionRecorderOptions) {
-    this.options = options;
+    this.sessionId = options.sessionId;
+    this.buildingId = options.buildingId;
+    this.packageHash = options.packageHash;
+    this.startedAtIso = options.startedAtIso;
+    this.device = captureDeviceSnapshot(options.device);
     // Anchors are normalised once, here, rather than at build time. A caller
     // may hand over anchors straight from a compiled VenuePackage, which carry
     // fields the capture schema does not define; the snapshot is what this
     // session resolves against and what it later serialises, so a later edit to
     // the caller's own anchor objects cannot change either.
-    this.anchors = options.anchors.map(captureAnchorSnapshot);
+    this.anchors = readOnce(options.anchors).map(captureAnchorSnapshot);
     this.recordLifecycle('session-start', 0);
   }
 
@@ -118,13 +136,18 @@ export class SessionRecorder {
   }
 
   recordImu(reading: ImuReading) {
+    const timeMs = reading.timeMs;
+    const accelerometer = vector3Once(reading.accelerometer);
+    const gyroscope = vector3Once(reading.gyroscope);
+    const orientation = reading.orientation;
+
     this.events.push({
       type: 'imu',
       sequence: this.nextSequence(),
-      timeMs: reading.timeMs,
-      accelerometer: [...reading.accelerometer] as Vector3,
-      gyroscope: [...reading.gyroscope] as Vector3,
-      orientation: reading.orientation ? { ...reading.orientation } : null,
+      timeMs,
+      accelerometer,
+      gyroscope,
+      orientation: orientation ? orientationSnapshot(orientation) : null,
     });
   }
 
@@ -134,16 +157,21 @@ export class SessionRecorder {
    * time, including refusals.
    */
   recordScan(attempt: ScanAttempt) {
-    let outcome: ScanOutcome = attempt.failure ?? 'decode-failed';
+    // Read once, then resolve and store the same values. Reading `payload`
+    // separately for the null check, the resolution and the stored event let a
+    // repeating getter resolve one payload and record another, so the stored
+    // outcome described a scan that was never stored.
+    const timeMs = attempt.timeMs;
+    const transport = attempt.transport;
+    const payload = attempt.payload;
+    const failure = attempt.failure;
+
+    let outcome: ScanOutcome = failure ?? 'decode-failed';
     let anchorId: string | null = null;
 
-    if (!attempt.failure && attempt.payload !== null) {
+    if (!failure && payload !== null) {
       const adapter = new CheckpointAdapter(this.anchors);
-      const resolution = adapter.resolve({
-        timeMs: attempt.timeMs,
-        kind: attempt.transport,
-        payload: attempt.payload,
-      });
+      const resolution = adapter.resolve({ timeMs, kind: transport, payload });
       outcome = resolution.accepted ? 'resolved' : resolution.reason;
       anchorId = resolution.anchorId;
     }
@@ -151,9 +179,9 @@ export class SessionRecorder {
     const event: ScanCaptureEvent = {
       type: 'scan',
       sequence: this.nextSequence(),
-      timeMs: attempt.timeMs,
-      transport: attempt.transport,
-      payload: attempt.payload,
+      timeMs,
+      transport,
+      payload,
       outcome,
       anchorId,
     };
@@ -164,12 +192,13 @@ export class SessionRecorder {
   }
 
   recordGroundTruth(mark: GroundTruthMark) {
+    const position = readOnce(mark.position);
     const event: GroundTruthCaptureEvent = {
       type: 'ground-truth',
       sequence: this.nextSequence(),
       timeMs: mark.timeMs,
       checkpointId: mark.checkpointId,
-      position: [...mark.position] as [number, number],
+      position: [position[0], position[1]],
       floorId: mark.floorId,
       surveyMethod: mark.surveyMethod,
       expectedAccuracyMeters: mark.expectedAccuracyMeters,
@@ -192,11 +221,11 @@ export class SessionRecorder {
   buildSession(): CaptureSession {
     return {
       captureVersion: CAPTURE_STREAM_VERSION,
-      sessionId: this.options.sessionId,
-      buildingId: this.options.buildingId,
-      packageHash: this.options.packageHash,
-      startedAtIso: this.options.startedAtIso,
-      device: { ...this.options.device, sensors: { ...this.options.device.sensors } },
+      sessionId: this.sessionId,
+      buildingId: this.buildingId,
+      packageHash: this.packageHash,
+      startedAtIso: this.startedAtIso,
+      device: captureDeviceSnapshot(this.device),
       anchors: this.anchors.map(captureAnchorSnapshot),
       // Snapshot per call, so two sessions built from one recorder never share
       // an event, and mutating either cannot reach back into the recorder.
@@ -217,6 +246,69 @@ export class SessionRecorder {
 export type CaptureAnchorSnapshot = CheckpointAnchor;
 
 /**
+ * One indexed read of an array-like input.
+ *
+ * Spreading and `Array.from` both go through the caller's iterator, so an
+ * object whose `Symbol.iterator` disagrees with its indices stored values the
+ * caller never held: indices `[1, 2, 3]` were recorded as `[99, 98, 97]`.
+ * Reading by index takes the data the caller actually indexed.
+ */
+function readOnce<T>(values: ArrayLike<T>): T[] {
+  const length = values.length;
+  const copy: T[] = [];
+  for (let index = 0; index < length; index += 1) copy.push(values[index]);
+  return copy;
+}
+
+function vector3Once(values: Vector3): Vector3 {
+  return [values[0], values[1], values[2]];
+}
+
+function orientationSnapshot(sample: DeviceOrientationSample): DeviceOrientationSample {
+  return {
+    alphaDegrees: sample.alphaDegrees,
+    betaDegrees: sample.betaDegrees,
+    gammaDegrees: sample.gammaDegrees,
+    absolute: sample.absolute,
+  };
+}
+
+/**
+ * The device and its sensor provenance, copied field by field.
+ *
+ * The sensor profile decides whether a walk is interpretable at all, so it must
+ * describe the handset as it was declared at construction and not as the caller
+ * last left the object. Optional fields are omitted rather than set to
+ * `undefined`, so a snapshot carries the same keys the schema would accept.
+ */
+function captureDeviceSnapshot(device: CaptureDeviceProfile): CaptureDeviceProfile {
+  const sensors = device.sensors;
+  return {
+    label: device.label,
+    platform: device.platform,
+    ...optional('model', device.model),
+    ...optional('osVersion', device.osVersion),
+    ...optional('browser', device.browser),
+    ...optional('browserVersion', device.browserVersion),
+    ...optional('userAgent', device.userAgent),
+    ...optional('appVersion', device.appVersion),
+    ...optional('timezone', device.timezone),
+    sensors: {
+      ...optional('accelerometerHz', sensors.accelerometerHz),
+      ...optional('gyroscopeHz', sensors.gyroscopeHz),
+      ...optional('orientationHz', sensors.orientationHz),
+      api: sensors.api,
+      gyroscopeUnits: sensors.gyroscopeUnits,
+      frame: sensors.frame,
+    },
+  };
+}
+
+function optional<K extends string, V>(key: K, value: V | undefined) {
+  return (value === undefined ? {} : { [key]: value }) as { [P in K]?: V };
+}
+
+/**
  * A capture event detached from every reference the caller can still reach.
  *
  * `buildSession` copied the events array but not the events, and `recordScan`
@@ -235,9 +327,9 @@ function captureEventSnapshot(event: CaptureEvent): CaptureEvent {
       type: 'imu',
       sequence: event.sequence,
       timeMs: event.timeMs,
-      accelerometer: [...event.accelerometer] as Vector3,
-      gyroscope: [...event.gyroscope] as Vector3,
-      orientation: event.orientation ? { ...event.orientation } : null,
+      accelerometer: vector3Once(event.accelerometer),
+      gyroscope: vector3Once(event.gyroscope),
+      orientation: event.orientation ? orientationSnapshot(event.orientation) : null,
     };
   }
   if (event.type === 'scan') {

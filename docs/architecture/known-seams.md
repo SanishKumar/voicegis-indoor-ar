@@ -58,33 +58,42 @@ packages. Before accepting georeferenced or unusually offset source geometry,
 the coordinate-frame contract and its bound must move to the shared spatial
 schema so compiler, package verification, runtime and capture agree.
 
-## Same-millisecond capture order is not fully carried through derivation
+## Per-observation lineage is not recorded
 
-Deferred from Recorder Integrity v0.1.1, which hardened only the evaluation
-boundary. Three of the four holes recorded here closed on 2026-08-11: a
-regressing sensor clock is now reported rather than sorted away, distinct
-inertial samples must differ by at least `MIN_SAMPLE_INTERVAL_MS`, and both
-`buildSession` and the events returned by `recordScan` and `recordGroundTruth`
-are snapshots, so a reference a caller kept can no longer rewrite a session.
+Capture chronology and immutability, deferred from Recorder Integrity v0.1.1,
+closed on 2026-08-11. A capture clock that goes backwards is reported rather
+than sorted away, distinct inertial samples must differ by at least
+`MIN_SAMPLE_INTERVAL_MS`, everything a session claims about itself is copied out
+of the caller's options at construction, each recorder input is read exactly
+once, and every event leaving the recorder is a snapshot.
 
-What remains: capture order among events sharing a millisecond is preserved in
-the stored stream, but not fully carried through derivation.
+Same-millisecond correctness is *not* outstanding. `(timeMs, sequence, ordinal)`
+keys and exact `observationIndex` scoring already carry capture order through
+derivation, so a mark is scored against the estimate it was actually taken
+against.
 
-The regressing-clock rule is deliberately scoped to inertial samples. They come
-from one device clock and are recorded as they arrive, so their capture order is
-their clock order. Ground-truth marks are exempt because a floor mark is
-hand-annotated and often noted a moment after it was stood on — that divergence
-is legitimate, and the stored-order rules already allow for it. Scan and
-lifecycle events are unscoped rather than exempt: their recording discipline is
-not yet established, and inventing a rule for them ahead of the handset recorder
-would likely have to be revised.
+What remains is optional: no derived observation records which capture event
+produced it in a form that survives outside the process. The key exists in
+memory during derivation and is discarded. Nothing is presently wrong because of
+this — it becomes worth doing when the sealed evidence artifact needs to show,
+from the artifact alone, how each observation traces back to the stream. It
+belongs with that slice rather than with the capture schema.
 
-An earlier version of this file claimed these could not alter reported accuracy.
-That was wrong and was disproved by review: an interruption was shown to move a
-published checkpoint error from 2.828 m to 0.776 m. Excluding ineligible
-checkpoints bounds *which* marks are scored; it does not bound the correctness
-of the estimate they are scored against. Treat any figure produced before this
-closes as provisional.
+The clock rule covers inertial samples, scans and lifecycle events, all of which
+the device stamps when it records them. Only ground-truth marks are exempt,
+because a floor mark is hand-annotated and often noted a moment after it was
+stood on. This does place a requirement on the handset recorder: a scan must
+carry the time it is recorded, so a decode that takes noticeable time cannot be
+stamped with its acquisition instant and backdated behind samples already
+written.
+
+An earlier version of this file claimed the chronology holes could not alter
+reported accuracy. That was wrong and was disproved by review: an interruption
+was shown to move a published checkpoint error from 2.828 m to 0.776 m, and a
+backdated scan moved a published error by reordering the anchor reset a mark was
+scored against. Excluding ineligible checkpoints bounds *which* marks are
+scored; it does not bound the correctness of the estimate they are scored
+against.
 
 ## Inertial integration ignores interruptions
 

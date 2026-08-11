@@ -82,8 +82,32 @@ describe('a regressing device clock is reported rather than sorted away', () => 
     );
 
     const issues = validateCaptureSession(session);
-    expect(issues.map((issue) => issue.code)).toEqual(['regressing-sensor-clock']);
+    expect(issues.map((issue) => issue.code)).toEqual(['regressing-capture-clock']);
     expect(issues[0].message).toMatch(/clock went backwards/);
+  });
+
+  it('reports a backdated scan, which moved the anchor reset a mark was scored against', () => {
+    const walk = completeWalk();
+    walk.recordGroundTruth({
+      timeMs: 2_000,
+      checkpointId: 'mark',
+      position: [3.5, 9],
+      floorId: 'g',
+      surveyMethod: 'tape-measure',
+      expectedAccuracyMeters: 0.03,
+      independentOfAnchors: true,
+    });
+    // Recorded last, timed before samples already recorded.
+    walk.recordScan({ timeMs: 1_900, transport: 'qr', payload: 'vg:corridor-start' });
+
+    expect(codesFor(walk.buildSession())).toEqual(['regressing-capture-clock']);
+  });
+
+  it('reports a backdated lifecycle event', () => {
+    const walk = completeWalk();
+    walk.recordLifecycle('backgrounded', 500, 'screen locked');
+
+    expect(codesFor(walk.buildSession())).toEqual(['regressing-capture-clock']);
   });
 
   it('leaves a back-dated ground-truth mark alone', () => {
@@ -148,6 +172,131 @@ describe('distinct samples must be far enough apart to be two samples', () => {
     expect(Number.isFinite(summary.observedHz)).toBe(true);
     expect(summary.observedHz).toBe(0);
     expect(summarizeSampling(completeWalk().buildSession()).observedHz).toBeCloseTo(50, 3);
+  });
+});
+
+describe('what the session claims about itself is fixed at construction', () => {
+  it('does not read the caller options object again after construction', () => {
+    // Reaching through the options turned a refused capture into a published
+    // one and rewrote the venue the recording claimed to be about.
+    const mutableDevice: CaptureDeviceProfile = {
+      label: 'field handset',
+      platform: 'android',
+      sensors: { api: 'devicemotion', gyroscopeUnits: 'deg/s', frame: 'device' },
+    };
+    const options = {
+      sessionId: 'aliased',
+      buildingId: 'reference-medical-centre',
+      packageHash: 'a'.repeat(64),
+      device: mutableDevice,
+      anchors,
+      startedAtIso: '2026-08-07T09:00:00.000Z',
+    };
+    const walk = new SessionRecorder(options);
+    walk.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
+    for (let timeMs = 100; timeMs <= 3_000; timeMs += 20) {
+      walk.recordImu({
+        timeMs,
+        accelerometer: [0, 0, 9.81 + 3 * Math.sin((2 * Math.PI * timeMs) / 500)],
+        gyroscope: [0, 0, 0],
+      });
+    }
+    walk.recordGroundTruth({
+      timeMs: 3_000,
+      checkpointId: 'mark',
+      position: [3.5, 9],
+      floorId: 'g',
+      surveyMethod: 'tape-measure',
+      expectedAccuracyMeters: 0.03,
+      independentOfAnchors: true,
+    });
+    const before = buildEvidenceReport(walk.buildSession()).report;
+    expect(before.evidenceStatus).toBe('unsupported-sensor-model');
+
+    mutableDevice.sensors.api = 'native';
+    mutableDevice.sensors.frame = 'world';
+    options.packageHash = 'b'.repeat(64);
+    options.sessionId = 'rewritten';
+
+    const after = buildEvidenceReport(walk.buildSession()).report;
+    expect(after.evidenceStatus).toBe('unsupported-sensor-model');
+    expect(after.medianHorizontalErrorMeters).toBeNull();
+    expect(after.packageHash).toBe('a'.repeat(64));
+    expect(after.sessionId).toBe('aliased');
+  });
+
+  it('gives every built session its own device and sensor profile', () => {
+    const walk = completeWalk();
+    const first = walk.buildSession();
+    const second = walk.buildSession();
+
+    expect(first.device).not.toBe(second.device);
+    expect(first.device.sensors).not.toBe(second.device.sensors);
+
+    first.device.sensors.frame = 'device';
+    expect(second.device.sensors.frame).toBe('world');
+  });
+});
+
+describe('recorder inputs are read exactly once', () => {
+  it('stores the payload it resolved, not one a getter substituted', () => {
+    let reads = 0;
+    const walk = recorder('repeating-getter');
+    const scan = walk.recordScan({
+      transport: 'qr',
+      timeMs: 100,
+      get payload() {
+        reads += 1;
+        return reads === 1 ? 'vg:corridor-start' : 'vg:something-else';
+      },
+    });
+
+    // Previously the null check, the resolution and the stored event were three
+    // separate reads, so the outcome described a scan that was never stored.
+    expect(scan.payload).toBe('vg:corridor-start');
+    expect(scan.outcome).toBe('resolved');
+    expect(scan.anchorId).toBe('corridor-start');
+  });
+
+  it('stores the vector the caller indexed, not one its iterator yielded', () => {
+    const hostile = [1, 2, 3];
+    Object.defineProperty(hostile, Symbol.iterator, {
+      value: function* () {
+        yield 99;
+        yield 98;
+        yield 97;
+      },
+    });
+
+    const walk = recorder('hostile-iterator');
+    walk.recordImu({ timeMs: 200, accelerometer: hostile as never, gyroscope: [0, 0, 0] });
+    const stored = walk.buildSession().events.find((event) => event.type === 'imu');
+
+    expect(stored).toMatchObject({ accelerometer: [1, 2, 3] });
+  });
+
+  it('stores the mark position the caller indexed', () => {
+    const hostile = [4, 5];
+    Object.defineProperty(hostile, Symbol.iterator, {
+      value: function* () {
+        yield 88;
+        yield 87;
+      },
+    });
+
+    const walk = recorder('hostile-mark');
+    walk.recordGroundTruth({
+      timeMs: 3_000,
+      checkpointId: 'mark',
+      position: hostile as never,
+      floorId: 'g',
+      surveyMethod: 'tape-measure',
+      expectedAccuracyMeters: 0.03,
+      independentOfAnchors: true,
+    });
+    const stored = walk.buildSession().events.find((event) => event.type === 'ground-truth');
+
+    expect(stored).toMatchObject({ position: [4, 5] });
   });
 });
 

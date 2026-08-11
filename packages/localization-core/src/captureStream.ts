@@ -621,8 +621,8 @@ const MAX_ANGULAR_RATE_RAD_S = (2_000 * Math.PI) / 180;
 export const MAX_BUILDING_FRAME_COORDINATE_METERS = 100_000;
 
 /**
- * Shortest gap that can separate two distinct inertial samples, in metres of
- * clock rather than space — one microsecond.
+ * Shortest gap that can separate two distinct inertial samples, in
+ * milliseconds — one microsecond.
  *
  * A positive interval had no lower bound, and the summary divides by it. An
  * interval of `5e-324` is a finite, non-negative, strictly increasing timestamp
@@ -1405,24 +1405,28 @@ function validateCaptureSessionSchema(value: unknown): CaptureIssue[] {
   // arrived late carrying an earlier timestamp is simply moved earlier in the
   // array, and the result reads as a flawless chronology.
   //
-  // Inertial samples are the one stream where capture order is clock order.
-  // They come from a single device clock and are recorded as they arrive, so a
-  // later-captured sample carrying an earlier time means the clock went
-  // backwards. Ground-truth marks are deliberately exempt: a floor mark is
+  // Samples, scans and lifecycle events are all stamped by the device clock at
+  // the moment they are recorded, so their capture order is their clock order.
+  // A later-captured event carrying an earlier time means the clock went
+  // backwards. Only ground-truth marks are exempt: a floor mark is
   // hand-annotated and often noted a moment after it was stood on, which is the
   // legitimate divergence the stored-order rules above already allow for.
-  const inertialByCaptureOrder = wellFormed
-    .filter(({ event }) => event.type === 'imu')
+  //
+  // Scans and lifecycle events matter as much as samples. A scan backdated
+  // before a mark it was actually recorded after validated cleanly, sorted
+  // ahead of that mark, and moved the anchor reset the mark was scored against.
+  const clockStamped = wellFormed
+    .filter(({ event }) => event.type !== 'ground-truth')
     .sort((left, right) => left.event.sequence - right.event.sequence);
 
-  for (let position = 1; position < inertialByCaptureOrder.length; position += 1) {
-    const previous = inertialByCaptureOrder[position - 1].event;
-    const current = inertialByCaptureOrder[position];
+  for (let position = 1; position < clockStamped.length; position += 1) {
+    const previous = clockStamped[position - 1].event;
+    const current = clockStamped[position];
     if (current.event.timeMs < previous.timeMs) {
       issues.push({
-        code: 'regressing-sensor-clock',
+        code: 'regressing-capture-clock',
         path: `/events/${current.index}/timeMs`,
-        message: `Inertial sample ${current.event.sequence} was captured after sample ${previous.sequence} but carries an earlier time, so the device clock went backwards.`,
+        message: `Event ${current.event.sequence} was captured after event ${previous.sequence} but carries an earlier time, so the device clock went backwards.`,
       });
     }
   }

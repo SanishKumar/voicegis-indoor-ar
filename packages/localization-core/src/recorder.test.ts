@@ -9,6 +9,7 @@ import {
   type CaptureDeviceProfile,
   type CaptureEvent,
   type CaptureSession,
+  type LifecycleEvent,
 } from './captureStream';
 import type { CheckpointAnchor } from './checkpoints';
 import { replayRecording } from './replay';
@@ -68,7 +69,23 @@ const baseOptions: SessionRecorderOptions = {
   startedAtIso: '2026-08-07T09:00:00.000Z',
 };
 
-function recordWalk(options: Partial<SessionRecorderOptions> = {}) {
+/**
+ * A lifecycle event that happened during the walk.
+ *
+ * Recorded at its chronological position rather than appended afterwards: the
+ * device stamps a lifecycle event when it fires, so a capture that reports one
+ * after `session-end` but timed before it is a regressing clock.
+ */
+interface WalkInterruption {
+  event: LifecycleEvent;
+  timeMs: number;
+  detail?: string;
+}
+
+function recordWalk(
+  options: Partial<SessionRecorderOptions> = {},
+  interruption?: WalkInterruption,
+) {
   const recorder = new SessionRecorder({ ...baseOptions, ...options });
   for (let elapsed = 0; elapsed <= 600; elapsed += 20) {
     recorder.recordImu({
@@ -78,7 +95,16 @@ function recordWalk(options: Partial<SessionRecorderOptions> = {}) {
     });
   }
   recorder.recordScan({ timeMs: 1_000, transport: 'qr', payload: 'vg:corridor-start' });
+  let pendingInterruption = interruption;
   for (let elapsed = 1_020; elapsed <= 6_000; elapsed += 20) {
+    if (pendingInterruption !== undefined && elapsed >= pendingInterruption.timeMs) {
+      recorder.recordLifecycle(
+        pendingInterruption.event,
+        pendingInterruption.timeMs,
+        pendingInterruption.detail,
+      );
+      pendingInterruption = undefined;
+    }
     recorder.recordImu({
       timeMs: elapsed,
       accelerometer: [0, 0, 9.81 + 3 * Math.sin((2 * Math.PI * elapsed) / 500)],
@@ -683,8 +709,7 @@ describe('fail-closed evaluation boundary', () => {
   });
 
   it('refuses to publish a capture that was interrupted', () => {
-    const recorder = recordWalk();
-    recorder.recordLifecycle('backgrounded', 4_000, 'screen locked');
+    const recorder = recordWalk({}, { event: 'backgrounded', timeMs: 4_000, detail: 'screen locked' });
     const session = recorder.buildSession();
 
     expect(() => buildEvidenceReport(session)).not.toThrow();
@@ -918,9 +943,8 @@ describe('fail-closed evaluation boundary', () => {
   });
 
   it('treats a resume with no recorded start as an interruption', () => {
-    const recorder = recordWalk();
     // Coming back without ever reporting leaving means events were lost.
-    recorder.recordLifecycle('sensor-resumed', 4_000);
+    const recorder = recordWalk({}, { event: 'sensor-resumed', timeMs: 4_000 });
 
     expect(buildEvidenceReport(recorder.buildSession()).report.evidenceStatus).toBe(
       'interrupted-capture',
