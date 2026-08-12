@@ -647,6 +647,15 @@ const SCAN_OUTCOMES = new Set<string>([
   'permission-denied',
   'transport-unavailable',
 ]);
+/**
+ * Outcomes that describe the acquisition itself rather than the anchor set.
+ * These are the device's own report and cannot be recomputed from anchors.
+ */
+const ACQUISITION_FAILURE_OUTCOMES = new Set<string>([
+  'decode-failed',
+  'permission-denied',
+  'transport-unavailable',
+]);
 const SURVEY_METHODS = new Set<string>([
   'tape-measure',
   'laser-distance',
@@ -1515,6 +1524,81 @@ function validateCaptureSessionSchema(value: unknown): CaptureIssue[] {
       });
     }
   }
+
+  // A scan's outcome is a claim about the anchor set, and the anchor set is
+  // right here. Trusting the stored label let a real reset be relabelled
+  // `unknown-payload`, which suppressed it and turned a refused walk into `ok`
+  // at 1.211 m; and let an ordinary sample be relabelled `resolved` against an
+  // anchor that does not exist, inventing a reset that excluded a real mark.
+  const path_of = (index: number) => `/events/${index}`;
+  const anchorsByPayload = new Map<string, CheckpointAnchor[]>();
+  for (const anchor of validAnchors) {
+    const list = anchorsByPayload.get(anchor.payload) ?? [];
+    list.push(anchor);
+    anchorsByPayload.set(anchor.payload, list);
+  }
+
+  wellFormed.forEach(({ event, index }) => {
+    if (event.type !== 'scan') return;
+
+    // An acquisition failure is a fact about the device, not about the anchors:
+    // nothing decoded, so nothing may be claimed to have been read. Without
+    // this, a real payload hidden behind `decode-failed` would suppress a reset
+    // the same way a forged `unknown-payload` did.
+    if (ACQUISITION_FAILURE_OUTCOMES.has(event.outcome)) {
+      if (event.payload !== null) {
+        add(
+          issues,
+          'scan-outcome-mismatch',
+          `${path_of(index)}/payload`,
+          `A scan that reports ${event.outcome} cannot also carry a payload it read.`,
+        );
+      }
+      return;
+    }
+
+    if (event.payload === null) {
+      add(
+        issues,
+        'scan-outcome-mismatch',
+        `${path_of(index)}/payload`,
+        `A scan reporting ${event.outcome} must carry the payload that outcome describes.`,
+      );
+      return;
+    }
+
+    const matches = anchorsByPayload.get(event.payload) ?? [];
+    const expectedOutcome: ScanOutcome =
+      matches.length === 0
+        ? 'unknown-payload'
+        : matches.length > 1
+          ? 'ambiguous-payload'
+          : matches[0].kind !== event.transport
+            ? 'anchor-kind-mismatch'
+            : 'resolved';
+    // The adapter names the anchor it refused on a kind mismatch, and names
+    // nothing when the payload identified no anchor or several.
+    const expectedAnchorId =
+      expectedOutcome === 'resolved' || expectedOutcome === 'anchor-kind-mismatch'
+        ? matches[0].id
+        : null;
+
+    if (event.outcome !== expectedOutcome) {
+      add(
+        issues,
+        'scan-outcome-mismatch',
+        `${path_of(index)}/outcome`,
+        `This payload resolves to ${expectedOutcome} against the captured anchors, but the scan reports ${event.outcome}.`,
+      );
+    } else if (event.anchorId !== expectedAnchorId) {
+      add(
+        issues,
+        'scan-outcome-mismatch',
+        `${path_of(index)}/anchorId`,
+        `This payload names anchor ${expectedAnchorId ?? 'none'}, but the scan reports ${event.anchorId ?? 'none'}.`,
+      );
+    }
+  });
 
   const anchorsByFloor = new Map<string, CheckpointAnchor[]>();
   for (const anchor of validAnchors) {

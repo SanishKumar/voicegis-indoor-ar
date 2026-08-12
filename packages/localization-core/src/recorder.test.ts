@@ -309,15 +309,37 @@ describe('capture stream integrity', () => {
 
 describe('fail-closed evaluation boundary', () => {
   /**
-   * Hand-built fixtures still have to be captures a recorder could produce.
-   * Every session begins with `session-start` at sequence and time zero, so the
-   * declared sequences shift up by one to make room for it.
+   * Hand-built fixtures still have to be captures a recorder could produce, and
+   * that evidence will accept. Every session begins with `session-start` at
+   * sequence and time zero — so the declared sequences shift up by one — and a
+   * complete walk closes with a terminal `session-end`.
    */
-  const withSessionStart = (events: CaptureEvent[]): CaptureEvent[] =>
-    [
+  const withSessionBoundaries = (events: CaptureEvent[]): CaptureEvent[] => {
+    const shifted = events.map((event) => ({ ...event, sequence: event.sequence + 1 }) as CaptureEvent);
+    const lastTimeMs = shifted.reduce((latest, event) => Math.max(latest, event.timeMs), 0);
+    return [
       { type: 'lifecycle', sequence: 0, timeMs: 0, event: 'session-start' } as CaptureEvent,
-      ...events.map((event) => ({ ...event, sequence: event.sequence + 1 }) as CaptureEvent),
+      ...shifted,
+      {
+        type: 'lifecycle',
+        sequence: shifted.length + 1,
+        timeMs: lastTimeMs + 100,
+        event: 'session-end',
+      } as CaptureEvent,
     ].sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence);
+  };
+
+  /**
+   * Closes a walk so the evidence path will accept it. Evidence refuses a
+   * capture that does not record its own end, because a stream can always lose
+   * its tail without leaving a gap in the sequence.
+   */
+  const finished = (recorder: SessionRecorder) => {
+    const draft = recorder.buildSession();
+    const lastTimeMs = draft.events.reduce((latest, event) => Math.max(latest, event.timeMs), 0);
+    recorder.recordLifecycle('session-end', lastTimeMs + 100);
+    return recorder.buildSession();
+  };
 
   const anchoredSession = (): CaptureSession => ({
     captureVersion: CAPTURE_STREAM_VERSION,
@@ -327,7 +349,7 @@ describe('fail-closed evaluation boundary', () => {
     startedAtIso: '2026-08-07T09:00:00.000Z',
     device,
     anchors,
-    events: withSessionStart([
+    events: withSessionBoundaries([
       {
         type: 'scan',
         sequence: 0,
@@ -399,7 +421,7 @@ describe('fail-closed evaluation boundary', () => {
     startedAtIso: '2026-08-07T09:00:00.000Z',
     device,
     anchors,
-    events: withSessionStart(
+    events: withSessionBoundaries(
       [
         {
           type: 'scan',
@@ -450,7 +472,7 @@ describe('fail-closed evaluation boundary', () => {
       { id: 'origin', floorId: 'g', kind: 'qr', position: [0, 0], headingDegrees: 0, payload: 'p:origin' },
       { id: 'far', floorId: 'g', kind: 'qr', position: [80, 80], headingDegrees: 0, payload: 'p:far' },
     ],
-    events: withSessionStart(
+    events: withSessionBoundaries(
       [
         {
           type: 'scan',
@@ -550,7 +572,7 @@ describe('fail-closed evaluation boundary', () => {
   it('never scores a mark against a first fix captured after it', () => {
     const session: CaptureSession = {
       ...tieBreakSession(true),
-      events: withSessionStart(
+      events: withSessionBoundaries(
         [
           {
             type: 'ground-truth',
@@ -704,7 +726,7 @@ describe('fail-closed evaluation boundary', () => {
       expectedAccuracyMeters: 0.03,
       independentOfAnchors: true,
     });
-    const session = recorder.buildSession();
+    const session = finished(recorder);
 
     // A walk that never localized is an expected field outcome, not a defect.
     expect(() => buildEvidenceReport(session)).not.toThrow();
@@ -788,7 +810,7 @@ describe('fail-closed evaluation boundary', () => {
       independentOfAnchors: true,
     });
 
-    const { report } = buildEvidenceReport(recorder.buildSession());
+    const { report } = buildEvidenceReport(finished(recorder));
     expect(report.evidenceStatus).toBe('interrupted-capture');
     expect(report.medianHorizontalErrorMeters).toBeNull();
   });
@@ -811,7 +833,7 @@ describe('fail-closed evaluation boundary', () => {
         expectedAccuracyMeters: 0.03,
         independentOfAnchors: true,
       });
-      return buildEvidenceReport(recorder.buildSession()).report.evidenceStatus;
+      return buildEvidenceReport(finished(recorder)).report.evidenceStatus;
     };
 
     // A 999 ms silence is tolerated; 1000 ms is not.
@@ -855,7 +877,7 @@ describe('fail-closed evaluation boundary', () => {
       independentOfAnchors: true,
     });
 
-    const evidence = buildEvidenceReport(recorder.buildSession());
+    const evidence = buildEvidenceReport(finished(recorder));
     const stranded = evidence.evaluationCheckpoints.find((c) => c.id === 'after-outage')!;
 
     // Gating on publishability would skip the stranded mark and let the
@@ -882,7 +904,7 @@ describe('fail-closed evaluation boundary', () => {
         expectedAccuracyMeters: 0.03,
         independentOfAnchors: true,
       });
-      return buildEvidenceReport(recorder.buildSession()).report;
+      return buildEvidenceReport(finished(recorder)).report;
     };
 
     // Zero samples: the whole window is silence. One sample: silence both sides.
@@ -913,7 +935,7 @@ describe('fail-closed evaluation boundary', () => {
     // value but answer different questions.
     expect(mark.recordedTimeMs - mark.alignedTimeMs).toBe(1_000);
     expect(mark.exclusionReason).not.toBe('no-causal-estimate-in-range');
-    expect(buildEvidenceReport(recorder.buildSession()).report.evidenceStatus).toBe(
+    expect(buildEvidenceReport(finished(recorder)).report.evidenceStatus).toBe(
       'interrupted-capture',
     );
   });
@@ -940,7 +962,7 @@ describe('fail-closed evaluation boundary', () => {
       'implausible-imu-event',
     );
     // An invalid capture must not reach the evidence path at all.
-    expect(() => buildEvidenceReport(recorder.buildSession())).toThrow(CaptureValidationError);
+    expect(() => buildEvidenceReport(finished(recorder))).toThrow(CaptureValidationError);
 
     const spinning = new SessionRecorder(baseOptions);
     spinning.recordImu({ timeMs: 10, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 1e9] });
@@ -951,6 +973,7 @@ describe('fail-closed evaluation boundary', () => {
 
   it('treats a resume with no recorded start as an interruption', () => {
     // Coming back without ever reporting leaving means events were lost.
+    // recordWalk already closes with session-end, so this must not add another.
     const recorder = recordWalk({}, { event: 'sensor-resumed', timeMs: 4_000 });
 
     expect(buildEvidenceReport(recorder.buildSession()).report.evidenceStatus).toBe(

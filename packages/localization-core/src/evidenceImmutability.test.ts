@@ -61,6 +61,8 @@ function walkWithMark(surveyMethod: 'tape-measure' | 'estimated', accuracyMeters
     expectedAccuracyMeters: accuracyMeters,
     independentOfAnchors: true,
   });
+  // Evidence refuses a capture that does not record its own end.
+  recorder.recordLifecycle('session-end', 3_100);
   return recorder.buildSession();
 }
 

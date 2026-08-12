@@ -113,17 +113,19 @@ export class SessionRecorder {
    * recording claimed a different venue.
    */
   constructor(options: SessionRecorderOptions) {
-    this.sessionId = options.sessionId;
-    this.buildingId = options.buildingId;
-    this.packageHash = options.packageHash;
-    this.startedAtIso = options.startedAtIso;
-    this.device = captureDeviceSnapshot(options.device);
+    this.sessionId = ownRequired<string>(options, 'sessionId');
+    this.buildingId = ownRequired<string>(options, 'buildingId');
+    this.packageHash = ownRequired<string>(options, 'packageHash');
+    this.startedAtIso = ownRequired<string>(options, 'startedAtIso');
+    this.device = captureDeviceSnapshot(ownRequired<CaptureDeviceProfile>(options, 'device') ?? {} as CaptureDeviceProfile);
     // Anchors are normalised once, here, rather than at build time. A caller
     // may hand over anchors straight from a compiled VenuePackage, which carry
     // fields the capture schema does not define; the snapshot is what this
     // session resolves against and what it later serialises, so a later edit to
     // the caller's own anchor objects cannot change either.
-    this.anchors = readOnce(options.anchors).map(captureAnchorSnapshot);
+    this.anchors = readOnce(ownRequired<CheckpointAnchor[]>(options, 'anchors') ?? []).map(
+      captureAnchorSnapshot,
+    );
     this.recordLifecycle('session-start', 0);
   }
 
@@ -136,10 +138,10 @@ export class SessionRecorder {
   }
 
   recordImu(reading: ImuReading) {
-    const timeMs = reading.timeMs;
-    const accelerometer = vector3Once(reading.accelerometer);
-    const gyroscope = vector3Once(reading.gyroscope);
-    const orientation = reading.orientation;
+    const timeMs = ownRequired<number>(reading, 'timeMs');
+    const accelerometer = vector3Once(ownRequired<Vector3>(reading, 'accelerometer') ?? ([] as unknown as Vector3));
+    const gyroscope = vector3Once(ownRequired<Vector3>(reading, 'gyroscope') ?? ([] as unknown as Vector3));
+    const orientation = ownData<DeviceOrientationSample | null>(reading, 'orientation');
 
     this.events.push({
       type: 'imu',
@@ -161,9 +163,9 @@ export class SessionRecorder {
     // separately for the null check, the resolution and the stored event let a
     // repeating getter resolve one payload and record another, so the stored
     // outcome described a scan that was never stored.
-    const timeMs = attempt.timeMs;
-    const transport = attempt.transport;
-    const payload = attempt.payload;
+    const timeMs = ownRequired<number>(attempt, 'timeMs');
+    const transport = ownRequired<ScanAttempt['transport']>(attempt, 'transport');
+    const payload = ownRequired<string | null>(attempt, 'payload') ?? null;
     const failure = ownData<ScanAttempt['failure']>(attempt, 'failure');
 
     let outcome: ScanOutcome = failure ?? 'decode-failed';
@@ -192,17 +194,19 @@ export class SessionRecorder {
   }
 
   recordGroundTruth(mark: GroundTruthMark) {
-    const position = position2Once(mark.position);
+    const position = position2Once(
+      ownRequired<[number, number]>(mark, 'position') ?? ([] as unknown as [number, number]),
+    );
     const event: GroundTruthCaptureEvent = {
       type: 'ground-truth',
       sequence: this.nextSequence(),
-      timeMs: mark.timeMs,
-      checkpointId: mark.checkpointId,
-      position: [position[0], position[1]],
-      floorId: mark.floorId,
-      surveyMethod: mark.surveyMethod,
-      expectedAccuracyMeters: mark.expectedAccuracyMeters,
-      independentOfAnchors: mark.independentOfAnchors,
+      timeMs: ownRequired<number>(mark, 'timeMs'),
+      checkpointId: ownRequired<string>(mark, 'checkpointId'),
+      position,
+      floorId: ownRequired<string>(mark, 'floorId'),
+      surveyMethod: ownRequired<SurveyMethod>(mark, 'surveyMethod'),
+      expectedAccuracyMeters: ownRequired<number>(mark, 'expectedAccuracyMeters'),
+      independentOfAnchors: ownRequired<boolean>(mark, 'independentOfAnchors'),
     };
     this.events.push(event);
     return captureEventSnapshot(event) as GroundTruthCaptureEvent;
@@ -293,6 +297,24 @@ function ownData<T>(source: object, key: string): T | undefined {
   return descriptor.value as T;
 }
 
+/**
+ * A required authoring input, read under the same rule as an optional one.
+ *
+ * The own-data rule initially covered only optional fields, which left the
+ * fields that matter most reachable from a prototype: an inherited
+ * `packageHash` claimed a different venue, an inherited `label` and `platform`
+ * described a different handset, and an inherited `payload` resolved a scan the
+ * caller never presented. All of it persisted as evidence and validated
+ * cleanly.
+ *
+ * A missing required field becomes `undefined` rather than throwing, so the
+ * capture fails validation at the boundary that already reports malformed
+ * fields, naming the field instead of unwinding the walk.
+ */
+function ownRequired<T>(source: object, key: string): T {
+  return ownData<T>(source, key) as T;
+}
+
 function orientationSnapshot(sample: DeviceOrientationSample): DeviceOrientationSample {
   return {
     alphaDegrees: sample.alphaDegrees,
@@ -311,10 +333,10 @@ function orientationSnapshot(sample: DeviceOrientationSample): DeviceOrientation
  * `undefined`, so a snapshot carries the same keys the schema would accept.
  */
 function captureDeviceSnapshot(device: CaptureDeviceProfile): CaptureDeviceProfile {
-  const sensors = device.sensors;
+  const sensors = ownRequired<CaptureDeviceProfile['sensors']>(device, 'sensors') ?? ({} as CaptureDeviceProfile['sensors']);
   return {
-    label: device.label,
-    platform: device.platform,
+    label: ownRequired<string>(device, 'label'),
+    platform: ownRequired<string>(device, 'platform'),
     ...optional('model', ownData<string>(device, 'model')),
     ...optional('osVersion', ownData<string>(device, 'osVersion')),
     ...optional('browser', ownData<string>(device, 'browser')),
@@ -326,9 +348,9 @@ function captureDeviceSnapshot(device: CaptureDeviceProfile): CaptureDeviceProfi
       ...optional('accelerometerHz', ownData<number>(sensors, 'accelerometerHz')),
       ...optional('gyroscopeHz', ownData<number>(sensors, 'gyroscopeHz')),
       ...optional('orientationHz', ownData<number>(sensors, 'orientationHz')),
-      api: sensors.api,
-      gyroscopeUnits: sensors.gyroscopeUnits,
-      frame: sensors.frame,
+      api: ownRequired<CaptureDeviceProfile['sensors']['api']>(sensors, 'api'),
+      gyroscopeUnits: ownRequired<CaptureDeviceProfile['sensors']['gyroscopeUnits']>(sensors, 'gyroscopeUnits'),
+      frame: ownRequired<CaptureDeviceProfile['sensors']['frame']>(sensors, 'frame'),
     },
   };
 }
@@ -396,13 +418,30 @@ function captureEventSnapshot(event: CaptureEvent): CaptureEvent {
 
 function captureAnchorSnapshot(anchor: CheckpointAnchor): CaptureAnchorSnapshot {
   return {
-    id: anchor.id,
-    floorId: anchor.floorId,
-    kind: anchor.kind,
-    position: position2Once(anchor.position),
-    headingDegrees: anchor.headingDegrees,
-    payload: anchor.payload,
+    id: ownRequired<string>(anchor, 'id'),
+    floorId: ownRequired<string>(anchor, 'floorId'),
+    kind: ownRequired<CheckpointAnchor['kind']>(anchor, 'kind'),
+    position: position2Once(
+      ownRequired<[number, number]>(anchor, 'position') ?? ([] as unknown as [number, number]),
+    ),
+    headingDegrees: ownRequired<number>(anchor, 'headingDegrees'),
+    payload: ownRequired<string>(anchor, 'payload'),
   };
+}
+
+/**
+ * Whether a scan actually resolves against the anchors the capture carries.
+ *
+ * Derivation used to gate on the scan's own `outcome`, which meant a stored
+ * label decided whether a reset existed. Relabelling a genuine reset
+ * `unknown-payload` suppressed it, and labelling an ordinary event `resolved`
+ * invented one. Validation now refuses a capture whose labels disagree with its
+ * anchors; recomputing here means derivation never depends on the label at all.
+ */
+function resolvesAgainstAnchors(event: ScanCaptureEvent, anchors: CheckpointAnchor[]) {
+  if (event.payload === null) return false;
+  const matches = anchors.filter((anchor) => anchor.payload === event.payload);
+  return matches.length === 1 && matches[0].kind === event.transport;
 }
 
 /** How far a surveyed mark may sit from the nearest estimate and still be measured. */
@@ -540,17 +579,29 @@ export function buildEvidenceReport(
     (core?.invalidMapMatchIndices.length ?? 0) > 0 ||
     (core?.unmeasurableCheckpointIds.length ?? 0) > 0;
 
+  // Sequence contiguity catches an event removed from the middle, but never one
+  // removed from the end: deleting a terminal `backgrounded` left 0..n-1 intact
+  // and turned `interrupted-capture` into a publishable `ok` at 3.688 m. A walk
+  // that declares its own end cannot lose its tail silently, because the end is
+  // the tail. Validation stays permissive so an unfinished draft is still
+  // diagnosable; only evidence requires the capture to be complete.
+  const declaresItsEnd = captured.events.some(
+    (event) => event.type === 'lifecycle' && event.event === 'session-end',
+  );
+
   const blockingStatus: EvidenceStatus | null = unsupportedSensors
     ? 'unsupported-sensor-model'
-    : !localized
-      ? 'insufficient-localization'
-      : interrupted
-        ? 'interrupted-capture'
-        : invalidLocalizationState
-          ? 'invalid-localization-state'
-          : derived.checkpoints.length === 0
-            ? 'insufficient-ground-truth'
-            : null;
+    : !declaresItsEnd
+      ? 'incomplete-capture'
+      : !localized
+        ? 'insufficient-localization'
+        : interrupted
+          ? 'interrupted-capture'
+          : invalidLocalizationState
+            ? 'invalid-localization-state'
+            : derived.checkpoints.length === 0
+              ? 'insufficient-ground-truth'
+              : null;
 
   const status: EvidenceStatus = blockingStatus ?? 'ok';
   const isPublishable = status === 'ok';
@@ -769,11 +820,13 @@ function deriveValidatedRecording(
       continue;
     }
     if (event.type === 'scan') {
-      if (event.outcome !== 'resolved' || event.payload === null) continue;
+      // Recomputed, not read off the event.
+      const payload = event.payload;
+      if (payload === null || !resolvesAgainstAnchors(event, session.anchors)) continue;
       const resolution = checkpoints.resolve({
         timeMs: event.timeMs,
         kind: event.transport,
-        payload: event.payload,
+        payload,
       });
       if (resolution.accepted) {
         const anchor = anchorsById.get(resolution.anchorId ?? '');
@@ -821,7 +874,10 @@ function deriveValidatedRecording(
   const causalPoints = retained.map((entry, index) => ({ key: entry.key, index }));
 
   const anchorResets = sortCaptureEvents(session.events)
-    .filter((event) => event.type === 'scan' && event.outcome === 'resolved')
+    .filter(
+      (event): event is ScanCaptureEvent =>
+        event.type === 'scan' && resolvesAgainstAnchors(event, session.anchors),
+    )
     .map((event) => ({ timeMs: event.timeMs, sequence: event.sequence }));
 
   // A capture event is at or before a mark when it precedes it in the stream.

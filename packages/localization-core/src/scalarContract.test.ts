@@ -51,6 +51,9 @@ function sessionWith(deviceOverrides: Partial<CaptureDeviceProfile> = {}) {
     startedAtIso: '2026-08-07T09:00:00.000Z',
   });
   recorder.recordImu({ timeMs: 10, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+  // A non-boundary lifecycle event, so the enum tests have one to rewrite
+  // without destroying the session-start every capture must carry.
+  recorder.recordLifecycle('foregrounded', 20);
   return recorder.buildSession();
 }
 
@@ -195,12 +198,17 @@ describe('enum scalars do not coerce', () => {
     return session;
   };
 
-  // The last lifecycle event, never the first: `session-start` is structural,
-  // and overwriting it would test the session boundary rather than the enum.
+  // Never a boundary event: `session-start` and `session-end` are structural,
+  // and overwriting either would test the session boundary rather than the enum.
   const lifecycleOf = (session: CaptureSession) =>
     [...session.events]
       .reverse()
-      .find((event) => event.type === 'lifecycle') as unknown as {
+      .find(
+        (event) =>
+          event.type === 'lifecycle' &&
+          event.event !== 'session-start' &&
+          event.event !== 'session-end',
+      ) as unknown as {
       event: unknown;
       detail?: unknown;
     };
@@ -296,6 +304,8 @@ describe('enum scalars do not coerce', () => {
       });
       recorder.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
       recorder.recordImu({ timeMs: 100, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+      // A non-boundary lifecycle for the enum tests to rewrite.
+      recorder.recordLifecycle('foregrounded', 150);
       recorder.recordLifecycle('session-end', 200);
       return recorder.buildSession();
     };

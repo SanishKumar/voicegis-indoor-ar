@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CaptureValidationError,
   SessionRecorder,
   buildEvidenceReport,
   summarizeSampling,
   validateCaptureSession,
   type CaptureDeviceProfile,
+  type CaptureEvent,
   type CaptureSession,
   type CheckpointAnchor,
 } from './index';
@@ -239,7 +241,7 @@ describe('what the session claims about itself is fixed at construction', () => 
 });
 
 describe('recorder inputs are read exactly once', () => {
-  it('stores the payload it resolved, not one a getter substituted', () => {
+  it('refuses a required field supplied as a getter rather than a value', () => {
     let reads = 0;
     const walk = recorder('repeating-getter');
     const scan = walk.recordScan({
@@ -251,11 +253,16 @@ describe('recorder inputs are read exactly once', () => {
       },
     });
 
-    // Previously the null check, the resolution and the stored event were three
-    // separate reads, so the outcome described a scan that was never stored.
-    expect(scan.payload).toBe('vg:corridor-start');
-    expect(scan.outcome).toBe('resolved');
-    expect(scan.anchorId).toBe('corridor-start');
+    // A repeating getter previously resolved one payload and recorded another.
+    // A required field must now be a plain own value, so it cannot differ
+    // between reads at all — the accessor is never invoked.
+    expect(reads).toBe(0);
+    // What is stored is neither of the values the getter would have produced,
+    // and no reset is invented: an unreadable payload is simply nothing read.
+    expect(scan.payload).toBeNull();
+    expect(scan.outcome).not.toBe('resolved');
+    expect(scan.anchorId).toBeNull();
+    expect(validateCaptureSession(walk.buildSession())).toEqual([]);
   });
 
   it('stores the vector the caller indexed, not one its iterator yielded', () => {
@@ -275,7 +282,7 @@ describe('recorder inputs are read exactly once', () => {
     expect(stored).toMatchObject({ accelerometer: [1, 2, 3] });
   });
 
-  it('stores the anchor position from one read, not a mix of two', () => {
+  it('refuses an anchor position supplied as a getter rather than a value', () => {
     let reads = 0;
     const shifting = {
       id: 'corridor-start',
@@ -299,9 +306,11 @@ describe('recorder inputs are read exactly once', () => {
     }).buildSession();
 
     // Reading `position` twice stored [1, 500] — a coordinate that existed in
-    // neither read, and one that validates cleanly because it is still two
-    // finite in-frame numbers.
-    expect(session.anchors[0].position).toEqual([1, 9]);
+    // neither read, and one that validated cleanly because it is still two
+    // finite in-frame numbers. An accessor is now not a value the capture will
+    // carry, so the anchor is reported instead of invented.
+    expect(reads).toBe(0);
+    expect(codesFor(session)).toContain('malformed-anchor');
   });
 
   it('ignores optional fields the caller does not own', () => {
@@ -386,6 +395,7 @@ describe('the stream asserts its own completeness', () => {
       expectedAccuracyMeters: 0.03,
       independentOfAnchors: true,
     });
+    walk.recordLifecycle('session-end', 3_100);
     const session = walk.buildSession();
     expect(buildEvidenceReport(session).report.evidenceStatus).toBe('interrupted-capture');
 
@@ -434,6 +444,244 @@ describe('the stream asserts its own completeness', () => {
     const wellFormed = completeWalk();
     wellFormed.recordLifecycle('session-end', 3_100);
     expect(validateCaptureSession(wellFormed.buildSession())).toEqual([]);
+  });
+});
+
+describe('evidence requires a capture that records its own end', () => {
+  /** A complete walk: localizes, keeps coverage, ends on a mark. */
+  const walkWithMark = () => {
+    const walk = completeWalk();
+    walk.recordGroundTruth({
+      timeMs: 3_000,
+      checkpointId: 'mark',
+      position: [3.5, 9],
+      floorId: 'g',
+      surveyMethod: 'tape-measure',
+      expectedAccuracyMeters: 0.03,
+      independentOfAnchors: true,
+    });
+    return walk;
+  };
+
+  it('refuses a walk with no terminal session-end, while still validating it', () => {
+    const draft = walkWithMark().buildSession();
+
+    // A draft stays diagnosable — validation is deliberately permissive.
+    expect(validateCaptureSession(draft)).toEqual([]);
+    // But it cannot be evidence, because a stream can lose its tail silently.
+    const report = buildEvidenceReport(draft).report;
+    expect(report.evidenceStatus).toBe('incomplete-capture');
+    expect(report.medianHorizontalErrorMeters).toBeNull();
+    expect(report.checkpointErrors).toEqual([]);
+
+    const closed = walkWithMark();
+    closed.recordLifecycle('session-end', 3_100);
+    expect(buildEvidenceReport(closed.buildSession()).report.evidenceStatus).toBe('ok');
+  });
+
+  it('refuses a walk whose tail was deleted', () => {
+    // Contiguity catches a hole in the middle but never a missing tail:
+    // deleting a terminal interruption left 0..n-1 intact and turned
+    // interrupted-capture into a publishable ok at 3.688 m.
+    const walk = walkWithMark();
+    walk.recordLifecycle('backgrounded', 3_100, 'screen locked');
+    walk.recordLifecycle('session-end', 3_200);
+    const session = walk.buildSession();
+    expect(buildEvidenceReport(session).report.evidenceStatus).toBe('interrupted-capture');
+
+    const tailRemoved = {
+      ...session,
+      events: session.events.filter(
+        (event) =>
+          !(
+            event.type === 'lifecycle' &&
+            (event.event === 'backgrounded' || event.event === 'session-end')
+          ),
+      ),
+    };
+
+    // Still contiguous, still valid — and now refused rather than published.
+    expect(tailRemoved.events.map((event) => event.sequence)).toEqual(
+      tailRemoved.events.map((_, index) => index),
+    );
+    expect(validateCaptureSession(tailRemoved)).toEqual([]);
+    expect(buildEvidenceReport(tailRemoved).report.evidenceStatus).toBe('incomplete-capture');
+  });
+});
+
+describe('a scan outcome is checked against the anchors it claims', () => {
+  const closedWalkWith = (scanTimeMs: number, markTimeMs: number) => {
+    const walk = recorder('scan-outcomes');
+    walk.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
+    for (let timeMs = 100; timeMs <= 3_000; timeMs += 20) {
+      if (timeMs === scanTimeMs) {
+        walk.recordScan({ timeMs, transport: 'qr', payload: 'vg:corridor-start' });
+        walk.recordGroundTruth({
+          timeMs: markTimeMs,
+          checkpointId: 'mark',
+          position: [3.5, 9],
+          floorId: 'g',
+          surveyMethod: 'tape-measure',
+          expectedAccuracyMeters: 0.03,
+          independentOfAnchors: true,
+        });
+      }
+      walk.recordImu({
+        timeMs,
+        accelerometer: [0, 0, 9.81 + 3 * Math.sin((2 * Math.PI * timeMs) / 500)],
+        gyroscope: [0, 0, 0],
+      });
+    }
+    walk.recordLifecycle('session-end', 3_100);
+    return walk.buildSession();
+  };
+
+  it('refuses a real reset relabelled as unresolvable', () => {
+    const session = closedWalkWith(2_000, 2_000);
+    // Honest: the mark ties with a genuine reset, so it cannot be scored.
+    expect(buildEvidenceReport(session).report.evidenceStatus).toBe('insufficient-ground-truth');
+
+    // Relabelling the reset made the tie disappear and published 1.211 m.
+    const forged = {
+      ...session,
+      events: session.events.map((event) =>
+        event.type === 'scan' && event.timeMs === 2_000
+          ? { ...event, outcome: 'unknown-payload' as const, anchorId: null }
+          : event,
+      ),
+    };
+
+    const issues = validateCaptureSession(forged);
+    expect(issues.map((issue) => issue.code)).toEqual(['scan-outcome-mismatch']);
+    expect(issues[0].message).toMatch(/resolves to resolved against the captured anchors/);
+    expect(() => buildEvidenceReport(forged)).toThrow(CaptureValidationError);
+  });
+
+  it('refuses a fabricated reset against an anchor that does not exist', () => {
+    const session = closedWalkWith(2_500, 2_000);
+    expect(buildEvidenceReport(session).report.evidenceStatus).toBe('ok');
+
+    // An ordinary sample relabelled as a reset at the mark's instant wrongly
+    // excluded a real mark as an ambiguous tie.
+    const forged = {
+      ...session,
+      events: session.events.map((event) =>
+        event.type === 'imu' && event.timeMs === 2_000
+          ? ({
+              type: 'scan',
+              sequence: event.sequence,
+              timeMs: 2_000,
+              transport: 'qr',
+              payload: 'vg:not-a-real-anchor',
+              outcome: 'resolved',
+              anchorId: 'ghost',
+            } as CaptureEvent)
+          : event,
+      ),
+    };
+
+    const issues = validateCaptureSession(forged);
+    expect(issues.map((issue) => issue.code)).toEqual(['scan-outcome-mismatch']);
+    expect(issues[0].message).toMatch(/resolves to unknown-payload against the captured anchors/);
+  });
+
+  it('refuses an acquisition failure that also claims a payload', () => {
+    const session = closedWalkWith(2_500, 2_000);
+    const forged = {
+      ...session,
+      events: session.events.map((event) =>
+        event.type === 'scan' && event.timeMs === 2_500
+          ? { ...event, outcome: 'decode-failed' as const, anchorId: null }
+          : event,
+      ),
+    };
+
+    // Hiding a real payload behind a decode failure would suppress the reset
+    // the same way a forged unknown-payload did.
+    expect(codesFor(forged)).toEqual(['scan-outcome-mismatch']);
+  });
+});
+
+describe('required fields must be owned by the caller', () => {
+  it('never persists an inherited session, device, or scan field', () => {
+    const proto = {
+      packageHash: 'f'.repeat(64),
+      label: 'inherited handset',
+      platform: 'inherited-os',
+      payload: 'vg:corridor-start',
+      transport: 'qr' as const,
+      timeMs: 100,
+    };
+    const inheritedDevice = Object.create(proto) as CaptureDeviceProfile;
+    inheritedDevice.sensors = { api: 'native', gyroscopeUnits: 'deg/s', frame: 'world' };
+
+    const options = Object.create(proto) as never;
+    Object.assign(options, {
+      sessionId: 'inherited-required',
+      buildingId: 'reference-medical-centre',
+      device: inheritedDevice,
+      anchors,
+      startedAtIso: '2026-08-07T09:00:00.000Z',
+    });
+
+    const walk = new SessionRecorder(options);
+    const scan = walk.recordScan(Object.create(proto) as never);
+    const session = walk.buildSession();
+
+    // Every one of these previously became persisted evidence and validated
+    // cleanly: an inherited packageHash claimed a different venue, an inherited
+    // label and platform described a different handset, and an inherited
+    // payload resolved a scan the caller never presented.
+    expect(session.packageHash).toBeUndefined();
+    expect(session.device.label).toBeUndefined();
+    expect(session.device.platform).toBeUndefined();
+    expect(scan.payload).toBeNull();
+    expect(scan.outcome).not.toBe('resolved');
+
+    // And the capture is refused, naming the fields rather than carrying them.
+    const codes = codesFor(session);
+    expect(codes).toContain('malformed-capture');
+    expect(codes).toContain('malformed-device');
+  });
+
+  it('never persists an inherited anchor or ground-truth field', () => {
+    const anchorProto = { payload: 'vg:corridor-start', headingDegrees: 90 };
+    const inheritedAnchor = Object.create(anchorProto) as CheckpointAnchor;
+    Object.assign(inheritedAnchor, {
+      id: 'corridor-start',
+      floorId: 'g',
+      kind: 'qr',
+      position: [1, 9],
+    });
+
+    const walk = new SessionRecorder({
+      sessionId: 'inherited-anchor',
+      buildingId: 'reference-medical-centre',
+      packageHash: 'a'.repeat(64),
+      device,
+      anchors: [inheritedAnchor],
+      startedAtIso: '2026-08-07T09:00:00.000Z',
+    });
+
+    const markProto = { surveyMethod: 'tape-measure', independentOfAnchors: true };
+    const inheritedMark = Object.create(markProto) as never;
+    Object.assign(inheritedMark, {
+      timeMs: 3_000,
+      checkpointId: 'mark',
+      position: [30, 30],
+      floorId: 'g',
+      expectedAccuracyMeters: 0.03,
+    });
+    walk.recordGroundTruth(inheritedMark);
+    const session = walk.buildSession();
+
+    expect(session.anchors[0].payload).toBeUndefined();
+    const mark = session.events.find((event) => event.type === 'ground-truth');
+    expect(mark).toMatchObject({ surveyMethod: undefined, independentOfAnchors: undefined });
+
+    const codes = codesFor(session);
+    expect(codes).toContain('malformed-anchor');
+    expect(codes).toContain('malformed-ground-truth-event');
   });
 });
 

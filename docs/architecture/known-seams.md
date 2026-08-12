@@ -63,13 +63,24 @@ schema so compiler, package verification, runtime and capture agree.
 Capture chronology and immutability, deferred from Recorder Integrity v0.1.1,
 closed on 2026-08-11. A capture clock that goes backwards is reported rather
 than sorted away for samples, scans and lifecycle events alike; distinct
-inertial samples must differ by at least `MIN_SAMPLE_INTERVAL_MS`; sequences
-must run `0..n-1` so an event cannot be deleted without trace; a session has one
-`session-start` at time zero and at most one terminal `session-end`; everything
-a session claims about itself is copied out of the caller's options at
-construction; each recorder input is read exactly once, by fixed index, and
-optional fields are copied only when the caller actually owns them; and every
-event leaving the recorder is a snapshot.
+inertial samples must differ by at least `MIN_SAMPLE_INTERVAL_MS`; a session has
+one `session-start` at time zero and at most one terminal `session-end`, and
+evidence additionally requires that end to be present; a scan's outcome and
+anchor id are checked against the anchors the capture carries, and derivation
+recomputes resets rather than trusting the stored label; everything a session
+claims about itself is copied out of the caller's options at construction; every
+recorder input, required or optional, is read exactly once and only when the
+caller owns it as a plain value; and every event leaving the recorder is a
+snapshot.
+
+Sequence contiguity is worth stating precisely, because it is easy to overread.
+Requiring `0..n-1` detects an event *dropped* from an otherwise untouched
+recorder stream, and requiring a terminal `session-end` extends that to the tail,
+which contiguity alone can never cover. Neither detects delete-and-renumber:
+anyone willing to rewrite the remaining sequences produces a stream that is
+indistinguishable from a shorter honest walk. Only the sealed evidence artifact,
+which hashes the stream as recorded, can close that — so these rules protect
+against accidental loss and casual edits, not against a determined author.
 
 An earlier version of this entry claimed same-millisecond correctness was fully
 solved. That overclaimed. `(timeMs, sequence, ordinal)` keys and exact

@@ -49,7 +49,10 @@ const device: CaptureDeviceProfile = {
 };
 
 /** A walk that localizes, keeps continuous inertial coverage, and ends on a mark. */
-function walkEndingOn(markPosition: [number, number]) {
+function walkEndingOn(
+  markPosition: [number, number],
+  interruption?: { event: 'backgrounded'; timeMs: number; detail?: string },
+) {
   const recorder = new SessionRecorder({
     sessionId: 'coordinate-bounds',
     buildingId: 'reference-medical-centre',
@@ -59,7 +62,12 @@ function walkEndingOn(markPosition: [number, number]) {
     startedAtIso: '2026-08-07T09:00:00.000Z',
   });
   recorder.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
+  let pending = interruption;
   for (let t = 100; t <= 3_000; t += 20) {
+    if (pending !== undefined && t >= pending.timeMs) {
+      recorder.recordLifecycle(pending.event, pending.timeMs, pending.detail);
+      pending = undefined;
+    }
     recorder.recordImu({
       timeMs: t,
       accelerometer: [0, 0, 9.81 + 3 * Math.sin((2 * Math.PI * t) / 500)],
@@ -75,6 +83,8 @@ function walkEndingOn(markPosition: [number, number]) {
     expectedAccuracyMeters: 0.03,
     independentOfAnchors: true,
   });
+  // A complete walk declares its own end; evidence refuses a possible draft.
+  recorder.recordLifecycle('session-end', 3_100);
   return recorder.buildSession();
 }
 
@@ -88,6 +98,7 @@ function anchorAt(position: [number, number]): CaptureSession {
     startedAtIso: '2026-08-07T09:00:00.000Z',
   });
   recorder.recordImu({ timeMs: 10, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+  recorder.recordLifecycle('session-end', 20);
   return recorder.buildSession();
 }
 
@@ -117,6 +128,7 @@ function oneStepFromBoundary() {
     expectedAccuracyMeters: 0.03,
     independentOfAnchors: true,
   });
+  recorder.recordLifecycle('session-end', 1_100);
   return recorder.buildSession();
 }
 
@@ -157,6 +169,7 @@ function transientRecoveryWalk() {
     expectedAccuracyMeters: 0.03,
     independentOfAnchors: true,
   });
+  recorder.recordLifecycle('session-end', 3_100);
   return recorder.buildSession();
 }
 
@@ -376,12 +389,9 @@ describe('invalid derived localization state is not evidence', () => {
 
   it('keeps interruption and unsupported-sensor precedence while redacting invalid state', () => {
     const baseline = walkEndingOn([3.5, 9]);
-    const interrupted = structuredClone(baseline);
-    interrupted.events.push({
-      type: 'lifecycle',
-      sequence: Math.max(...interrupted.events.map((event) => event.sequence)) + 1,
-      timeMs: 3_000,
+    const interrupted = walkEndingOn([3.5, 9], {
       event: 'backgrounded',
+      timeMs: 2_000,
       detail: 'test interruption',
     });
     const unsupported = structuredClone(baseline);
@@ -403,7 +413,11 @@ describe('invalid derived localization state is not evidence', () => {
 
   it('reports invalid state ahead of missing ground truth', () => {
     const noGroundTruth = structuredClone(walkEndingOn([3.5, 9]));
-    noGroundTruth.events = noGroundTruth.events.filter((event) => event.type !== 'ground-truth');
+    // Renumbered: a bare filter leaves a sequence gap, which is a different
+    // refusal from the one under test.
+    noGroundTruth.events = noGroundTruth.events
+      .filter((event) => event.type !== 'ground-truth')
+      .map((event, index) => ({ ...event, sequence: index }));
     const report = buildEvidenceReport(noGroundTruth, {
       checkpointConfig: { elevationByFloorId: { g: Infinity } },
     }).report;

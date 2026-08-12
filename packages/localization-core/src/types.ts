@@ -153,6 +153,12 @@ export type EvidenceStatus =
   /** Current processing cannot interpret the recorded units or frame. */
   | 'unsupported-sensor-model'
   /**
+   * The capture does not record its own end, so it may be a truncated draft.
+   * A stream can always lose its tail without leaving a gap in the sequence,
+   * and the missing tail is exactly where a late interruption would sit.
+   */
+  | 'incomplete-capture'
+  /**
    * Replay produced a non-finite or out-of-frame estimate, uncertainty value,
    * or map match. Kept separate from `insufficient-ground-truth`: the marks are
    * present, but the localization state used to evaluate them is not numeric
