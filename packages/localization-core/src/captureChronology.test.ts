@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CaptureAuthoringError,
   CaptureValidationError,
   SessionRecorder,
   buildEvidenceReport,
@@ -244,25 +245,39 @@ describe('recorder inputs are read exactly once', () => {
   it('refuses a required field supplied as a getter rather than a value', () => {
     let reads = 0;
     const walk = recorder('repeating-getter');
-    const scan = walk.recordScan({
-      transport: 'qr',
+    const attempt = {
+      transport: 'qr' as const,
       timeMs: 100,
       get payload() {
         reads += 1;
         return reads === 1 ? 'vg:corridor-start' : 'vg:something-else';
       },
-    });
+    };
 
-    // A repeating getter previously resolved one payload and recorded another.
-    // A required field must now be a plain own value, so it cannot differ
-    // between reads at all — the accessor is never invoked.
+    // Degrading was itself a bypass: an accessor payload became a valid
+    // decode-failed carrying nothing, which suppressed a genuine reset and
+    // moved a published figure from 1.288 m to 2.449 m while reporting ok.
+    expect(() => walk.recordScan(attempt)).toThrow(CaptureAuthoringError);
+    expect(() => walk.recordScan(attempt)).toThrow(/own enumerable value/);
     expect(reads).toBe(0);
-    // What is stored is neither of the values the getter would have produced,
-    // and no reset is invented: an unreadable payload is simply nothing read.
-    expect(scan.payload).toBeNull();
-    expect(scan.outcome).not.toBe('resolved');
-    expect(scan.anchorId).toBeNull();
-    expect(validateCaptureSession(walk.buildSession())).toEqual([]);
+  });
+
+  it('refuses a required field that is inherited or non-enumerable', () => {
+    const walk = recorder('hidden-fields');
+
+    const inherited = Object.create({ payload: 'vg:corridor-start' }) as never;
+    Object.assign(inherited, { timeMs: 100, transport: 'qr' });
+    expect(() => walk.recordScan(inherited)).toThrow(CaptureAuthoringError);
+
+    const hidden = { timeMs: 100, transport: 'qr' as const };
+    Object.defineProperty(hidden, 'payload', {
+      value: 'vg:corridor-start',
+      enumerable: false,
+    });
+    expect(() => walk.recordScan(hidden as never)).toThrow(CaptureAuthoringError);
+
+    // An explicit null is a real value and stays acceptable.
+    expect(() => walk.recordScan({ timeMs: 100, transport: 'qr', payload: null })).not.toThrow();
   });
 
   it('stores the vector the caller indexed, not one its iterator yielded', () => {
@@ -296,21 +311,61 @@ describe('recorder inputs are read exactly once', () => {
       payload: 'vg:corridor-start',
     };
 
-    const session = new SessionRecorder({
-      sessionId: 'shifting-anchor',
-      buildingId: 'reference-medical-centre',
-      packageHash: 'a'.repeat(64),
-      device,
-      anchors: [shifting],
-      startedAtIso: '2026-08-07T09:00:00.000Z',
-    }).buildSession();
-
     // Reading `position` twice stored [1, 500] — a coordinate that existed in
     // neither read, and one that validated cleanly because it is still two
-    // finite in-frame numbers. An accessor is now not a value the capture will
-    // carry, so the anchor is reported instead of invented.
+    // finite in-frame numbers. An accessor is not a value the capture will
+    // carry at all, so the anchor is refused rather than invented.
+    expect(
+      () =>
+        new SessionRecorder({
+          sessionId: 'shifting-anchor',
+          buildingId: 'reference-medical-centre',
+          packageHash: 'a'.repeat(64),
+          device,
+          anchors: [shifting],
+          startedAtIso: '2026-08-07T09:00:00.000Z',
+        }),
+    ).toThrow(CaptureAuthoringError);
     expect(reads).toBe(0);
-    expect(codesFor(session)).toContain('malformed-anchor');
+  });
+
+  it('refuses a coordinate array whose elements are accessors', () => {
+    // The own-data rule stopped at the property holding the array, so an object
+    // the schema's own plain-array check would reject was copied element by
+    // element into a real one, moving a published median from 3.688 m to
+    // 22.688 m with nothing reported.
+    const accessorPair = {
+      length: 2,
+      get 0() {
+        return 20;
+      },
+      get 1() {
+        return 9;
+      },
+    } as unknown as [number, number];
+
+    expect(
+      () =>
+        new SessionRecorder({
+          sessionId: 'accessor-pair',
+          buildingId: 'reference-medical-centre',
+          packageHash: 'a'.repeat(64),
+          device,
+          anchors: [{ ...anchors[0], position: accessorPair }],
+          startedAtIso: '2026-08-07T09:00:00.000Z',
+        }),
+    ).toThrow(/plain array of 2 numbers/);
+
+    // A real array carrying an accessor element is refused for the same reason.
+    const spiked: number[] = [1, 2];
+    Object.defineProperty(spiked, '2', { get: () => 9.81, enumerable: true, configurable: true });
+    expect(() =>
+      recorder('spiked-vector').recordImu({
+        timeMs: 10,
+        accelerometer: [0, 0, 9.81],
+        gyroscope: spiked as never,
+      }),
+    ).toThrow(CaptureAuthoringError);
   });
 
   it('ignores optional fields the caller does not own', () => {
@@ -479,6 +534,39 @@ describe('evidence requires a capture that records its own end', () => {
     expect(buildEvidenceReport(closed.buildSession()).report.evidenceStatus).toBe('ok');
   });
 
+  it('places incompleteness after sensor support and before localization', () => {
+    // Precedence matters because an incomplete capture short-circuits: without
+    // an explicit test, other status combinations can stop being exercised
+    // while their assertions still pass.
+    const unsupported = new SessionRecorder({
+      sessionId: 'unsupported-and-open',
+      buildingId: 'reference-medical-centre',
+      packageHash: 'a'.repeat(64),
+      device: { ...device, sensors: { ...device.sensors, frame: 'device' } },
+      anchors,
+      startedAtIso: '2026-08-07T09:00:00.000Z',
+    });
+    unsupported.recordImu({ timeMs: 10, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+    // Unsupported sensors outrank a missing end: the walk is uninterpretable
+    // whether or not it finished.
+    expect(buildEvidenceReport(unsupported.buildSession()).report.evidenceStatus).toBe(
+      'unsupported-sensor-model',
+    );
+
+    const neverLocalized = recorder('open-and-unlocalized');
+    neverLocalized.recordImu({ timeMs: 10, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+    // A missing end outranks a missing fix: a truncated stream may simply not
+    // have reached the scan yet, so the absence of a fix proves nothing.
+    expect(buildEvidenceReport(neverLocalized.buildSession()).report.evidenceStatus).toBe(
+      'incomplete-capture',
+    );
+
+    neverLocalized.recordLifecycle('session-end', 20);
+    expect(buildEvidenceReport(neverLocalized.buildSession()).report.evidenceStatus).toBe(
+      'insufficient-localization',
+    );
+  });
+
   it('refuses a walk whose tail was deleted', () => {
     // Contiguity catches a hole in the middle but never a missing tail:
     // deleting a terminal interruption left 0..n-1 intact and turned
@@ -624,24 +712,26 @@ describe('required fields must be owned by the caller', () => {
       startedAtIso: '2026-08-07T09:00:00.000Z',
     });
 
-    const walk = new SessionRecorder(options);
-    const scan = walk.recordScan(Object.create(proto) as never);
-    const session = walk.buildSession();
+    // Each of these previously became persisted evidence and validated cleanly:
+    // an inherited packageHash claimed a different venue, an inherited label and
+    // platform described a different handset, and an inherited payload resolved
+    // a scan the caller never presented.
+    let thrown: unknown;
+    try {
+      new SessionRecorder(options);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(CaptureAuthoringError);
+    expect((thrown as CaptureAuthoringError).field).toBe('packageHash');
 
-    // Every one of these previously became persisted evidence and validated
-    // cleanly: an inherited packageHash claimed a different venue, an inherited
-    // label and platform described a different handset, and an inherited
-    // payload resolved a scan the caller never presented.
-    expect(session.packageHash).toBeUndefined();
-    expect(session.device.label).toBeUndefined();
-    expect(session.device.platform).toBeUndefined();
-    expect(scan.payload).toBeNull();
-    expect(scan.outcome).not.toBe('resolved');
+    // With the session's own fields owned, the inherited device is still caught.
+    Object.assign(options, { packageHash: 'a'.repeat(64) });
+    expect(() => new SessionRecorder(options)).toThrow(/label/);
 
-    // And the capture is refused, naming the fields rather than carrying them.
-    const codes = codesFor(session);
-    expect(codes).toContain('malformed-capture');
-    expect(codes).toContain('malformed-device');
+    // And so is an inherited scan payload.
+    const walk = recorder('inherited-scan');
+    expect(() => walk.recordScan(Object.create(proto) as never)).toThrow(CaptureAuthoringError);
   });
 
   it('never persists an inherited anchor or ground-truth field', () => {
@@ -654,14 +744,17 @@ describe('required fields must be owned by the caller', () => {
       position: [1, 9],
     });
 
-    const walk = new SessionRecorder({
-      sessionId: 'inherited-anchor',
-      buildingId: 'reference-medical-centre',
-      packageHash: 'a'.repeat(64),
-      device,
-      anchors: [inheritedAnchor],
-      startedAtIso: '2026-08-07T09:00:00.000Z',
-    });
+    expect(
+      () =>
+        new SessionRecorder({
+          sessionId: 'inherited-anchor',
+          buildingId: 'reference-medical-centre',
+          packageHash: 'a'.repeat(64),
+          device,
+          anchors: [inheritedAnchor],
+          startedAtIso: '2026-08-07T09:00:00.000Z',
+        }),
+    ).toThrow(/headingDegrees|payload/);
 
     const markProto = { surveyMethod: 'tape-measure', independentOfAnchors: true };
     const inheritedMark = Object.create(markProto) as never;
@@ -672,16 +765,38 @@ describe('required fields must be owned by the caller', () => {
       floorId: 'g',
       expectedAccuracyMeters: 0.03,
     });
-    walk.recordGroundTruth(inheritedMark);
-    const session = walk.buildSession();
 
-    expect(session.anchors[0].payload).toBeUndefined();
-    const mark = session.events.find((event) => event.type === 'ground-truth');
-    expect(mark).toMatchObject({ surveyMethod: undefined, independentOfAnchors: undefined });
+    expect(() => recorder('inherited-mark').recordGroundTruth(inheritedMark)).toThrow(
+      /surveyMethod|independentOfAnchors/,
+    );
+  });
 
-    const codes = codesFor(session);
-    expect(codes).toContain('malformed-anchor');
-    expect(codes).toContain('malformed-ground-truth-event');
+  it('refuses duplicate anchor ids, which silently replace one another', () => {
+    // Derivation looks anchors up by id, so a duplicate supplied its own
+    // heading to a reset and moved a published median from 3.688 m to 8.591 m.
+    const duplicated = new SessionRecorder({
+      sessionId: 'duplicate-ids',
+      buildingId: 'reference-medical-centre',
+      packageHash: 'a'.repeat(64),
+      device,
+      anchors: [
+        anchors[0],
+        {
+          id: 'corridor-start',
+          floorId: 'g',
+          kind: 'qr',
+          position: [60, 60],
+          headingDegrees: 270,
+          payload: 'vg:elsewhere',
+        },
+      ],
+      startedAtIso: '2026-08-07T09:00:00.000Z',
+    });
+
+    expect(validateCaptureSession(recorder('unique-ids').buildSession())).toEqual([]);
+    const issues = validateCaptureSession(duplicated.buildSession());
+    expect(issues.map((issue) => issue.code)).toEqual(['duplicate-anchor-id']);
+    expect(issues[0].path).toBe('/anchors/1/id');
   });
 });
 

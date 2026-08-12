@@ -1531,6 +1531,23 @@ function validateCaptureSessionSchema(value: unknown): CaptureIssue[] {
   // at 1.211 m; and let an ordinary sample be relabelled `resolved` against an
   // anchor that does not exist, inventing a reset that excluded a real mark.
   const path_of = (index: number) => `/events/${index}`;
+
+  // Anchor ids are how derivation looks an anchor up, so a duplicate silently
+  // replaces the one it shadows: an unrelated second anchor sharing an id
+  // supplied its own heading to the reset and moved a published median from
+  // 3.688 m to 8.591 m, with nothing reported.
+  const seenAnchorIds = new Set<string>();
+  validAnchors.forEach((anchor, index) => {
+    if (seenAnchorIds.has(anchor.id)) {
+      issues.push({
+        code: 'duplicate-anchor-id',
+        path: `/anchors/${index}/id`,
+        message: `Anchor id "${anchor.id}" is used more than once, so which anchor a scan resolves to is undefined.`,
+      });
+    }
+    seenAnchorIds.add(anchor.id);
+  });
+
   const anchorsByPayload = new Map<string, CheckpointAnchor[]>();
   for (const anchor of validAnchors) {
     const list = anchorsByPayload.get(anchor.payload) ?? [];
@@ -1552,6 +1569,15 @@ function validateCaptureSessionSchema(value: unknown): CaptureIssue[] {
           'scan-outcome-mismatch',
           `${path_of(index)}/payload`,
           `A scan that reports ${event.outcome} cannot also carry a payload it read.`,
+        );
+      }
+      // Nothing was read, so nothing can have been identified.
+      if (event.anchorId !== null) {
+        add(
+          issues,
+          'scan-outcome-mismatch',
+          `${path_of(index)}/anchorId`,
+          `A scan that reports ${event.outcome} cannot also name an anchor it resolved.`,
         );
       }
       return;

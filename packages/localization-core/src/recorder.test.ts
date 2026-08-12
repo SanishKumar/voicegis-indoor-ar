@@ -784,11 +784,18 @@ describe('fail-closed evaluation boundary', () => {
     noFixInterrupted.recordImu({ timeMs: 10, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
     noFixInterrupted.recordLifecycle('backgrounded', 20);
 
-    for (const recorder of [noFixNoSensors, noFixInterrupted]) {
-      const session = recorder.buildSession();
+    // Both walks are closed. Left open, every combination exits through
+    // `incomplete-capture` and this test passes without exercising any of them.
+    const expected: Array<[SessionRecorder, string]> = [
+      [noFixNoSensors, 'unsupported-sensor-model'],
+      [noFixInterrupted, 'insufficient-localization'],
+    ];
+
+    for (const [recorder, status] of expected) {
+      const session = finished(recorder);
       expect(() => buildEvidenceReport(session)).not.toThrow();
       const { report } = buildEvidenceReport(session);
-      expect(report.evidenceStatus).not.toBe('ok');
+      expect(report.evidenceStatus).toBe(status);
       expect(report.medianHorizontalErrorMeters).toBeNull();
       expect(report.checkpointErrors).toEqual([]);
     }

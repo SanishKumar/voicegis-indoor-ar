@@ -117,13 +117,13 @@ export class SessionRecorder {
     this.buildingId = ownRequired<string>(options, 'buildingId');
     this.packageHash = ownRequired<string>(options, 'packageHash');
     this.startedAtIso = ownRequired<string>(options, 'startedAtIso');
-    this.device = captureDeviceSnapshot(ownRequired<CaptureDeviceProfile>(options, 'device') ?? {} as CaptureDeviceProfile);
+    this.device = captureDeviceSnapshot(ownRequired<CaptureDeviceProfile>(options, 'device'));
     // Anchors are normalised once, here, rather than at build time. A caller
     // may hand over anchors straight from a compiled VenuePackage, which carry
     // fields the capture schema does not define; the snapshot is what this
     // session resolves against and what it later serialises, so a later edit to
     // the caller's own anchor objects cannot change either.
-    this.anchors = readOnce(ownRequired<CheckpointAnchor[]>(options, 'anchors') ?? []).map(
+    this.anchors = readOnce(ownRequired<CheckpointAnchor[]>(options, 'anchors')).map(
       captureAnchorSnapshot,
     );
     this.recordLifecycle('session-start', 0);
@@ -139,8 +139,8 @@ export class SessionRecorder {
 
   recordImu(reading: ImuReading) {
     const timeMs = ownRequired<number>(reading, 'timeMs');
-    const accelerometer = vector3Once(ownRequired<Vector3>(reading, 'accelerometer') ?? ([] as unknown as Vector3));
-    const gyroscope = vector3Once(ownRequired<Vector3>(reading, 'gyroscope') ?? ([] as unknown as Vector3));
+    const accelerometer = ownNumberTuple(reading, 'accelerometer', 3) as Vector3;
+    const gyroscope = ownNumberTuple(reading, 'gyroscope', 3) as Vector3;
     const orientation = ownData<DeviceOrientationSample | null>(reading, 'orientation');
 
     this.events.push({
@@ -165,7 +165,7 @@ export class SessionRecorder {
     // outcome described a scan that was never stored.
     const timeMs = ownRequired<number>(attempt, 'timeMs');
     const transport = ownRequired<ScanAttempt['transport']>(attempt, 'transport');
-    const payload = ownRequired<string | null>(attempt, 'payload') ?? null;
+    const payload = ownRequired<string | null>(attempt, 'payload');
     const failure = ownData<ScanAttempt['failure']>(attempt, 'failure');
 
     let outcome: ScanOutcome = failure ?? 'decode-failed';
@@ -194,9 +194,7 @@ export class SessionRecorder {
   }
 
   recordGroundTruth(mark: GroundTruthMark) {
-    const position = position2Once(
-      ownRequired<[number, number]>(mark, 'position') ?? ([] as unknown as [number, number]),
-    );
+    const position = ownNumberTuple(mark, 'position', 2) as [number, number];
     const event: GroundTruthCaptureEvent = {
       type: 'ground-truth',
       sequence: this.nextSequence(),
@@ -268,15 +266,7 @@ function vector3Once(values: Vector3): Vector3 {
   return [values[0], values[1], values[2]];
 }
 
-/**
- * A two-component position, read from one property access at fixed indices.
- *
- * `[value.position[0], value.position[1]]` reads `position` twice. A getter
- * returning a different array each time produced a coordinate that existed in
- * neither — `[1, 9]` and `[500, 500]` stored as `[1, 500]` — and it validated
- * cleanly, because a mixed pair is still two finite in-frame numbers.
- */
-function position2Once(values: readonly [number, number]): [number, number] {
+function tuple2Once(values: readonly [number, number]): [number, number] {
   return [values[0], values[1]];
 }
 
@@ -298,7 +288,22 @@ function ownData<T>(source: object, key: string): T | undefined {
 }
 
 /**
- * A required authoring input, read under the same rule as an optional one.
+ * Raised when a recorder is handed something it will not author from.
+ *
+ * Refusing is the whole point. Degrading instead was itself a bypass: a scan
+ * payload supplied as an accessor became a valid `decode-failed` with no
+ * payload, which silently suppressed a genuine anchor reset and moved a
+ * published figure from 1.288 m to 2.449 m while still reporting `ok`.
+ */
+export class CaptureAuthoringError extends Error {
+  constructor(readonly field: string, message: string) {
+    super(message);
+    this.name = 'CaptureAuthoringError';
+  }
+}
+
+/**
+ * A required authoring input, which must be a plain own value.
  *
  * The own-data rule initially covered only optional fields, which left the
  * fields that matter most reachable from a prototype: an inherited
@@ -307,12 +312,56 @@ function ownData<T>(source: object, key: string): T | undefined {
  * caller never presented. All of it persisted as evidence and validated
  * cleanly.
  *
- * A missing required field becomes `undefined` rather than throwing, so the
- * capture fails validation at the boundary that already reports malformed
- * fields, naming the field instead of unwinding the walk.
+ * Anything that is not an own, enumerable data property is refused here rather
+ * than recorded as absent. A capture must not be able to launder input the
+ * schema would have rejected into a stream that validates.
  */
-function ownRequired<T>(source: object, key: string): T {
-  return ownData<T>(source, key) as T;
+function ownRequired<T>(source: object, key: string, field = key): T {
+  if (source === null || typeof source !== 'object') {
+    throw new CaptureAuthoringError(field, `Cannot author ${field} from a non-object.`);
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(source, key);
+  if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
+    throw new CaptureAuthoringError(
+      field,
+      `${field} must be supplied as an own enumerable value, not inherited, hidden, or computed.`,
+    );
+  }
+  return descriptor.value as T;
+}
+
+/**
+ * A fixed-length tuple of plain own numbers.
+ *
+ * The own-data rule stopped at the property holding the array, so its elements
+ * were still read as ordinary indices. An object with accessor indices — one
+ * the schema's own `isPlainArray` check would have rejected outright — was
+ * copied element by element into a real array and became a valid capture,
+ * moving a published median from 3.688 m to 22.688 m.
+ *
+ * The property itself is also read exactly once, through `ownRequired`. Reading
+ * `mark.position` twice to take its two components let a getter returning a
+ * different array each time produce a coordinate that existed in neither:
+ * `[1, 9]` and `[500, 500]` stored as `[1, 500]`, which validated cleanly
+ * because a mixed pair is still two finite in-frame numbers.
+ */
+function ownNumberTuple(source: object, key: string, length: number, field = key): number[] {
+  const values = ownRequired<unknown>(source, key, field);
+  if (
+    !Array.isArray(values) ||
+    Object.getPrototypeOf(values) !== Array.prototype ||
+    values.length !== length
+  ) {
+    throw new CaptureAuthoringError(
+      field,
+      `${field} must be a plain array of ${length} numbers.`,
+    );
+  }
+  const copy: number[] = [];
+  for (let index = 0; index < length; index += 1) {
+    copy.push(ownRequired<number>(values, String(index), `${field}[${index}]`));
+  }
+  return copy;
 }
 
 function orientationSnapshot(sample: DeviceOrientationSample): DeviceOrientationSample {
@@ -333,7 +382,7 @@ function orientationSnapshot(sample: DeviceOrientationSample): DeviceOrientation
  * `undefined`, so a snapshot carries the same keys the schema would accept.
  */
 function captureDeviceSnapshot(device: CaptureDeviceProfile): CaptureDeviceProfile {
-  const sensors = ownRequired<CaptureDeviceProfile['sensors']>(device, 'sensors') ?? ({} as CaptureDeviceProfile['sensors']);
+  const sensors = ownRequired<CaptureDeviceProfile['sensors']>(device, 'sensors', 'device.sensors');
   return {
     label: ownRequired<string>(device, 'label'),
     platform: ownRequired<string>(device, 'platform'),
@@ -400,7 +449,7 @@ function captureEventSnapshot(event: CaptureEvent): CaptureEvent {
       sequence: event.sequence,
       timeMs: event.timeMs,
       checkpointId: event.checkpointId,
-      position: [event.position[0], event.position[1]],
+      position: tuple2Once(event.position),
       floorId: event.floorId,
       surveyMethod: event.surveyMethod,
       expectedAccuracyMeters: event.expectedAccuracyMeters,
@@ -421,9 +470,7 @@ function captureAnchorSnapshot(anchor: CheckpointAnchor): CaptureAnchorSnapshot 
     id: ownRequired<string>(anchor, 'id'),
     floorId: ownRequired<string>(anchor, 'floorId'),
     kind: ownRequired<CheckpointAnchor['kind']>(anchor, 'kind'),
-    position: position2Once(
-      ownRequired<[number, number]>(anchor, 'position') ?? ([] as unknown as [number, number]),
-    ),
+    position: ownNumberTuple(anchor, 'position', 2) as [number, number],
     headingDegrees: ownRequired<number>(anchor, 'headingDegrees'),
     payload: ownRequired<string>(anchor, 'payload'),
   };

@@ -65,13 +65,24 @@ closed on 2026-08-11. A capture clock that goes backwards is reported rather
 than sorted away for samples, scans and lifecycle events alike; distinct
 inertial samples must differ by at least `MIN_SAMPLE_INTERVAL_MS`; a session has
 one `session-start` at time zero and at most one terminal `session-end`, and
-evidence additionally requires that end to be present; a scan's outcome and
-anchor id are checked against the anchors the capture carries, and derivation
+evidence additionally requires that end to be present; anchor ids are unique, so
+a duplicate cannot silently shadow the anchor a scan resolves to; a scan's
+outcome and anchor id are checked against the anchors the capture carries, an
+acquisition failure may claim neither a payload nor an anchor, and derivation
 recomputes resets rather than trusting the stored label; everything a session
-claims about itself is copied out of the caller's options at construction; every
-recorder input, required or optional, is read exactly once and only when the
-caller owns it as a plain value; and every event leaving the recorder is a
-snapshot.
+claims about itself is copied out of the caller's options at construction; and
+every event leaving the recorder is a snapshot.
+
+Authoring is strict rather than forgiving, which took two attempts to get right.
+Every required input, and every element of a coordinate array, must be an own
+enumerable data property; anything else raises `CaptureAuthoringError` at the
+moment it is recorded. Degrading instead was itself a bypass twice over: a scan
+payload supplied as an accessor became a valid `decode-failed` carrying nothing,
+which suppressed a genuine reset and moved a published figure from 1.288 m to
+2.449 m; and an object with accessor indices — one the schema's own plain-array
+check would have rejected — was copied element by element into a real array,
+moving a published median from 3.688 m to 22.688 m. A recorder must never
+launder input the schema would refuse into a stream that validates.
 
 Sequence contiguity is worth stating precisely, because it is easy to overread.
 Requiring `0..n-1` detects an event *dropped* from an otherwise untouched
