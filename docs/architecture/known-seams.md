@@ -58,26 +58,43 @@ packages. Before accepting georeferenced or unusually offset source geometry,
 the coordinate-frame contract and its bound must move to the shared spatial
 schema so compiler, package verification, runtime and capture agree.
 
-## Per-observation lineage is not recorded
+## A ground-truth mark carries one timestamp for two different meanings
 
 Capture chronology and immutability, deferred from Recorder Integrity v0.1.1,
 closed on 2026-08-11. A capture clock that goes backwards is reported rather
-than sorted away, distinct inertial samples must differ by at least
-`MIN_SAMPLE_INTERVAL_MS`, everything a session claims about itself is copied out
-of the caller's options at construction, each recorder input is read exactly
-once, and every event leaving the recorder is a snapshot.
+than sorted away for samples, scans and lifecycle events alike; distinct
+inertial samples must differ by at least `MIN_SAMPLE_INTERVAL_MS`; sequences
+must run `0..n-1` so an event cannot be deleted without trace; a session has one
+`session-start` at time zero and at most one terminal `session-end`; everything
+a session claims about itself is copied out of the caller's options at
+construction; each recorder input is read exactly once, by fixed index, and
+optional fields are copied only when the caller actually owns them; and every
+event leaving the recorder is a snapshot.
 
-Same-millisecond correctness is *not* outstanding. `(timeMs, sequence, ordinal)`
-keys and exact `observationIndex` scoring already carry capture order through
-derivation, so a mark is scored against the estimate it was actually taken
-against.
+An earlier version of this entry claimed same-millisecond correctness was fully
+solved. That overclaimed. `(timeMs, sequence, ordinal)` keys and exact
+`observationIndex` scoring do carry capture order through derivation among
+events the device stamps, and that part is sound. But a ground-truth mark
+carries only one timestamp, and it means two different things: `timeMs` is when
+the surveyor stood on the mark, while `sequence` is when the annotation was
+written, which may be much later.
 
-What remains is optional: no derived observation records which capture event
+So when a resolved scan shares a mark's millisecond, the capture genuinely
+cannot say which happened first, and the two readings are not close: the same
+fixture scores 1.28 m if the mark preceded the reset and 88.197 m if it
+followed. Those marks are now excluded as `ambiguous-anchor-reset-tie` rather
+than ordered by annotation sequence, which is not evidence of when anything
+occurred.
+
+Capture Stream 0.3 is where this closes properly, by giving a mark separate
+occurrence and recording timestamps. Until then the exclusion is conservative
+and costs only marks that were never orderable.
+
+Separately and optionally: no derived observation records which capture event
 produced it in a form that survives outside the process. The key exists in
 memory during derivation and is discarded. Nothing is presently wrong because of
 this — it becomes worth doing when the sealed evidence artifact needs to show,
-from the artifact alone, how each observation traces back to the stream. It
-belongs with that slice rather than with the capture schema.
+from the artifact alone, how each observation traces back to the stream.
 
 The clock rule covers inertial samples, scans and lifecycle events, all of which
 the device stamps when it records them. Only ground-truth marks are exempt,

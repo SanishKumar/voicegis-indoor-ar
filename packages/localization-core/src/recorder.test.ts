@@ -308,6 +308,17 @@ describe('capture stream integrity', () => {
 });
 
 describe('fail-closed evaluation boundary', () => {
+  /**
+   * Hand-built fixtures still have to be captures a recorder could produce.
+   * Every session begins with `session-start` at sequence and time zero, so the
+   * declared sequences shift up by one to make room for it.
+   */
+  const withSessionStart = (events: CaptureEvent[]): CaptureEvent[] =>
+    [
+      { type: 'lifecycle', sequence: 0, timeMs: 0, event: 'session-start' } as CaptureEvent,
+      ...events.map((event) => ({ ...event, sequence: event.sequence + 1 }) as CaptureEvent),
+    ].sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence);
+
   const anchoredSession = (): CaptureSession => ({
     captureVersion: CAPTURE_STREAM_VERSION,
     sessionId: 's',
@@ -316,7 +327,7 @@ describe('fail-closed evaluation boundary', () => {
     startedAtIso: '2026-08-07T09:00:00.000Z',
     device,
     anchors,
-    events: [
+    events: withSessionStart([
       {
         type: 'scan',
         sequence: 0,
@@ -337,7 +348,7 @@ describe('fail-closed evaluation boundary', () => {
         expectedAccuracyMeters: 0.03,
         independentOfAnchors: false,
       },
-    ],
+    ]),
   });
 
   it('keeps a dependent checkpoint out of the published metric entirely', () => {
@@ -380,7 +391,7 @@ describe('fail-closed evaluation boundary', () => {
    * Two scans and one mark, all at the same millisecond. Only the sequence
    * distinguishes a mark taken before the second reset from one taken after.
    */
-  const sameMillisecondSession = (markSequence: number): CaptureSession => ({
+  const sameMillisecondSession = (markBeforeReset: boolean): CaptureSession => ({
     captureVersion: CAPTURE_STREAM_VERSION,
     sessionId: 's',
     buildingId: 'b',
@@ -388,7 +399,7 @@ describe('fail-closed evaluation boundary', () => {
     startedAtIso: '2026-08-07T09:00:00.000Z',
     device,
     anchors,
-    events: (
+    events: withSessionStart(
       [
         {
           type: 'scan',
@@ -401,7 +412,7 @@ describe('fail-closed evaluation boundary', () => {
         },
         {
           type: 'ground-truth',
-          sequence: markSequence,
+          sequence: markBeforeReset ? 1 : 2,
           timeMs: 500,
           checkpointId: 'tie-mark',
           position: [40, 40],
@@ -412,7 +423,7 @@ describe('fail-closed evaluation boundary', () => {
         },
         {
           type: 'scan',
-          sequence: 2,
+          sequence: markBeforeReset ? 2 : 1,
           timeMs: 500,
           transport: 'qr',
           payload: 'vg:corridor-end',
@@ -420,7 +431,7 @@ describe('fail-closed evaluation boundary', () => {
           anchorId: 'corridor-end',
         },
       ] as CaptureEvent[]
-    ).sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence),
+    ),
   });
 
   /**
@@ -428,7 +439,7 @@ describe('fail-closed evaluation boundary', () => {
    * reset all in one millisecond. Scoring by time alone selects whichever
    * estimate was written last, which is the reset.
    */
-  const tieBreakSession = (markSequence: number): CaptureSession => ({
+  const tieBreakSession = (markBeforeReset: boolean): CaptureSession => ({
     captureVersion: CAPTURE_STREAM_VERSION,
     sessionId: 's',
     buildingId: 'b',
@@ -439,7 +450,7 @@ describe('fail-closed evaluation boundary', () => {
       { id: 'origin', floorId: 'g', kind: 'qr', position: [0, 0], headingDegrees: 0, payload: 'p:origin' },
       { id: 'far', floorId: 'g', kind: 'qr', position: [80, 80], headingDegrees: 0, payload: 'p:far' },
     ],
-    events: (
+    events: withSessionStart(
       [
         {
           type: 'scan',
@@ -478,7 +489,7 @@ describe('fail-closed evaluation boundary', () => {
         },
         {
           type: 'ground-truth',
-          sequence: markSequence,
+          sequence: markBeforeReset ? 4 : 5,
           timeMs: 500,
           checkpointId: 'tie-mark',
           position: [0, 2],
@@ -489,7 +500,7 @@ describe('fail-closed evaluation boundary', () => {
         },
         {
           type: 'scan',
-          sequence: 5,
+          sequence: markBeforeReset ? 5 : 4,
           timeMs: 500,
           transport: 'qr',
           payload: 'p:far',
@@ -497,55 +508,49 @@ describe('fail-closed evaluation boundary', () => {
           anchorId: 'far',
         },
       ] as CaptureEvent[]
-    ).sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence),
+    ),
   });
 
-  it('scores a mark before a same-millisecond reset against the pre-reset estimate', () => {
-    const session = tieBreakSession(4);
-    const derived = deriveRecording(session);
-    const mark = derived.evaluationCheckpoints.find((c) => c.id === 'tie-mark')!;
-    const { estimates } = replayRecording(derived);
-    const { report } = buildEvidenceReport(session);
+  it('refuses to score a mark tied with a reset, whichever side it was written on', () => {
+    // A mark's timeMs is when the surveyor stood on it; its sequence is when
+    // the annotation was written, which may be much later. When a resolved scan
+    // shares that millisecond, nothing in the capture says which happened
+    // first, so the mark is excluded rather than scored against a guess.
+    //
+    // Both orderings were previously scored, and they disagree wildly: the
+    // pre-reset reading gave 1.28 m and the post-reset one 88.197 m from the
+    // same capture. That spread is the reason this cannot be guessed.
+    for (const markBeforeReset of [true, false]) {
+      const session = tieBreakSession(markBeforeReset);
+      const derived = deriveRecording(session);
+      const mark = derived.evaluationCheckpoints.find((c) => c.id === 'tie-mark')!;
+      const { report } = buildEvidenceReport(session);
 
-    expect(mark.publishable).toBe(true);
-    expect(mark.observationIndex).not.toBeNull();
-    // The chosen estimate must come from the step at sequence 3, not the reset
-    // at sequence 5.
-    expect(mark.estimateKey!.sequence).toBe(3);
-
-    // The completed step advances one 0.72 m stride from the origin anchor, so
-    // the estimate is exactly [0, 0.72] and the mark at [0, 2] is exactly
-    // 1.28 m away. Scoring by time alone chose the far anchor instead.
-    const scored = estimates[mark.observationIndex!];
-    expect(scored.position[0]).toBeCloseTo(0, 9);
-    expect(scored.position[1]).toBeCloseTo(0.72, 9);
-    expect(report.medianHorizontalErrorMeters).toBe(1.28);
-    expect(report.p95HorizontalErrorMeters).toBe(1.28);
+      expect(mark.publishable, `markBeforeReset=${markBeforeReset}`).toBe(false);
+      expect(mark.exclusionReason).toBe('ambiguous-anchor-reset-tie');
+      // Nothing reaches the evaluator, so no figure can rest on the tie.
+      expect(derived.checkpoints).toEqual([]);
+      expect(report.evidenceStatus).toBe('insufficient-ground-truth');
+      expect(report.medianHorizontalErrorMeters).toBeNull();
+    }
   });
 
-  it('scores a mark after a same-millisecond reset against the post-reset estimate', () => {
-    const session = tieBreakSession(6);
-    const derived = deriveRecording(session);
-    const mark = derived.evaluationCheckpoints.find((c) => c.id === 'tie-mark')!;
-    const { estimates } = replayRecording(derived);
+  it('keeps a tied mark and its provenance rather than dropping it', () => {
+    const mark = deriveRecording(tieBreakSession(true)).evaluationCheckpoints.find(
+      (c) => c.id === 'tie-mark',
+    )!;
 
-    expect(mark.publishable).toBe(true);
-    // The mark now follows the reset, so the reset is legitimately causal.
-    // Ordinal 2 is the third observation the scan emits (position, heading,
-    // floor); the mark follows all three, so the last is causal.
-    expect(mark.estimateKey).toEqual({ timeMs: 500, sequence: 5, ordinal: 2 });
-    // A fix corrects toward the anchor in proportion to relative uncertainty
-    // rather than snapping onto it, so the estimate lands short of [80, 80].
-    const scored = estimates[mark.observationIndex!];
-    expect(scored.position[0]).toBeCloseTo(63.282728403721265, 9);
-    expect(scored.position[1]).toBeCloseTo(63.43318384808777, 9);
-    expect(buildEvidenceReport(tieBreakSession(6)).report.medianHorizontalErrorMeters).toBe(88.197);
+    // The mark qualifies on its own terms. It is the ordering that is unknown,
+    // not the survey, so the record of it must survive for diagnosis.
+    expect(mark.surveyEligible).toBe(true);
+    expect(mark.recordedTimeMs).toBe(500);
+    expect(mark.surveyMethod).toBe('tape-measure');
   });
 
   it('never scores a mark against a first fix captured after it', () => {
     const session: CaptureSession = {
-      ...tieBreakSession(4),
-      events: (
+      ...tieBreakSession(true),
+      events: withSessionStart(
         [
           {
             type: 'ground-truth',
@@ -568,7 +573,7 @@ describe('fail-closed evaluation boundary', () => {
             anchorId: 'far',
           },
         ] as CaptureEvent[]
-      ).sort((left, right) => left.timeMs - right.timeMs || left.sequence - right.sequence),
+      ),
     };
 
     const derived = deriveRecording(session);
@@ -581,23 +586,21 @@ describe('fail-closed evaluation boundary', () => {
     expect(buildEvidenceReport(session).report.evidenceStatus).toBe('insufficient-ground-truth');
   });
 
-  it('distinguishes the several observations one scan emits at a single instant', () => {
-    const session = tieBreakSession(6);
-    const derived = deriveRecording(session);
-    const mark = derived.evaluationCheckpoints.find((c) => c.id === 'tie-mark')!;
+  it('emits several observations from one scan at a single instant', () => {
+    const derived = deriveRecording(tieBreakSession(false));
+    const fromReset = derived.observations.filter((observation) => observation.timeMs === 500);
 
-    // A resolved scan after the first fix emits position, heading, and floor.
-    const fromReset = derived.observations.filter((o) => o.timeMs === 500);
+    // A resolved scan emits position, heading and floor on one millisecond,
+    // which is why a millisecond alone can never name the estimate a mark was
+    // scored against — the keys carry an ordinal for exactly this reason.
     expect(fromReset.length).toBeGreaterThan(1);
-    // The key must name which of them was used, not merely the millisecond.
-    // The key names which of them was used, not merely the millisecond.
-    expect(mark.estimateKey).toEqual({ timeMs: 500, sequence: 5, ordinal: 2 });
-    expect(derived.checkpoints[0].observationIndex).toBe(mark.observationIndex);
+    // A mark sharing that instant is refused rather than bound to one of them.
+    expect(derived.checkpoints).toEqual([]);
   });
 
   it('scores a mark captured before a same-millisecond reset against pre-reset state', () => {
     // sequence 1 puts the mark ahead of the reset at sequence 2.
-    const derived = deriveRecording(sameMillisecondSession(1));
+    const derived = deriveRecording(sameMillisecondSession(true));
     const mark = derived.evaluationCheckpoints.find((c) => c.id === 'tie-mark')!;
 
     expect(mark.alignedTimeMs).toBeLessThanOrEqual(mark.recordedTimeMs);
@@ -607,8 +610,8 @@ describe('fail-closed evaluation boundary', () => {
   });
 
   it('never scores any mark against a future estimate', () => {
-    for (const markSequence of [1, 3]) {
-      const derived = deriveRecording(sameMillisecondSession(markSequence));
+    for (const markBeforeReset of [true, false]) {
+      const derived = deriveRecording(sameMillisecondSession(markBeforeReset));
       for (const mark of derived.evaluationCheckpoints) {
         expect(mark.alignedTimeMs).toBeLessThanOrEqual(mark.recordedTimeMs);
         expect(mark.alignmentDeltaMs).toBeLessThanOrEqual(0);
@@ -617,11 +620,11 @@ describe('fail-closed evaluation boundary', () => {
   });
 
   it('excludes a mark with no causal estimate behind it', () => {
-    const session = sameMillisecondSession(1);
+    const session = sameMillisecondSession(true);
     // Move the mark before any observation exists.
     session.events = sortCaptureEvents(
       session.events.map((event) =>
-        event.type === 'ground-truth' ? { ...event, timeMs: 1, sequence: 5 } : event,
+        event.type === 'ground-truth' ? { ...event, timeMs: 1 } : event,
       ),
     );
 
@@ -635,11 +638,15 @@ describe('fail-closed evaluation boundary', () => {
 
   it('keeps estimated and coarse survey marks diagnostic only', () => {
     const build = (surveyMethod: string, expectedAccuracyMeters: number) => {
-      const session = sameMillisecondSession(1);
-      session.events = session.events.map((event) =>
-        event.type === 'ground-truth'
-          ? ({ ...event, surveyMethod, expectedAccuracyMeters } as CaptureEvent)
-          : event,
+      const session = sameMillisecondSession(true);
+      // Off the reset's millisecond: this is about survey policy, not about
+      // whether a tied mark can be ordered.
+      session.events = sortCaptureEvents(
+        session.events.map((event) =>
+          event.type === 'ground-truth'
+            ? ({ ...event, timeMs: 400, surveyMethod, expectedAccuracyMeters } as CaptureEvent)
+            : event,
+        ),
       );
       return deriveRecording(session).evaluationCheckpoints[0];
     };

@@ -275,6 +275,71 @@ describe('recorder inputs are read exactly once', () => {
     expect(stored).toMatchObject({ accelerometer: [1, 2, 3] });
   });
 
+  it('stores the anchor position from one read, not a mix of two', () => {
+    let reads = 0;
+    const shifting = {
+      id: 'corridor-start',
+      floorId: 'g',
+      kind: 'qr' as const,
+      get position(): [number, number] {
+        reads += 1;
+        return reads === 1 ? [1, 9] : [500, 500];
+      },
+      headingDegrees: 90,
+      payload: 'vg:corridor-start',
+    };
+
+    const session = new SessionRecorder({
+      sessionId: 'shifting-anchor',
+      buildingId: 'reference-medical-centre',
+      packageHash: 'a'.repeat(64),
+      device,
+      anchors: [shifting],
+      startedAtIso: '2026-08-07T09:00:00.000Z',
+    }).buildSession();
+
+    // Reading `position` twice stored [1, 500] — a coordinate that existed in
+    // neither read, and one that validates cleanly because it is still two
+    // finite in-frame numbers.
+    expect(session.anchors[0].position).toEqual([1, 9]);
+  });
+
+  it('ignores optional fields the caller does not own', () => {
+    const proto = {
+      get model() {
+        return { cameraFrames: ['leak'] };
+      },
+      get failure() {
+        return 'permission-denied';
+      },
+    };
+    const inheritedDevice = Object.create(proto) as CaptureDeviceProfile;
+    inheritedDevice.label = 'field handset';
+    inheritedDevice.platform = 'android';
+    inheritedDevice.sensors = { api: 'native', gyroscopeUnits: 'deg/s', frame: 'world' };
+
+    const walk = new SessionRecorder({
+      sessionId: 'inherited',
+      buildingId: 'reference-medical-centre',
+      packageHash: 'a'.repeat(64),
+      device: inheritedDevice,
+      anchors,
+      startedAtIso: '2026-08-07T09:00:00.000Z',
+    });
+
+    const attempt = Object.create(proto) as never;
+    Object.assign(attempt, { timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
+    const scan = walk.recordScan(attempt);
+    const session = walk.buildSession();
+
+    // A prototype getter injected device.model into a recorded session, and an
+    // inherited `failure` turned a scan that had resolved into permission-denied.
+    expect(session.device).not.toHaveProperty('model');
+    expect(scan.outcome).toBe('resolved');
+    expect(scan.anchorId).toBe('corridor-start');
+    expect(validateCaptureSession(session)).toEqual([]);
+  });
+
   it('stores the mark position the caller indexed', () => {
     const hostile = [4, 5];
     Object.defineProperty(hostile, Symbol.iterator, {
@@ -297,6 +362,78 @@ describe('recorder inputs are read exactly once', () => {
     const stored = walk.buildSession().events.find((event) => event.type === 'ground-truth');
 
     expect(stored).toMatchObject({ position: [4, 5] });
+  });
+});
+
+describe('the stream asserts its own completeness', () => {
+  it('refuses a sequence gap left by a deleted event', () => {
+    const walk = recorder('deleted-event');
+    walk.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
+    for (let timeMs = 100; timeMs <= 3_000; timeMs += 20) {
+      if (timeMs === 1_500) walk.recordLifecycle('backgrounded', 1_500, 'screen locked');
+      walk.recordImu({
+        timeMs,
+        accelerometer: [0, 0, 9.81 + 3 * Math.sin((2 * Math.PI * timeMs) / 500)],
+        gyroscope: [0, 0, 0],
+      });
+    }
+    walk.recordGroundTruth({
+      timeMs: 3_000,
+      checkpointId: 'mark',
+      position: [3.5, 9],
+      floorId: 'g',
+      surveyMethod: 'tape-measure',
+      expectedAccuracyMeters: 0.03,
+      independentOfAnchors: true,
+    });
+    const session = walk.buildSession();
+    expect(buildEvidenceReport(session).report.evidenceStatus).toBe('interrupted-capture');
+
+    // Deleting the interruption previously produced a clean, publishable walk:
+    // evidence suppressed by deletion rather than by argument.
+    const pruned = {
+      ...session,
+      events: session.events.filter(
+        (event) => !(event.type === 'lifecycle' && event.event === 'backgrounded'),
+      ),
+    };
+
+    expect(codesFor(pruned)).toEqual(['non-contiguous-event-sequence']);
+  });
+
+  it('requires exactly one session-start, first and at time zero', () => {
+    const walk = completeWalk();
+    const session = walk.buildSession();
+    expect(validateCaptureSession(session)).toEqual([]);
+
+    const withoutStart = {
+      ...session,
+      events: session.events
+        .filter((event) => !(event.type === 'lifecycle' && event.event === 'session-start'))
+        .map((event, index) => ({ ...event, sequence: index })),
+    };
+    expect(codesFor(withoutStart)).toContain('invalid-session-boundary');
+
+    const walkWithSecondStart = completeWalk();
+    walkWithSecondStart.recordLifecycle('session-start', 3_100);
+    expect(codesFor(walkWithSecondStart.buildSession())).toContain('invalid-session-boundary');
+  });
+
+  it('requires any session-end to be unique and terminal', () => {
+    const twice = completeWalk();
+    twice.recordLifecycle('session-end', 3_100);
+    twice.recordLifecycle('session-end', 3_200);
+    expect(codesFor(twice.buildSession())).toContain('invalid-session-boundary');
+
+    // An event after the end still reached evaluation.
+    const afterEnd = completeWalk();
+    afterEnd.recordLifecycle('session-end', 3_100);
+    afterEnd.recordImu({ timeMs: 4_000, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+    expect(codesFor(afterEnd.buildSession())).toContain('invalid-session-boundary');
+
+    const wellFormed = completeWalk();
+    wellFormed.recordLifecycle('session-end', 3_100);
+    expect(validateCaptureSession(wellFormed.buildSession())).toEqual([]);
   });
 });
 

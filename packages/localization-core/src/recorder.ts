@@ -164,7 +164,7 @@ export class SessionRecorder {
     const timeMs = attempt.timeMs;
     const transport = attempt.transport;
     const payload = attempt.payload;
-    const failure = attempt.failure;
+    const failure = ownData<ScanAttempt['failure']>(attempt, 'failure');
 
     let outcome: ScanOutcome = failure ?? 'decode-failed';
     let anchorId: string | null = null;
@@ -192,7 +192,7 @@ export class SessionRecorder {
   }
 
   recordGroundTruth(mark: GroundTruthMark) {
-    const position = readOnce(mark.position);
+    const position = position2Once(mark.position);
     const event: GroundTruthCaptureEvent = {
       type: 'ground-truth',
       sequence: this.nextSequence(),
@@ -264,6 +264,35 @@ function vector3Once(values: Vector3): Vector3 {
   return [values[0], values[1], values[2]];
 }
 
+/**
+ * A two-component position, read from one property access at fixed indices.
+ *
+ * `[value.position[0], value.position[1]]` reads `position` twice. A getter
+ * returning a different array each time produced a coordinate that existed in
+ * neither — `[1, 9]` and `[500, 500]` stored as `[1, 500]` — and it validated
+ * cleanly, because a mixed pair is still two finite in-frame numbers.
+ */
+function position2Once(values: readonly [number, number]): [number, number] {
+  return [values[0], values[1]];
+}
+
+/**
+ * The value of an own, enumerable data property, or `undefined`.
+ *
+ * Optional fields were copied by plain property access, which also reads the
+ * prototype chain. A prototype getter injected `device.model` and a lifecycle
+ * `detail` into a recorded session, and an inherited `failure` turned a scan
+ * that had resolved into `permission-denied`. A field the caller does not
+ * actually own is not a field the capture should carry.
+ */
+function ownData<T>(source: object, key: string): T | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(source, key);
+  if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
+    return undefined;
+  }
+  return descriptor.value as T;
+}
+
 function orientationSnapshot(sample: DeviceOrientationSample): DeviceOrientationSample {
   return {
     alphaDegrees: sample.alphaDegrees,
@@ -286,17 +315,17 @@ function captureDeviceSnapshot(device: CaptureDeviceProfile): CaptureDeviceProfi
   return {
     label: device.label,
     platform: device.platform,
-    ...optional('model', device.model),
-    ...optional('osVersion', device.osVersion),
-    ...optional('browser', device.browser),
-    ...optional('browserVersion', device.browserVersion),
-    ...optional('userAgent', device.userAgent),
-    ...optional('appVersion', device.appVersion),
-    ...optional('timezone', device.timezone),
+    ...optional('model', ownData<string>(device, 'model')),
+    ...optional('osVersion', ownData<string>(device, 'osVersion')),
+    ...optional('browser', ownData<string>(device, 'browser')),
+    ...optional('browserVersion', ownData<string>(device, 'browserVersion')),
+    ...optional('userAgent', ownData<string>(device, 'userAgent')),
+    ...optional('appVersion', ownData<string>(device, 'appVersion')),
+    ...optional('timezone', ownData<string>(device, 'timezone')),
     sensors: {
-      ...optional('accelerometerHz', sensors.accelerometerHz),
-      ...optional('gyroscopeHz', sensors.gyroscopeHz),
-      ...optional('orientationHz', sensors.orientationHz),
+      ...optional('accelerometerHz', ownData<number>(sensors, 'accelerometerHz')),
+      ...optional('gyroscopeHz', ownData<number>(sensors, 'gyroscopeHz')),
+      ...optional('orientationHz', ownData<number>(sensors, 'orientationHz')),
       api: sensors.api,
       gyroscopeUnits: sensors.gyroscopeUnits,
       frame: sensors.frame,
@@ -361,7 +390,7 @@ function captureEventSnapshot(event: CaptureEvent): CaptureEvent {
     sequence: event.sequence,
     timeMs: event.timeMs,
     event: event.event,
-    ...(event.detail === undefined ? {} : { detail: event.detail }),
+    ...optional('detail', ownData<string>(event, 'detail')),
   };
 }
 
@@ -370,7 +399,7 @@ function captureAnchorSnapshot(anchor: CheckpointAnchor): CaptureAnchorSnapshot 
     id: anchor.id,
     floorId: anchor.floorId,
     kind: anchor.kind,
-    position: [anchor.position[0], anchor.position[1]],
+    position: position2Once(anchor.position),
     headingDegrees: anchor.headingDegrees,
     payload: anchor.payload,
   };
@@ -567,6 +596,7 @@ export function buildEvidenceReport(
     'no-causal-estimate-in-range': 0,
     'survey-method-not-publishable': 0,
     'survey-accuracy-out-of-policy': 0,
+    'ambiguous-anchor-reset-tie': 0,
   } as Record<CheckpointExclusionReason, number>;
   for (const checkpoint of derived.diagnosticCheckpoints) {
     if (checkpoint.exclusionReason) exclusionCounts[checkpoint.exclusionReason] += 1;
@@ -616,7 +646,9 @@ export type CheckpointExclusionReason =
   | 'alignment-crosses-anchor-reset'
   | 'no-causal-estimate-in-range'
   | 'survey-method-not-publishable'
-  | 'survey-accuracy-out-of-policy';
+  | 'survey-accuracy-out-of-policy'
+  /** A resolved scan shares the mark's millisecond, so their order is unknown. */
+  | 'ambiguous-anchor-reset-tie';
 
 
 /**
@@ -837,6 +869,18 @@ function deriveValidatedRecording(
         isPublishableSurveyMethod(mark.surveyMethod) &&
         isPublishableSurveyAccuracy(mark.expectedAccuracyMeters);
 
+      // A mark's `timeMs` is when the surveyor stood on it; its `sequence` is
+      // when the annotation was written, which may be much later. So when a
+      // resolved scan shares the mark's millisecond, nothing in the capture says
+      // which happened first — whether the mark was taken against pre-reset or
+      // post-reset state is genuinely unknown, and `notAfter` resolves the tie
+      // by annotation order, which is not evidence of anything.
+      //
+      // Excluded rather than guessed. Capture Stream 0.3 is where a mark gains
+      // separate occurrence and recording timestamps; until then a tie cannot
+      // be scored honestly.
+      const ambiguousResetTie = anchorResets.some((reset) => reset.timeMs === mark.timeMs);
+
       const exclusionReason: CheckpointExclusionReason | null = !mark.independentOfAnchors
         ? 'dependent-on-anchor'
         : !isPublishableSurveyMethod(mark.surveyMethod)
@@ -845,9 +889,11 @@ function deriveValidatedRecording(
             ? 'survey-accuracy-out-of-policy'
             : !withinTolerance
               ? 'no-causal-estimate-in-range'
-              : crossesReset
-                ? 'alignment-crosses-anchor-reset'
-                : null;
+              : ambiguousResetTie
+                ? 'ambiguous-anchor-reset-tie'
+                : crossesReset
+                  ? 'alignment-crosses-anchor-reset'
+                  : null;
 
       return {
         id: mark.checkpointId,

@@ -195,8 +195,12 @@ describe('enum scalars do not coerce', () => {
     return session;
   };
 
+  // The last lifecycle event, never the first: `session-start` is structural,
+  // and overwriting it would test the session boundary rather than the enum.
   const lifecycleOf = (session: CaptureSession) =>
-    session.events.find((event) => event.type === 'lifecycle') as unknown as {
+    [...session.events]
+      .reverse()
+      .find((event) => event.type === 'lifecycle') as unknown as {
       event: unknown;
       detail?: unknown;
     };

@@ -1449,6 +1449,73 @@ function validateCaptureSessionSchema(value: unknown): CaptureIssue[] {
     }
   }
 
+  // Uniqueness alone let events be removed. Deleting the `backgrounded` event
+  // from a walk left a hole in the sequence that nothing objected to, and the
+  // capture went from `interrupted-capture` to a publishable `ok` — evidence
+  // suppressed by deletion rather than by argument. Requiring the sequences to
+  // be exactly 0..n-1 makes the stream assert its own completeness.
+  //
+  // Skipped when an event is malformed: those are already reported, and their
+  // absence from `wellFormed` would raise a second, misleading complaint.
+  if (wellFormed.length === session.events.length) {
+    const sequences = wellFormed.map(({ event }) => event.sequence).sort((a, b) => a - b);
+    for (let position = 0; position < sequences.length; position += 1) {
+      if (sequences[position] !== position) {
+        issues.push({
+          code: 'non-contiguous-event-sequence',
+          path: '/events',
+          message: `Capture sequences must run 0..${sequences.length - 1} with nothing missing; found a gap at ${position}.`,
+        });
+        break;
+      }
+    }
+  }
+
+  // A session has one beginning and at most one end, and nothing happens after
+  // the end. Duplicate starts, several ends, and samples recorded after
+  // `session-end` all validated, and events past the end still reached
+  // evaluation.
+  const lifecycleEvents = wellFormed.filter(
+    (entry): entry is { event: LifecycleCaptureEvent; index: number } =>
+      entry.event.type === 'lifecycle',
+  );
+  const starts = lifecycleEvents.filter(({ event }) => event.event === 'session-start');
+  const ends = lifecycleEvents.filter(({ event }) => event.event === 'session-end');
+
+  if (starts.length !== 1) {
+    issues.push({
+      code: 'invalid-session-boundary',
+      path: '/events',
+      message: `A capture must record exactly one session-start; found ${starts.length}.`,
+    });
+  } else if (starts[0].event.sequence !== 0 || starts[0].event.timeMs !== 0) {
+    issues.push({
+      code: 'invalid-session-boundary',
+      path: `/events/${starts[0].index}`,
+      message: 'session-start must be the first event captured, at time zero.',
+    });
+  }
+
+  if (ends.length > 1) {
+    issues.push({
+      code: 'invalid-session-boundary',
+      path: '/events',
+      message: `A capture may record at most one session-end; found ${ends.length}.`,
+    });
+  } else if (ends.length === 1) {
+    const end = ends[0].event;
+    const after = wellFormed.filter(
+      ({ event }) => event.sequence > end.sequence || event.timeMs > end.timeMs,
+    );
+    if (after.length > 0) {
+      issues.push({
+        code: 'invalid-session-boundary',
+        path: `/events/${after[0].index}`,
+        message: 'session-end must be the last event captured, and nothing may be timed after it.',
+      });
+    }
+  }
+
   const anchorsByFloor = new Map<string, CheckpointAnchor[]>();
   for (const anchor of validAnchors) {
     const list = anchorsByFloor.get(anchor.floorId) ?? [];
