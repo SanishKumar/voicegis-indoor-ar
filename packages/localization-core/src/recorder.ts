@@ -123,9 +123,7 @@ export class SessionRecorder {
     // fields the capture schema does not define; the snapshot is what this
     // session resolves against and what it later serialises, so a later edit to
     // the caller's own anchor objects cannot change either.
-    this.anchors = readOnce(ownRequired<CheckpointAnchor[]>(options, 'anchors')).map(
-      captureAnchorSnapshot,
-    );
+    this.anchors = ownDenseArray<CheckpointAnchor>(options, 'anchors').map(captureAnchorSnapshot);
     this.recordLifecycle('session-start', 0);
   }
 
@@ -141,7 +139,7 @@ export class SessionRecorder {
     const timeMs = ownRequired<number>(reading, 'timeMs');
     const accelerometer = ownNumberTuple(reading, 'accelerometer', 3) as Vector3;
     const gyroscope = ownNumberTuple(reading, 'gyroscope', 3) as Vector3;
-    const orientation = ownData<DeviceOrientationSample | null>(reading, 'orientation');
+    const orientation = ownOptional<DeviceOrientationSample | null>(reading, 'orientation');
 
     this.events.push({
       type: 'imu',
@@ -166,7 +164,7 @@ export class SessionRecorder {
     const timeMs = ownRequired<number>(attempt, 'timeMs');
     const transport = ownRequired<ScanAttempt['transport']>(attempt, 'transport');
     const payload = ownRequired<string | null>(attempt, 'payload');
-    const failure = ownData<ScanAttempt['failure']>(attempt, 'failure');
+    const failure = ownOptional<ScanAttempt['failure']>(attempt, 'failure');
 
     let outcome: ScanOutcome = failure ?? 'decode-failed';
     let anchorId: string | null = null;
@@ -194,17 +192,28 @@ export class SessionRecorder {
   }
 
   recordGroundTruth(mark: GroundTruthMark) {
+    // Every field is snapshotted before a sequence is allocated. Taking the
+    // sequence first meant a refused mark still consumed one, leaving the
+    // recorder permanently unable to produce a contiguous stream: the next
+    // capture validated as non-contiguous and could never be evidence again.
     const position = ownNumberTuple(mark, 'position', 2) as [number, number];
+    const timeMs = ownRequired<number>(mark, 'timeMs');
+    const checkpointId = ownRequired<string>(mark, 'checkpointId');
+    const floorId = ownRequired<string>(mark, 'floorId');
+    const surveyMethod = ownRequired<SurveyMethod>(mark, 'surveyMethod');
+    const expectedAccuracyMeters = ownRequired<number>(mark, 'expectedAccuracyMeters');
+    const independentOfAnchors = ownRequired<boolean>(mark, 'independentOfAnchors');
+
     const event: GroundTruthCaptureEvent = {
       type: 'ground-truth',
       sequence: this.nextSequence(),
-      timeMs: ownRequired<number>(mark, 'timeMs'),
-      checkpointId: ownRequired<string>(mark, 'checkpointId'),
+      timeMs,
+      checkpointId,
       position,
-      floorId: ownRequired<string>(mark, 'floorId'),
-      surveyMethod: ownRequired<SurveyMethod>(mark, 'surveyMethod'),
-      expectedAccuracyMeters: ownRequired<number>(mark, 'expectedAccuracyMeters'),
-      independentOfAnchors: ownRequired<boolean>(mark, 'independentOfAnchors'),
+      floorId,
+      surveyMethod,
+      expectedAccuracyMeters,
+      independentOfAnchors,
     };
     this.events.push(event);
     return captureEventSnapshot(event) as GroundTruthCaptureEvent;
@@ -248,17 +257,35 @@ export class SessionRecorder {
 export type CaptureAnchorSnapshot = CheckpointAnchor;
 
 /**
- * One indexed read of an array-like input.
+ * A dense array of plain own elements, copied by descriptor.
  *
  * Spreading and `Array.from` both go through the caller's iterator, so an
  * object whose `Symbol.iterator` disagrees with its indices stored values the
  * caller never held: indices `[1, 2, 3]` were recorded as `[99, 98, 97]`.
- * Reading by index takes the data the caller actually indexed.
+ * Reading by index fixed that but left the elements themselves unchecked, so an
+ * accessor-backed element was still laundered into a valid anchor and moved a
+ * published median from 3.688 m to 18.688 m.
+ *
+ * This mirrors the schema's own dense-array rule at the authoring boundary: a
+ * real array, no holes, no named properties, and every element a plain own
+ * value.
  */
-function readOnce<T>(values: ArrayLike<T>): T[] {
-  const length = values.length;
+function ownDenseArray<T>(source: object, key: string, field = key): T[] {
+  const values = ownRequired<unknown>(source, key, field);
+  if (!Array.isArray(values) || Object.getPrototypeOf(values) !== Array.prototype) {
+    throw new CaptureAuthoringError(field, `${field} must be a plain array.`);
+  }
+  const keys = Reflect.ownKeys(values);
+  if (keys.length !== values.length + 1 || !keys.includes('length')) {
+    throw new CaptureAuthoringError(
+      field,
+      `${field} must be dense and carry nothing but its elements.`,
+    );
+  }
   const copy: T[] = [];
-  for (let index = 0; index < length; index += 1) copy.push(values[index]);
+  for (let index = 0; index < values.length; index += 1) {
+    copy.push(ownRequired<T>(values, String(index), `${field}[${index}]`));
+  }
   return copy;
 }
 
@@ -271,20 +298,41 @@ function tuple2Once(values: readonly [number, number]): [number, number] {
 }
 
 /**
- * The value of an own, enumerable data property, or `undefined`.
+ * An optional field: absent, or a plain own value. Never anything else.
  *
- * Optional fields were copied by plain property access, which also reads the
- * prototype chain. A prototype getter injected `device.model` and a lifecycle
- * `detail` into a recorded session, and an inherited `failure` turned a scan
- * that had resolved into `permission-denied`. A field the caller does not
- * actually own is not a field the capture should carry.
+ * Optional fields were first copied by plain property access, which also reads
+ * the prototype chain, so a prototype getter injected `device.model` and a
+ * lifecycle `detail` into a recorded session. Treating those as absent fixed
+ * the injection but introduced the mirror-image bug: a scan declaring
+ * `permission-denied` through an own getter had its `failure` silently
+ * discarded, resolved against the anchors instead, and published `ok` at 2 m
+ * from a reset the device had reported it never made.
+ *
+ * Absent and malformed are therefore different answers. Nothing at all is a
+ * legitimate omission; something present that is inherited, hidden, or computed
+ * is a field the caller meant to supply and the capture will not carry.
  */
-function ownData<T>(source: object, key: string): T | undefined {
-  const descriptor = Object.getOwnPropertyDescriptor(source, key);
-  if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
-    return undefined;
+function ownOptional<T>(source: object, key: string, field = key): T | undefined {
+  if (source === null || typeof source !== 'object') {
+    throw new CaptureAuthoringError(field, `Cannot author ${field} from a non-object.`);
   }
-  return descriptor.value as T;
+  const descriptor = Object.getOwnPropertyDescriptor(source, key);
+  if (descriptor !== undefined) {
+    if (!descriptor.enumerable || !('value' in descriptor)) {
+      throw new CaptureAuthoringError(
+        field,
+        `${field} is present but hidden or computed; supply it as a plain value or omit it.`,
+      );
+    }
+    return descriptor.value as T;
+  }
+  if (key in source) {
+    throw new CaptureAuthoringError(
+      field,
+      `${field} is inherited rather than owned; supply it as a plain value or omit it.`,
+    );
+  }
+  return undefined;
 }
 
 /**
@@ -364,12 +412,19 @@ function ownNumberTuple(source: object, key: string, length: number, field = key
   return copy;
 }
 
+/**
+ * Orientation is optional, but once supplied its components are required.
+ *
+ * They were read by plain access, so an inherited or computed subfield became
+ * valid raw orientation evidence — the one part of the stream a better
+ * processor is meant to be able to re-derive from.
+ */
 function orientationSnapshot(sample: DeviceOrientationSample): DeviceOrientationSample {
   return {
-    alphaDegrees: sample.alphaDegrees,
-    betaDegrees: sample.betaDegrees,
-    gammaDegrees: sample.gammaDegrees,
-    absolute: sample.absolute,
+    alphaDegrees: ownRequired<number>(sample, 'alphaDegrees', 'orientation.alphaDegrees'),
+    betaDegrees: ownRequired<number>(sample, 'betaDegrees', 'orientation.betaDegrees'),
+    gammaDegrees: ownRequired<number>(sample, 'gammaDegrees', 'orientation.gammaDegrees'),
+    absolute: ownRequired<boolean>(sample, 'absolute', 'orientation.absolute'),
   };
 }
 
@@ -386,17 +441,17 @@ function captureDeviceSnapshot(device: CaptureDeviceProfile): CaptureDeviceProfi
   return {
     label: ownRequired<string>(device, 'label'),
     platform: ownRequired<string>(device, 'platform'),
-    ...optional('model', ownData<string>(device, 'model')),
-    ...optional('osVersion', ownData<string>(device, 'osVersion')),
-    ...optional('browser', ownData<string>(device, 'browser')),
-    ...optional('browserVersion', ownData<string>(device, 'browserVersion')),
-    ...optional('userAgent', ownData<string>(device, 'userAgent')),
-    ...optional('appVersion', ownData<string>(device, 'appVersion')),
-    ...optional('timezone', ownData<string>(device, 'timezone')),
+    ...optional('model', ownOptional<string>(device, 'model')),
+    ...optional('osVersion', ownOptional<string>(device, 'osVersion')),
+    ...optional('browser', ownOptional<string>(device, 'browser')),
+    ...optional('browserVersion', ownOptional<string>(device, 'browserVersion')),
+    ...optional('userAgent', ownOptional<string>(device, 'userAgent')),
+    ...optional('appVersion', ownOptional<string>(device, 'appVersion')),
+    ...optional('timezone', ownOptional<string>(device, 'timezone')),
     sensors: {
-      ...optional('accelerometerHz', ownData<number>(sensors, 'accelerometerHz')),
-      ...optional('gyroscopeHz', ownData<number>(sensors, 'gyroscopeHz')),
-      ...optional('orientationHz', ownData<number>(sensors, 'orientationHz')),
+      ...optional('accelerometerHz', ownOptional<number>(sensors, 'accelerometerHz')),
+      ...optional('gyroscopeHz', ownOptional<number>(sensors, 'gyroscopeHz')),
+      ...optional('orientationHz', ownOptional<number>(sensors, 'orientationHz')),
       api: ownRequired<CaptureDeviceProfile['sensors']['api']>(sensors, 'api'),
       gyroscopeUnits: ownRequired<CaptureDeviceProfile['sensors']['gyroscopeUnits']>(sensors, 'gyroscopeUnits'),
       frame: ownRequired<CaptureDeviceProfile['sensors']['frame']>(sensors, 'frame'),
@@ -461,7 +516,7 @@ function captureEventSnapshot(event: CaptureEvent): CaptureEvent {
     sequence: event.sequence,
     timeMs: event.timeMs,
     event: event.event,
-    ...optional('detail', ownData<string>(event, 'detail')),
+    ...optional('detail', ownOptional<string>(event, 'detail')),
   };
 }
 
@@ -474,21 +529,6 @@ function captureAnchorSnapshot(anchor: CheckpointAnchor): CaptureAnchorSnapshot 
     headingDegrees: ownRequired<number>(anchor, 'headingDegrees'),
     payload: ownRequired<string>(anchor, 'payload'),
   };
-}
-
-/**
- * Whether a scan actually resolves against the anchors the capture carries.
- *
- * Derivation used to gate on the scan's own `outcome`, which meant a stored
- * label decided whether a reset existed. Relabelling a genuine reset
- * `unknown-payload` suppressed it, and labelling an ordinary event `resolved`
- * invented one. Validation now refuses a capture whose labels disagree with its
- * anchors; recomputing here means derivation never depends on the label at all.
- */
-function resolvesAgainstAnchors(event: ScanCaptureEvent, anchors: CheckpointAnchor[]) {
-  if (event.payload === null) return false;
-  const matches = anchors.filter((anchor) => anchor.payload === event.payload);
-  return matches.length === 1 && matches[0].kind === event.transport;
 }
 
 /** How far a surveyed mark may sit from the nearest estimate and still be measured. */
@@ -850,6 +890,8 @@ function deriveValidatedRecording(
     observation: LocalizationObservation;
   }> = [];
   const groundTruth: GroundTruthCaptureEvent[] = [];
+  /** Filled from the adapter's accepted resolutions as the stream is walked. */
+  const anchorResets: Array<{ timeMs: number; sequence: number }> = [];
   let order = 0;
   let firstFixKey: ObservationKey | null = null;
 
@@ -867,15 +909,21 @@ function deriveValidatedRecording(
       continue;
     }
     if (event.type === 'scan') {
-      // Recomputed, not read off the event.
+      // A scan with nothing decoded cannot resolve. Validation already refuses
+      // an acquisition failure that carries a payload, so this is the whole
+      // gate: the stored outcome is never read.
       const payload = event.payload;
-      if (payload === null || !resolvesAgainstAnchors(event, session.anchors)) continue;
+      if (payload === null) continue;
       const resolution = checkpoints.resolve({
         timeMs: event.timeMs,
         kind: event.transport,
         payload,
       });
       if (resolution.accepted) {
+        // The reset is recorded from the adapter's own answer. Deciding it a
+        // second time through a parallel helper meant two places had to agree
+        // about what resolves, and only one of them was the authority.
+        anchorResets.push({ timeMs: event.timeMs, sequence: event.sequence });
         const anchor = anchorsById.get(resolution.anchorId ?? '');
         if (anchor) deadReckoning.syncHeading(anchor.headingDegrees);
       }
@@ -919,13 +967,6 @@ function deriveValidatedRecording(
   // Candidate estimates, in the exact order replay will produce them. The index
   // is the join: estimate[i] comes from observation[i].
   const causalPoints = retained.map((entry, index) => ({ key: entry.key, index }));
-
-  const anchorResets = sortCaptureEvents(session.events)
-    .filter(
-      (event): event is ScanCaptureEvent =>
-        event.type === 'scan' && resolvesAgainstAnchors(event, session.anchors),
-    )
-    .map((event) => ({ timeMs: event.timeMs, sequence: event.sequence }));
 
   // A capture event is at or before a mark when it precedes it in the stream.
   // Equal timestamps are separated by capture sequence, which is what makes a

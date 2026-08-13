@@ -368,7 +368,7 @@ describe('recorder inputs are read exactly once', () => {
     ).toThrow(CaptureAuthoringError);
   });
 
-  it('ignores optional fields the caller does not own', () => {
+  it('separates an absent optional field from a malformed one', () => {
     const proto = {
       get model() {
         return { cameraFrames: ['leak'] };
@@ -377,31 +377,105 @@ describe('recorder inputs are read exactly once', () => {
         return 'permission-denied';
       },
     };
+
+    // Omitted entirely is a legitimate omission.
+    const walk = recorder('optional-absent');
+    expect(() =>
+      walk.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' }),
+    ).not.toThrow();
+    expect(walk.buildSession().device).not.toHaveProperty('model');
+
+    // Inherited is not. Treating it as absent fixed a prototype injecting
+    // device.model, but created the mirror-image bug: a scan declaring
+    // permission-denied had its failure discarded, resolved against the anchors
+    // instead, and published ok at 2 m from a reset the device never made.
     const inheritedDevice = Object.create(proto) as CaptureDeviceProfile;
     inheritedDevice.label = 'field handset';
     inheritedDevice.platform = 'android';
     inheritedDevice.sensors = { api: 'native', gyroscopeUnits: 'deg/s', frame: 'world' };
 
-    const walk = new SessionRecorder({
-      sessionId: 'inherited',
-      buildingId: 'reference-medical-centre',
-      packageHash: 'a'.repeat(64),
-      device: inheritedDevice,
-      anchors,
-      startedAtIso: '2026-08-07T09:00:00.000Z',
+    expect(
+      () =>
+        new SessionRecorder({
+          sessionId: 'inherited-optional',
+          buildingId: 'reference-medical-centre',
+          packageHash: 'a'.repeat(64),
+          device: inheritedDevice,
+          anchors,
+          startedAtIso: '2026-08-07T09:00:00.000Z',
+        }),
+    ).toThrow(/model is inherited/);
+
+    const inheritedFailure = Object.create(proto) as never;
+    Object.assign(inheritedFailure, {
+      timeMs: 100,
+      transport: 'qr',
+      payload: 'vg:corridor-start',
     });
+    expect(() => recorder('inherited-failure').recordScan(inheritedFailure)).toThrow(
+      /failure is inherited/,
+    );
+  });
 
-    const attempt = Object.create(proto) as never;
-    Object.assign(attempt, { timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
-    const scan = walk.recordScan(attempt);
-    const session = walk.buildSession();
+  it('refuses an own failure supplied as a getter', () => {
+    // The declared permission-denied was discarded, the scan resolved against
+    // the anchors, and the walk published ok at 2 m — a reset invented from a
+    // scan the device had reported it never completed.
+    const attempt = {
+      timeMs: 100,
+      transport: 'qr' as const,
+      payload: 'vg:corridor-start',
+      get failure() {
+        return 'permission-denied' as const;
+      },
+    };
 
-    // A prototype getter injected device.model into a recorded session, and an
-    // inherited `failure` turned a scan that had resolved into permission-denied.
-    expect(session.device).not.toHaveProperty('model');
-    expect(scan.outcome).toBe('resolved');
-    expect(scan.anchorId).toBe('corridor-start');
-    expect(validateCaptureSession(session)).toEqual([]);
+    expect(() => recorder('computed-failure').recordScan(attempt)).toThrow(CaptureAuthoringError);
+    expect(() => recorder('computed-failure').recordScan(attempt)).toThrow(
+      /failure is present but hidden or computed/,
+    );
+  });
+
+  it('refuses orientation components that are inherited or computed', () => {
+    const walk = recorder('orientation-subfields');
+    const proto = { alphaDegrees: 999, betaDegrees: 888, gammaDegrees: 777, absolute: true };
+
+    // Raw orientation is the part of the stream a better processor is meant to
+    // re-derive from, so a component the caller never owned must not enter it.
+    expect(() =>
+      walk.recordImu({
+        timeMs: 10,
+        accelerometer: [0, 0, 9.81],
+        gyroscope: [0, 0, 0],
+        orientation: Object.create(proto) as never,
+      }),
+    ).toThrow(/orientation\.alphaDegrees/);
+
+    expect(() =>
+      walk.recordImu({
+        timeMs: 10,
+        accelerometer: [0, 0, 9.81],
+        gyroscope: [0, 0, 0],
+        orientation: {
+          get alphaDegrees() {
+            return 123;
+          },
+          betaDegrees: 0,
+          gammaDegrees: 0,
+          absolute: true,
+        },
+      }),
+    ).toThrow(CaptureAuthoringError);
+
+    // A fully owned orientation is still accepted.
+    expect(() =>
+      walk.recordImu({
+        timeMs: 10,
+        accelerometer: [0, 0, 9.81],
+        gyroscope: [0, 0, 0],
+        orientation: { alphaDegrees: 90, betaDegrees: 0, gammaDegrees: 0, absolute: true },
+      }),
+    ).not.toThrow();
   });
 
   it('stores the mark position the caller indexed', () => {
@@ -769,6 +843,75 @@ describe('required fields must be owned by the caller', () => {
     expect(() => recorder('inherited-mark').recordGroundTruth(inheritedMark)).toThrow(
       /surveyMethod|independentOfAnchors/,
     );
+  });
+
+  it('refuses an anchors collection that is not a plain dense array', () => {
+    const anchorsFrom = (collection: unknown) =>
+      new SessionRecorder({
+        sessionId: 'anchor-collection',
+        buildingId: 'reference-medical-centre',
+        packageHash: 'a'.repeat(64),
+        device,
+        anchors: collection as CheckpointAnchor[],
+        startedAtIso: '2026-08-07T09:00:00.000Z',
+      });
+
+    // An accessor-backed element was laundered into a valid anchor and moved a
+    // published median from 3.688 m to 18.688 m, with nothing reported.
+    const arrayLike = {
+      length: 1,
+      get 0(): CheckpointAnchor {
+        return { ...anchors[0], position: [16, 9] };
+      },
+    };
+    expect(() => anchorsFrom(arrayLike)).toThrow(/plain array/);
+
+    const accessorElement: CheckpointAnchor[] = [];
+    Object.defineProperty(accessorElement, '0', {
+      get: () => ({ ...anchors[0], position: [16, 9] }),
+      enumerable: true,
+      configurable: true,
+    });
+    Object.defineProperty(accessorElement, 'length', { value: 1 });
+    expect(() => anchorsFrom(accessorElement)).toThrow(CaptureAuthoringError);
+
+    // A hole is not an anchor either, and a named property is not an element.
+    expect(() => anchorsFrom([, anchors[0]] as CheckpointAnchor[])).toThrow(CaptureAuthoringError);
+    const withNamed = [anchors[0]] as CheckpointAnchor[] & { smuggled?: string };
+    withNamed.smuggled = 'x';
+    expect(() => anchorsFrom(withNamed)).toThrow(/dense/);
+
+    expect(() => anchorsFrom([anchors[0]])).not.toThrow();
+  });
+
+  it('does not spend a sequence number on a mark it refuses', () => {
+    const walk = recorder('refused-mark');
+    walk.recordImu({ timeMs: 10, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+    const before = walk.eventCount;
+
+    expect(() =>
+      walk.recordGroundTruth({
+        position: [1, 2],
+        get timeMs() {
+          return 100;
+        },
+        checkpointId: 'mark',
+        floorId: 'g',
+        surveyMethod: 'tape-measure',
+        expectedAccuracyMeters: 0.03,
+        independentOfAnchors: true,
+      } as never),
+    ).toThrow(CaptureAuthoringError);
+
+    // The sequence was allocated before the fields were read, so a refused mark
+    // consumed one and left the recorder permanently unable to produce a
+    // contiguous stream — every later capture from it was non-evidence.
+    expect(walk.eventCount).toBe(before);
+    walk.recordImu({ timeMs: 20, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+    const session = walk.buildSession();
+
+    expect(session.events.map((event) => event.sequence)).toEqual([0, 1, 2]);
+    expect(validateCaptureSession(session)).toEqual([]);
   });
 
   it('refuses duplicate anchor ids, which silently replace one another', () => {

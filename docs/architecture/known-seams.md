@@ -73,16 +73,32 @@ recomputes resets rather than trusting the stored label; everything a session
 claims about itself is copied out of the caller's options at construction; and
 every event leaving the recorder is a snapshot.
 
-Authoring is strict rather than forgiving, which took two attempts to get right.
-Every required input, and every element of a coordinate array, must be an own
-enumerable data property; anything else raises `CaptureAuthoringError` at the
-moment it is recorded. Degrading instead was itself a bypass twice over: a scan
-payload supplied as an accessor became a valid `decode-failed` carrying nothing,
-which suppressed a genuine reset and moved a published figure from 1.288 m to
-2.449 m; and an object with accessor indices — one the schema's own plain-array
-check would have rejected — was copied element by element into a real array,
-moving a published median from 3.688 m to 22.688 m. A recorder must never
-launder input the schema would refuse into a stream that validates.
+Authoring is strict rather than forgiving, which took several attempts to get
+right. Every input the recorder reads — required or optional, a scalar, an array
+element, or an orientation component — must be an own enumerable data property;
+anything else raises `CaptureAuthoringError` where it is recorded. A refused
+call also spends nothing: fields are snapshotted before a sequence is allocated,
+because a refused mark that had already taken one left the recorder permanently
+unable to produce a contiguous stream.
+
+Every softer variant of this rule turned out to be a bypass, which is why the
+rule is now uniform:
+
+- A scan payload supplied as an accessor became a valid `decode-failed` carrying
+  nothing, suppressing a genuine reset and moving a figure from 1.288 m to
+  2.449 m.
+- An object with accessor indices — one the schema's own plain-array check would
+  have rejected — was copied element by element into a real array, moving a
+  median from 3.688 m to 22.688 m. The same hole existed one level up, in the
+  anchors collection itself: 3.688 m to 18.688 m.
+- Treating an unreadable *optional* field as absent fixed a prototype injecting
+  `device.model`, then created the mirror-image bug: a scan declaring
+  `permission-denied` through a getter had that failure discarded, resolved
+  against the anchors instead, and published `ok` from a reset the device had
+  reported it never made. Absent and malformed are now different answers.
+
+A recorder must never launder input the schema would refuse into a stream that
+validates, and it must never quietly discard a claim the caller did make.
 
 Sequence contiguity is worth stating precisely, because it is easy to overread.
 Requiring `0..n-1` detects an event *dropped* from an otherwise untouched
