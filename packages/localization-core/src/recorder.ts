@@ -139,7 +139,9 @@ export class SessionRecorder {
     const timeMs = ownRequired<number>(reading, 'timeMs');
     const accelerometer = ownNumberTuple(reading, 'accelerometer', 3) as Vector3;
     const gyroscope = ownNumberTuple(reading, 'gyroscope', 3) as Vector3;
-    const orientation = ownOptional<DeviceOrientationSample | null>(reading, 'orientation');
+    // Snapshotted before a sequence is allocated: a refused orientation that
+    // had already taken one left the recorder permanently non-contiguous.
+    const orientation = ownDeclaredOrientation(reading);
 
     this.events.push({
       type: 'imu',
@@ -147,7 +149,7 @@ export class SessionRecorder {
       timeMs,
       accelerometer,
       gyroscope,
-      orientation: orientation ? orientationSnapshot(orientation) : null,
+      orientation,
     });
   }
 
@@ -164,7 +166,7 @@ export class SessionRecorder {
     const timeMs = ownRequired<number>(attempt, 'timeMs');
     const transport = ownRequired<ScanAttempt['transport']>(attempt, 'transport');
     const payload = ownRequired<string | null>(attempt, 'payload');
-    const failure = ownOptional<ScanAttempt['failure']>(attempt, 'failure');
+    const failure = ownDeclaredFailure(attempt);
 
     let outcome: ScanOutcome = failure ?? 'decode-failed';
     let anchorId: string | null = null;
@@ -272,21 +274,50 @@ export type CaptureAnchorSnapshot = CheckpointAnchor;
  */
 function ownDenseArray<T>(source: object, key: string, field = key): T[] {
   const values = ownRequired<unknown>(source, key, field);
-  if (!Array.isArray(values) || Object.getPrototypeOf(values) !== Array.prototype) {
-    throw new CaptureAuthoringError(field, `${field} must be a plain array.`);
-  }
-  const keys = Reflect.ownKeys(values);
-  if (keys.length !== values.length + 1 || !keys.includes('length')) {
+  const length = ownArrayLength(values, field);
+  const keys = Reflect.ownKeys(values as object);
+  if (keys.length !== length + 1 || !keys.includes('length')) {
     throw new CaptureAuthoringError(
       field,
       `${field} must be dense and carry nothing but its elements.`,
     );
   }
   const copy: T[] = [];
-  for (let index = 0; index < values.length; index += 1) {
-    copy.push(ownRequired<T>(values, String(index), `${field}[${index}]`));
+  for (let index = 0; index < length; index += 1) {
+    copy.push(ownRequired<T>(values as object, String(index), `${field}[${index}]`));
   }
   return copy;
+}
+
+/**
+ * The length of an array, taken once from its own descriptor.
+ *
+ * `values.length` is a property read, and a Proxy answers each one however it
+ * likes. Reading it to check the shape and again to drive the copy let a
+ * collection present its true length for validation and a shorter one for
+ * copying: two anchors sharing a payload — an ambiguity that refuses to resolve
+ * — became one anchor that resolves cleanly, turning
+ * `insufficient-localization` into a publishable `ok` at 3.188 m. One read,
+ * used for everything after it.
+ */
+function ownArrayLength(values: unknown, field: string): number {
+  if (
+    values === null ||
+    typeof values !== 'object' ||
+    !Array.isArray(values) ||
+    Object.getPrototypeOf(values) !== Array.prototype
+  ) {
+    throw new CaptureAuthoringError(field, `${field} must be a plain array.`);
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(values, 'length');
+  if (descriptor === undefined || !('value' in descriptor)) {
+    throw new CaptureAuthoringError(field, `${field} must carry a plain length.`);
+  }
+  const length = descriptor.value;
+  if (typeof length !== 'number' || !Number.isInteger(length) || length < 0) {
+    throw new CaptureAuthoringError(field, `${field} must carry a non-negative integer length.`);
+  }
+  return length;
 }
 
 function vector3Once(values: Vector3): Vector3 {
@@ -333,6 +364,47 @@ function ownOptional<T>(source: object, key: string, field = key): T | undefined
     );
   }
   return undefined;
+}
+
+/** The acquisition failures a caller may declare. Nothing else is one. */
+const DECLARABLE_SCAN_FAILURES: ReadonlySet<string> = new Set([
+  'decode-failed',
+  'permission-denied',
+  'transport-unavailable',
+]);
+
+/**
+ * An optional field checked against its own domain rather than its truthiness.
+ *
+ * `failure ?? 'decode-failed'` and `orientation ? … : null` both treat a
+ * malformed value as an absent one. `failure: false`, `0`, `''` or `null` each
+ * produced a valid resolved scan naming an anchor, so a declared acquisition
+ * failure published `ok`; and `orientation: false`, `0` or `''` each became a
+ * valid `orientation: null`, quietly discarding a sample the caller believed
+ * carried orientation.
+ */
+function ownDeclaredFailure(attempt: object): ScanAttempt['failure'] | undefined {
+  const failure = ownOptional<unknown>(attempt, 'failure');
+  if (failure === undefined) return undefined;
+  if (typeof failure !== 'string' || !DECLARABLE_SCAN_FAILURES.has(failure)) {
+    throw new CaptureAuthoringError(
+      'failure',
+      `failure must be one of ${[...DECLARABLE_SCAN_FAILURES].join(', ')} when present.`,
+    );
+  }
+  return failure as ScanAttempt['failure'];
+}
+
+function ownDeclaredOrientation(reading: object): DeviceOrientationSample | null {
+  const orientation = ownOptional<unknown>(reading, 'orientation');
+  if (orientation === undefined || orientation === null) return null;
+  if (typeof orientation !== 'object') {
+    throw new CaptureAuthoringError(
+      'orientation',
+      'orientation must be an object, null, or omitted.',
+    );
+  }
+  return orientationSnapshot(orientation as DeviceOrientationSample);
 }
 
 /**
@@ -395,11 +467,7 @@ function ownRequired<T>(source: object, key: string, field = key): T {
  */
 function ownNumberTuple(source: object, key: string, length: number, field = key): number[] {
   const values = ownRequired<unknown>(source, key, field);
-  if (
-    !Array.isArray(values) ||
-    Object.getPrototypeOf(values) !== Array.prototype ||
-    values.length !== length
-  ) {
+  if (ownArrayLength(values, field) !== length) {
     throw new CaptureAuthoringError(
       field,
       `${field} must be a plain array of ${length} numbers.`,
@@ -407,7 +475,7 @@ function ownNumberTuple(source: object, key: string, length: number, field = key
   }
   const copy: number[] = [];
   for (let index = 0; index < length; index += 1) {
-    copy.push(ownRequired<number>(values, String(index), `${field}[${index}]`));
+    copy.push(ownRequired<number>(values as object, String(index), `${field}[${index}]`));
   }
   return copy;
 }

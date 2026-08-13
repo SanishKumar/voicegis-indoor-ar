@@ -354,7 +354,7 @@ describe('recorder inputs are read exactly once', () => {
           anchors: [{ ...anchors[0], position: accessorPair }],
           startedAtIso: '2026-08-07T09:00:00.000Z',
         }),
-    ).toThrow(/plain array of 2 numbers/);
+    ).toThrow(/plain array/);
 
     // A real array carrying an accessor element is refused for the same reason.
     const spiked: number[] = [1, 2];
@@ -912,6 +912,150 @@ describe('required fields must be owned by the caller', () => {
 
     expect(session.events.map((event) => event.sequence)).toEqual([0, 1, 2]);
     expect(validateCaptureSession(session)).toEqual([]);
+  });
+
+  it('stays usable after refusing a call', () => {
+    // A refusal must cost nothing. Both of these allocated a sequence before
+    // reading the fields that refused them, so one bad call left the recorder
+    // permanently unable to produce a contiguous stream.
+    const walk = recorder('reuse-after-refusal');
+
+    expect(() =>
+      walk.recordImu({
+        timeMs: 10,
+        accelerometer: [0, 0, 9.81],
+        gyroscope: [0, 0, 0],
+        orientation: Object.create({
+          alphaDegrees: 90,
+          betaDegrees: 0,
+          gammaDegrees: 0,
+          absolute: true,
+        }) as never,
+      }),
+    ).toThrow(CaptureAuthoringError);
+
+    expect(() =>
+      walk.recordGroundTruth({
+        position: [1, 2],
+        get timeMs() {
+          return 100;
+        },
+        checkpointId: 'mark',
+        floorId: 'g',
+        surveyMethod: 'tape-measure',
+        expectedAccuracyMeters: 0.03,
+        independentOfAnchors: true,
+      } as never),
+    ).toThrow(CaptureAuthoringError);
+
+    expect(() => walk.recordScan({ timeMs: 20, transport: 'qr', payload: null })).not.toThrow();
+
+    walk.recordImu({ timeMs: 30, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+    const session = walk.buildSession();
+
+    expect(session.events.map((event) => event.sequence)).toEqual([0, 1, 2]);
+    expect(validateCaptureSession(session)).toEqual([]);
+  });
+
+  it('refuses a falsy optional rather than reading it as absent', () => {
+    // `failure ?? …` and `orientation ? … : null` both treat a malformed value
+    // as an omission. Each of these produced a valid resolved scan naming an
+    // anchor, so a declared acquisition failure published ok.
+    for (const failure of [false, 0, '', null, 'nope']) {
+      expect(() =>
+        recorder('falsy-failure').recordScan({
+          timeMs: 100,
+          transport: 'qr',
+          payload: 'vg:corridor-start',
+          failure: failure as never,
+        }),
+      ).toThrow(/failure must be one of/);
+    }
+
+    // A declared failure still works, and still refuses to name an anchor.
+    const declared = recorder('declared-failure').recordScan({
+      timeMs: 100,
+      transport: 'qr',
+      payload: null,
+      failure: 'permission-denied',
+    });
+    expect(declared.outcome).toBe('permission-denied');
+    expect(declared.anchorId).toBeNull();
+
+    // And each of these became a valid `orientation: null`, quietly discarding
+    // a sample the caller believed carried orientation.
+    for (const orientation of [false, 0, '']) {
+      expect(() =>
+        recorder('falsy-orientation').recordImu({
+          timeMs: 10,
+          accelerometer: [0, 0, 9.81],
+          gyroscope: [0, 0, 0],
+          orientation: orientation as never,
+        }),
+      ).toThrow(/orientation must be an object, null, or omitted/);
+    }
+
+    // Explicit null and omission both remain legitimate.
+    const walk = recorder('honest-orientation');
+    expect(() =>
+      walk.recordImu({
+        timeMs: 10,
+        accelerometer: [0, 0, 9.81],
+        gyroscope: [0, 0, 0],
+        orientation: null,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      walk.recordImu({ timeMs: 20, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] }),
+    ).not.toThrow();
+  });
+
+  it('reads a collection length once, so it cannot change under the copy', () => {
+    // Two anchors sharing a payload are an ambiguity that refuses to resolve.
+    // A proxy that reported its true length while the shape was checked and a
+    // shorter one while it was copied dropped the twin, so the payload
+    // resolved cleanly and `insufficient-localization` became a publishable ok.
+    const ambiguous: CheckpointAnchor[] = [
+      anchors[0],
+      {
+        id: 'corridor-twin',
+        floorId: 'g',
+        kind: 'qr',
+        position: [40, 40],
+        headingDegrees: 90,
+        payload: 'vg:corridor-start',
+      },
+    ];
+
+    let lengthReads = 0;
+    const shrinking = new Proxy(ambiguous, {
+      get(target, property, receiver) {
+        if (property === 'length') {
+          lengthReads += 1;
+          return lengthReads <= 1 ? 2 : 1;
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    const walk = new SessionRecorder({
+      sessionId: 'shrinking-anchors',
+      buildingId: 'reference-medical-centre',
+      packageHash: 'a'.repeat(64),
+      device,
+      anchors: shrinking,
+      startedAtIso: '2026-08-07T09:00:00.000Z',
+    });
+
+    // Both anchors are carried, so the ambiguity survives into the capture.
+    const session = walk.buildSession();
+    expect(session.anchors).toHaveLength(2);
+    expect(session.anchors.map((anchor) => anchor.id)).toEqual([
+      'corridor-start',
+      'corridor-twin',
+    ]);
+    // The length trap is never consulted; the descriptor is read instead.
+    expect(lengthReads).toBe(0);
   });
 
   it('refuses duplicate anchor ids, which silently replace one another', () => {

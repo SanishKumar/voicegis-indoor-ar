@@ -76,10 +76,7 @@ every event leaving the recorder is a snapshot.
 Authoring is strict rather than forgiving, which took several attempts to get
 right. Every input the recorder reads — required or optional, a scalar, an array
 element, or an orientation component — must be an own enumerable data property;
-anything else raises `CaptureAuthoringError` where it is recorded. A refused
-call also spends nothing: fields are snapshotted before a sequence is allocated,
-because a refused mark that had already taken one left the recorder permanently
-unable to produce a contiguous stream.
+anything else raises `CaptureAuthoringError` where it is recorded.
 
 Every softer variant of this rule turned out to be a bypass, which is why the
 rule is now uniform:
@@ -96,9 +93,23 @@ rule is now uniform:
   `permission-denied` through a getter had that failure discarded, resolved
   against the anchors instead, and published `ok` from a reset the device had
   reported it never made. Absent and malformed are now different answers.
+- Judging an optional by truthiness rather than by its domain kept that same
+  bypass alive: `failure: false`, `0`, `''` or `null` each produced a resolved
+  scan naming an anchor, and `orientation: false`, `0` or `''` each became a
+  valid `orientation: null`. Optionals are now checked against their exact
+  domain.
+- Reading a collection's `length` more than once let a Proxy answer differently
+  each time — full length while the shape was checked, shorter while it was
+  copied. Two anchors sharing a payload are an ambiguity that refuses to
+  resolve; dropping one made the payload resolve cleanly and turned
+  `insufficient-localization` into a publishable figure. Length is taken once
+  from its own descriptor and used for everything after.
 
 A recorder must never launder input the schema would refuse into a stream that
-validates, and it must never quietly discard a claim the caller did make.
+validates, and it must never quietly discard a claim the caller did make. A
+refusal must also cost nothing: fields are snapshotted before a sequence is
+allocated, because a refused call that had already taken one left the recorder
+permanently unable to produce a contiguous stream.
 
 Sequence contiguity is worth stating precisely, because it is easy to overread.
 Requiring `0..n-1` detects an event *dropped* from an otherwise untouched
