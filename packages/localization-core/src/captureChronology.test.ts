@@ -280,7 +280,16 @@ describe('recorder inputs are read exactly once', () => {
     expect(() => walk.recordScan({ timeMs: 100, transport: 'qr', payload: null })).not.toThrow();
   });
 
-  it('stores the vector the caller indexed, not one its iterator yielded', () => {
+  it('stores the vector the caller indexed, never one an iterator yielded', () => {
+    // Spreading went through the caller's iterator, so indices [1, 2, 3] were
+    // recorded as [99, 98, 97]. An ordinary vector is still read by index...
+    const walk = recorder('hostile-iterator');
+    walk.recordImu({ timeMs: 200, accelerometer: [1, 2, 3], gyroscope: [0, 0, 0] });
+    const stored = walk.buildSession().events.find((event) => event.type === 'imu');
+    expect(stored).toMatchObject({ accelerometer: [1, 2, 3] });
+
+    // ...and a vector carrying its own iterator is refused outright, because a
+    // tuple that owns anything the schema does not define is not a tuple.
     const hostile = [1, 2, 3];
     Object.defineProperty(hostile, Symbol.iterator, {
       value: function* () {
@@ -290,11 +299,9 @@ describe('recorder inputs are read exactly once', () => {
       },
     });
 
-    const walk = recorder('hostile-iterator');
-    walk.recordImu({ timeMs: 200, accelerometer: hostile as never, gyroscope: [0, 0, 0] });
-    const stored = walk.buildSession().events.find((event) => event.type === 'imu');
-
-    expect(stored).toMatchObject({ accelerometer: [1, 2, 3] });
+    expect(() =>
+      walk.recordImu({ timeMs: 220, accelerometer: hostile as never, gyroscope: [0, 0, 0] }),
+    ).toThrow(/does not define/);
   });
 
   it('refuses an anchor position supplied as a getter rather than a value', () => {
@@ -479,6 +486,21 @@ describe('recorder inputs are read exactly once', () => {
   });
 
   it('stores the mark position the caller indexed', () => {
+    const walk = recorder('hostile-mark');
+    const mark = (position: [number, number]) => ({
+      timeMs: 3_000,
+      checkpointId: 'mark',
+      position,
+      floorId: 'g',
+      surveyMethod: 'tape-measure' as const,
+      expectedAccuracyMeters: 0.03,
+      independentOfAnchors: true,
+    });
+
+    walk.recordGroundTruth(mark([4, 5]));
+    const stored = walk.buildSession().events.find((event) => event.type === 'ground-truth');
+    expect(stored).toMatchObject({ position: [4, 5] });
+
     const hostile = [4, 5];
     Object.defineProperty(hostile, Symbol.iterator, {
       value: function* () {
@@ -487,19 +509,7 @@ describe('recorder inputs are read exactly once', () => {
       },
     });
 
-    const walk = recorder('hostile-mark');
-    walk.recordGroundTruth({
-      timeMs: 3_000,
-      checkpointId: 'mark',
-      position: hostile as never,
-      floorId: 'g',
-      surveyMethod: 'tape-measure',
-      expectedAccuracyMeters: 0.03,
-      independentOfAnchors: true,
-    });
-    const stored = walk.buildSession().events.find((event) => event.type === 'ground-truth');
-
-    expect(stored).toMatchObject({ position: [4, 5] });
+    expect(() => walk.recordGroundTruth(mark(hostile as never))).toThrow(/does not define/);
   });
 });
 
@@ -1056,6 +1066,112 @@ describe('required fields must be owned by the caller', () => {
     ]);
     // The length trap is never consulted; the descriptor is read instead.
     expect(lengthReads).toBe(0);
+  });
+
+  it('refuses a declared failure that also carries a payload, at the call', () => {
+    // Validation refuses this pairing in a stored stream. Refusing it here
+    // names the conflict at the call that made it rather than at the end of a
+    // walk, when the fix is a re-walk.
+    expect(() =>
+      recorder('failure-with-payload').recordScan({
+        timeMs: 100,
+        transport: 'qr',
+        payload: 'vg:corridor-start',
+        failure: 'permission-denied',
+      }),
+    ).toThrow(/cannot also carry a payload/);
+  });
+
+  it('refuses tuple and orientation properties the schema does not define', () => {
+    const walk = recorder('undeclared-properties');
+
+    const taggedPosition = [1, 9] as [number, number] & { note?: string };
+    taggedPosition.note = 'smuggled';
+    expect(() =>
+      walk.recordGroundTruth({
+        timeMs: 3_000,
+        checkpointId: 'mark',
+        position: taggedPosition,
+        floorId: 'g',
+        surveyMethod: 'tape-measure',
+        expectedAccuracyMeters: 0.03,
+        independentOfAnchors: true,
+      }),
+    ).toThrow(/does not define/);
+
+    expect(() =>
+      walk.recordImu({
+        timeMs: 10,
+        accelerometer: [0, 0, 9.81],
+        gyroscope: [0, 0, 0],
+        orientation: {
+          alphaDegrees: 90,
+          betaDegrees: 0,
+          gammaDegrees: 0,
+          absolute: true,
+          cameraFrame: 'smuggled',
+        } as never,
+      }),
+    ).toThrow(/does not define/);
+  });
+
+  it('is unaffected by later Object.prototype pollution', () => {
+    // `key in source` made the recorder hostage to the ambient realm: setting
+    // Object.prototype.failure made every honest scan look like it inherited
+    // one, and authoring refused every capture. That fails closed, but a
+    // recorder that cannot record is still broken.
+    const polluted = Object.prototype as unknown as Record<string, unknown>;
+    try {
+      polluted.failure = 'permission-denied';
+      polluted.model = 'ghost handset';
+      polluted.orientation = { alphaDegrees: 1, betaDegrees: 2, gammaDegrees: 3, absolute: true };
+
+      const walk = recorder('polluted-realm');
+      const scan = walk.recordScan({ timeMs: 100, transport: 'qr', payload: 'vg:corridor-start' });
+      expect(scan.outcome).toBe('resolved');
+
+      walk.recordImu({ timeMs: 120, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+      const session = walk.buildSession();
+
+      // Nothing ambient reached the capture, and nothing honest was refused.
+      // Own keys are what the capture carries: `toHaveProperty` walks the
+      // prototype chain and would be measuring the pollution, not the session.
+      expect(Object.keys(session.device).sort()).toEqual(['label', 'platform', 'sensors']);
+      const imu = session.events.find((event) => event.type === 'imu');
+      expect(Object.prototype.hasOwnProperty.call(imu, 'orientation')).toBe(true);
+      expect((imu as { orientation: unknown }).orientation).toBeNull();
+      // And validation, which reads own keys only, still sees a clean capture.
+      expect(validateCaptureSession(session)).toEqual([]);
+    } finally {
+      delete polluted.failure;
+      delete polluted.model;
+      delete polluted.orientation;
+    }
+  });
+
+  it('names the duplicate anchor at its position in the capture', () => {
+    // Indexing the surviving anchors pointed the diagnostic at the wrong
+    // element whenever a malformed anchor sat earlier in the list.
+    const session = {
+      captureVersion: '0.2.0',
+      sessionId: 's',
+      buildingId: 'b',
+      packageHash: 'a'.repeat(64),
+      startedAtIso: '2026-08-07T09:00:00.000Z',
+      device,
+      anchors: [
+        { id: 'broken', floorId: 'g', kind: 'qr', position: [1, 9], headingDegrees: 999, payload: 'p' },
+        anchors[0],
+        { ...anchors[0], payload: 'vg:elsewhere' },
+      ],
+      events: [{ type: 'lifecycle', sequence: 0, timeMs: 0, event: 'session-start' }],
+    } as unknown as CaptureSession;
+
+    const issues = validateCaptureSession(session);
+    const duplicate = issues.find((issue) => issue.code === 'duplicate-anchor-id');
+
+    // The duplicate is at index 2 of the capture, not index 1 of the survivors.
+    expect(duplicate?.path).toBe('/anchors/2/id');
   });
 
   it('refuses duplicate anchor ids, which silently replace one another', () => {

@@ -168,6 +168,16 @@ export class SessionRecorder {
     const payload = ownRequired<string | null>(attempt, 'payload');
     const failure = ownDeclaredFailure(attempt);
 
+    // Nothing was acquired, so nothing can have been read. Validation already
+    // refuses this pairing in a stored stream; refusing it here names the
+    // conflict at the call that made it, rather than at the end of a walk.
+    if (failure !== undefined && payload !== null) {
+      throw new CaptureAuthoringError(
+        'failure',
+        `A scan reporting ${failure} cannot also carry a payload it read.`,
+      );
+    }
+
     let outcome: ScanOutcome = failure ?? 'decode-failed';
     let anchorId: string | null = null;
 
@@ -357,13 +367,37 @@ function ownOptional<T>(source: object, key: string, field = key): T | undefined
     }
     return descriptor.value as T;
   }
-  if (key in source) {
+  if (inheritedFromCaller(source, key)) {
     throw new CaptureAuthoringError(
       field,
       `${field} is inherited rather than owned; supply it as a plain value or omit it.`,
     );
   }
   return undefined;
+}
+
+/**
+ * Whether the caller's own prototype chain supplies a field, ignoring the
+ * ambient builtin prototypes at the end of it.
+ *
+ * `key in source` was the obvious check and it makes the recorder hostage to
+ * `Object.prototype` pollution: a page that sets `Object.prototype.failure`
+ * makes every honest scan look like it inherited one, and authoring refuses
+ * every capture. That fails closed rather than publishing anything false, but a
+ * recorder that cannot record is still broken, and the pollution says nothing
+ * about what this caller supplied.
+ *
+ * The chain is therefore walked explicitly and stopped at the builtins, which
+ * belong to the realm rather than to the caller.
+ */
+function inheritedFromCaller(source: object, key: string) {
+  const ambient: unknown[] = [Object.prototype, Array.prototype];
+  let prototype = Object.getPrototypeOf(source);
+  while (prototype !== null && !ambient.includes(prototype)) {
+    if (Object.getOwnPropertyDescriptor(prototype, key) !== undefined) return true;
+    prototype = Object.getPrototypeOf(prototype);
+  }
+  return false;
 }
 
 /** The acquisition failures a caller may declare. Nothing else is one. */
@@ -473,11 +507,37 @@ function ownNumberTuple(source: object, key: string, length: number, field = key
       `${field} must be a plain array of ${length} numbers.`,
     );
   }
+  requireExactKeys(values as object, [...indexKeys(length), 'length'], field);
   const copy: number[] = [];
   for (let index = 0; index < length; index += 1) {
     copy.push(ownRequired<number>(values as object, String(index), `${field}[${index}]`));
   }
   return copy;
+}
+
+const indexKeys = (length: number) => Array.from({ length }, (_, index) => String(index));
+
+/**
+ * Refuses an authored object that carries anything the schema does not define.
+ *
+ * The rest of the capture schema is closed — unknown properties are reported
+ * rather than dropped — but the authoring snapshots read only the fields they
+ * knew about, so a tuple or an orientation could arrive carrying extra ones. It
+ * never reached the stored stream, because the snapshot copies field by field.
+ * Checking it here keeps the recorder's contract the same shape as the schema's
+ * instead of quietly narrower, so a caller sending something unrecognised is
+ * told rather than silently having it ignored.
+ */
+function requireExactKeys(source: object, allowed: readonly string[], field: string) {
+  const permitted = new Set<string | symbol>(allowed);
+  for (const key of Reflect.ownKeys(source)) {
+    if (!permitted.has(key)) {
+      throw new CaptureAuthoringError(
+        field,
+        `${field} carries ${String(key)}, which the capture schema does not define.`,
+      );
+    }
+  }
 }
 
 /**
@@ -488,6 +548,11 @@ function ownNumberTuple(source: object, key: string, length: number, field = key
  * processor is meant to be able to re-derive from.
  */
 function orientationSnapshot(sample: DeviceOrientationSample): DeviceOrientationSample {
+  requireExactKeys(
+    sample,
+    ['alphaDegrees', 'betaDegrees', 'gammaDegrees', 'absolute'],
+    'orientation',
+  );
   return {
     alphaDegrees: ownRequired<number>(sample, 'alphaDegrees', 'orientation.alphaDegrees'),
     betaDegrees: ownRequired<number>(sample, 'betaDegrees', 'orientation.betaDegrees'),

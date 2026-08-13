@@ -111,6 +111,40 @@ refusal must also cost nothing: fields are snapshotted before a sequence is
 allocated, because a refused call that had already taken one left the recorder
 permanently unable to produce a contiguous stream.
 
+### Where authoring stops trying
+
+The boundary is a Proxy that lies *coherently* — one whose `ownKeys` and
+property descriptors agree with each other while disagreeing with a hidden
+target. Authoring reads each field once, through its own descriptor, and every
+earlier defect here was an *incoherence*: a value that changed between two reads,
+or a shape the descriptors themselves disclosed. Those are all closed. A Proxy
+that answers consistently is not lying to the recorder in any detectable sense —
+its reflected view simply *is* the object it supplied, and the target behind it
+is not reliably discoverable from inside.
+
+This is a deliberate stopping point, not an unfinished one:
+
+- No real input can express it. Captures arrive from `JSON.parse` or from a
+  handset adapter, and neither produces a Proxy. The hostile shapes that
+  motivated the rules above — accessors, prototypes, hidden and non-enumerable
+  fields, changing lengths — all *can* arise from ordinary object graphs, which
+  is why they were worth closing.
+- A caller who can construct a Proxy is already inside the process and can call
+  `recordScan` with whatever values it likes. Hardening against it defends
+  nothing that is not already lost.
+- What actually closes this class is the sealed evidence artifact, which hashes
+  the stream as recorded. Provenance is the answer to "is this capture the one
+  that was walked", and no amount of authoring-time reflection substitutes for
+  it.
+
+The same reasoning bounds `Object.prototype` pollution. Authoring ignores the
+ambient builtin prototypes when deciding whether a field was inherited, so a
+polluted realm cannot make honest captures unrecordable, and snapshots copy only
+own keys so nothing ambient is carried into a stream. Snapshot objects
+themselves are ordinary objects and still *inherit* from a polluted
+`Object.prototype`; that is invisible to serialisation and to validation, both
+of which read own keys only.
+
 Sequence contiguity is worth stating precisely, because it is easy to overread.
 Requiring `0..n-1` detects an event *dropped* from an otherwise untouched
 recorder stream, and requiring a terminal `session-end` extends that to the tail,

@@ -1206,7 +1206,7 @@ function validateAnchors(anchors: unknown, issues: CaptureIssue[]) {
     );
     return [];
   }
-  const valid: CheckpointAnchor[] = [];
+  const valid: Array<{ anchor: CheckpointAnchor; index: number }> = [];
   for (let index = 0; index < anchors.length; index += 1) {
     const anchor = anchors[index];
     const path = `/anchors/${index}`;
@@ -1264,7 +1264,7 @@ function validateAnchors(anchors: unknown, issues: CaptureIssue[]) {
       add(issues, 'malformed-anchor', `${path}/headingDegrees`, 'Anchor heading must be in [0, 360).');
       ok = false;
     }
-    if (ok) valid.push(anchor as unknown as CheckpointAnchor);
+    if (ok) valid.push({ anchor: anchor as unknown as CheckpointAnchor, index });
   }
   return valid;
 }
@@ -1536,8 +1536,12 @@ function validateCaptureSessionSchema(value: unknown): CaptureIssue[] {
   // replaces the one it shadows: an unrelated second anchor sharing an id
   // supplied its own heading to the reset and moved a published median from
   // 3.688 m to 8.591 m, with nothing reported.
+  // The path names the anchor's position in the capture, not its position
+  // among the anchors that happened to survive validation: with a malformed
+  // anchor earlier in the list those differ, and a diagnostic that points at
+  // the wrong element is worse than none.
   const seenAnchorIds = new Set<string>();
-  validAnchors.forEach((anchor, index) => {
+  validAnchors.forEach(({ anchor, index }) => {
     if (seenAnchorIds.has(anchor.id)) {
       issues.push({
         code: 'duplicate-anchor-id',
@@ -1549,7 +1553,7 @@ function validateCaptureSessionSchema(value: unknown): CaptureIssue[] {
   });
 
   const anchorsByPayload = new Map<string, CheckpointAnchor[]>();
-  for (const anchor of validAnchors) {
+  for (const { anchor } of validAnchors) {
     const list = anchorsByPayload.get(anchor.payload) ?? [];
     list.push(anchor);
     anchorsByPayload.set(anchor.payload, list);
@@ -1627,7 +1631,7 @@ function validateCaptureSessionSchema(value: unknown): CaptureIssue[] {
   });
 
   const anchorsByFloor = new Map<string, CheckpointAnchor[]>();
-  for (const anchor of validAnchors) {
+  for (const { anchor } of validAnchors) {
     const list = anchorsByFloor.get(anchor.floorId) ?? [];
     list.push(anchor);
     anchorsByFloor.set(anchor.floorId, list);
