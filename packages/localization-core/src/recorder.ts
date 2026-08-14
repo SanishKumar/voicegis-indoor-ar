@@ -286,7 +286,7 @@ function ownDenseArray<T>(source: object, key: string, field = key): T[] {
   const values = ownRequired<unknown>(source, key, field);
   const length = ownArrayLength(values, field);
   const keys = Reflect.ownKeys(values as object);
-  if (keys.length !== length + 1 || !keys.includes('length')) {
+  if (keys.length !== length + 1 || !listContains(keys, 'length')) {
     throw new CaptureAuthoringError(
       field,
       `${field} must be dense and carry nothing but its elements.`,
@@ -391,9 +391,8 @@ function ownOptional<T>(source: object, key: string, field = key): T | undefined
  * belong to the realm rather than to the caller.
  */
 function inheritedFromCaller(source: object, key: string) {
-  const ambient: unknown[] = [Object.prototype, Array.prototype];
   let prototype = Object.getPrototypeOf(source);
-  while (prototype !== null && !ambient.includes(prototype)) {
+  while (prototype !== null && prototype !== Object.prototype && prototype !== Array.prototype) {
     if (Object.getOwnPropertyDescriptor(prototype, key) !== undefined) return true;
     prototype = Object.getPrototypeOf(prototype);
   }
@@ -401,11 +400,11 @@ function inheritedFromCaller(source: object, key: string) {
 }
 
 /** The acquisition failures a caller may declare. Nothing else is one. */
-const DECLARABLE_SCAN_FAILURES: ReadonlySet<string> = new Set([
+const DECLARABLE_SCAN_FAILURES: readonly string[] = [
   'decode-failed',
   'permission-denied',
   'transport-unavailable',
-]);
+];
 
 /**
  * An optional field checked against its own domain rather than its truthiness.
@@ -420,10 +419,10 @@ const DECLARABLE_SCAN_FAILURES: ReadonlySet<string> = new Set([
 function ownDeclaredFailure(attempt: object): ScanAttempt['failure'] | undefined {
   const failure = ownOptional<unknown>(attempt, 'failure');
   if (failure === undefined) return undefined;
-  if (typeof failure !== 'string' || !DECLARABLE_SCAN_FAILURES.has(failure)) {
+  if (typeof failure !== 'string' || !listContains(DECLARABLE_SCAN_FAILURES, failure)) {
     throw new CaptureAuthoringError(
       'failure',
-      `failure must be one of ${[...DECLARABLE_SCAN_FAILURES].join(', ')} when present.`,
+      `failure must be one of ${DECLARABLE_SCAN_FAILURES.join(', ')} when present.`,
     );
   }
   return failure as ScanAttempt['failure'];
@@ -507,7 +506,7 @@ function ownNumberTuple(source: object, key: string, length: number, field = key
       `${field} must be a plain array of ${length} numbers.`,
     );
   }
-  requireExactKeys(values as object, [...indexKeys(length), 'length'], field);
+  requireExactKeys(values as object, tupleKeys(length), field);
   const copy: number[] = [];
   for (let index = 0; index < length; index += 1) {
     copy.push(ownRequired<number>(values as object, String(index), `${field}[${index}]`));
@@ -515,7 +514,28 @@ function ownNumberTuple(source: object, key: string, length: number, field = key
   return copy;
 }
 
-const indexKeys = (length: number) => Array.from({ length }, (_, index) => String(index));
+/**
+ * `['0', … , String(length - 1), 'length']`, built by indexed assignment.
+ *
+ * The allowed-key list is part of the check rather than part of the data, so it
+ * is assembled without calling anything: `push` is an intrinsic like any other,
+ * and the surrounding trust boundary puts intrinsics inside it, but a control
+ * list is cheap to build from nothing at all.
+ */
+function tupleKeys(length: number): string[] {
+  const keys = new Array<string>(length + 1);
+  for (let index = 0; index < length; index += 1) keys[index] = String(index);
+  keys[length] = 'length';
+  return keys;
+}
+
+/** Membership by index. `includes` and `Set.has` are both replaceable methods. */
+function listContains(list: readonly (string | symbol)[], value: string | symbol) {
+  for (let index = 0; index < list.length; index += 1) {
+    if (list[index] === value) return true;
+  }
+  return false;
+}
 
 /**
  * Refuses an authored object that carries anything the schema does not define.
@@ -527,11 +547,24 @@ const indexKeys = (length: number) => Array.from({ length }, (_, index) => Strin
  * Checking it here keeps the recorder's contract the same shape as the schema's
  * instead of quietly narrower, so a caller sending something unrecognised is
  * told rather than silently having it ignored.
+ *
+ * Written with counted loops over `Reflect.ownKeys` and no `Set`, spread, or
+ * `for…of`. All three reach `Array.prototype[Symbol.iterator]`, and replacing
+ * that with a generator yielding nothing made this check pass unconditionally:
+ * a tuple carrying `smuggled` was accepted, and the property was then silently
+ * dropped by the field-by-field copy — precisely the outcome the check exists
+ * to prevent.
+ *
+ * That exploit needs global prototype mutation, which the trust boundary
+ * already concedes — replacing `Array.prototype.push` rewrites a copied
+ * position just as effectively. The loops are kept because they cost nothing,
+ * not because they defend a class the boundary excludes.
  */
 function requireExactKeys(source: object, allowed: readonly string[], field: string) {
-  const permitted = new Set<string | symbol>(allowed);
-  for (const key of Reflect.ownKeys(source)) {
-    if (!permitted.has(key)) {
+  const keys = Reflect.ownKeys(source);
+  for (let index = 0; index < keys.length; index += 1) {
+    const key = keys[index];
+    if (!listContains(allowed, key)) {
       throw new CaptureAuthoringError(
         field,
         `${field} carries ${String(key)}, which the capture schema does not define.`,
@@ -548,6 +581,22 @@ function requireExactKeys(source: object, allowed: readonly string[], field: str
  * processor is meant to be able to re-derive from.
  */
 function orientationSnapshot(sample: DeviceOrientationSample): DeviceOrientationSample {
+  // Orientation is stored, not merely read, so it has to be the kind of object
+  // the schema accepts in that position. A custom prototype carrying inherited
+  // unknown data was accepted here and normalised into a clean sample, while
+  // the same raw shape handed to validation is refused outright as
+  // `non-json-capture-object`. The recorder must not be the lenient door.
+  //
+  // This applies to nested data that becomes part of the stream. The argument
+  // bags — options, an attempt, a mark — are never stored, so a class instance
+  // remains a perfectly good way to call the recorder.
+  const prototype = Object.getPrototypeOf(sample);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new CaptureAuthoringError(
+      'orientation',
+      'orientation must be a plain object, so it cannot carry an inherited shape.',
+    );
+  }
   requireExactKeys(
     sample,
     ['alphaDegrees', 'betaDegrees', 'gammaDegrees', 'absolute'],

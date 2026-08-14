@@ -10,6 +10,7 @@ import {
   type CaptureEvent,
   type CaptureSession,
   type CheckpointAnchor,
+  type DeviceOrientationSample,
 } from './index';
 import { MIN_SAMPLE_INTERVAL_MS } from './captureStream';
 
@@ -449,6 +450,8 @@ describe('recorder inputs are read exactly once', () => {
 
     // Raw orientation is the part of the stream a better processor is meant to
     // re-derive from, so a component the caller never owned must not enter it.
+    // An inherited component is caught one step earlier now, by the rule that
+    // orientation must be the kind of plain object the schema accepts.
     expect(() =>
       walk.recordImu({
         timeMs: 10,
@@ -456,7 +459,17 @@ describe('recorder inputs are read exactly once', () => {
         gyroscope: [0, 0, 0],
         orientation: Object.create(proto) as never,
       }),
-    ).toThrow(/orientation\.alphaDegrees/);
+    ).toThrow(/must be a plain object/);
+
+    // A plain object missing a component still names that component.
+    expect(() =>
+      walk.recordImu({
+        timeMs: 10,
+        accelerometer: [0, 0, 9.81],
+        gyroscope: [0, 0, 0],
+        orientation: { alphaDegrees: 90, betaDegrees: 0, gammaDegrees: 0 } as never,
+      }),
+    ).toThrow(/orientation\.absolute/);
 
     expect(() =>
       walk.recordImu({
@@ -1113,6 +1126,119 @@ describe('required fields must be owned by the caller', () => {
         } as never,
       }),
     ).toThrow(/does not define/);
+  });
+
+  it('checks keys without depending on the array iterator', () => {
+    // `Set`, spread and `for…of` all reach Array.prototype[Symbol.iterator].
+    // Replacing it with a generator that yields nothing made exact-key checking
+    // pass unconditionally: a tuple carrying `smuggled` was accepted, and the
+    // property was then silently dropped by the field-by-field copy — exactly
+    // the outcome the check exists to prevent.
+    const original = Array.prototype[Symbol.iterator];
+    try {
+      Object.defineProperty(Array.prototype, Symbol.iterator, {
+        value: function* () {
+          /* yields nothing */
+        },
+        configurable: true,
+        writable: true,
+      });
+
+      const walk = recorder('iterator-replaced');
+      const before = walk.eventCount;
+      const tagged = [1, 9] as [number, number] & { smuggled?: string };
+      tagged.smuggled = 'carried';
+
+      expect(() =>
+        walk.recordGroundTruth({
+          timeMs: 3_000,
+          checkpointId: 'mark',
+          position: tagged,
+          floorId: 'g',
+          surveyMethod: 'tape-measure',
+          expectedAccuracyMeters: 0.03,
+          independentOfAnchors: true,
+        }),
+      ).toThrow(/smuggled/);
+
+      // The refusal is still atomic under a hostile realm.
+      expect(walk.eventCount).toBe(before);
+
+      // And an honest walk is still recordable with the iterator replaced —
+      // recording the right values, not merely recording something. A copy that
+      // silently produced empty or wrong vectors would satisfy a sequence check.
+      walk.recordImu({ timeMs: 10, accelerometer: [0, 1, 9.81], gyroscope: [2, 3, 4] });
+      const session = walk.buildSession();
+      expect(session.events.map((event) => event.sequence)).toEqual([0, 1]);
+
+      const imu = session.events.find((event) => event.type === 'imu') as {
+        accelerometer: number[];
+        gyroscope: number[];
+      };
+      expect(imu.accelerometer).toEqual([0, 1, 9.81]);
+      expect(imu.gyroscope).toEqual([2, 3, 4]);
+      expect(validateCaptureSession(session)).toEqual([]);
+    } finally {
+      Object.defineProperty(Array.prototype, Symbol.iterator, {
+        value: original,
+        configurable: true,
+        writable: true,
+      });
+    }
+  });
+
+  it('refuses an orientation whose shape validation would reject', () => {
+    // Authoring accepted a custom prototype carrying inherited unknown data and
+    // normalised it into a clean sample, while the same raw shape handed to
+    // validation is refused as non-json-capture-object. The recorder must not
+    // be the lenient door into the stream.
+    const proto = { cameraFrame: 'smuggled', alphaDegrees: 999 };
+    const orientation = Object.create(proto) as never;
+    Object.assign(orientation, {
+      alphaDegrees: 90,
+      betaDegrees: 0,
+      gammaDegrees: 0,
+      absolute: true,
+    });
+
+    const walk = recorder('inherited-orientation-shape');
+    const before = walk.eventCount;
+    expect(() =>
+      walk.recordImu({
+        timeMs: 10,
+        accelerometer: [0, 0, 9.81],
+        gyroscope: [0, 0, 0],
+        orientation,
+      }),
+    ).toThrow(/must be a plain object/);
+    expect(walk.eventCount).toBe(before);
+
+    // The same shape reaching validation directly is refused there too, which
+    // is the agreement that was missing.
+    const clean = recorder('orientation-shape-baseline');
+    clean.recordImu({ timeMs: 10, accelerometer: [0, 0, 9.81], gyroscope: [0, 0, 0] });
+    const session = clean.buildSession();
+    (session.events.find((event) => event.type === 'imu') as unknown as {
+      orientation: unknown;
+    }).orientation = orientation;
+    expect(validateCaptureSession(session).length).toBeGreaterThan(0);
+
+    // A null-prototype orientation is still a plain shape and stays accepted.
+    const nullProto = Object.create(null) as DeviceOrientationSample;
+    Object.assign(nullProto, {
+      alphaDegrees: 90,
+      betaDegrees: 0,
+      gammaDegrees: 0,
+      absolute: true,
+    });
+    expect(() =>
+      recorder('null-prototype-orientation').recordImu({
+        timeMs: 10,
+        accelerometer: [0, 0, 9.81],
+        gyroscope: [0, 0, 0],
+        orientation: nullProto,
+      }),
+    ).not.toThrow();
   });
 
   it('is unaffected by later Object.prototype pollution', () => {

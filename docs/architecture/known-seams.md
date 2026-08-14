@@ -113,37 +113,58 @@ permanently unable to produce a contiguous stream.
 
 ### Where authoring stops trying
 
-The boundary is a Proxy that lies *coherently* — one whose `ownKeys` and
-property descriptors agree with each other while disagreeing with a hidden
-target. Authoring reads each field once, through its own descriptor, and every
-earlier defect here was an *incoherence*: a value that changed between two reads,
-or a shape the descriptors themselves disclosed. Those are all closed. A Proxy
-that answers consistently is not lying to the recorder in any detectable sense —
-its reflected view simply *is* the object it supplied, and the target behind it
-is not reliably discoverable from inside.
+The line is drawn by *ownership*, not by mechanism:
 
-This is a deliberate stopping point, not an unfinished one:
+- **The realm is trusted.** Standard intrinsics behave as the language says.
+- **Caller-owned data shapes are not.** Objects and arrays handed to the
+  recorder are checked, because ordinary code — and ordinary bugs — produce
+  accessors, prototypes, hidden fields and odd lengths without anyone attacking
+  anything.
 
-- No real input can express it. Captures arrive from `JSON.parse` or from a
-  handset adapter, and neither produces a Proxy. The hostile shapes that
-  motivated the rules above — accessors, prototypes, hidden and non-enumerable
-  fields, changing lengths — all *can* arise from ordinary object graphs, which
-  is why they were worth closing.
-- A caller who can construct a Proxy is already inside the process and can call
-  `recordScan` with whatever values it likes. Hardening against it defends
-  nothing that is not already lost.
-- What actually closes this class is the sealed evidence artifact, which hashes
-  the stream as recorded. Provenance is the answer to "is this capture the one
-  that was walked", and no amount of authoring-time reflection substitutes for
-  it.
+Two things sit outside that line, and both are deliberate stopping points rather
+than unfinished work.
 
-The same reasoning bounds `Object.prototype` pollution. Authoring ignores the
-ambient builtin prototypes when deciding whether a field was inherited, so a
-polluted realm cannot make honest captures unrecordable, and snapshots copy only
-own keys so nothing ambient is carried into a stream. Snapshot objects
-themselves are ordinary objects and still *inherit* from a polluted
-`Object.prototype`; that is invisible to serialisation and to validation, both
-of which read own keys only.
+**Replaced intrinsics.** Authoring trusts that `Array.prototype.push`,
+`Object.getPrototypeOf`, `Object.getOwnPropertyDescriptor` and
+`Reflect.ownKeys` are what they claim to be, and it has to: a replaced `push`
+rewrote a copied position from `[1, 9]` to `[101, 109]` and produced a session
+with no validation issues, and a replaced `getPrototypeOf` defeats the
+orientation shape rule the same way. Chasing this is an unbounded audit of every
+intrinsic the code touches, and it buys nothing — anyone who can patch a builtin
+is already running in the process and can call `recordScan` with whatever they
+like.
+
+Key checking is written without `Set`, spread or `for…of` anyway. All three
+reach `Array.prototype[Symbol.iterator]`, and replacing it made the check pass
+unconditionally, so an undeclared property was accepted and then silently
+stripped. That exploit needs global prototype mutation exactly as replacing
+`push` does, so it is the same trusted-realm case and not a separate one; the
+counted loops are simply cheap, and cheap defence-in-depth is worth keeping even
+on the trusted side of the line. It buys nothing that the boundary above does
+not already concede.
+
+**A Proxy that lies coherently** — one whose `ownKeys` and property descriptors
+agree with each other while disagreeing with a hidden target. Authoring reads
+each field once through its own descriptor, and every defect closed here was an
+*incoherence*: a value that changed between two reads, or a shape the descriptors
+themselves disclosed. A Proxy that answers consistently is not lying in any
+detectable sense — its reflected view simply *is* the object it supplied. No
+`JSON.parse` result or handset adapter produces one, and what actually closes
+this class is the sealed evidence artifact, which hashes the stream as recorded.
+Provenance answers "is this the capture that was walked"; no amount of
+authoring-time reflection substitutes for it.
+
+The hostile shapes that motivated the rules above — accessors, prototypes, hidden
+and non-enumerable fields, changing lengths — all *can* arise from ordinary
+object graphs, which is why they were worth closing and these two are not.
+
+`Object.prototype` pollution falls on the trusted side but still must not break
+honest recording. Authoring ignores the ambient builtin prototypes when deciding
+whether a field was inherited, so a polluted realm cannot make honest captures
+unrecordable, and snapshots copy only own keys so nothing ambient is carried into
+a stream. Snapshot objects themselves are ordinary objects and still *inherit*
+from a polluted `Object.prototype`; that is invisible to serialisation and to
+validation, both of which read own keys only.
 
 Sequence contiguity is worth stating precisely, because it is easy to overread.
 Requiring `0..n-1` detects an event *dropped* from an otherwise untouched
