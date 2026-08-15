@@ -10,13 +10,20 @@ function stableJson(value: unknown) {
 }
 
 /**
- * Produces a report from whichever input was given.
+ * Produces a diagnostic report from whichever input was given.
  *
- * A capture session is the evidential path: it is validated, derived, and
- * checkpoint eligibility is enforced before anything is measured. A bare
- * recording cannot carry survey provenance or independence claims, so it is
- * replayed for diagnosis only and its accuracy figures are withheld rather
- * than printed as if they were evidence.
+ * Nothing this tool writes is evidence. A capture session is validated,
+ * derived, and put through checkpoint eligibility, which is more than a bare
+ * recording gets — a recording carries no survey provenance or independence
+ * claims, so it is replayed for diagnosis only and its accuracy figures are
+ * withheld. But neither path is sealed, and an unsealed figure names none of
+ * the inputs that produced it: no capture hash, no venue package hash, no
+ * predeclared checkpoint manifest, no configuration fingerprint.
+ *
+ * A quotable figure comes from `sealEvidenceArtifact(session, manifest)`, which
+ * requires a manifest this tool has no way to supply. Calling this path
+ * evidential, as an earlier comment did, described the ambition rather than the
+ * output.
  */
 function buildReport(parsed: unknown) {
   const imported = importCaptureSession(JSON.stringify(parsed));
@@ -41,7 +48,11 @@ function buildReport(parsed: unknown) {
 async function main() {
   const [inputArgument, outputArgument, checkArgument] = process.argv.slice(2);
   if (!inputArgument || !outputArgument) {
-    throw new Error('Usage: localization-replay <capture-or-recording.json> <report.json> [--check]');
+    throw new Error(
+      'Usage: localization-replay <capture-or-recording.json> <report.json> [--check]. ' +
+        'Produces a diagnostic report. Sealed evidence comes from sealEvidenceArtifact, ' +
+        'which needs a predeclared checkpoint manifest this tool does not take.',
+    );
   }
   const inputPath = resolve(inputArgument);
   const outputPath = resolve(outputArgument);

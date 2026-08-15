@@ -33,14 +33,37 @@ export interface LocalizationFilterConfig {
   degradedQualityCorrectionAgeMs: number;
 }
 
-const DEFAULT_CONFIG: LocalizationFilterConfig = {
+/**
+ * The authoritative filter tuning. Private and frozen.
+ *
+ * This was an exported mutable object used as a default parameter, so every
+ * filter shared one instance and anyone holding a constructed filter could
+ * reach through `filter.config` and edit it for the whole process. It was also
+ * absent from the evidence fingerprint, so a capture could produce a different
+ * figure while the sealed artifact recorded identical configuration. The
+ * checkpoint and dead-reckoning tunings were closed this way already; this one
+ * was missed because the filter takes its config as a constructor default
+ * rather than through a resolver.
+ */
+const AUTHORITATIVE_FILTER_CONFIG: LocalizationFilterConfig = Object.freeze({
   accelerationNoiseMetersPerSecond2: 0.45,
   headingDriftDegreesPerSecond: 2,
   highQualitySigmaMeters: 1,
   degradedQualitySigmaMeters: 3,
   highQualityCorrectionAgeMs: 5_000,
   degradedQualityCorrectionAgeMs: 15_000,
-};
+});
+
+/** Frozen copy for diagnostics. The evidence path never reads this. */
+export const DEFAULT_LOCALIZATION_FILTER_CONFIG: Readonly<LocalizationFilterConfig> =
+  Object.freeze({ ...AUTHORITATIVE_FILTER_CONFIG });
+
+/** Resolves caller tuning against the private authority, as a fresh object. */
+export function resolveLocalizationFilterConfig(
+  overrides: Partial<LocalizationFilterConfig> = {},
+): LocalizationFilterConfig {
+  return { ...AUTHORITATIVE_FILTER_CONFIG, ...overrides };
+}
 
 function degreesToRadians(degrees: number) {
   return (degrees * Math.PI) / 180;
@@ -79,7 +102,11 @@ export class LocalizationFilter {
   private lastCorrectionTimeMs = 0;
   private readonly sources = new Set<ObservationSource>();
 
-  constructor(private readonly config: LocalizationFilterConfig = DEFAULT_CONFIG) {}
+  private readonly config: LocalizationFilterConfig;
+
+  constructor(overrides: Partial<LocalizationFilterConfig> = {}) {
+    this.config = resolveLocalizationFilterConfig(overrides);
+  }
 
   private initialize(observation: InitialFixObservation) {
     const positionVariance = observation.accuracyMeters ** 2;

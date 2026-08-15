@@ -1,5 +1,5 @@
 import { isBuildingFrameCoordinate } from './captureStream';
-import { LocalizationFilter } from './filter';
+import { LocalizationFilter, resolveLocalizationFilterConfig, type LocalizationFilterConfig } from './filter';
 import { matchEstimateToRoute } from './mapMatching';
 import { LocalizationRuntimeController, type RuntimeSnapshot } from './runtimeState';
 import {
@@ -18,6 +18,8 @@ export interface ReplayCoreResult {
   estimates: LocalizationEstimate[];
   mapMatches: MapMatchResult[];
   runtimeSnapshots: RuntimeSnapshot[];
+  /** The filter tuning these estimates were produced with. */
+  filterConfig: LocalizationFilterConfig;
   /** Every estimate whose numeric state cannot describe a localization result. */
   invalidEstimateIndices: number[];
   /** Every map match whose geometry or numeric output cannot be represented safely. */
@@ -134,7 +136,8 @@ export function validateRecording(recording: LocalizationRecording) {
  */
 export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
   validateRecording(recording);
-  const filter = new LocalizationFilter();
+  const filterConfig = resolveLocalizationFilterConfig();
+  const filter = new LocalizationFilter(filterConfig);
   const estimates = recording.observations.map((observation) => filter.apply(observation));
   const runtime = new LocalizationRuntimeController();
   const runtimeSnapshots = estimates.map((estimate) => runtime.update(estimate));
@@ -249,6 +252,7 @@ export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
     estimates,
     mapMatches,
     runtimeSnapshots,
+    filterConfig,
     invalidEstimateIndices,
     invalidMapMatchIndices,
     checkpointErrors,

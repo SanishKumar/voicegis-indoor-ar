@@ -150,6 +150,13 @@ export type EvidenceStatus =
   | 'interrupted-capture'
   /** No surveyed mark survived eligibility. */
   | 'insufficient-ground-truth'
+  /**
+   * The walk did not satisfy the checkpoints predeclared for it: a scored mark
+   * is missing, or one that was declared scored did not survive eligibility.
+   * The denominator is fixed before the walk, so a walk that covers less of it
+   * than promised cannot report against the promise.
+   */
+  | 'manifest-not-satisfied'
   /** Current processing cannot interpret the recorded units or frame. */
   | 'unsupported-sensor-model'
   /**

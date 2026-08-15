@@ -32,6 +32,27 @@ export type {
   SurveyMethod,
   Vector3,
 } from './captureStream';
+export {
+  CHECKPOINT_MANIFEST_VERSION,
+  EVIDENCE_ARTIFACT_VERSION,
+  EVIDENCE_PROCESSOR_VERSION,
+  exportEvidenceArtifact,
+  importEvidenceArtifact,
+  sealEvidenceArtifact,
+  validateCheckpointManifest,
+  verifyEvidenceArtifact,
+} from './evidenceArtifact';
+export type {
+  ArtifactImport,
+  ArtifactVerification,
+  CheckpointManifest,
+  CheckpointManifestEntry,
+  EvidenceArtifact,
+  ManifestValidation,
+  SealRefusal,
+  SealRefusalReason,
+  SealResult,
+} from './evidenceArtifact';
 export * from './checkpoints';
 export * from './deadReckoning';
 export * from './filter';

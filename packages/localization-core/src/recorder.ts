@@ -34,6 +34,7 @@ import {
   isPublishableSurveyMethod,
   worstCoverageGapMs,
 } from './internalEvidencePolicy';
+import type { LocalizationFilterConfig } from './filter';
 import { replayCore } from './internalReplay';
 import {
   LOCALIZATION_RECORDING_VERSION,
@@ -762,6 +763,21 @@ export interface EvidenceReport {
     toleranceMs: number;
   };
   sampling: SamplingSummary;
+  /**
+   * The tuning this report was actually produced with, after any overrides.
+   *
+   * Reported rather than assumed, because overrides are accepted here and not
+   * otherwise written down: one capture could report different figures while
+   * every result claimed `ok`. A sealed artifact fingerprints these values, so
+   * a figure names the configuration that produced it.
+   */
+  configuration: {
+    checkpoint: CheckpointAdapterConfig;
+    deadReckoning: DeadReckoningConfig;
+    /** The localization filter tuning, when replay ran. */
+    filter: LocalizationFilterConfig | null;
+    routeSegmentCount: number;
+  };
 }
 
 /**
@@ -775,11 +791,12 @@ export interface EvidenceReport {
 export function buildEvidenceReport(
   session: CaptureSession,
   overrides: DeriveOverrides = {},
+  binding: ManifestBinding | null = null,
 ): EvidenceReport {
   // Structurally invalid captures still throw: bad data is a different problem
   // from a valid walk that simply did not produce usable evidence.
   const captured = requireCaptureSnapshot(session);
-  const derived = deriveValidatedRecording(captured, overrides);
+  const derived = deriveValidatedRecording(captured, overrides, binding);
 
   // Current processing reduces the gyroscope by taking its Z component as yaw,
   // which is only correct for degrees per second in the device frame. Anything
@@ -858,6 +875,16 @@ export function buildEvidenceReport(
     (event) => event.type === 'lifecycle' && event.event === 'session-end',
   );
 
+  // Every predeclared scored mark must have survived to back the figure. A
+  // walk that covered less of the manifest than promised cannot report against
+  // the promise, whether the mark was never walked or was excluded for cause.
+  const scoredAndPublishable = new Set(
+    derived.evaluationCheckpoints.filter((entry) => entry.publishable).map((entry) => entry.id),
+  );
+  const manifestNotSatisfied =
+    binding !== null &&
+    binding.scoredCheckpointIds.some((id) => !scoredAndPublishable.has(id));
+
   const blockingStatus: EvidenceStatus | null = unsupportedSensors
     ? 'unsupported-sensor-model'
     : !declaresItsEnd
@@ -868,9 +895,11 @@ export function buildEvidenceReport(
           ? 'interrupted-capture'
           : invalidLocalizationState
             ? 'invalid-localization-state'
-            : derived.checkpoints.length === 0
-              ? 'insufficient-ground-truth'
-              : null;
+            : manifestNotSatisfied
+              ? 'manifest-not-satisfied'
+              : derived.checkpoints.length === 0
+                ? 'insufficient-ground-truth'
+                : null;
 
   const status: EvidenceStatus = blockingStatus ?? 'ok';
   const isPublishable = status === 'ok';
@@ -917,6 +946,7 @@ export function buildEvidenceReport(
     'survey-method-not-publishable': 0,
     'survey-accuracy-out-of-policy': 0,
     'ambiguous-anchor-reset-tie': 0,
+    'not-declared-scored': 0,
   } as Record<CheckpointExclusionReason, number>;
   for (const checkpoint of derived.diagnosticCheckpoints) {
     if (checkpoint.exclusionReason) exclusionCounts[checkpoint.exclusionReason] += 1;
@@ -952,7 +982,25 @@ export function buildEvidenceReport(
       toleranceMs: GROUND_TRUTH_ALIGNMENT_TOLERANCE_MS,
     },
     sampling: summarizeSampling(captured),
+    configuration: {
+      checkpoint: derived.checkpointConfig,
+      deadReckoning: derived.deadReckoningConfig,
+      filter: core?.filterConfig ?? null,
+      routeSegmentCount: derived.routeSegments?.length ?? 0,
+    },
   };
+}
+
+/**
+ * The checkpoints a manifest predeclared as scored.
+ *
+ * Passing this makes the manifest authoritative over the denominator: any mark
+ * outside the set is excluded from metrics however eligible it otherwise looks.
+ * Without it, eligibility is judged only on what the capture asserts about
+ * itself, which is the diagnostic path.
+ */
+export interface ManifestBinding {
+  scoredCheckpointIds: readonly string[];
 }
 
 export interface DeriveOverrides {
@@ -968,7 +1016,13 @@ export type CheckpointExclusionReason =
   | 'survey-method-not-publishable'
   | 'survey-accuracy-out-of-policy'
   /** A resolved scan shares the mark's millisecond, so their order is unknown. */
-  | 'ambiguous-anchor-reset-tie';
+  | 'ambiguous-anchor-reset-tie'
+  /**
+   * The mark was not predeclared as scored. Under a manifest the denominator is
+   * chosen before the walk, so a mark that was declared diagnostic — or never
+   * declared at all — is recorded and never counted.
+   */
+  | 'not-declared-scored';
 
 
 /**
@@ -1048,6 +1102,7 @@ export function deriveRecording(
 function deriveValidatedRecording(
   session: CaptureSession,
   overrides: DeriveOverrides,
+  binding: ManifestBinding | null = null,
 ): DerivedRecording {
   const checkpointConfig: CheckpointAdapterConfig = resolveCheckpointConfig(
     overrides.checkpointConfig,
@@ -1188,9 +1243,15 @@ function deriveValidatedRecording(
             notAfter(reset, markPoint),
         );
 
+      // The manifest decides the denominator before the walk, so a mark it did
+      // not declare scored is excluded whatever else is true of it.
+      const declaredScored =
+        binding === null || binding.scoredCheckpointIds.includes(mark.checkpointId);
+
       // True when the mark itself qualifies as evidence, independently of
       // whether an estimate could be found for it.
       const surveyEligible =
+        declaredScored &&
         mark.independentOfAnchors &&
         isPublishableSurveyMethod(mark.surveyMethod) &&
         isPublishableSurveyAccuracy(mark.expectedAccuracyMeters);
@@ -1207,7 +1268,9 @@ function deriveValidatedRecording(
       // be scored honestly.
       const ambiguousResetTie = anchorResets.some((reset) => reset.timeMs === mark.timeMs);
 
-      const exclusionReason: CheckpointExclusionReason | null = !mark.independentOfAnchors
+      const exclusionReason: CheckpointExclusionReason | null = !declaredScored
+        ? 'not-declared-scored'
+        : !mark.independentOfAnchors
         ? 'dependent-on-anchor'
         : !isPublishableSurveyMethod(mark.surveyMethod)
           ? 'survey-method-not-publishable'

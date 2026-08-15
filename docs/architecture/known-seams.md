@@ -3,47 +3,117 @@
 Deliberately unfinished work, recorded so it is not rediscovered as a bug. Each
 entry says what is incomplete, why it was left, and what finishing it involves.
 
-## Checkpoint eligibility is self-declared
+## Nothing dates a checkpoint manifest before the walk it governs
 
-Every rule that decides whether a surveyed mark counts reads a property the
-capture itself asserts: whether the mark is independent of anchors, how it was
-surveyed, and how accurate that survey was. All three are declared after the
-walk, by whoever writes the capture.
+Eligibility used to be entirely self-declared: every rule deciding whether a
+mark counted read a property the capture asserted after the fact, so a late mark
+that came out badly could disappear from the denominator by being relabelled.
 
-That means a mark can disappear from the denominator by being labelled
-`estimated`, marked dependent, or given an expected accuracy outside policy —
-and a late mark that would have failed is exactly the one most tempting to
-relabel. The eligibility rules are sound; what is missing is that nothing binds
-them to a decision made *before* the walk.
+Evidence Artifact v0.1 closed most of that. Sealing takes a checkpoint manifest
+that fixes each mark's id, surveyed position, floor and intended role before the
+walk, and refuses a capture that contradicts it: a mark that was never
+predeclared, a mark surveyed somewhere other than where it was declared, or a
+checkpoint id used twice all stop the seal. The manifest is canonicalised and
+hashed into the artifact, so relabelling a mark from `scored` to `diagnostic`
+changes both the manifest hash and the artifact hash even though the walk is
+byte-identical.
 
-Real field evidence will need a predeclared checkpoint and evaluation manifest:
-the marks, their surveyed positions, and their intended role fixed and hashed
-before capture begins, so the denominator is chosen in advance rather than
-discovered afterwards. That belongs with the sealed evidence artifact and the
-field protocol, not with the evaluation code.
+The manifest precommits every claim eligibility reads — the surveyed position
+and floor, the survey method, the expected accuracy, and independence from
+anchors — and sealing refuses a capture that disagrees with any of them. Those
+claims live in the capture, which is written *after* the walk, so leaving them
+unpinned meant a mark that came out badly could be rescued by upgrading its
+declared survey or dropped by downgrading it. Manifest version 0.2.0.
 
-## Derivation configuration is caller-supplied and unrecorded
+A walk that falls short of its manifest now seals rather than being refused.
+Refusing suppressed the failure outright: the walk that missed a predeclared
+mark produced no artifact at all, so only the walks that went well left a
+record. It seals with `manifest-not-satisfied` and a `missingScoredCount` that
+says how far short it fell. A missing *diagnostic* mark blocks nothing, because
+it never counted toward anything.
+
+Duplicate checkpoint ids are refused at sealing rather than by the capture
+schema. The rule is right either way, but adding it to Capture Stream 0.2.0
+changed a released contract without the version saying so; it moves into the
+schema at 0.3.0, alongside the separate occurrence and recording timestamps.
+
+The roles are authoritative rather than advisory, which took a correction to get
+right. A first version compared the manifest against the walk and then evaluated
+the walk without it, so a mark declared `diagnostic` still sealed as `ok` with
+the same median while the manifest beside it reported `scoredCount: 0`. The
+binding now reaches evaluation: an undeclared mark is excluded as
+`not-declared-scored`, and a predeclared scored mark that goes missing or fails
+eligibility yields `manifest-not-satisfied` instead of a figure over whatever
+survived.
+
+What remains is provenance in time. The manifest is authored by the same person
+who runs the walk, and nothing establishes that it existed *before* the capture
+did. The hash proves which manifest produced a figure, not when it was written,
+so a manifest edited after a disappointing walk and re-sealed is visible as a
+different artifact but not as a later one. Closing that needs something outside
+this repository — a countersignature, a published commitment, or simply a field
+protocol that records the manifest hash somewhere durable before walking.
+
+## A sealed artifact identifies the walk it describes
+
+The artifact deliberately omits the walk itself: no inertial vectors, no
+orientation samples, no scan payloads, no anchor positions. It is easy to read
+that as anonymity, and it is not.
+
+An artifact names the session id, the building id, the venue package hash, the
+exact wall-clock instant the walk began, how many events it contained, and the
+timestamps of any sampling gaps within it. Anyone holding one learns that a
+particular walk happened in a particular building at a particular time, and
+roughly how it went. That is appropriate for an accuracy report about a venue
+the publisher chose to survey, and inappropriate for anything derived from a
+walk someone else did not consent to publishing.
+
+Nothing here needs changing yet, because nothing is published and no walk has
+involved anyone but the author. Before an artifact is shown to a third party,
+the identifying fields need a decision — a coarser start time, a session id that
+is not reused across venues, or an explicit statement that artifacts are
+venue-public. Signatures, which would add an author identity rather than remove
+one, are a separate question again.
+
+## A diagnostic report can still be tuned into any figure
 
 `buildEvidenceReport(session, overrides)` accepts checkpoint tuning,
-dead-reckoning tuning and route geometry that are applied to the derivation and
-then not written down anywhere in the report. One capture can therefore report
-different figures or map-matching counts while every result claims `ok`.
+dead-reckoning tuning and route geometry, applies them to the derivation, and
+claims `ok` regardless. Verified on 2026-08-11 against the walk in
+`coordinateBounds.test.ts`: 3.688 m with the authoritative tuning, and
+8591.346 m — still `ok` — with `strideLengthMeters` overridden to 1000.
 
-Verified on 2026-08-11 against the walk in `coordinateBounds.test.ts`: it reports
-a median of 3.688 m with the authoritative tuning, and 8591.346 m — still `ok` —
-with `strideLengthMeters` overridden to 1000.
+Evidence Artifact v0.1 answers this by separating the paths rather than by
+removing the overrides. `sealEvidenceArtifact(session, manifest)` takes no
+tuning at all, resolves the authoritative configuration, and fingerprints the
+values it actually used — both configurations in full, the thresholds around
+them, and the policy as values rather than as a version — into a hash covering
+the whole artifact. A figure that is evidence names the tuning that produced it;
+a figure that names nothing is a diagnostic.
 
-The building-frame coordinate bound refuses only the far end of this. Tuning
-extreme enough to make any derived estimate or map match non-numeric or leave
-the frame now reports `invalid-localization-state` instead of a number, which
-is why an override of 1e300 is refused. Any override that keeps the complete
-derived state inside the frame still moves the figure silently.
+The overrides stay because tuning experiments are how the processor improves,
+and a derivation that cannot be re-run with different values is hard to develop
+against. The rule is not that overrides are forbidden but that nothing tuned is
+evidence, and the type system now says so: only a sealed artifact carries a
+content hash.
+
+The localization filter was missed on the first pass. Its tuning was a shared
+mutable object used as a constructor default rather than resolved through a
+private authority, so every filter in the process shared one instance and it was
+absent from the fingerprint entirely — the same capture could have produced a
+different figure while the artifact recorded identical configuration. It is now
+frozen, resolved per filter, and fingerprinted with the rest. The lesson is that
+"the configuration" is every value that can move a number, not the ones that
+happen to have a resolver.
+
+The replay CLI is diagnostic and now says so. It calls `buildEvidenceReport`
+without a manifest and writes an unsealed report, which names none of the inputs
+that produced it; an earlier comment there described it as the evidential path,
+which was the ambition rather than the output.
 
 Bounding the reported error itself was considered and rejected. A walk with
 genuinely poor accuracy is still a real measurement, and refusing it would
-suppress the results most worth publishing honestly. The fix belongs with the
-sealed evidence artifact: the resolved configuration has to be fingerprinted
-into the report, so a figure names the tuning that produced it.
+suppress the results most worth publishing honestly.
 
 ## The capture frame bound is not yet a shared spatial-schema rule
 
@@ -171,9 +241,16 @@ Requiring `0..n-1` detects an event *dropped* from an otherwise untouched
 recorder stream, and requiring a terminal `session-end` extends that to the tail,
 which contiguity alone can never cover. Neither detects delete-and-renumber:
 anyone willing to rewrite the remaining sequences produces a stream that is
-indistinguishable from a shorter honest walk. Only the sealed evidence artifact,
-which hashes the stream as recorded, can close that — so these rules protect
-against accidental loss and casual edits, not against a determined author.
+indistinguishable from a shorter honest walk.
+
+An earlier version of this paragraph said the sealed artifact closes that. It
+does not, and the distinction matters. Sealing binds a figure to one exact
+capture and makes any later change to either one detectable — but it seals
+whatever it is given, so a stream edited *before* sealing is sealed in its
+edited form and verifies perfectly. What the artifact provides is that the
+window for undetectable editing ends at the seal; narrowing that window to
+nothing is a field-protocol requirement (seal at the end of the walk, keep the
+hash) rather than something the code can enforce.
 
 An earlier version of this entry claimed same-millisecond correctness was fully
 solved. That overclaimed. `(timeMs, sequence, ordinal)` keys and exact

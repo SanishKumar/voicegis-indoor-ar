@@ -90,12 +90,52 @@ export function isPublishableSurveyMethod(method: SurveyMethod) {
 /**
  * Coarsest survey a published mark may rest on. Error is measured in metres, so
  * a mark known only to half a metre cannot support the claim.
+ *
+ * One literal, in one place. The predicate and the reported threshold were two
+ * independent `0.25`s, which is two things that can disagree about the policy a
+ * sealed artifact fingerprints.
  */
+const MAX_PUBLISHABLE_SURVEY_ACCURACY_METERS = 0.25;
+
 export function isPublishableSurveyAccuracy(expectedAccuracyMeters: number) {
-  return expectedAccuracyMeters <= 0.25;
+  return expectedAccuracyMeters <= MAX_PUBLISHABLE_SURVEY_ACCURACY_METERS;
 }
 
 /** Read-only view of the accuracy threshold, for reports. */
 export function maxPublishableSurveyAccuracyMeters() {
-  return 0.25;
+  return MAX_PUBLISHABLE_SURVEY_ACCURACY_METERS;
 }
+
+/** Every survey method the capture schema defines, publishable or not. */
+const ALL_SURVEY_METHODS: readonly SurveyMethod[] = [
+  'tape-measure',
+  'laser-distance',
+  'total-station',
+  'estimated',
+];
+
+/**
+ * The publishable methods, as a list, for recording in a sealed artifact.
+ *
+ * Computed by asking the predicate rather than repeating its contents. A second
+ * hand-maintained list is a second thing that can disagree with the authority,
+ * and an artifact that fingerprints the wrong policy is worse than one that
+ * fingerprints none.
+ */
+export function publishableSurveyMethods(): SurveyMethod[] {
+  const publishable: SurveyMethod[] = [];
+  for (let index = 0; index < ALL_SURVEY_METHODS.length; index += 1) {
+    const method = ALL_SURVEY_METHODS[index];
+    if (isPublishableSurveyMethod(method)) publishable.push(method);
+  }
+  return publishable;
+}
+
+/**
+ * The version of the rules that decide publishability.
+ *
+ * Bump this whenever a policy value or predicate changes meaning. The artifact
+ * records both this and the resolved values, so a reader can tell a policy
+ * change from a configuration change without diffing every field.
+ */
+export const EVIDENCE_POLICY_VERSION = '0.1.0' as const;

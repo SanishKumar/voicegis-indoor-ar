@@ -1708,6 +1708,17 @@ export function summarizeSampling(session: CaptureSession): SamplingSummary {
   };
 }
 
+/**
+ * One canonical JSON form, used for everything that gets hashed.
+ *
+ * Internal to the package rather than part of its public surface: the evidence
+ * artifact must serialise exactly the way a capture does, or two things that
+ * are supposed to be the same bytes would not be.
+ */
+export function canonicalJson(value: unknown) {
+  return `${JSON.stringify(canonicalize(value), null, 2)}\n`;
+}
+
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) {
     const result = new Array<unknown>(value.length);
