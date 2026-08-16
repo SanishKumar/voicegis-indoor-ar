@@ -218,9 +218,12 @@ describe('the artifact names its inputs without republishing them', () => {
     const sealed = await seal();
 
     expect(sealed.artifactVersion).toBe(EVIDENCE_ARTIFACT_VERSION);
+    // Pinned as literals on purpose. Reading the constants here would let a
+    // version change through silently, and these numbers are how a reader tells
+    // a figure produced by one processor from a figure produced by another.
     expect(sealed.versions).toMatchObject({
-      processor: '0.1.0',
-      policy: '0.1.0',
+      processor: '0.2.0',
+      policy: '0.2.0',
       captureStream: '0.2.0',
       recording: '0.1.0',
     });

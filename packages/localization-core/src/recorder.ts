@@ -1142,7 +1142,7 @@ function deriveValidatedRecording(
 
   for (const event of sortCaptureEvents(session.events)) {
     if (event.type === 'imu') {
-      collect(deadReckoning.push(reduceImuEvent(event)), event.sequence);
+      collect(deadReckoning.push(reduceImuEvent(event, session.device.sensors)), event.sequence);
       continue;
     }
     if (event.type === 'scan') {

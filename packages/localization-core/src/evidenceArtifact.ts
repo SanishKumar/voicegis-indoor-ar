@@ -50,7 +50,7 @@ export const EVIDENCE_ARTIFACT_VERSION = '0.1.0' as const;
  * The derivation and replay pipeline that turned a capture into a figure.
  * Bumped whenever a change could move a number from the same inputs.
  */
-export const EVIDENCE_PROCESSOR_VERSION = '0.1.0' as const;
+export const EVIDENCE_PROCESSOR_VERSION = '0.2.0' as const;
 
 /** The manifest shape, versioned separately: it is authored before a walk. */
 export const CHECKPOINT_MANIFEST_VERSION = '0.2.0' as const;

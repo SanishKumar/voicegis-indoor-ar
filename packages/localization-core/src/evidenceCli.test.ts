@@ -236,6 +236,29 @@ describe('verifying an artifact on its own', () => {
     expect(await failureFrom(verifyOptions())).toContain('content hash');
   });
 
+  it('rejects an artifact sealed by a different build, seal intact or not', async () => {
+    // Verification does not outlive the code that produced it: the decoder
+    // pins every version literal to what this build emits, so an artifact from
+    // an earlier processor is refused before its seal is ever recomputed. This
+    // was found by verifying an artifact sealed minutes earlier, across a
+    // processor bump, and it is pinned here rather than fixed - see
+    // known-seams.md, "An artifact is only checkable by the build that sealed
+    // it".
+    await writeInputs();
+    await runEvidenceCli(sealOptions());
+
+    const document = JSON.parse(await readFile(paths().artifactPath, 'utf8')) as {
+      versions: { processor: string };
+    };
+    document.versions.processor = '0.1.0';
+    await writeFile(paths().artifactPath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
+
+    const message = await failureFrom(verifyOptions());
+    expect(message).toContain('versions.processor');
+    // The version is refused on its own terms, not merely as a broken digest.
+    expect(message).not.toContain('content hash');
+  });
+
   it('rejects a file that is not an artifact at all', async () => {
     await writeFile(paths().artifactPath, '{"nearly": true}\n', 'utf8');
 

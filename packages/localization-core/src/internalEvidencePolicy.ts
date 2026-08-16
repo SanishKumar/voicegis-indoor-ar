@@ -11,18 +11,27 @@ import type { CaptureSensorProfile, SurveyMethod } from './captureStream';
  */
 
 /**
- * The one sensor model current processing can interpret.
+ * The one sensor model this policy admits as evidence.
  *
- * Yaw is read from the gyroscope's Z component, which is the world vertical
- * only when the samples are already resolved into the world frame. Browser APIs
- * report in the device frame, so a browser capture declaring the world frame
- * has been transformed by something unrecorded or simply renamed.
+ * The frame is now a defined term rather than a label. `world` means
+ * North-East-Down: the third axis points at the ground, so a right-handed rate
+ * about it is the rate at which compass heading increases, and the reduction
+ * reads it directly. The device frame and the projection that resolves it are
+ * defined in `orientation.ts`.
  *
- * This native path is presently test-only: no production native adapter exists,
- * and nothing records which transform produced the world frame, which axes it
- * used, or which direction it calls positive yaw. Declaring `native/world/deg/s`
- * therefore still passes this gate without proving anything, and it stays that
- * way until the orientation and provenance slice defines those terms.
+ * Admitting `device` is deliberately *not* part of defining it. The projection
+ * makes a device-frame stream interpretable, which is necessary and not
+ * sufficient: a browser delivers orientation and inertial samples on separate,
+ * throttled, independently coalesced channels, and nothing yet characterises
+ * how far apart in time the two may drift before the projection is applying
+ * last second's tilt to this second's turn. Until that is measured, admitting
+ * device-frame captures would trade a known refusal for an unquantified error.
+ *
+ * The native path remains test-only for a different reason: no production
+ * native adapter exists, and nothing records which transform produced the world
+ * frame or on what evidence. Declaring `native/world/deg/s` still asserts
+ * rather than proves, and closing that needs provenance the capture stream does
+ * not yet carry.
  */
 const EVIDENTIAL_SENSOR_MODEL = Object.freeze({
   api: 'native',
@@ -138,4 +147,4 @@ export function publishableSurveyMethods(): SurveyMethod[] {
  * records both this and the resolved values, so a reader can tell a policy
  * change from a configuration change without diffing every field.
  */
-export const EVIDENCE_POLICY_VERSION = '0.1.0' as const;
+export const EVIDENCE_POLICY_VERSION = '0.2.0' as const;

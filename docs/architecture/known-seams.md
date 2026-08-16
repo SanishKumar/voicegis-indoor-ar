@@ -115,6 +115,32 @@ Bounding the reported error itself was considered and rejected. A walk with
 genuinely poor accuracy is still a real measurement, and refusing it would
 suppress the results most worth publishing honestly.
 
+## An artifact is only checkable by the build that sealed it
+
+`decodeEvidenceArtifact` accepts `versions.processor` and `versions.policy` only
+at the exact values the running build emits, so an artifact sealed under an
+earlier version is refused before its seal is recomputed:
+`versions.processor: must be 0.2.0, which is what this build can interpret.`
+
+Found by pointing `evidence verify` at an artifact sealed minutes earlier,
+across the processor bump in the orientation slice. It is the decoder behaving
+as written — every literal in that document is pinned to what this build knows —
+but it means verification does not outlive the code, which sits awkwardly beside
+a document whose whole purpose is to make a figure checkable later.
+
+The tension is that `verify` currently answers two questions at once. "Are these
+bytes intact and sealed?" is version-independent and is what someone re-checking
+a published figure wants. "Can this build interpret and reproduce this?" is
+version-pinned and is what a gate wants. Splitting them would let an old
+artifact have its seal confirmed while being explicit that this build cannot
+vouch for what the fields mean.
+
+Not done here because it changes the decoder, and because the alternative is not
+obviously safe: accepting a foreign version means returning a typed
+`EvidenceArtifact` whose fields may have meant something else when they were
+written — this slice changed what a heading rate means without changing a single
+key. Current behaviour is pinned by a test so it cannot drift unnoticed.
+
 ## Nothing in the repository is sealed
 
 Sealing is no longer library-only: `npm run evidence -- seal` produces an
@@ -328,17 +354,52 @@ Deferred to the interruption-recovery slice. Until then, any walk containing a
 that point, and **its accuracy figures must not be published** — this is the
 defect that was shown to move a checkpoint error from 2.828 m to 0.776 m.
 
-## Gyroscope axis assumes a flat handset
+## Orientation is projected, but a device-frame walk is still not evidence
 
-`reduceImuEvent` takes `gyroscope[2]` as the yaw rate, which is only the world
-vertical when the phone is held flat. Held upright — the natural navigation
-posture — the vertical axis is a different component, so heading drift will be
-wrong in the field.
+`reduceImuEvent` used to take `gyroscope[2]` as the yaw rate, which is world
+vertical only for a handset lying flat. Held upright — the posture someone
+actually walks a building in — that component is horizontal, so turning a corner
+produced no heading change and nodding at the screen produced a large one. It
+also ignored the declared angular-rate units, so a `rad/s` capture validated
+cleanly and then integrated a heading about 57 times too slowly.
 
-The agreed fix is orientation-aware projection of the gyroscope vector onto
-world vertical, not a flat-phone requirement. The capture stream already records
-the sensor API, angular-rate units, and coordinate frame needed to do this
-correctly; only the projection maths is outstanding.
+`orientation.ts` now projects the gyroscope vector onto true vertical using the
+tilt from the orientation sample, and applies the declared units. Two terms that
+were previously unstated are now defined, because the defect was as much
+vagueness as arithmetic:
+
+- the declared `world` frame is North-East-Down, so a right-handed rate about
+  its third axis *is* the rate at which compass heading increases;
+- the reduced scalar is named `headingRateDegreesPerSecond` rather than
+  `yawRateDegreesPerSecond`, because the old name committed to neither a frame
+  nor a sign and every value it produced looked plausible.
+
+Only tilt is used. Alpha never enters the projection — a rotation about vertical
+cannot change which axis is vertical — so orientation reported with
+`absolute: false` is fully usable, which matters because that is what a browser
+gives you without a compass fix.
+
+What remains is not the maths. **Admitting a device-frame capture as evidence is
+a separate decision and has not been taken.** The policy still accepts only
+`native/world/deg/s`, so every browser capture is still refused with
+`unsupported-sensor-model`. Making the projection interpretable is necessary and
+not sufficient: a browser delivers orientation and inertial samples on separate
+channels, each throttled and coalesced independently, and nothing yet measures
+how far apart in time the two drift. A projection applying last second's tilt to
+this second's turn is wrong in a way that looks entirely reasonable. Quantifying
+that lag is the work that has to happen before the policy widens.
+
+A sample that cannot be resolved — device frame with no orientation — yields
+null rather than zero, and `DeadReckoningIntegrator` steps over it rather than
+integrating it, counting it in `unresolvedHeadingSamples`. Zero would assert the
+walker held their course, which is a measurement nobody took. Nothing reads that
+counter yet: the only way to reach a nonzero value is a device-frame capture,
+and the policy refuses those wholesale. It exists so the count predates the
+policy that will need it rather than being invented alongside it.
+
+The world-frame provenance gap is untouched by any of this. Nothing records
+which transform produced a `world` stream, or on what evidence, so declaring
+`native/world/deg/s` still asserts rather than proves.
 
 ## Collapsed map labels are computed but not drawn
 

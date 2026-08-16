@@ -53,6 +53,7 @@ export type {
   SealRefusalReason,
   SealResult,
 } from './evidenceArtifact';
+export { headingRateDegreesPerSecond, worldUpComponent } from './orientation';
 export * from './checkpoints';
 export * from './deadReckoning';
 export * from './filter';

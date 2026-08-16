@@ -9,8 +9,19 @@ export interface ImuSample {
   timeMs: number;
   /** Magnitude of linear acceleration including gravity, in m/s^2. */
   accelerationMagnitude: number;
-  /** Rate of turn about the vertical axis, in degrees per second. */
-  yawRateDegreesPerSecond: number;
+  /**
+   * Rate of change of compass heading, in degrees per second: positive turning
+   * clockwise seen from above, which is the direction heading increases.
+   *
+   * Named for the quantity rather than for the axis it used to be read from. It
+   * was `yawRateDegreesPerSecond`, which named neither a frame nor a sign, and
+   * that vagueness is what let the reduction quietly hand this a rate about a
+   * horizontal axis: every value it produced was plausible.
+   *
+   * Null when the sample carries no usable rotation about true vertical — see
+   * `headingRateDegreesPerSecond` in `orientation.ts`.
+   */
+  headingRateDegreesPerSecond: number | null;
 }
 
 export interface DeadReckoningConfig {
@@ -87,6 +98,7 @@ export class DeadReckoningIntegrator {
   private lastHeadingEmitMs: number | null = null;
   private aboveThreshold = false;
   private stepCount = 0;
+  private unresolvedHeadingCount = 0;
 
   constructor(
     config: Partial<DeadReckoningConfig> = {},
@@ -104,6 +116,19 @@ export class DeadReckoningIntegrator {
 
   get steps() {
     return this.stepCount;
+  }
+
+  /**
+   * Samples that produced no heading rate and were stepped over.
+   *
+   * Nonzero means the integrated heading covers less than the walk does. No
+   * evidence path reads this yet, because the policy still refuses every
+   * capture whose frame is `device` outright, and a device-frame capture is the
+   * only way to reach it. It is here so that the count exists before the policy
+   * that needs it, rather than being invented alongside it.
+   */
+  get unresolvedHeadingSamples() {
+    return this.unresolvedHeadingCount;
   }
 
   get heading() {
@@ -147,10 +172,17 @@ export class DeadReckoningIntegrator {
     const previousTimeMs = this.lastSampleTimeMs;
     this.lastSampleTimeMs = sample.timeMs;
 
-    if (previousTimeMs !== null && sample.timeMs > previousTimeMs) {
+    // A sample whose heading rate could not be resolved is stepped over rather
+    // than integrated as zero. Zero would assert that the walker held their
+    // course across the interval, which is a measurement nobody took; the
+    // heading simply stops advancing and goes stale until a scan re-seeds it.
+    // `unresolvedHeadingSamples` is what makes that staleness countable.
+    if (sample.headingRateDegreesPerSecond === null) {
+      this.unresolvedHeadingCount += 1;
+    } else if (previousTimeMs !== null && sample.timeMs > previousTimeMs) {
       const elapsedSeconds = (sample.timeMs - previousTimeMs) / 1_000;
       this.headingDegrees = normalizeHeading(
-        this.headingDegrees + sample.yawRateDegreesPerSecond * elapsedSeconds,
+        this.headingDegrees + sample.headingRateDegreesPerSecond * elapsedSeconds,
       );
     }
 

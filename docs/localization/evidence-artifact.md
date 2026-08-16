@@ -48,20 +48,41 @@ npm run evidence -- seal <capture.json> <manifest.json> <artifact.json> --check
 
 They are easy to confuse and are not interchangeable.
 
-| Command        | Reads                        | Claim                                                                       |
-| -------------- | ---------------------------- | --------------------------------------------------------------------------- |
-| `verify`       | the artifact alone           | The document is internally consistent and was sealed by this pipeline.       |
-| `seal --check` | the artifact and its inputs  | The figure is still reproducible from those inputs with the code as it is today. |
-
-`verify` is the weaker claim and the one that keeps working forever: an artifact
-sealed by processor 0.1.0 will still verify long after 0.1.0 is gone, because
-verifying only recomputes the seal over the bytes present.
+| Command        | Reads                       | Claim                                                                            |
+| -------------- | --------------------------- | -------------------------------------------------------------------------------- |
+| `verify`       | the artifact alone          | This build can interpret the document, and its seal matches its contents.        |
+| `seal --check` | the artifact and its inputs | The figure is still reproducible from those inputs with the code as it is today. |
 
 `seal --check` is the claim that decays, and is supposed to. If the derivation
 changes in a way that moves a number, `--check` fails against every artifact
-sealed before the change. That failure is the tool working: the artifact records
-`versions.processor`, and a figure produced by a different processor is a
-different figure. Reseal deliberately, and expect the content hash to change.
+sealed before the change. That failure is the tool working: a figure produced by
+a different processor is a different figure. Reseal deliberately, and expect the
+content hash to change.
+
+`verify` is the weaker claim but **it is not the durable one**, which is easy to
+assume and wrong. The decoder accepts only the processor and policy versions the
+running build itself emits, so an artifact sealed under an earlier version is
+rejected before its seal is ever recomputed:
+
+```text
+versions.processor: must be 0.2.0, which is what this build can interpret.
+```
+
+The bytes may be perfectly intact; this build simply declines to vouch for a
+document it did not produce the rules for. The practical consequence is that an
+artifact is checkable only by the build that sealed it, which is a real limit on
+a document whose purpose is to outlive the run that made it. See
+[Known seams](../architecture/known-seams.md#an-artifact-is-only-checkable-by-the-build-that-sealed-it).
+
+Neither command says who sealed anything. Authorship needs a signature and is
+deliberately outside v0.1.
+
+## Versions move when the numbers can
+
+`versions.processor` is `0.2.0` and `versions.policy` is `0.2.0` as of the
+orientation slice. Both were bumped because heading is now projected through the
+device's tilt and the declared angular-rate units are finally applied, either of
+which can move a figure derived from an unchanged capture.
 
 Neither says who sealed anything. Authorship needs a signature and is
 deliberately outside v0.1.

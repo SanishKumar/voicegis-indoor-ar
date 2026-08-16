@@ -10,14 +10,14 @@ function walkingSamples({
   sampleMs = 20,
   stepPeriodMs = 500,
   amplitude = 3,
-  yawRateDegreesPerSecond = 0,
+  headingRateDegreesPerSecond = 0,
   startTimeMs = 0,
 }: {
   durationMs: number;
   sampleMs?: number;
   stepPeriodMs?: number;
   amplitude?: number;
-  yawRateDegreesPerSecond?: number;
+  headingRateDegreesPerSecond?: number;
   startTimeMs?: number;
 }): ImuSample[] {
   const samples: ImuSample[] = [];
@@ -25,7 +25,7 @@ function walkingSamples({
     samples.push({
       timeMs: startTimeMs + elapsed,
       accelerationMagnitude: GRAVITY + amplitude * Math.sin((2 * Math.PI * elapsed) / stepPeriodMs),
-      yawRateDegreesPerSecond,
+      headingRateDegreesPerSecond,
     });
   }
   return samples;
@@ -65,7 +65,7 @@ describe('IMU dead reckoning', () => {
     const integrator = new DeadReckoningIntegrator({}, 0, 0);
     runAll(
       integrator,
-      walkingSamples({ durationMs: 1_000, yawRateDegreesPerSecond: 90, amplitude: 0.1 }),
+      walkingSamples({ durationMs: 1_000, headingRateDegreesPerSecond: 90, amplitude: 0.1 }),
     );
 
     expect(integrator.heading).toBeCloseTo(90, 0);
@@ -75,7 +75,7 @@ describe('IMU dead reckoning', () => {
     const integrator = new DeadReckoningIntegrator({}, 0, 350);
     runAll(
       integrator,
-      walkingSamples({ durationMs: 1_000, yawRateDegreesPerSecond: 30, amplitude: 0.1 }),
+      walkingSamples({ durationMs: 1_000, headingRateDegreesPerSecond: 30, amplitude: 0.1 }),
     );
 
     expect(integrator.heading).toBeGreaterThanOrEqual(0);
@@ -87,7 +87,7 @@ describe('IMU dead reckoning', () => {
     const integrator = new DeadReckoningIntegrator({}, 0, 0);
     runAll(
       integrator,
-      walkingSamples({ durationMs: 4_000, yawRateDegreesPerSecond: 5, amplitude: 0.1 }),
+      walkingSamples({ durationMs: 4_000, headingRateDegreesPerSecond: 5, amplitude: 0.1 }),
     );
     const drifted = integrator.heading;
 
@@ -110,7 +110,7 @@ describe('IMU dead reckoning', () => {
   });
 
   it('produces identical observations for identical samples', () => {
-    const samples = walkingSamples({ durationMs: 3_000, yawRateDegreesPerSecond: 12 });
+    const samples = walkingSamples({ durationMs: 3_000, headingRateDegreesPerSecond: 12 });
 
     expect(runAll(new DeadReckoningIntegrator(), samples)).toEqual(
       runAll(new DeadReckoningIntegrator(), samples),

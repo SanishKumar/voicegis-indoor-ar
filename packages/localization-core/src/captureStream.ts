@@ -1,3 +1,4 @@
+import { headingRateDegreesPerSecond } from './orientation';
 import type { CheckpointAnchor } from './checkpoints';
 import type { ImuSample } from './deadReckoning';
 
@@ -575,15 +576,25 @@ export function inspectCaptureSession(value: unknown): CaptureInspection {
  * consumes. Kept separate from capture so the reduction can change without
  * invalidating a recorded walk.
  */
-export function reduceImuEvent(event: ImuCaptureEvent): ImuSample {
+/**
+ * Reduces one inertial event to the two scalars dead reckoning consumes.
+ *
+ * Takes the sensor profile because neither scalar can be recovered from the
+ * event alone: the declared units decide the scale of the turn, and the
+ * declared frame decides whether the gyroscope vector needs projecting through
+ * the device's orientation at all. Reading `gyroscope[2]` and hoping, which is
+ * what this did, is correct only for a handset lying flat.
+ */
+export function reduceImuEvent(event: ImuCaptureEvent, sensors: CaptureSensorProfile): ImuSample {
   const [ax, ay, az] = event.accelerometer;
   return {
     timeMs: event.timeMs,
     accelerationMagnitude: Math.hypot(ax, ay, az),
-    // Takes Z as yaw, which is only the world vertical when the samples are
-    // already in the world frame. The evidence path refuses anything else until
-    // orientation-aware projection exists.
-    yawRateDegreesPerSecond: event.gyroscope[2],
+    headingRateDegreesPerSecond: headingRateDegreesPerSecond(
+      event.gyroscope,
+      event.orientation,
+      sensors,
+    ),
   };
 }
 
