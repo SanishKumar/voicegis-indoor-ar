@@ -129,6 +129,7 @@ The development server prints the local URL after startup.
 | `npm run venues:sync:check`      | Verify browser-served package artifacts match compiler output                                               |
 | `npm run replay:reference`       | Regenerate the reference localization replay report                                                         |
 | `npm run replay:check`           | Verify the committed replay report byte-for-byte                                                            |
+| `npm run evidence`               | Seal a capture and its predeclared manifest into an evidence artifact, or verify one                        |
 | `npm run build`                  | Create a production build in `dist/`                                                                        |
 
 ## Repository structure
@@ -167,6 +168,7 @@ The camera guidance view is screen-aligned and can optionally compare device hea
 - [Asterion assumption audit](docs/architecture/asterion-assumption-audit.md)
 - [Architecture decision records](docs/adr/)
 - [Reference localization replay](docs/localization/reference-replay.md)
+- [Sealing and checking an evidence artifact](docs/localization/evidence-artifact.md)
 
 ## License
 

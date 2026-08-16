@@ -26,6 +26,7 @@
     "venues:sync:check": "tsx scripts/syncVenueArtifacts.ts --check",
     "replay:reference": "tsx packages/localization-core/src/cli.ts recordings/reference-corridor-walk.json recordings/reference-corridor-walk.report.json",
     "replay:check": "tsx packages/localization-core/src/cli.ts recordings/reference-corridor-walk.json recordings/reference-corridor-walk.report.json --check",
+    "evidence": "tsx packages/localization-core/src/evidenceCli.ts",
     "check": "npm run lint && npm run typecheck && npm run test && npm run compile:check && npm run compile:asterion:check && npm run compile:harbor:check && npm run venues:sync:check && npm run replay:check && npm run build"
   },
   "dependencies": {

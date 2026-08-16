@@ -115,6 +115,29 @@ Bounding the reported error itself was considered and rejected. A walk with
 genuinely poor accuracy is still a real measurement, and refusing it would
 suppress the results most worth publishing honestly.
 
+## Nothing in the repository is sealed
+
+Sealing is no longer library-only: `npm run evidence -- seal` produces an
+artifact and `npm run evidence -- verify` checks one, with `seal --check`
+re-deriving it from its inputs. The two are different claims and the tool keeps
+them apart — verifying recomputes the seal over an artifact held alone, while
+`--check` asks whether those inputs still produce it under today's processor.
+
+What is missing is any artifact under the quality gate. `npm run check` covers
+compiler determinism, browser artifact sync and the replay report byte-for-byte,
+but nothing sealed, so a processor change that moves a figure is caught only
+where a test happens to assert that figure. The obvious fix — commit a sealed
+artifact from the synthetic corridor walk and add `evidence:check` — was left
+undone on purpose: a committed artifact carrying `status: ok` and a plausible
+median error is exactly the object this project treats as quotable, and the
+capture behind it is a constructed path with no device or building in it. The
+replay report has the same hazard and manages it with a loud header, so the
+precedent for labelling one exists; the judgement is whether a document whose
+whole purpose is to look authoritative should ever be synthetic.
+
+Deciding it either way is cheap. Doing nothing is the status quo, and the status
+quo is that the seal is exercised by unit tests only.
+
 ## The capture frame bound is not yet a shared spatial-schema rule
 
 Capture anchors and ground-truth marks use an axis-aligned local-metre frame
