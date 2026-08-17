@@ -1,0 +1,325 @@
+import { describe, expect, it } from 'vitest';
+import {
+  SessionRecorder,
+  buildEvidenceReport,
+  validateCaptureSession,
+  type CheckpointAnchor,
+} from '@voicegis/localization-core';
+import {
+  HANDSET_SENSOR_PROFILE,
+  HandsetCaptureAdapter,
+  requestMotionPermission,
+  type MotionEventLike,
+  type OrientationEventLike,
+} from './handsetCapture';
+
+/**
+ * The first code here that meets a real device, so these cover the things a
+ * deterministic replay never had to survive: half-populated events, a clock
+ * that steps backwards, and two sensor channels that arrive on their own
+ * schedules.
+ */
+
+const anchors: CheckpointAnchor[] = [
+  {
+    id: 'corridor-start',
+    floorId: 'g',
+    kind: 'qr',
+    position: [1, 9],
+    headingDegrees: 90,
+    payload: 'vg:corridor-start',
+  },
+];
+
+function recorder() {
+  return new SessionRecorder({
+    sessionId: 'handset-walk',
+    buildingId: 'reference-medical-centre',
+    packageHash: 'a'.repeat(64),
+    device: {
+      label: 'pixel 7a',
+      platform: 'android',
+      sensors: { ...HANDSET_SENSOR_PROFILE },
+    },
+    anchors,
+    startedAtIso: '2026-08-17T09:00:00.000Z',
+  });
+}
+
+function motion(
+  timeStamp: number,
+  rotationRate: { alpha: number; beta: number; gamma: number } = { alpha: 0, beta: 0, gamma: 0 },
+  accelerationIncludingGravity = { x: 0, y: 0, z: 9.81 },
+): MotionEventLike {
+  return { timeStamp, accelerationIncludingGravity, rotationRate };
+}
+
+function orientation(timeStamp: number, beta: number, gamma: number, alpha = 0): OrientationEventLike {
+  return { timeStamp, alpha, beta, gamma, absolute: false };
+}
+
+describe('mapping a browser motion event onto a capture reading', () => {
+  it('puts each rotation rate on the axis it is about, not the one it is named after', () => {
+    // The trap: rotationRate.alpha is the rate about Z, .beta about X and
+    // .gamma about Y. Written across in name order the vector is plausible and
+    // completely wrong, and no downstream check would ever notice.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleMotion(motion(0, { alpha: 1, beta: 2, gamma: 3 }));
+
+    const events = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(events).toHaveLength(1);
+    expect(events[0].gyroscope).toEqual([2, 3, 1]);
+  });
+
+  it('records acceleration including gravity in axis order', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleMotion(motion(0, undefined, { x: 0.5, y: -1.5, z: 9.7 }));
+
+    const events = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(events[0].accelerometer).toEqual([0.5, -1.5, 9.7]);
+  });
+
+  it('starts the session clock at the first event rather than the page time origin', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleMotion(motion(184_233.5));
+    adapter.handleMotion(motion(184_253.5));
+
+    const events = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(events.map((event) => event.timeMs)).toEqual([0, 20]);
+  });
+
+  it('honours an explicit origin when the caller has one', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session, { originTimeStampMs: 1_000 });
+
+    adapter.handleMotion(motion(1_250));
+
+    const events = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(events[0].timeMs).toBe(250);
+  });
+});
+
+describe('pairing tilt with turn across two independent channels', () => {
+  it('attaches the most recent orientation and measures how stale it was', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation(orientation(100, 90, 0));
+    adapter.handleMotion(motion(140, { alpha: 0, beta: 0, gamma: 30 }));
+
+    const events = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(events[0].orientation).toEqual({
+      alphaDegrees: 0,
+      betaDegrees: 90,
+      gammaDegrees: 0,
+      absolute: false,
+    });
+    expect(adapter.pairing).toMatchObject({
+      pairedCount: 1,
+      unpairedCount: 0,
+      medianStalenessMs: 40,
+      worstStalenessMs: 40,
+    });
+  });
+
+  it('records a sample that arrived before any tilt, with no orientation', () => {
+    // Dropping it would cost a footfall the accelerometer measured perfectly
+    // well. A null orientation is refused explicitly downstream rather than
+    // quietly becoming a heading.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleMotion(motion(0, { alpha: 5, beta: 0, gamma: 0 }));
+
+    const events = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(events).toHaveLength(1);
+    expect(events[0].orientation).toBeNull();
+    expect(adapter.pairing).toMatchObject({ pairedCount: 0, unpairedCount: 1 });
+  });
+
+  it('summarises the staleness distribution the lag decision needs', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    // Ten samples whose tilt is between 1 ms and 10 ms behind.
+    for (let index = 1; index <= 10; index += 1) {
+      adapter.handleOrientation(orientation(index * 100, 0, 0));
+      adapter.handleMotion(motion(index * 100 + index));
+    }
+
+    expect(adapter.pairing).toMatchObject({
+      pairedCount: 10,
+      medianStalenessMs: 6,
+      p95StalenessMs: 10,
+      worstStalenessMs: 10,
+    });
+  });
+
+  it('drops a tilt that is older than the caller allows, but still counts it', () => {
+    // The measurement is the point, so an excluded sample still contributes to
+    // the distribution. Excluding it from both would hide exactly the walks
+    // that motivated setting a limit.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session, { maxOrientationStalenessMs: 50 });
+
+    adapter.handleOrientation(orientation(0, 90, 0));
+    adapter.handleMotion(motion(500));
+
+    const events = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(events[0].orientation).toBeNull();
+    expect(adapter.pairing).toMatchObject({ pairedCount: 1, worstStalenessMs: 500 });
+    expect(adapter.orientationStalenessLimitMs).toBe(50);
+  });
+
+  it('keeps nothing by default, because no threshold has been measured yet', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation(orientation(0, 90, 0));
+    adapter.handleMotion(motion(10_000));
+
+    const events = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(events[0].orientation).not.toBeNull();
+    expect(adapter.orientationStalenessLimitMs).toBeNull();
+  });
+});
+
+describe('what the adapter refuses', () => {
+  it('counts a motion event with no gyroscope rather than recording half of it', () => {
+    // A device without a gyroscope still fires devicemotion, with rotationRate
+    // present and empty. Recorded, it would look like a walk with no turns.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleMotion({
+      timeStamp: 0,
+      accelerationIncludingGravity: { x: 0, y: 0, z: 9.81 },
+      rotationRate: { alpha: null, beta: null, gamma: null },
+    });
+    adapter.handleMotion({
+      timeStamp: 20,
+      accelerationIncludingGravity: null,
+      rotationRate: { alpha: 0, beta: 0, gamma: 0 },
+    });
+
+    expect(session.buildSession().events.filter((event) => event.type === 'imu')).toHaveLength(0);
+    expect(adapter.rejections).toMatchObject({ incomplete: 2, regressed: 0, refused: 0 });
+  });
+
+  it('refuses a sample whose clock stepped backwards instead of reordering it', () => {
+    // Sorting a regressing clock into place is the erasure the capture
+    // chronology rules exist to prevent, so it must not happen here either.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleMotion(motion(100));
+    adapter.handleMotion(motion(80));
+    adapter.handleMotion(motion(120));
+
+    const events = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(events.map((event) => event.timeMs)).toEqual([0, 20]);
+    expect(adapter.rejections).toMatchObject({ regressed: 1 });
+  });
+
+  it('ignores an orientation event with missing angles', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation({ timeStamp: 0, alpha: null, beta: null, gamma: null });
+    adapter.handleMotion(motion(10));
+
+    const events = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(events[0].orientation).toBeNull();
+    expect(adapter.pairing).toMatchObject({ unpairedCount: 1 });
+  });
+});
+
+describe('what the adapter produces is a valid capture', () => {
+  it('builds a session the capture schema accepts', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation(orientation(0, 90, 0));
+    for (let timeStamp = 0; timeStamp <= 3_000; timeStamp += 20) {
+      adapter.handleMotion(
+        motion(
+          timeStamp,
+          { alpha: 0, beta: 30, gamma: 0 },
+          { x: 0, y: 0, z: 9.81 + 3 * Math.sin((2 * Math.PI * timeStamp) / 500) },
+        ),
+      );
+    }
+    session.recordLifecycle('session-end', 3_100);
+
+    expect(validateCaptureSession(session.buildSession())).toEqual([]);
+  });
+
+  it('is still refused as evidence, which is the decision this unblocks', () => {
+    // Interpretable is not the same as admissible, and this is where the two
+    // part company. The projection can now resolve a device-frame turn, but the
+    // policy admits only native/world/deg/s, so every handset walk this adapter
+    // produces is refused outright.
+    //
+    // Pinned deliberately. Widening the policy is a decision that should be
+    // taken once the orientation lag this adapter measures is known, and this
+    // test is what makes taking it loud rather than incidental.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation(orientation(0, 90, 0));
+    for (let timeStamp = 0; timeStamp <= 2_000; timeStamp += 20) {
+      adapter.handleMotion(motion(timeStamp, { alpha: 0, beta: 0, gamma: 30 }));
+    }
+    session.recordLifecycle('session-end', 2_100);
+
+    const { report } = buildEvidenceReport(session.buildSession());
+    expect(report.evidenceStatus).toBe('unsupported-sensor-model');
+  });
+
+  it('carries the tilt every recorded turn needs to be projected at all', () => {
+    // The precondition for admitting device-frame data: no inertial sample may
+    // reach the stream without the orientation that resolves it. A walk that
+    // met the policy but carried null tilts would still be unprojectable.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation(orientation(0, 90, 0));
+    for (let timeStamp = 0; timeStamp <= 500; timeStamp += 20) {
+      adapter.handleMotion(motion(timeStamp, { alpha: 0, beta: 0, gamma: 30 }));
+    }
+
+    const imu = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(imu.length).toBeGreaterThan(0);
+    expect(imu.every((event) => event.orientation !== null)).toBe(true);
+  });
+});
+
+describe('asking for motion access', () => {
+  it('separates a platform that never asks from one that granted', async () => {
+    await expect(requestMotionPermission(undefined)).resolves.toBe('unsupported');
+    await expect(requestMotionPermission({})).resolves.toBe('not-required');
+    await expect(
+      requestMotionPermission({ requestPermission: async () => 'granted' }),
+    ).resolves.toBe('granted');
+    await expect(
+      requestMotionPermission({ requestPermission: async () => 'denied' }),
+    ).resolves.toBe('denied');
+  });
+
+  it('treats a throw as a denial rather than crashing the walk', async () => {
+    // iOS throws when the request happens outside a user gesture.
+    await expect(
+      requestMotionPermission({
+        requestPermission: async () => {
+          throw new Error('requires a user gesture');
+        },
+      }),
+    ).resolves.toBe('denied');
+  });
+});

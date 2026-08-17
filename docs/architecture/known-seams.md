@@ -381,13 +381,27 @@ gives you without a compass fix.
 
 What remains is not the maths. **Admitting a device-frame capture as evidence is
 a separate decision and has not been taken.** The policy still accepts only
-`native/world/deg/s`, so every browser capture is still refused with
-`unsupported-sensor-model`. Making the projection interpretable is necessary and
-not sufficient: a browser delivers orientation and inertial samples on separate
-channels, each throttled and coalesced independently, and nothing yet measures
-how far apart in time the two drift. A projection applying last second's tilt to
-this second's turn is wrong in a way that looks entirely reasonable. Quantifying
-that lag is the work that has to happen before the policy widens.
+`native/world/deg/s`, so every browser capture is refused with
+`unsupported-sensor-model`, and `handsetCapture.test.ts` pins that refusal so
+widening it has to be deliberate rather than incidental.
+
+Interpretable is not admissible. A browser delivers orientation and inertial
+samples on two independent event channels, each throttled and coalesced on its
+own schedule, so every sample is paired with a tilt that is already slightly
+old. A projection applying last second's tilt to this second's turn is wrong in
+a way that looks entirely reasonable.
+
+`src/capture/handsetCapture.ts` now measures that lag rather than assuming it:
+every pairing records how stale its tilt was, and `pairing` reports the median,
+p95 and worst. Its staleness limit defaults to null — nothing is discarded —
+because a default here would be a number nobody has measured, and the adapter
+exists to produce the measurement a real limit should come from.
+
+So the remaining work is no longer code. It is running the adapter on real
+handsets, reading the distribution, and deciding from it: whether the lag is
+small enough to admit device-frame captures outright, small enough with a
+staleness limit, or large enough that pairing has to be interpolated rather than
+nearest-neighboured.
 
 A sample that cannot be resolved — device frame with no orientation — yields
 null rather than zero, and `DeadReckoningIntegrator` steps over it rather than

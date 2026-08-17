@@ -146,6 +146,7 @@ packages/
 └── localization-core/           observation replay and estimate pipeline
 
 src/
+├── capture/                     handset sensor adapter driving a capture session
 ├── components/                  plan, spatial twin, search, and guidance UI
 ├── context/                     navigation state and user preferences
 ├── data/                        compiled-package runtime adapter
