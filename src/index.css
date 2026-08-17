@@ -6676,3 +6676,59 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.walk-recorder-access {
+  margin: 14px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.walk-recorder-live {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  margin: 18px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.walk-recorder-live-ok {
+  border-color: var(--color-accent-green);
+  background: var(--color-accent-green-dim);
+  font-weight: 700;
+}
+
+.walk-recorder-live-bad {
+  border-color: var(--color-accent-red);
+  background: color-mix(in srgb, var(--color-accent-red) 12%, transparent);
+  display: block;
+}
+
+.walk-recorder-pulse {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-accent-green);
+  animation: walk-recorder-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes walk-recorder-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .walk-recorder-pulse {
+    animation: none;
+  }
+}

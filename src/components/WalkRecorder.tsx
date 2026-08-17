@@ -15,9 +15,8 @@ import {
   type MotionEventLike,
   type MotionPermission,
   type OrientationEventLike,
-  type PairingSummary,
-  type RejectionSummary,
 } from '../capture/handsetCapture';
+import { RATE_WINDOW_MS, liveness, type LiveStats, type Liveness } from '../capture/liveness';
 import { useVenue } from '../context/VenueContext.jsx';
 
 /**
@@ -54,12 +53,13 @@ interface RecordingVenue {
   };
 }
 
-interface LiveStats {
-  elapsedMs: number;
-  eventCount: number;
-  pairing: PairingSummary;
-  rejections: RejectionSummary;
-}
+const ACCESS_NOTE: Record<MotionPermission, string> = {
+  granted: 'Motion access granted.',
+  denied: 'Motion access was refused. iOS only grants it over HTTPS, and only from a direct tap.',
+  'not-required':
+    'This browser hands over motion sensors without asking, so there was no prompt. That is not the same as having any.',
+  unsupported: 'This browser exposes no motion sensors at all.',
+};
 
 interface Finished {
   session: CaptureSession;
@@ -84,7 +84,9 @@ export default function WalkRecorder() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [access, setAccess] = useState<MotionPermission | null>(null);
   const [stats, setStats] = useState<LiveStats | null>(null);
+  const [windowedHz, setWindowedHz] = useState<number | null>(null);
   const [finished, setFinished] = useState<Finished | null>(null);
+  const rateMarksRef = useRef<Array<{ atMs: number; samples: number }>>([]);
 
   const recorderRef = useRef<SessionRecorder | null>(null);
   const adapterRef = useRef<HandsetCaptureAdapter | null>(null);
@@ -101,9 +103,18 @@ export default function WalkRecorder() {
     const adapter = adapterRef.current;
     const recorder = recorderRef.current;
     if (!adapter || !recorder) return;
+
+    const now = performance.now();
+    const marks = rateMarksRef.current;
+    marks.push({ atMs: now, samples: adapter.recordedSamples });
+    while (marks.length > 1 && now - marks[0].atMs > RATE_WINDOW_MS) marks.shift();
+    const span = marks.length > 1 ? (now - marks[0].atMs) / 1000 : 0;
+    setWindowedHz(span > 0 ? (adapter.recordedSamples - marks[0].samples) / span : null);
+
     setStats({
       elapsedMs: performance.now() - originRef.current,
       eventCount: recorder.eventCount,
+      recordedSamples: adapter.recordedSamples,
       pairing: adapter.pairing,
       rejections: adapter.rejections,
     });
@@ -161,6 +172,8 @@ export default function WalkRecorder() {
     sessionIdRef.current = sessionId;
     setFinished(null);
     setStats(null);
+    setWindowedHz(null);
+    rateMarksRef.current = [];
     setPhase('recording');
   }, [venue]);
 
@@ -210,14 +223,16 @@ export default function WalkRecorder() {
         behind each sample its orientation arrives — the number the policy decision is waiting on.
       </p>
 
-      {access === 'denied' && (
-        <p className="walk-recorder-error" role="alert">
-          Motion access was refused. iOS only grants it over HTTPS and only from a direct tap.
-        </p>
-      )}
-      {access === 'unsupported' && (
-        <p className="walk-recorder-error" role="alert">
-          This browser exposes no motion sensors, so there is nothing to record.
+      {access && (
+        <p
+          className={
+            access === 'granted' || access === 'not-required'
+              ? 'walk-recorder-access'
+              : 'walk-recorder-error'
+          }
+          role={access === 'denied' || access === 'unsupported' ? 'alert' : undefined}
+        >
+          {ACCESS_NOTE[access]}
         </p>
       )}
 
@@ -233,11 +248,13 @@ export default function WalkRecorder() {
         )}
       </div>
 
+      {stats && phase === 'recording' && <LivenessBanner status={liveness(stats, windowedHz)} />}
+
       {stats && (
         <section className="walk-recorder-stats" aria-live="polite">
           <Stat label="Elapsed" value={`${(stats.elapsedMs / 1000).toFixed(1)} s`} />
-          <Stat label="Events" value={String(stats.eventCount)} />
-          <Stat label="Paired samples" value={String(stats.pairing.pairedCount)} />
+          <Stat label="Samples recorded" value={String(stats.recordedSamples)} />
+          <Stat label="Paired with tilt" value={String(stats.pairing.pairedCount)} />
           <Stat label="Tilt lag, median" value={formatMs(stats.pairing.medianStalenessMs)} />
           <Stat label="Tilt lag, p95" value={formatMs(stats.pairing.p95StalenessMs)} />
           <Stat label="Tilt lag, worst" value={formatMs(stats.pairing.worstStalenessMs)} />
@@ -277,6 +294,44 @@ export default function WalkRecorder() {
         </section>
       )}
     </main>
+  );
+}
+
+function LivenessBanner({ status }: { status: Liveness }) {
+  if (status.kind === 'receiving') {
+    return (
+      <p className="walk-recorder-live walk-recorder-live-ok" role="status">
+        <span className="walk-recorder-pulse" aria-hidden="true" />
+        Receiving {status.hz.toFixed(0)} samples/sec.
+      </p>
+    );
+  }
+
+  if (status.kind === 'stalled') {
+    return (
+      <p className="walk-recorder-live walk-recorder-live-bad" role="alert">
+        <strong>Delivery has stopped.</strong> Samples were arriving and no longer are. A phone that
+        locks, sleeps, or backgrounds the browser stops reporting motion; bring this page back to
+        the foreground.
+      </p>
+    );
+  }
+
+  if (status.kind === 'sensorless') {
+    return (
+      <p className="walk-recorder-live walk-recorder-live-bad" role="alert">
+        <strong>Nothing is being recorded.</strong> This browser is firing motion events with every
+        field empty, which is what a device with no motion sensors does — a desktop or a laptop.
+        Open this page on a phone.
+      </p>
+    );
+  }
+
+  return (
+    <p className="walk-recorder-live walk-recorder-live-bad" role="alert">
+      <strong>Nothing is being recorded.</strong> No motion events have arrived at all. On a desktop
+      browser none ever will; open this page on a phone.
+    </p>
   );
 }
 

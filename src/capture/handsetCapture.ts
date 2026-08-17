@@ -256,6 +256,17 @@ export class HandsetCaptureAdapter {
   get rejections(): RejectionSummary {
     return { incomplete: this.incomplete, regressed: this.regressed, refused: this.refused };
   }
+
+  /**
+   * Samples that actually reached the recorder.
+   *
+   * The one number that answers "is this working at all". A caller can derive
+   * it from the pairing counts, but a surface that has to compute its own
+   * liveness signal from two other numbers is a surface that will get it wrong.
+   */
+  get recordedSamples() {
+    return this.stalenessMs.length + this.unpaired;
+  }
 }
 
 export type MotionPermission = 'granted' | 'denied' | 'unsupported' | 'not-required';
