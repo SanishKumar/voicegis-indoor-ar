@@ -397,11 +397,20 @@ p95 and worst. Its staleness limit defaults to null — nothing is discarded —
 because a default here would be a number nobody has measured, and the adapter
 exists to produce the measurement a real limit should come from.
 
-So the remaining work is no longer code. It is running the adapter on real
-handsets, reading the distribution, and deciding from it: whether the lag is
-small enough to admit device-frame captures outright, small enough with a
-staleness limit, or large enough that pairing has to be interpolated rather than
-nearest-neighboured.
+So the remaining work is no longer code. `#/recorder` records a walk from the
+handset the page is open on and shows the lag while it runs, so what is left is
+running it on real handsets, reading the distribution, and deciding from it:
+whether the lag is small enough to admit device-frame captures outright, small
+enough with a staleness limit, or large enough that pairing has to be
+interpolated rather than nearest-neighboured.
+
+One thing that surface already confirmed, on desktop Chrome rather than a
+handset: the browser fires genuine `devicemotion` events — `isTrusted` true —
+with every acceleration and rotation component null, on a machine with no
+sensors at all. Recorded, those would have read as a walk with no turns. The
+adapter's `incomplete` counter was written for exactly that case on the argument
+that it was plausible; it turns out to be the ordinary behaviour of a browser
+with nothing to report.
 
 A sample that cannot be resolved — device frame with no orientation — yields
 null rather than zero, and `DeadReckoningIntegrator` steps over it rather than

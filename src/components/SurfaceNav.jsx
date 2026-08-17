@@ -1,9 +1,10 @@
-import { Box, Map, PenTool } from 'lucide-react';
+import { Box, Map, PenTool, Radio } from 'lucide-react';
 
 const SURFACES = [
   { id: 'visitor', label: '2D map', icon: Map },
   { id: 'inspector', label: '3D + venues', icon: Box },
   { id: 'studio', label: 'Studio', icon: PenTool },
+  { id: 'recorder', label: 'Record', icon: Radio },
 ];
 
 export default function SurfaceNav({ activeSurface }) {

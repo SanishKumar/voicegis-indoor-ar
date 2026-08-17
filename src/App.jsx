@@ -17,10 +17,11 @@ const FloorplanViewer = lazy(() => import('./components/FloorplanViewer.tsx'));
 const BuildingSourceWorkspace = lazy(
   () => import('./components/BuildingSourceWorkspace.tsx'),
 );
+const WalkRecorder = lazy(() => import('./components/WalkRecorder.tsx'));
 
 function currentSurface() {
   const value = window.location.hash.replace(/^#\/?/, '').split('/')[0];
-  return ['visitor', 'inspector', 'studio'].includes(value) ? value : 'visitor';
+  return ['visitor', 'inspector', 'studio', 'recorder'].includes(value) ? value : 'visitor';
 }
 
 function useSurfaceRoute() {
@@ -107,6 +108,20 @@ function StudioApp() {
   );
 }
 
+function RecorderApp() {
+  return (
+    <Suspense
+      fallback={
+        <main className="walk-recorder" id="main-content">
+          Loading capture surface…
+        </main>
+      }
+    >
+      <WalkRecorder />
+    </Suspense>
+  );
+}
+
 function ActiveVenueApplication() {
   const { venue, status } = useVenue();
   const surface = useSurfaceRoute();
@@ -129,6 +144,8 @@ function ActiveVenueApplication() {
         <InspectorApp />
       ) : surface === 'studio' ? (
         <StudioApp />
+      ) : surface === 'recorder' ? (
+        <RecorderApp />
       ) : (
         <VisitorApp />
       )}
