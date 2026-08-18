@@ -5,14 +5,18 @@
  * Features search, category filtering, and a beautiful list.
  */
 
-import { useEffect, useState, useMemo } from 'react';
-import { Search, MapPin, X, ChevronRight } from 'lucide-react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Search, MapPin, X, ChevronRight, QrCode } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
+import QrCheckIn from './QrCheckIn.tsx';
+import { checkInFromScan } from '../capture/anchorCheckIn.ts';
 
 export default function LocationPicker({ isOpen, onClose }) {
   const { actions, venue } = useNavigation();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanProblem, setScanProblem] = useState(null);
   const allPOIs = useMemo(() => venue.getPOIs(), [venue]);
   const availableCategories = useMemo(
     () => new Set(allPOIs.map((node) => node.poi.category)),
@@ -37,6 +41,28 @@ export default function LocationPicker({ isOpen, onClose }) {
     actions.setStart(node.id);
     onClose();
   };
+
+  const handleScannedPayload = useCallback(
+    (payload) => {
+      const pkg = venue.buildingPackage;
+      const result = checkInFromScan(payload, pkg.localizationAnchors, pkg.routing.nodes);
+      if (!result.ok) {
+        setScanProblem(
+          result.reason === 'unknown-code'
+            ? 'That code is not one of this venue’s check-in points.'
+            : result.reason === 'not-a-checkin-code'
+              ? 'That marker is not a check-in code.'
+              : 'That code has no routable path on its floor.',
+        );
+        return;
+      }
+      setScanProblem(null);
+      setScanning(false);
+      actions.setStart(result.nodeId);
+      onClose();
+    },
+    [actions, onClose, venue],
+  );
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -74,6 +100,19 @@ export default function LocationPicker({ isOpen, onClose }) {
             <X size={20} />
           </button>
         </div>
+
+        <button type="button" className="lp-scan-cta" onClick={() => { setScanProblem(null); setScanning(true); }}>
+          <QrCode size={18} aria-hidden="true" />
+          <span>Scan a check-in code</span>
+        </button>
+
+        {scanning && (
+          <QrCheckIn
+            onPayload={handleScannedPayload}
+            onClose={() => setScanning(false)}
+            hint={scanProblem}
+          />
+        )}
 
         {/* Search */}
         <div className="lp-search">

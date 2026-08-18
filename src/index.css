@@ -6732,3 +6732,103 @@ body {
     animation: none;
   }
 }
+
+/* --------------------------------------------------------------------------
+   QR check-in scanner
+   -------------------------------------------------------------------------- */
+
+.qr-checkin-overlay {
+  position: fixed;
+  z-index: 2000;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.qr-checkin {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-bg-primary);
+  box-shadow: var(--shadow-lg, 0 20px 60px rgba(0, 0, 0, 0.5));
+}
+
+.qr-checkin-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.qr-checkin-stage {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1 / 1;
+  border-radius: 14px;
+  background: #000;
+}
+
+.qr-checkin-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qr-checkin-reticle {
+  position: absolute;
+  inset: 18%;
+  border: 3px solid var(--color-accent-green);
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.28);
+}
+
+.qr-checkin-status {
+  margin: 14px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.qr-checkin-hint {
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border: 1px solid var(--color-accent-red);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.lp-scan-cta {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-accent-blue);
+  border-radius: 12px;
+  background: var(--color-accent-blue);
+  color: #fff;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+}

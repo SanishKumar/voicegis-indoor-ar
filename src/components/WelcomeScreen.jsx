@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Navigation, MapPin, ArrowRight, QrCode, Search, ChevronRight } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs } from '../engine/searchIndex.js';
+import QrCheckIn from './QrCheckIn.tsx';
+import { checkInFromScan } from '../capture/anchorCheckIn.ts';
 
 export default function WelcomeScreen({ onComplete }) {
   const { actions, venue } = useNavigation();
@@ -9,6 +11,8 @@ export default function WelcomeScreen({ onComplete }) {
   const [step, setStep] = useState(0); // 0 = welcome, 1 = location, 2 = destination
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanProblem, setScanProblem] = useState(null);
 
   const handleStart = () => setStep(1);
 
@@ -25,6 +29,33 @@ export default function WelcomeScreen({ onComplete }) {
   const skipToMap = () => {
     onComplete();
   };
+
+  // Everything a check-in needs already lives in the compiled package, so this
+  // resolves with no network and no lookup service.
+  const handleScannedPayload = useCallback(
+    (payload) => {
+      const result = checkInFromScan(
+        payload,
+        buildingPackage.localizationAnchors,
+        buildingPackage.routing.nodes,
+      );
+      if (!result.ok) {
+        setScanProblem(
+          result.reason === 'unknown-code'
+            ? 'That code is not one of this venue’s check-in points.'
+            : result.reason === 'not-a-checkin-code'
+              ? 'That marker is not a check-in code.'
+              : 'That code has no routable path on its floor.',
+        );
+        return;
+      }
+      setScanProblem(null);
+      setScanning(false);
+      actions.setStart(result.nodeId);
+      setStep(2);
+    },
+    [actions, buildingPackage],
+  );
 
   const pois = useMemo(() => venue.getPOIs(), [venue]);
   const landmarks = useMemo(() => {
@@ -109,11 +140,22 @@ export default function WelcomeScreen({ onComplete }) {
             <button
               className="welcome-feature-card"
               style={{ marginBottom: '16px', justifyContent: 'center' }}
-              disabled
+              onClick={() => {
+                setScanProblem(null);
+                setScanning(true);
+              }}
             >
               <QrCode size={24} style={{ marginRight: '8px' }} />
-              <span style={{ fontSize: '16px', fontWeight: 'bold' }}>QR check-in · planned</span>
+              <span style={{ fontSize: '16px', fontWeight: 'bold' }}>Scan a check-in code</span>
             </button>
+
+            {scanning && (
+              <QrCheckIn
+                onPayload={handleScannedPayload}
+                onClose={() => setScanning(false)}
+                hint={scanProblem}
+              />
+            )}
 
             <div
               style={{

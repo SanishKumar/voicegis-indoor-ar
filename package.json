@@ -28,7 +28,8 @@
     "replay:reference": "tsx packages/localization-core/src/cli.ts recordings/reference-corridor-walk.json recordings/reference-corridor-walk.report.json",
     "replay:check": "tsx packages/localization-core/src/cli.ts recordings/reference-corridor-walk.json recordings/reference-corridor-walk.report.json --check",
     "evidence": "tsx packages/localization-core/src/evidenceCli.ts",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run compile:check && npm run compile:asterion:check && npm run compile:harbor:check && npm run venues:sync:check && npm run replay:check && npm run build"
+    "check": "npm run lint && npm run typecheck && npm run test && npm run compile:check && npm run compile:asterion:check && npm run compile:harbor:check && npm run venues:sync:check && npm run replay:check && npm run build",
+    "codes": "tsx scripts/generateCheckInCodes.ts"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
@@ -36,6 +37,7 @@
     "@tailwindcss/postcss": "^4.3.0",
     "@voicegis/dxf-importer": "0.1.0",
     "ajv": "^8.18.0",
+    "jsqr": "^1.4.0",
     "konva": "^9.3.22",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
@@ -46,6 +48,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.10.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
@@ -58,6 +61,7 @@
     "globals": "^17.7.0",
     "postcss": "^8.5.15",
     "prettier": "^3.9.6",
+    "qrcode": "^1.5.4",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.65.0",

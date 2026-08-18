@@ -31,7 +31,26 @@ The repository includes a compiler, routing engine, browser application, offline
   </tr>
 </table>
 
+## Try it in 60 seconds
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000/check-in-codes.html` in a second window, then in the
+app choose **Plan a route → Scan a check-in code** and point the camera at one.
+You are checked in at a surveyed point and can be routed step-free to any room —
+no beacons, no site survey, no network. Full script: [the 60-second demo](docs/demo.md).
+
 ## Core capabilities
+
+### QR check-in
+
+A code at a junction resolves against the anchors inside the compiled venue
+package, giving a position fix on the right floor without beacons or
+connectivity. Codes are generated from the package (`npm run codes`), so a
+printed sign can only encode a payload the venue actually publishes, and every
+payload is round-trip tested through the decoder iOS uses.
 
 ### Spatial package compiler
 
@@ -129,6 +148,7 @@ The development server prints the local URL after startup.
 | `npm run venues:sync:check`      | Verify browser-served package artifacts match compiler output                                               |
 | `npm run replay:reference`       | Regenerate the reference localization replay report                                                         |
 | `npm run replay:check`           | Verify the committed replay report byte-for-byte                                                            |
+| `npm run codes`                  | Regenerate the printable check-in code sheet from the compiled venue packages                               |
 | `npm run dev:mobile`             | Serve over HTTPS on the LAN so a phone can reach `#/recorder` and use its motion sensors                     |
 | `npm run evidence`               | Seal a capture and its predeclared manifest into an evidence artifact, or verify one                        |
 | `npm run build`                  | Create a production build in `dist/`                                                                        |
@@ -172,6 +192,7 @@ The camera guidance view is screen-aligned and can optionally compare device hea
 - [Reference localization replay](docs/localization/reference-replay.md)
 - [Sealing and checking an evidence artifact](docs/localization/evidence-artifact.md)
 - [Recording a walk on a phone](docs/localization/recording-on-a-phone.md)
+- [The 60-second demo](docs/demo.md)
 
 ## License
 
