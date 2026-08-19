@@ -23,6 +23,8 @@ export interface AnchorLike {
   position: [number, number];
   headingDegrees: number;
   payload: string;
+  /** The space the sign hangs in, when the package names one. */
+  spaceId?: string;
 }
 
 export interface RoutingNodeLike {
@@ -96,4 +98,45 @@ export function checkInFromScan(
 /** Every anchor in a venue that a printed code could legitimately encode. */
 export function scannableAnchors(anchors: readonly AnchorLike[]): AnchorLike[] {
   return anchors.filter((anchor) => SCANNABLE_KINDS.includes(anchor.kind));
+}
+
+/** What a completed check-in remembers, for showing the visitor where they are. */
+export interface CheckInRecord {
+  anchorId: string;
+  floorId: string;
+  spaceId?: string;
+  nodeId: string;
+  distanceMeters: number;
+}
+
+export interface CheckInLabel {
+  place: string;
+  detail: string;
+}
+
+/**
+ * Turns a check-in into something worth reading on screen.
+ *
+ * The anchor id is always in the detail line, never omitted as clutter, because
+ * space names do not identify a code: Asterion hangs `anchor-g-east` and
+ * `anchor-g-west` at opposite ends of one space called Central Concourse, so a
+ * label naming only the space would read identically at both and a visitor
+ * could not tell a mis-scan from a correct one.
+ *
+ * Lookups are passed in rather than reached for, so this stays testable without
+ * a compiled package and cannot start depending on venue internals.
+ */
+export function describeCheckIn(
+  record: CheckInRecord,
+  names: { space(id: string): string | null; floor(id: string): string | null },
+): CheckInLabel {
+  const spaceName = record.spaceId ? names.space(record.spaceId) : null;
+  const floorName = names.floor(record.floorId);
+
+  // Falling back to the floor as the place would otherwise print it twice.
+  const place = spaceName ?? floorName ?? 'a surveyed point';
+  const parts = spaceName === null ? [] : floorName === null ? [] : [floorName];
+  parts.push(record.anchorId);
+
+  return { place, detail: parts.join(' · ') };
 }

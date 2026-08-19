@@ -16,6 +16,7 @@ import {
   Navigation2,
 } from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
+import { startPointLabel } from '../capture/startLabel.ts';
 
 export default function Header() {
   const {
@@ -29,13 +30,18 @@ export default function Header() {
     toggleHighContrast,
     accessibleRouting,
     toggleAccessibleRouting,
+    checkIn,
     venue,
   } = useNavigation();
   const { activeFloorId, activeView, startNodeId } = state;
 
   const startNode = venue.getNodeById(startNodeId);
   const activeFloor = venue.getFloorById(activeFloorId);
-  const locationLabel = startNode?.poi ? startNode.poi.name : 'Choose a starting point';
+  const labelNames = {
+    space: (id) => venue.getSpaceById(id)?.name ?? null,
+    floor: (id) => venue.getFloorById(id)?.name ?? null,
+  };
+  const locationLabel = startPointLabel(startNode, checkIn, labelNames, 'Choose a starting point');
 
   return (
     <header className="app-header visitor-header" id="app-header">

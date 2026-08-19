@@ -15,6 +15,7 @@ import { findRoute, shutdownRoutingWorker } from '../engine/routingEngine';
 import { calculateCompiledRoute } from '../engine/compiledRoutePolicy';
 import { useVenue } from './VenueContext.jsx';
 import { createVenueScopedState } from '../data/venueSession';
+import { checkInFromScan } from '../capture/anchorCheckIn.ts';
 
 function routeOptionsFor(stepFree, operationalOverlay, evaluatedAt) {
   return {
@@ -55,8 +56,17 @@ export const VIEW_TYPE = {
 };
 
 // ── Initial State ──
-function createInitialState(venue) {
-  return createVenueScopedState(venue).navigation;
+function createInitialState({ venue, urlCheckIn }) {
+  const navigation = createVenueScopedState(venue).navigation;
+  if (!urlCheckIn) return navigation;
+  // A URL check-in names both where the visitor is and which floor that is on,
+  // so the first render is already correct rather than starting at the venue
+  // default and jumping.
+  return {
+    ...navigation,
+    startNodeId: urlCheckIn.nodeId,
+    activeFloorId: urlCheckIn.anchor.floorId,
+  };
 }
 
 // ── Reducer ──
@@ -172,8 +182,38 @@ function navigationReducer(state, action) {
 const NavigationContext = createContext(null);
 
 // ── Provider ──
+/**
+ * A check-in carried in the URL: `/?checkin=<payload>`
+ *
+ * The same payload a sticker encodes, so a printed sign can be a link rather
+ * than a bare code, a demo does not die with a flaky camera, and the check-in
+ * path can be exercised on a machine that has no camera at all.
+ *
+ * Resolved before any state exists rather than in an effect, so the app opens
+ * already checked in instead of rendering somewhere else first and correcting
+ * itself.
+ *
+ * Strictly a read. Stripping the parameter here as well looked tidier and was
+ * wrong: this runs inside a state initialiser, which StrictMode deliberately
+ * invokes twice, so the first call removed the parameter and the second found
+ * nothing and returned null — a check-in that vanished in development only.
+ * Removing it is a side effect and belongs in one.
+ */
+function checkInFromUrl(venue) {
+  if (typeof window === 'undefined') return null;
+  const payload = new URLSearchParams(window.location.search).get('checkin');
+  if (!payload) return null;
+
+  const pkg = venue.buildingPackage;
+  const result = checkInFromScan(payload, pkg.localizationAnchors, pkg.routing.nodes);
+  return result.ok ? result : null;
+}
+
 export function NavigationProvider({ children, venue }) {
-  const [state, dispatch] = useReducer(navigationReducer, venue, createInitialState);
+  // Read once, before the reducer, so both the start node and the confirmation
+  // can be seeded from it.
+  const [urlCheckIn] = useState(() => checkInFromUrl(venue));
+  const [state, dispatch] = useReducer(navigationReducer, { venue, urlCheckIn }, createInitialState);
   const { packageCacheStatus } = useVenue();
 
   const [theme, setTheme] = useState(() => {
@@ -206,8 +246,34 @@ export function NavigationProvider({ children, venue }) {
     return false;
   });
 
+  // Consumed once. Left in place, a refresh would silently move the visitor
+  // back to a code they walked away from. Stripped whenever the parameter is
+  // present, including when it named nothing, so a bad link does not persist.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('checkin')) return;
+    url.searchParams.delete('checkin');
+    window.history.replaceState(null, '', url.toString());
+  }, []);
+
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [operationalOverlay, setOperationalOverlayState] = useState(null);
+  // The last successful QR check-in. Held here rather than inside whichever
+  // modal performed the scan, because each of those unmounts the moment the
+  // scan succeeds and the visitor would never see the confirmation.
+  const [checkIn, setCheckIn] = useState(() =>
+    urlCheckIn === null
+      ? null
+      : {
+          anchorId: urlCheckIn.anchor.id,
+          floorId: urlCheckIn.anchor.floorId,
+          spaceId: urlCheckIn.anchor.spaceId,
+          nodeId: urlCheckIn.nodeId,
+          distanceMeters: urlCheckIn.distanceMeters,
+          scannedAt: Date.now(),
+        },
+  );
   const [operationalEvaluatedAt, setOperationalEvaluatedAt] = useState(null);
 
   const completeOnboarding = useCallback(() => {
@@ -303,6 +369,38 @@ export function NavigationProvider({ children, venue }) {
     dispatch({ type: ACTION.CLEAR_ROUTE });
   }, []);
 
+  /**
+   * Resolves a scanned payload and, when it names a check-in point, starts the
+   * next route from there.
+   *
+   * Lives in the context so the onboarding flow and the location picker share
+   * one implementation. They each held their own copy first, which is two
+   * places that can drift about what counts as a valid code.
+   */
+  const checkInWithPayload = useCallback(
+    (payload) => {
+      const pkg = venue.buildingPackage;
+      const result = checkInFromScan(payload, pkg.localizationAnchors, pkg.routing.nodes);
+      if (!result.ok) return result;
+
+      const node = venue.getNodeById(result.nodeId);
+      dispatch({
+        type: ACTION.SET_START,
+        payload: { nodeId: result.nodeId, floorId: node ? String(node.floor) : undefined },
+      });
+      setCheckIn({
+        anchorId: result.anchor.id,
+        floorId: result.anchor.floorId,
+        spaceId: result.anchor.spaceId,
+        nodeId: result.nodeId,
+        distanceMeters: result.distanceMeters,
+        scannedAt: Date.now(),
+      });
+      return result;
+    },
+    [venue],
+  );
+
   const actions = {
     setStart: useCallback(
       (nodeId) => {
@@ -314,6 +412,10 @@ export function NavigationProvider({ children, venue }) {
       },
       [venue],
     ),
+
+    checkInWithPayload,
+
+    dismissCheckIn: useCallback(() => setCheckIn(null), []),
 
     setDestination: useCallback((nodeId) => {
       dispatch({ type: ACTION.SET_DESTINATION, payload: nodeId });
@@ -375,6 +477,7 @@ export function NavigationProvider({ children, venue }) {
         toggleHighContrast,
         accessibleRouting,
         toggleAccessibleRouting,
+        checkIn,
         operationalOverlay,
         operationalEvaluatedAt,
         setOperationalOverlay,

@@ -6,14 +6,19 @@
 
 import { MapPin, Wifi, WifiOff, Layers } from 'lucide-react';
 import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
+import { startPointLabel } from '../capture/startLabel.ts';
 import { useState, useEffect } from 'react';
 
 export default function StatusBar() {
-  const { state, venue } = useNavigation();
+  const { state, venue, checkIn } = useNavigation();
   const { navStatus, activeFloorId, startNodeId } = state;
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const startNode = venue.getNodeById(startNodeId);
   const activeFloor = venue.getFloorById(activeFloorId);
+  const labelNames = {
+    space: (id) => venue.getSpaceById(id)?.name ?? null,
+    floor: (id) => venue.getFloorById(id)?.name ?? null,
+  };
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -50,7 +55,7 @@ export default function StatusBar() {
 
       <div className="status-item status-location">
         <MapPin size={11} />
-        <span>{startNode?.poi?.name || 'Starting point not set'}</span>
+        <span>{startPointLabel(startNode, checkIn, labelNames, 'Starting point not set')}</span>
       </div>
 
       <div className="status-item status-floor">

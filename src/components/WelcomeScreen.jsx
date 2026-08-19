@@ -3,7 +3,7 @@ import { Navigation, MapPin, ArrowRight, QrCode, Search, ChevronRight } from 'lu
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs } from '../engine/searchIndex.js';
 import QrCheckIn from './QrCheckIn.tsx';
-import { checkInFromScan } from '../capture/anchorCheckIn.ts';
+import { scanProblemText } from '../capture/scanProblemText.ts';
 
 export default function WelcomeScreen({ onComplete }) {
   const { actions, venue } = useNavigation();
@@ -30,31 +30,18 @@ export default function WelcomeScreen({ onComplete }) {
     onComplete();
   };
 
-  // Everything a check-in needs already lives in the compiled package, so this
-  // resolves with no network and no lookup service.
   const handleScannedPayload = useCallback(
     (payload) => {
-      const result = checkInFromScan(
-        payload,
-        buildingPackage.localizationAnchors,
-        buildingPackage.routing.nodes,
-      );
+      const result = actions.checkInWithPayload(payload);
       if (!result.ok) {
-        setScanProblem(
-          result.reason === 'unknown-code'
-            ? 'That code is not one of this venue’s check-in points.'
-            : result.reason === 'not-a-checkin-code'
-              ? 'That marker is not a check-in code.'
-              : 'That code has no routable path on its floor.',
-        );
+        setScanProblem(scanProblemText(result.reason));
         return;
       }
       setScanProblem(null);
       setScanning(false);
-      actions.setStart(result.nodeId);
       setStep(2);
     },
-    [actions, buildingPackage],
+    [actions],
   );
 
   const pois = useMemo(() => venue.getPOIs(), [venue]);

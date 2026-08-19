@@ -6832,3 +6832,79 @@ body {
   font-weight: 700;
   cursor: pointer;
 }
+
+/* --------------------------------------------------------------------------
+   Check-in confirmation
+   -------------------------------------------------------------------------- */
+
+.checkin-toast {
+  position: fixed;
+  z-index: 1400;
+  top: 74px;
+  left: 50%;
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 11px 13px;
+  border: 1px solid var(--color-accent-green);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-bg-primary) 94%, var(--color-accent-green));
+  box-shadow: var(--shadow-md, 0 10px 30px rgba(0, 0, 0, 0.35));
+  transform: translateX(-50%);
+  animation: checkin-toast-in 220ms ease-out;
+}
+
+.checkin-toast-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--color-accent-green);
+  color: #fff;
+}
+
+.checkin-toast-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: 13.5px;
+}
+
+.checkin-toast-detail {
+  color: var(--color-text-muted);
+  font-size: 11.5px;
+  font-family: ui-monospace, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkin-toast-close {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+@keyframes checkin-toast-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checkin-toast { animation: none; }
+}
+
+@media (max-width: 700px) {
+  .checkin-toast { top: 172px; }
+}

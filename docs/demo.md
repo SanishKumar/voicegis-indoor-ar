@@ -34,15 +34,34 @@ That serves HTTPS on the LAN and prints a Network URL. The camera and the motion
 sensors both require a secure context, so plain `http://192.168.x.x` will fail —
 see [Recording a walk on a phone](localization/recording-on-a-phone.md).
 
+## If the camera is not cooperating
+
+A check-in can also be carried in the URL, using the same payload a sticker
+encodes:
+
+```text
+http://localhost:3000/?checkin=voicegis://asterion/l2/east#/visitor
+```
+
+The app opens already checked in, on the right floor, and the parameter is
+stripped so a refresh does not silently send you back. This is the same
+resolution path the scanner uses, so it is a fair demo and not a mock — and it
+means a flaky camera cannot take the demo down.
+
 ## The four beats
 
 1. **Scan.** A code at a corridor junction resolves to a surveyed anchor: floor,
-   position, heading. The app now knows where you are, to about a metre.
+   position, heading. The app now knows where you are, to about a metre, and
+   says so — *Checked in at Family Care Concourse · Level 2 · anchor-l2-east*.
+   The anchor id is shown because one space can hold two codes at opposite ends.
 2. **Route.** Ask for "pharmacy". The route is computed over the compiled graph,
    on-device, and drawn across the floor plan with turn-by-turn steps.
-3. **Step-free.** Toggle accessible routing. If a step-free path cannot be
-   proven — a lift out of service, a portal with no accessible attribute — it
-   **refuses** rather than quietly routing you up a staircase.
+3. **Step-free.** Toggle accessible routing and the route changes under you.
+   Checked in on Level 2, the pharmacy on the ground floor is 79 m via the South
+   Public Stair, or 91 m via the Panoramic Atrium Lift with step-free on. If a
+   step-free path cannot be *proven* — a lift out of service, a portal with no
+   accessible attribute — it refuses rather than quietly routing you up a
+   staircase.
 4. **Offline.** Turn off the network and do it again. Nothing changes.
 
 ## Why the codes are generated, not authored

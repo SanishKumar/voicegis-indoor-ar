@@ -11,6 +11,7 @@ import CameraPreview from './components/CameraPreview.jsx';
 import StatusBar from './components/StatusBar.jsx';
 import SurfaceNav from './components/SurfaceNav.jsx';
 import VenuePackageManager from './components/VenuePackageManager.jsx';
+import CheckInToast from './components/CheckInToast.tsx';
 
 const SpatialTwinViewer = lazy(() => import('./components/SpatialTwinViewer.tsx'));
 const FloorplanViewer = lazy(() => import('./components/FloorplanViewer.tsx'));
@@ -64,6 +65,7 @@ function VisitorApp() {
         )}
         <CameraPreview />
       </main>
+      <CheckInToast />
       <StatusBar />
       <LocationPicker isOpen={showLocationPicker} onClose={() => setShowLocationPicker(false)} />
     </div>

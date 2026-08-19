@@ -9,7 +9,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Search, MapPin, X, ChevronRight, QrCode } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import QrCheckIn from './QrCheckIn.tsx';
-import { checkInFromScan } from '../capture/anchorCheckIn.ts';
+import { scanProblemText } from '../capture/scanProblemText.ts';
 
 export default function LocationPicker({ isOpen, onClose }) {
   const { actions, venue } = useNavigation();
@@ -44,24 +44,16 @@ export default function LocationPicker({ isOpen, onClose }) {
 
   const handleScannedPayload = useCallback(
     (payload) => {
-      const pkg = venue.buildingPackage;
-      const result = checkInFromScan(payload, pkg.localizationAnchors, pkg.routing.nodes);
+      const result = actions.checkInWithPayload(payload);
       if (!result.ok) {
-        setScanProblem(
-          result.reason === 'unknown-code'
-            ? 'That code is not one of this venue’s check-in points.'
-            : result.reason === 'not-a-checkin-code'
-              ? 'That marker is not a check-in code.'
-              : 'That code has no routable path on its floor.',
-        );
+        setScanProblem(scanProblemText(result.reason));
         return;
       }
       setScanProblem(null);
       setScanning(false);
-      actions.setStart(result.nodeId);
       onClose();
     },
-    [actions, onClose, venue],
+    [actions, onClose],
   );
 
   useEffect(() => {

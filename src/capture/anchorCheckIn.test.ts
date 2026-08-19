@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { checkInFromScan, scannableAnchors, type AnchorLike, type RoutingNodeLike } from './anchorCheckIn';
+import {
+  checkInFromScan,
+  describeCheckIn,
+  scannableAnchors,
+  type AnchorLike,
+  type RoutingNodeLike,
+} from './anchorCheckIn';
 
 /**
  * Check-in is the moment the product stops being a map and starts being
@@ -109,5 +115,49 @@ describe('which anchors deserve a printed code', () => {
       'anchor-g-west',
       'anchor-l1-west',
     ]);
+  });
+});
+
+describe('telling the visitor where they just checked in', () => {
+  const names = {
+    space: (id: string) => (id === 'g-concourse' ? 'Central Concourse' : null),
+    floor: (id: string) => (id === 'g' ? 'Ground · Diagnostics' : null),
+  };
+
+  it('always names the anchor, because a space name can cover two codes', () => {
+    // Asterion hangs anchor-g-east and anchor-g-west at opposite ends of one
+    // space. A label naming only the space reads identically at both, so a
+    // visitor could not tell a mis-scan from a correct one.
+    const west = describeCheckIn(
+      { anchorId: 'anchor-g-west', floorId: 'g', spaceId: 'g-concourse', nodeId: 'n1', distanceMeters: 1 },
+      names,
+    );
+    const east = describeCheckIn(
+      { anchorId: 'anchor-g-east', floorId: 'g', spaceId: 'g-concourse', nodeId: 'n2', distanceMeters: 1 },
+      names,
+    );
+
+    expect(west.place).toBe('Central Concourse');
+    expect(west.detail).toBe('Ground · Diagnostics · anchor-g-west');
+    expect(east.detail).not.toBe(west.detail);
+  });
+
+  it('falls back to the floor as the place without printing it twice', () => {
+    const label = describeCheckIn(
+      { anchorId: 'anchor-g-west', floorId: 'g', nodeId: 'n1', distanceMeters: 1 },
+      names,
+    );
+
+    expect(label.place).toBe('Ground · Diagnostics');
+    expect(label.detail).toBe('anchor-g-west');
+  });
+
+  it('still says something when the package names neither', () => {
+    const label = describeCheckIn(
+      { anchorId: 'anchor-x', floorId: 'zz', nodeId: 'n1', distanceMeters: 1 },
+      { space: () => null, floor: () => null },
+    );
+
+    expect(label).toEqual({ place: 'a surveyed point', detail: 'anchor-x' });
   });
 });
