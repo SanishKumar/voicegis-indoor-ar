@@ -105,9 +105,12 @@ async function main() {
   <body>
     <p class="lede">
       Check-in codes generated from the compiled venue packages. Scanning one tells
-      the app exactly which surveyed point you are standing at, with no beacons and
-      no network. Print these and put each one at the position named on its card, or
-      display this page on a screen and scan it with the app.
+      the app which anchor the package declares you are standing at, with no beacons
+      and no lookup service &mdash; how well that matches the building depends
+      entirely on each sign being placed at the position printed on its card, which
+      is a physical measurement and is not automated. These venues are synthetic
+      fixtures. Print the cards and place them, or display this page on a screen and
+      scan it with the app.
     </p>
 ${sections.join('\n')}
   </body>
@@ -115,9 +118,30 @@ ${sections.join('\n')}
 `;
 
   const out = resolve('public/check-in-codes.html');
-  await writeFile(out, html, 'utf8');
   const total = html.split('<article class="card">').length - 1;
-  process.stdout.write(`wrote ${out} (${total} codes)\n`);
+
+  // --check exists so the committed sheet cannot drift away from the packages
+  // it claims to describe. A sign encoding a payload the venue no longer
+  // publishes is the failure that looks fine on screen and fails in a corridor,
+  // so it is a gate rather than a convention.
+  if (process.argv.includes('--check')) {
+    const existing = await readFile(out, 'utf8').catch(() => null);
+    if (existing === null) {
+      throw new Error(`No generated sheet at ${out}. Run: npm run codes`);
+    }
+    if (existing !== html) {
+      throw new Error(
+        `The check-in code sheet is stale: ${out} is not what the compiled packages produce now. Run: npm run codes`,
+      );
+    }
+    process.stdout.write(`verified check-in codes (${total} codes)
+`);
+    return;
+  }
+
+  await writeFile(out, html, 'utf8');
+  process.stdout.write(`wrote ${out} (${total} codes)
+`);
 }
 
 void main().catch((error) => {

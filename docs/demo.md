@@ -1,8 +1,12 @@
 # The 60-second demo
 
 What this shows: **a stranger walks into a building, scans one code, and gets a
-step-free route to any room — with no beacons, no RF fingerprinting, and no
-positioning service.**
+step-free route to a published public destination — with no beacons, no RF
+fingerprinting, and no positioning service.**
+
+"Any room" would be wrong twice over: the runtime offers published public POIs
+rather than every space in the model, and a step-free request that cannot be
+proven is refused rather than answered. Both are deliberate.
 
 Everything routing needs is inside a compiled venue package sealed with a
 content hash. Once it is loaded, check-in and routing run entirely on the

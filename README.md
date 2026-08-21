@@ -40,8 +40,9 @@ npm run dev
 Open `http://localhost:3000/check-in-codes.html` in a second window, then in the
 app choose **Plan a route → Scan a check-in code** and point the camera at one.
 You are checked in at the point the package declares, and can be routed step-free
-to any room with no beacons, no RF fingerprinting and no positioning service —
-check-in and routing run against the compiled package on the device.
+to any published public destination — when the selected profile can prove a route
+— with no beacons, no RF fingerprinting and no positioning service. Check-in and
+routing run against the compiled package on the device.
 
 The bundled venues are synthetic fixtures, each code still has to be physically
 placed where the package says it is, and a cold reload with the network down is

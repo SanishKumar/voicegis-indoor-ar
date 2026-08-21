@@ -377,3 +377,68 @@ describe('a tilt from the future is not a tilt', () => {
     expect(adapter.rejections.futureOrientation).toBe(1);
   });
 });
+
+describe('the session clock is defined by the samples that are stored in it', () => {
+  /** The check the earlier tests were missing: does the capture actually validate? */
+  function validated(session: ReturnType<typeof recorder>) {
+    const built = session.buildSession();
+    return {
+      issues: validateCaptureSession(built),
+      imuTimes: built.events.filter((event) => event.type === 'imu').map((event) => event.timeMs),
+    };
+  }
+
+  it('is not dated from an orientation, which is never stored as an event', () => {
+    // The regression: orientation at 200 ms then a sample at 100 ms dated the
+    // stream from the orientation, stored timeMs -100, and the whole capture
+    // failed validation as malformed-event. The earlier test for this checked
+    // the tilt and the lag fields and never validated the session.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation(orientation(200, 90, 0));
+    adapter.handleMotion(motion(100, { alpha: 0, beta: 0, gamma: 30 }));
+
+    const { issues, imuTimes } = validated(session);
+    expect(issues).toEqual([]);
+    expect(imuTimes).toEqual([0]);
+  });
+
+  it('never stores a negative timestamp, whatever order the channels arrive in', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation(orientation(5_000, 90, 0));
+    for (const timeStamp of [100, 120, 140, 6_000]) adapter.handleMotion(motion(timeStamp));
+
+    const { issues, imuTimes } = validated(session);
+    expect(issues).toEqual([]);
+    expect(Math.min(...imuTimes)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('refuses a sample from before an explicit origin instead of storing it negative', () => {
+    // The same defect on the parallel path: an origin later than the first
+    // sample also wrote a negative timeMs and failed validation.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session, { originTimeStampMs: 1_000 });
+
+    adapter.handleMotion(motion(500));
+    adapter.handleMotion(motion(1_250));
+
+    const { issues, imuTimes } = validated(session);
+    expect(issues).toEqual([]);
+    expect(imuTimes).toEqual([250]);
+    expect(adapter.rejections.regressed).toBe(1);
+  });
+
+  it('still produces a valid capture on the ordinary path', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation(orientation(0, 90, 0));
+    for (let timeStamp = 0; timeStamp <= 400; timeStamp += 20) adapter.handleMotion(motion(timeStamp));
+    session.recordLifecycle('session-end', 500);
+
+    expect(validated(session).issues).toEqual([]);
+  });
+});

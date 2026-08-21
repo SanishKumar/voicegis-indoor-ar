@@ -111,8 +111,14 @@ excluded-edge counts, and selected connectors.
   accessibility preferences.
 - `#/inspector` contains the compiled 3D twin, graph/anchor inspection, package
   URL/file activation, catalog switching, and closure-overlay loading.
-- `#/studio` is a boundary placeholder only. No authoring workflow is implemented
-  in Venue Bootstrap v0.
+- `#/studio` contains the BuildingSource authoring workspace: source editing, DXF
+  import with layer mapping, floor canvas editing, compile-in-browser, and a
+  publish dry run. It was a boundary placeholder in Venue Bootstrap v0 and no
+  longer is. What it still cannot do is publish for real: the catalog remains a
+  static artifact, so promoting or archiving a release is out of scope.
+- `#/recorder` records a walk from the handset's own sensors. It is an instrument
+  for measuring sensor behaviour, not live localization, and what it captures is
+  refused as evidence by policy.
 
 This keeps package diagnostics and engineering-only controls out of the visitor
 surface without redesigning the entire application.

@@ -53,7 +53,11 @@ The filter rejects a stream that does not begin with an initial fix or moves bac
 
 ## Evidence still required
 
-- Real sensor adapters and timestamp characterization
+- Timestamp characterisation on real hardware. A browser sensor adapter now
+  exists (`src/capture/handsetCapture.ts`, driven from `#/recorder`) and reports
+  the lag between the orientation and inertial channels, but no distribution has
+  been recorded from a real handset, and a device-frame capture is refused as
+  evidence until one has been.
 - Surveyed ground-truth checkpoints
 - Multiple devices, routes, floors, walking speeds, and carrying positions
 - Relocalization recovery timing

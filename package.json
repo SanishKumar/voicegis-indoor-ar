@@ -6,7 +6,7 @@
   "workspaces": [
     "packages/*"
   ],
-  "description": "Offline-first indoor spatial intelligence and navigation platform",
+  "description": "Indoor spatial intelligence and navigation platform with content-addressed venue packages and on-device routing",
   "scripts": {
     "dev": "vite",
     "dev:mobile": "vite --mode mobile",
@@ -28,8 +28,9 @@
     "replay:reference": "tsx packages/localization-core/src/cli.ts recordings/reference-corridor-walk.json recordings/reference-corridor-walk.report.json",
     "replay:check": "tsx packages/localization-core/src/cli.ts recordings/reference-corridor-walk.json recordings/reference-corridor-walk.report.json --check",
     "evidence": "tsx packages/localization-core/src/evidenceCli.ts",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run compile:check && npm run compile:asterion:check && npm run compile:harbor:check && npm run venues:sync:check && npm run replay:check && npm run build",
-    "codes": "tsx scripts/generateCheckInCodes.ts"
+    "check": "npm run lint && npm run typecheck && npm run test && npm run compile:check && npm run compile:asterion:check && npm run compile:harbor:check && npm run venues:sync:check && npm run replay:check && npm run codes:check && npm run build",
+    "codes": "tsx scripts/generateCheckInCodes.ts",
+    "codes:check": "tsx scripts/generateCheckInCodes.ts --check"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

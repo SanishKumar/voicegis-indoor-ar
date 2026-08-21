@@ -49,6 +49,11 @@ export default function QrCheckIn({
   // same code resolves several times and the modal closes over itself. Settling
   // tracks *acceptance*, never merely a successful decode.
   const gateRef = useRef(initialScanGate());
+  // Identifies the effect run that owns the camera. Every asynchronous step
+  // rechecks it, because `getUserMedia`, `play` and `decode` all resolve on
+  // later ticks by which time the scanner may have been closed — or reopened,
+  // in which case a stale continuation must not tear down the new run's stream.
+  const generationRef = useRef(0);
 
   const teardown = useCallback(() => {
     if (timerRef.current !== null) {
@@ -64,7 +69,8 @@ export default function QrCheckIn({
   useEffect(() => teardown, [teardown]);
 
   useEffect(() => {
-    let cancelled = false;
+    const generation = (generationRef.current += 1);
+    const current = () => generationRef.current === generation;
     const decoder = createQrDecoder();
 
     void (async () => {
@@ -74,7 +80,7 @@ export default function QrCheckIn({
           video: { facingMode: { ideal: 'environment' } },
           audio: false,
         });
-        if (cancelled) {
+        if (!current()) {
           stream.getTracks().forEach((track) => track.stop());
           return;
         }
@@ -83,16 +89,30 @@ export default function QrCheckIn({
         if (video) {
           video.srcObject = stream;
           await video.play().catch(() => undefined);
+          // `play` resolves a tick later, so the scanner may have closed while
+          // it was pending. Without this the run continued past its own
+          // cleanup and installed an interval cleanup had already missed.
+          if (!current()) {
+            teardown();
+            return;
+          }
         }
         setState({ kind: 'scanning' });
 
-        timerRef.current = window.setInterval(() => {
+        const timer = window.setInterval(() => {
+          if (!current()) {
+            window.clearInterval(timer);
+            return;
+          }
           const source = videoRef.current;
           if (!source || gateRef.current.settled || source.readyState < 2) return;
           void decoder
             .decode(source)
             .then((value) => {
-              if (!shouldSubmitScan(value, gateRef.current)) return;
+              // A decode in flight when the scanner closes would otherwise
+              // still report its payload, checking the visitor in at a sign
+              // they had already dismissed.
+              if (!current() || !shouldSubmitScan(value, gateRef.current)) return;
               const payload = (value as string).trim();
               // The camera is only released once the caller has accepted. A
               // rejected code leaves the scanner live so the visitor can walk to
@@ -110,8 +130,15 @@ export default function QrCheckIn({
               // detections rather than as an error worth showing.
             });
         }, SCAN_INTERVAL_MS);
+
+        timerRef.current = timer;
+        // Cleanup may have run between installing the interval and this line.
+        if (!current()) {
+          window.clearInterval(timer);
+          teardown();
+        }
       } catch (error) {
-        if (cancelled) return;
+        if (!current()) return;
         const name = (error as { name?: string }).name;
         setState(
           name === 'NotAllowedError' || name === 'SecurityError'
@@ -122,7 +149,9 @@ export default function QrCheckIn({
     })();
 
     return () => {
-      cancelled = true;
+      // Retiring the generation is what makes every pending continuation above
+      // inert, including ones that have already been scheduled.
+      generationRef.current += 1;
       teardown();
     };
   }, [onPayload, teardown]);

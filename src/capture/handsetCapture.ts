@@ -82,7 +82,13 @@ export interface PairingSummary {
 export interface RejectionSummary {
   /** The event carried no acceleration, no rotation rate, or a null component. */
   incomplete: number;
-  /** The event's timestamp went backwards, which no honest clock does. */
+  /**
+   * The timestamp could not be placed on the session clock.
+   *
+   * Either it went backwards, which no honest clock does, or it predates the
+   * origin the caller supplied. Both would store a `timeMs` the capture schema
+   * refuses, taking the whole walk down with them.
+   */
   regressed: number;
   /** The recorder refused the reading. Should stay zero; counted, not assumed. */
   refused: number;
@@ -167,7 +173,11 @@ export class HandsetCaptureAdapter {
    */
   handleOrientation(event: OrientationEventLike) {
     if (!finite(event.alpha) || !finite(event.beta) || !finite(event.gamma)) return;
-    this.adoptOrigin(event.timeStamp);
+    // Deliberately does not adopt the session origin. Orientation is context
+    // attached to samples and is never itself recorded, so letting it define
+    // time zero dated the stream from an event that is not in it: an
+    // orientation at 200 ms followed by a sample at 100 ms stored `timeMs: -100`
+    // and the whole capture failed validation as `malformed-event`.
     this.latestOrientation = {
       alphaDegrees: event.alpha,
       betaDegrees: event.beta,
@@ -211,6 +221,14 @@ export class HandsetCaptureAdapter {
     }
 
     this.adoptOrigin(event.timeStamp);
+    if (this.originTimeStampMs !== null && event.timeStamp < this.originTimeStampMs) {
+      // A sample from before time zero, which an explicit `originTimeStampMs`
+      // later than the first event produces. It cannot be placed on the session
+      // clock, and storing it wrote a negative `timeMs` that failed validation
+      // exactly as the orientation case did. Refused for the same reason.
+      this.regressed += 1;
+      return;
+    }
     this.lastMotionTimeStampMs = event.timeStamp;
 
     let orientation = this.latestOrientation;
