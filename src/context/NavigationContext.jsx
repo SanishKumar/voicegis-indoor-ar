@@ -51,7 +51,6 @@ export const NAV_STATUS = {
 // ── View Types ──
 export const VIEW_TYPE = {
   MAP: 'map',
-  SPATIAL_TWIN: 'spatial-twin',
   CAMERA_PREVIEW: 'camera-preview',
 };
 

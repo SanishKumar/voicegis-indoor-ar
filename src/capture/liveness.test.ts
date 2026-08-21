@@ -20,7 +20,7 @@ function stats(overrides: Partial<LiveStats> = {}): LiveStats {
       p95StalenessMs: null,
       worstStalenessMs: null,
     },
-    rejections: { incomplete: 0, regressed: 0, refused: 0 },
+    rejections: { incomplete: 0, regressed: 0, refused: 0, futureOrientation: 0 },
     ...overrides,
   };
 }
@@ -46,7 +46,7 @@ describe('what the recorder reports about itself', () => {
     // A browser with no motion hardware still fires devicemotion on schedule
     // with every field null. Events arriving and data arriving are different
     // questions, and only the second one matters.
-    expect(liveness(stats({ rejections: { incomplete: 12, regressed: 0, refused: 0 } }), null))
+    expect(liveness(stats({ rejections: { incomplete: 12, regressed: 0, refused: 0, futureOrientation: 0 } }), null))
       .toEqual({ kind: 'sensorless' });
 
     expect(liveness(stats(), null)).toEqual({ kind: 'waiting' });

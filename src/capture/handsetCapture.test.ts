@@ -323,3 +323,57 @@ describe('asking for motion access', () => {
     ).resolves.toBe('denied');
   });
 });
+
+describe('a tilt from the future is not a tilt', () => {
+  it('refuses to pair an orientation stamped after the sample it would explain', () => {
+    // Reported by review: orientation at 200 ms paired with motion at 100 ms
+    // produced a validating capture whose median, p95 and worst staleness were
+    // all -100 ms. A negative lag is not a lag, and the orientation describes a
+    // pose the handset had not reached yet.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation(orientation(200, 90, 0));
+    adapter.handleMotion(motion(100, { alpha: 0, beta: 0, gamma: 30 }));
+
+    const events = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(events).toHaveLength(1);
+    expect(events[0].orientation).toBeNull();
+
+    expect(adapter.pairing.pairedCount).toBe(0);
+    expect(adapter.pairing.medianStalenessMs).toBeNull();
+    expect(adapter.pairing.worstStalenessMs).toBeNull();
+    expect(adapter.rejections.futureOrientation).toBe(1);
+  });
+
+  it('never reports a negative lag in the distribution', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation(orientation(500, 90, 0));
+    for (const timeStamp of [100, 200, 300, 600, 700]) {
+      adapter.handleMotion(motion(timeStamp));
+    }
+
+    const { medianStalenessMs, p95StalenessMs, worstStalenessMs, pairedCount } = adapter.pairing;
+    expect(pairedCount).toBe(2);
+    for (const value of [medianStalenessMs, p95StalenessMs, worstStalenessMs]) {
+      expect(value).not.toBeNull();
+      expect(value as number).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('pairs again once orientation catches up', () => {
+    // The refusal is per sample, not a latch: a clock hiccup must not cost the
+    // rest of the walk its tilt.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation(orientation(200, 90, 0));
+    adapter.handleMotion(motion(100));
+    adapter.handleMotion(motion(300));
+
+    expect(adapter.pairing.pairedCount).toBe(1);
+    expect(adapter.rejections.futureOrientation).toBe(1);
+  });
+});

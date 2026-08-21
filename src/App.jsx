@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { NavigationProvider, useNavigation, VIEW_TYPE } from './context/NavigationContext.jsx';
+import { NavigationProvider, useNavigation } from './context/NavigationContext.jsx';
 import { VenueProvider, useVenue } from './context/VenueContext.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import Header from './components/Header.jsx';
@@ -12,6 +12,7 @@ import StatusBar from './components/StatusBar.jsx';
 import SurfaceNav from './components/SurfaceNav.jsx';
 import VenuePackageManager from './components/VenuePackageManager.jsx';
 import CheckInToast from './components/CheckInToast.tsx';
+import { VISITOR_VIEW, visitorViewFor } from './context/visitorView.ts';
 
 const SpatialTwinViewer = lazy(() => import('./components/SpatialTwinViewer.tsx'));
 const FloorplanViewer = lazy(() => import('./components/FloorplanViewer.tsx'));
@@ -53,7 +54,7 @@ function VisitorApp() {
     <div className="visitor-shell">
       <Header />
       <main className="main-content visitor-map-stage" id="main-content">
-        {state.activeView === VIEW_TYPE.MAP && (
+        {visitorViewFor(state.activeView) === VISITOR_VIEW.MAP && (
           <>
             <Suspense fallback={<div className="map-loading">Loading compiled floor map…</div>}>
               <FloorplanViewer />
@@ -73,12 +74,11 @@ function VisitorApp() {
 }
 
 function InspectorApp() {
-  const { actions } = useNavigation();
-  const setView = actions.setView;
-  useEffect(() => {
-    setView(VIEW_TYPE.SPATIAL_TWIN);
-  }, [setView]);
-
+  // Deliberately writes nothing to shared navigation state. It used to store
+  // `spatial-twin` in `activeView`, which no surface reads and which the
+  // visitor surface cannot render — returning to the map afterwards produced an
+  // empty canvas. The twin below renders unconditionally, so the write bought
+  // nothing and cost the visitor journey.
   return (
     <main className="inspector-surface" id="main-content">
       <Suspense

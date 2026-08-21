@@ -261,6 +261,7 @@ export default function WalkRecorder() {
           <Stat label="No tilt yet" value={String(stats.pairing.unpairedCount)} />
           <Stat label="Incomplete" value={String(stats.rejections.incomplete)} />
           <Stat label="Clock went back" value={String(stats.rejections.regressed)} />
+          <Stat label="Tilt from the future" value={String(stats.rejections.futureOrientation)} />
         </section>
       )}
 

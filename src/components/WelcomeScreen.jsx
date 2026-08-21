@@ -34,12 +34,15 @@ export default function WelcomeScreen({ onComplete }) {
     (payload) => {
       const result = actions.checkInWithPayload(payload);
       if (!result.ok) {
+        // Reported as refused so the scanner keeps its camera running and the
+        // visitor can try another sign.
         setScanProblem(scanProblemText(result.reason));
-        return;
+        return false;
       }
       setScanProblem(null);
       setScanning(false);
       setStep(2);
+      return true;
     },
     [actions],
   );

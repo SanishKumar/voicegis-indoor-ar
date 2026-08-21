@@ -86,6 +86,14 @@ export interface RejectionSummary {
   regressed: number;
   /** The recorder refused the reading. Should stay zero; counted, not assumed. */
   refused: number;
+  /**
+   * The only orientation available was stamped *after* the sample.
+   *
+   * The sample is still recorded, without tilt. A negative lag is not a lag:
+   * the orientation describes a pose the handset had not reached yet, and
+   * pairing it would explain a turn with the tilt that followed it.
+   */
+  futureOrientation: number;
 }
 
 export interface HandsetCaptureOptions {
@@ -134,6 +142,7 @@ export class HandsetCaptureAdapter {
   private lastMotionTimeStampMs: number | null = null;
   private readonly stalenessMs: number[] = [];
   private unpaired = 0;
+  private futureOrientation = 0;
   private incomplete = 0;
   private regressed = 0;
   private refused = 0;
@@ -210,9 +219,22 @@ export class HandsetCaptureAdapter {
       orientation = null;
     } else {
       const staleness = event.timeStamp - this.latestOrientationAtMs;
-      this.stalenessMs.push(staleness);
-      if (this.maxStalenessMs !== null && staleness > this.maxStalenessMs) {
+      if (staleness < 0) {
+        // The orientation is from the future relative to this sample, which the
+        // two channels can genuinely produce: they are timestamped
+        // independently and delivered out of order. Kept out of the
+        // distribution as well as off the sample — a negative value dragged the
+        // median and p95 below zero and reported a lag that had not happened.
+        // Refused per sample rather than latched, so a clock hiccup does not
+        // cost the rest of the walk its tilt.
+        this.futureOrientation += 1;
+        this.unpaired += 1;
         orientation = null;
+      } else {
+        this.stalenessMs.push(staleness);
+        if (this.maxStalenessMs !== null && staleness > this.maxStalenessMs) {
+          orientation = null;
+        }
       }
     }
 
@@ -254,7 +276,12 @@ export class HandsetCaptureAdapter {
   }
 
   get rejections(): RejectionSummary {
-    return { incomplete: this.incomplete, regressed: this.regressed, refused: this.refused };
+    return {
+      incomplete: this.incomplete,
+      regressed: this.regressed,
+      refused: this.refused,
+      futureOrientation: this.futureOrientation,
+    };
   }
 
   /**

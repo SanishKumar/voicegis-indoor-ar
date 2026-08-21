@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
 import { startPointLabel } from '../capture/startLabel.ts';
+import { VISITOR_VIEW, visitorViewFor } from '../context/visitorView.ts';
 
 export default function Header() {
   const {
@@ -33,7 +34,9 @@ export default function Header() {
     checkIn,
     venue,
   } = useNavigation();
-  const { activeFloorId, activeView, startNodeId } = state;
+  const { activeFloorId, startNodeId } = state;
+  // Derived, so the two toggles can never both read unpressed.
+  const activeView = visitorViewFor(state.activeView);
 
   const startNode = venue.getNodeById(startNodeId);
   const activeFloor = venue.getFloorById(activeFloorId);
@@ -75,21 +78,21 @@ export default function Header() {
 
         <div className="visitor-mode-switch" id="view-toggle" aria-label="Guidance mode">
           <button
-            className={activeView === VIEW_TYPE.MAP ? 'active' : ''}
+            className={activeView === VISITOR_VIEW.MAP ? 'active' : ''}
             onClick={() => actions.setView(VIEW_TYPE.MAP)}
             id="btn-map-view"
             aria-label="Switch to map view"
-            aria-pressed={activeView === VIEW_TYPE.MAP}
+            aria-pressed={activeView === VISITOR_VIEW.MAP}
           >
             <Map size={14} />
             Plan
           </button>
           <button
-            className={activeView === VIEW_TYPE.CAMERA_PREVIEW ? 'active' : ''}
+            className={activeView === VISITOR_VIEW.CAMERA_PREVIEW ? 'active' : ''}
             onClick={() => actions.setView(VIEW_TYPE.CAMERA_PREVIEW)}
             id="btn-camera-preview"
             aria-label="Switch to camera preview"
-            aria-pressed={activeView === VIEW_TYPE.CAMERA_PREVIEW}
+            aria-pressed={activeView === VISITOR_VIEW.CAMERA_PREVIEW}
           >
             <Camera size={14} />
             Guide

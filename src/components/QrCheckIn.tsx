@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { createQrDecoder } from '../capture/qrDecoder';
+import { initialScanGate, shouldSubmitScan } from '../capture/scanGate';
 
 /**
  * The camera half of a check-in: read a QR code, hand back its payload.
@@ -29,7 +30,14 @@ export default function QrCheckIn({
   onClose,
   hint,
 }: {
-  onPayload: (payload: string) => void;
+  /**
+   * Handed each decoded payload. Returns whether it was accepted.
+   *
+   * The verdict is the caller's because only the caller knows the venue. The
+   * scanner keeps its camera running until it hears `true`, which is what makes
+   * a wrong code recoverable instead of terminal.
+   */
+  onPayload: (payload: string) => boolean;
   onClose: () => void;
   hint?: string | null;
 }) {
@@ -38,8 +46,9 @@ export default function QrCheckIn({
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<number | null>(null);
   // A detection fires while the loop is still scheduled, so without this the
-  // same code resolves several times and the modal closes over itself.
-  const settledRef = useRef(false);
+  // same code resolves several times and the modal closes over itself. Settling
+  // tracks *acceptance*, never merely a successful decode.
+  const gateRef = useRef(initialScanGate());
 
   const teardown = useCallback(() => {
     if (timerRef.current !== null) {
@@ -79,14 +88,21 @@ export default function QrCheckIn({
 
         timerRef.current = window.setInterval(() => {
           const source = videoRef.current;
-          if (!source || settledRef.current || source.readyState < 2) return;
+          if (!source || gateRef.current.settled || source.readyState < 2) return;
           void decoder
             .decode(source)
             .then((value) => {
-              if (!value || settledRef.current) return;
-              settledRef.current = true;
-              teardown();
-              onPayload(value);
+              if (!shouldSubmitScan(value, gateRef.current)) return;
+              const payload = (value as string).trim();
+              // The camera is only released once the caller has accepted. A
+              // rejected code leaves the scanner live so the visitor can walk to
+              // another sign and try again.
+              if (onPayload(payload)) {
+                gateRef.current = { ...gateRef.current, settled: true };
+                teardown();
+                return;
+              }
+              gateRef.current = { ...gateRef.current, lastRejected: payload };
             })
             .catch(() => {
               // A single failed frame is normal while focus settles. Only a
