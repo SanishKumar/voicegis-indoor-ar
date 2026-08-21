@@ -2680,11 +2680,28 @@ body {
   }
 }
 /* Venue Bootstrap v0 application boundaries */
+/*
+  In the layout, not floating above it.
+
+  This was a fixed, centred overlay with z-index 1200, and it sat on top of
+  whichever surface was beneath. At 1280x720 it covered the visitor header's
+  control cluster, so "Change start location" could not be clicked at all -
+  elementFromPoint at the button's centre returned the nav. Three media queries
+  had accumulated trying to dodge that by nudging it to 88px, then 122px, then
+  the bottom; they disagreed with each other and none of them fixed it, because
+  a fixed overlay in a shared band will always collide with something
+  eventually.
+
+  #root is already a column flex container filling the viewport, so the nav
+  simply takes a row and every surface flexes into what is left. Overlap is
+  impossible by construction rather than avoided by offset.
+*/
 .surface-nav {
-  position: fixed;
+  position: relative;
   z-index: 1200;
-  top: 10px;
-  left: 50%;
+  flex: 0 0 auto;
+  align-self: center;
+  margin: 8px 0 0;
   display: flex;
   gap: 3px;
   padding: 4px;
@@ -2692,7 +2709,6 @@ body {
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-bg-primary) 88%, transparent);
   box-shadow: var(--shadow-sm);
-  transform: translateX(-50%);
   backdrop-filter: blur(14px);
 }
 
@@ -2713,7 +2729,9 @@ body {
 
 .inspector-surface {
   position: relative;
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   background: #18191c;
 }
 
@@ -2841,7 +2859,8 @@ body {
 .studio-boundary,
 .venue-bootstrap-state {
   display: grid;
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
   place-content: center;
   gap: 12px;
   padding: 32px;
@@ -2856,11 +2875,6 @@ body {
 }
 
 @media (max-width: 760px) {
-  .surface-nav {
-    top: auto;
-    bottom: 12px;
-  }
-
   .venue-package-manager {
     right: 10px;
     bottom: 60px;
@@ -2883,7 +2897,8 @@ body {
   --visitor-panel: rgba(253, 253, 250, 0.97);
   --visitor-line: #d9ddd7;
   width: 100%;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3947,7 +3962,6 @@ body {
 
 /* Persistent product navigation: 2D map, 3D twin + venue tools, and Studio. */
 .surface-nav {
-  top: 16px;
   gap: 4px;
   padding: 4px;
   border-color: var(--visitor-line, var(--color-border));
@@ -3984,19 +3998,7 @@ body {
   cursor: grabbing;
 }
 
-@media (max-width: 1180px) {
-  .surface-nav {
-    top: 88px;
-    bottom: auto;
-  }
-}
-
 @media (max-width: 700px) {
-  .surface-nav {
-    top: 122px;
-    bottom: auto;
-  }
-
   .surface-nav a {
     min-width: 40px;
     justify-content: center;
@@ -4015,7 +4017,7 @@ body {
   --studio-accent: #176b5b;
   --studio-ink: #17211f;
   --studio-line: #d7ddd8;
-  height: 100vh;
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -4025,12 +4027,14 @@ body {
 }
 
 .studio-header {
-  min-height: 126px;
+  /* 126px of minimum height and 56px of top padding were clearance for a nav
+     that floated above this header. It has its own row now, so that space was
+     simply empty. */
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
-  padding: 56px 24px 18px;
+  padding: 18px 24px;
   border-bottom: 1px solid var(--studio-line);
   background: #fbfcf9;
 }
@@ -6357,12 +6361,22 @@ body {
 }
 
 @media (max-width: 1050px) {
+  /*
+    Scrolls itself rather than the document.
+
+    The workspace stacks into one column here and cannot fit, so something has
+    to scroll. Letting it grow past the viewport made the *document* the scroll
+    container, which took the navigation row with it: 700px down, the nav sat at
+    y=-692 and there was no way back to another surface without scrolling to the
+    top first. Constrained to the space the nav leaves and scrolling internally,
+    the nav stays where it is.
+  */
   .studio-surface {
     height: auto;
-    min-height: 100vh;
+    min-height: 0;
     display: block;
-    flex: 0 0 auto;
-    overflow: visible;
+    flex: 1 1 auto;
+    overflow-y: auto;
   }
 
   .studio-workspace {
@@ -6383,12 +6397,11 @@ body {
 
 @media (max-width: 700px) {
   .studio-header {
-    min-height: 188px;
     align-items: stretch;
     flex-direction: column;
     justify-content: flex-end;
     gap: 10px;
-    padding: 62px 12px 12px;
+    padding: 12px;
   }
 
   .studio-boundary-note {
@@ -6529,9 +6542,13 @@ body {
    -------------------------------------------------------------------------- */
 
 .walk-recorder {
+  width: 100%;
   max-width: 640px;
   margin: 0 auto;
-  padding: 64px 20px 48px;
+  padding: 24px 20px 48px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   color: var(--color-text-primary);
 }
 
@@ -6653,22 +6670,6 @@ body {
   margin: 10px 0 0;
   padding-left: 18px;
   color: var(--color-text-muted);
-}
-
-/* The surface nav is fixed and drops down the page at narrower widths to clear
-   the visitor header. This surface has no header of its own, so its top padding
-   has to track those same offsets or the nav sits on top of the first
-   paragraph. */
-@media (max-width: 1180px) {
-  .walk-recorder {
-    padding-top: 148px;
-  }
-}
-
-@media (max-width: 700px) {
-  .walk-recorder {
-    padding-top: 182px;
-  }
 }
 
 @media (max-width: 560px) {

@@ -254,7 +254,7 @@ export default function WalkRecorder() {
         <section className="walk-recorder-stats" aria-live="polite">
           <Stat label="Elapsed" value={`${(stats.elapsedMs / 1000).toFixed(1)} s`} />
           <Stat label="Samples recorded" value={String(stats.recordedSamples)} />
-          <Stat label="Paired with tilt" value={String(stats.pairing.pairedCount)} />
+          <Stat label="Tilt lag measured" value={String(stats.pairing.pairedCount)} />
           <Stat label="Tilt lag, median" value={formatMs(stats.pairing.medianStalenessMs)} />
           <Stat label="Tilt lag, p95" value={formatMs(stats.pairing.p95StalenessMs)} />
           <Stat label="Tilt lag, worst" value={formatMs(stats.pairing.worstStalenessMs)} />
