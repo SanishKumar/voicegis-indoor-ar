@@ -39,18 +39,27 @@ npm run dev
 
 Open `http://localhost:3000/check-in-codes.html` in a second window, then in the
 app choose **Plan a route → Scan a check-in code** and point the camera at one.
-You are checked in at a surveyed point and can be routed step-free to any room —
-no beacons, no site survey, no network. Full script: [the 60-second demo](docs/demo.md).
+You are checked in at the point the package declares, and can be routed step-free
+to any room with no beacons, no RF fingerprinting and no positioning service —
+check-in and routing run against the compiled package on the device.
+
+The bundled venues are synthetic fixtures, each code still has to be physically
+placed where the package says it is, and a cold reload with the network down is
+not yet supported. Full script and the exact limits: [the 60-second demo](docs/demo.md).
 
 ## Core capabilities
 
 ### QR check-in
 
 A code at a junction resolves against the anchors inside the compiled venue
-package, giving a position fix on the right floor without beacons or
-connectivity. Codes are generated from the package (`npm run codes`), so a
-printed sign can only encode a payload the venue actually publishes, and every
-payload is round-trip tested through the decoder iOS uses.
+package, giving a position fix on the right floor with no beacons and no lookup
+service. Codes are generated from the package (`npm run codes`), so a printed
+sign can only encode a payload the venue actually publishes, and every payload is
+round-trip tested through the decoder iOS uses.
+
+The fix is only as good as the sign's placement, which is a physical measurement
+per code and is not automated. Accuracy against a real building has not been
+measured; the bundled venues are synthetic.
 
 ### Spatial package compiler
 

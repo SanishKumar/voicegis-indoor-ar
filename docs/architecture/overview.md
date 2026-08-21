@@ -20,7 +20,7 @@ spatial compiler ──► versioned building package
                     navigation runtime
                  ┌────────────┼────────────┐
                  ▼            ▼            ▼
-              3D map       mobile AR    VoiceGIS
+              3D map      mobile AR*   voice*   (* intended)
 ```
 
 ## System boundaries
@@ -78,10 +78,26 @@ The runtime owns progress gates, instruction advancement, wrong-way hysteresis, 
 
 ### Presentation clients
 
-- The web viewer inspects packages, topology, routes, and operations state.
-- The mobile client performs production localization and world-anchored AR.
-- The voice adapter converts grounded user intent into typed navigation operations.
-- A later VR client reuses building packages for route rehearsal and training.
+This section describes the intended client set, not what exists. Only the first
+item is built; the rest are why the package boundary is drawn where it is, and
+none of them should be described as delivered.
+
+**Built today**
+
+- The web viewer inspects packages, topology, routes, and operations state, and
+  the visitor client routes over a compiled package after a QR check-in.
+- A browser capture surface records a walk from the handset's own sensors. It is
+  an instrument for measuring sensor behaviour, not live localization.
+
+**Intended, not built**
+
+- A mobile client performing production localization and world-anchored AR.
+  There is no AR rendering: the camera view is a screen-aligned preview that can
+  compare device heading with route bearing.
+- A voice adapter converting grounded user intent into typed navigation
+  operations. Nothing in the repository uses a speech API, and the project's
+  name should not be read as a claim that it does.
+- A VR client reusing building packages for route rehearsal and training.
 
 ## Design rules
 
