@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { createQrDecoder } from '../capture/qrDecoder';
 import { initialScanGate, shouldSubmitScan } from '../capture/scanGate';
@@ -43,35 +43,41 @@ export default function QrCheckIn({
 }) {
   const [state, setState] = useState<ScannerState>({ kind: 'starting' });
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const timerRef = useRef<number | null>(null);
   // A detection fires while the loop is still scheduled, so without this the
   // same code resolves several times and the modal closes over itself. Settling
   // tracks *acceptance*, never merely a successful decode.
   const gateRef = useRef(initialScanGate());
   // Identifies the effect run that owns the camera. Every asynchronous step
-  // rechecks it, because `getUserMedia`, `play` and `decode` all resolve on
-  // later ticks by which time the scanner may have been closed — or reopened,
-  // in which case a stale continuation must not tear down the new run's stream.
+  // rechecks it, because getUserMedia, play and decode all resolve on later
+  // ticks, by which time the scanner may have been closed - or closed and
+  // reopened, which is the harder case.
   const generationRef = useRef(0);
-
-  const teardown = useCallback(() => {
-    if (timerRef.current !== null) {
-      window.clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    // Releasing every track is what actually turns the camera light off. A
-    // stopped video element alone leaves the device held open.
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-  }, []);
-
-  useEffect(() => teardown, [teardown]);
 
   useEffect(() => {
     const generation = (generationRef.current += 1);
     const current = () => generationRef.current === generation;
     const decoder = createQrDecoder();
+
+    // Owned by this effect run alone, held in closure rather than in refs.
+    //
+    // Refs are shared across runs, so a stale continuation that called a shared
+    // teardown stopped whichever stream the ref happened to hold - after a
+    // reopen, the *new* run's camera. Checking the generation stopped a stale
+    // run proceeding; it could not stop it releasing something it never owned.
+    // Owning the resources is what makes that impossible rather than unlikely.
+    let ownedStream: MediaStream | null = null;
+    let ownedTimer: number | null = null;
+
+    const release = () => {
+      if (ownedTimer !== null) {
+        window.clearInterval(ownedTimer);
+        ownedTimer = null;
+      }
+      // Releasing every track is what actually turns the camera light off. A
+      // stopped video element alone leaves the device held open.
+      ownedStream?.getTracks().forEach((track) => track.stop());
+      ownedStream = null;
+    };
 
     void (async () => {
       try {
@@ -80,28 +86,28 @@ export default function QrCheckIn({
           video: { facingMode: { ideal: 'environment' } },
           audio: false,
         });
+        // Claimed before the cancellation check, so that a scanner closed while
+        // this was in flight still releases the camera it opened.
+        ownedStream = stream;
         if (!current()) {
-          stream.getTracks().forEach((track) => track.stop());
+          release();
           return;
         }
-        streamRef.current = stream;
+
         const video = videoRef.current;
         if (video) {
           video.srcObject = stream;
           await video.play().catch(() => undefined);
-          // `play` resolves a tick later, so the scanner may have closed while
-          // it was pending. Without this the run continued past its own
-          // cleanup and installed an interval cleanup had already missed.
           if (!current()) {
-            teardown();
+            release();
             return;
           }
         }
         setState({ kind: 'scanning' });
 
-        const timer = window.setInterval(() => {
+        ownedTimer = window.setInterval(() => {
           if (!current()) {
-            window.clearInterval(timer);
+            release();
             return;
           }
           const source = videoRef.current;
@@ -115,11 +121,11 @@ export default function QrCheckIn({
               if (!current() || !shouldSubmitScan(value, gateRef.current)) return;
               const payload = (value as string).trim();
               // The camera is only released once the caller has accepted. A
-              // rejected code leaves the scanner live so the visitor can walk to
-              // another sign and try again.
+              // rejected code leaves the scanner live so the visitor can walk
+              // to another sign and try again.
               if (onPayload(payload)) {
                 gateRef.current = { ...gateRef.current, settled: true };
-                teardown();
+                release();
                 return;
               }
               gateRef.current = { ...gateRef.current, lastRejected: payload };
@@ -131,12 +137,8 @@ export default function QrCheckIn({
             });
         }, SCAN_INTERVAL_MS);
 
-        timerRef.current = timer;
-        // Cleanup may have run between installing the interval and this line.
-        if (!current()) {
-          window.clearInterval(timer);
-          teardown();
-        }
+        // Cleanup can run between scheduling the interval and this line.
+        if (!current()) release();
       } catch (error) {
         if (!current()) return;
         const name = (error as { name?: string }).name;
@@ -149,12 +151,12 @@ export default function QrCheckIn({
     })();
 
     return () => {
-      // Retiring the generation is what makes every pending continuation above
-      // inert, including ones that have already been scheduled.
+      // Retiring the generation makes every pending continuation above inert,
+      // and release() touches only what this run opened.
       generationRef.current += 1;
-      teardown();
+      release();
     };
-  }, [onPayload, teardown]);
+  }, [onPayload]);
 
   return (
     <div className="qr-checkin-overlay" role="dialog" aria-modal="true" aria-label="Scan a check-in code">

@@ -7,9 +7,14 @@ import { scannableAnchors, type AnchorLike } from '../src/capture/anchorCheckIn'
  * Builds the printable sheet of check-in codes for every compiled venue.
  *
  * The codes are generated from the compiled package rather than authored
- * alongside it, so a printed sign can never encode a payload the venue does not
- * actually publish. Recompile a venue and regenerate; a sign that stops
- * resolving is then a visible diff rather than a mystery in a corridor.
+ * alongside it, so the sheet in the repository can never encode a payload the
+ * venue does not publish. `--check` holds that: recompile a venue without
+ * regenerating and the gate fails.
+ *
+ * What that cannot do is keep *paper* current. A sign already printed and stuck
+ * to a wall is outside version control, so recompiling a venue can strand it
+ * silently — the repository is consistent, the corridor is not. Reprinting after
+ * a venue change is a field procedure, not something a gate can enforce.
  *
  * Output lands in `public/`, so it is served by the dev server at
  * /check-in-codes.html. That is the demo path: open it on a laptop, scan it

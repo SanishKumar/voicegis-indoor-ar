@@ -442,3 +442,86 @@ describe('the session clock is defined by the samples that are stored in it', ()
     expect(validated(session).issues).toEqual([]);
   });
 });
+
+describe('values that are not times', () => {
+  it('ignores an orientation whose timestamp is not a number', () => {
+    // The worst of the set, because it was silent: the capture validated
+    // cleanly, reported a paired sample, and carried a lag distribution of NaN
+    // that JSON writes out as null. A hole where the measurement should be,
+    // with nothing flagged anywhere.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation({ timeStamp: Number.NaN, alpha: 0, beta: 90, gamma: 0, absolute: false });
+    adapter.handleMotion(motion(100));
+
+    const built = session.buildSession();
+    const imu = built.events.filter((event) => event.type === 'imu');
+    expect(validateCaptureSession(built)).toEqual([]);
+    expect(imu[0].orientation).toBeNull();
+    expect(adapter.pairing).toMatchObject({
+      pairedCount: 0,
+      unpairedCount: 1,
+      medianStalenessMs: null,
+      p95StalenessMs: null,
+      worstStalenessMs: null,
+    });
+  });
+
+  it('refuses a construction that could only produce broken times', () => {
+    // Loud at construction, because these are programming errors rather than
+    // sensor behaviour, and everything downstream of them is arithmetic.
+    for (const origin of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(() => new HandsetCaptureAdapter(recorder(), { originTimeStampMs: origin })).toThrow(
+        /finite/,
+      );
+    }
+    expect(
+      () => new HandsetCaptureAdapter(recorder(), { maxOrientationStalenessMs: Number.NaN }),
+    ).toThrow(/finite/);
+    expect(
+      () => new HandsetCaptureAdapter(recorder(), { maxOrientationStalenessMs: -5 }),
+    ).toThrow(/non-negative/);
+  });
+
+  it('accepts the option shapes that are legitimate', () => {
+    expect(() => new HandsetCaptureAdapter(recorder(), {})).not.toThrow();
+    expect(
+      () => new HandsetCaptureAdapter(recorder(), { maxOrientationStalenessMs: null }),
+    ).not.toThrow();
+    expect(
+      () => new HandsetCaptureAdapter(recorder(), { originTimeStampMs: 0, maxOrientationStalenessMs: 0 }),
+    ).not.toThrow();
+  });
+
+  it('refuses a sample whose session time overflows two finite timestamps', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session, { originTimeStampMs: -Number.MAX_VALUE });
+
+    adapter.handleMotion(motion(Number.MAX_VALUE));
+
+    const built = session.buildSession();
+    expect(validateCaptureSession(built)).toEqual([]);
+    expect(built.events.filter((event) => event.type === 'imu')).toHaveLength(0);
+    expect(adapter.rejections.regressed).toBe(1);
+  });
+
+  it('keeps every reported lag statistic finite', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleOrientation({ timeStamp: Number.NaN, alpha: 0, beta: 1, gamma: 2, absolute: false });
+    adapter.handleOrientation(orientation(100, 90, 0));
+    adapter.handleMotion(motion(140));
+    adapter.handleMotion(motion(160));
+
+    for (const value of [
+      adapter.pairing.medianStalenessMs,
+      adapter.pairing.p95StalenessMs,
+      adapter.pairing.worstStalenessMs,
+    ]) {
+      expect(value).not.toBeNull();
+      expect(Number.isFinite(value as number)).toBe(true);
+    }
+  });
+});

@@ -6,8 +6,8 @@ import { describeCheckIn, type CheckInRecord } from './anchorCheckIn';
  * A check-in resolves to the nearest *routable* node, which is usually a
  * corridor waypoint rather than a room, and waypoints carry no POI. Labelling
  * from the POI alone therefore printed "Choose a starting point" immediately
- * after a successful scan — the app knew exactly where the visitor was and told
- * them it had no idea.
+ * after a successful scan — the app had just resolved a check-in and was
+ * reporting that it had none.
  *
  * The check-in is only allowed to name the start while it still *is* the start.
  * Once someone picks a landmark by hand the node changes, and a check-in left

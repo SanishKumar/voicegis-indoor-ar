@@ -2,11 +2,17 @@
  * Turning a scanned code into "you are here".
  *
  * This is the whole point of a check-in: a visitor holds a phone up to a sign
- * and the app knows where they are, with no beacons, no site survey and no
- * connectivity. Everything it needs already ships inside the compiled venue
- * package — the anchors carry their surveyed position, floor and payload — so a
- * check-in resolves entirely offline against data that was hashed at compile
- * time.
+ * and the app places them at the anchor the package declares, with no beacons,
+ * no RF fingerprinting and no lookup service. Everything it needs already ships
+ * inside the compiled venue package — the anchors carry a declared position,
+ * floor and payload — so a check-in resolves against data hashed at compile
+ * time without a network round-trip.
+ *
+ * It is not survey-free, and the position is only as true as the sign's
+ * placement. Somebody still has to measure where each code goes and hang it
+ * there; nothing in this file can tell a correctly placed sign from one moved a
+ * corridor to the left. That is the assumption the whole feature rests on, and
+ * it is a physical one.
  *
  * Deliberately separate from `checkpoints.ts` in localization-core. That adapter
  * resolves scans into *observations* for the evidence pipeline, which cares
@@ -48,9 +54,9 @@ export type CheckIn =
 /**
  * The anchor kinds a camera can actually read.
  *
- * An `image` or `apriltag` anchor is a real surveyed point, but a QR code
- * encoding its payload is not the thing that was surveyed. Accepting it would
- * mean a printed sticker could claim to be a wall sign nobody verified.
+ * An `image` or `apriltag` anchor is a distinct declared marker, and a QR code
+ * encoding its payload is not that marker. Accepting it would let a printed
+ * sticker stand in for a fixture nobody put up or checked.
  */
 const SCANNABLE_KINDS = ['qr'];
 
@@ -134,7 +140,7 @@ export function describeCheckIn(
   const floorName = names.floor(record.floorId);
 
   // Falling back to the floor as the place would otherwise print it twice.
-  const place = spaceName ?? floorName ?? 'a surveyed point';
+  const place = spaceName ?? floorName ?? 'a check-in point';
   const parts = spaceName === null ? [] : floorName === null ? [] : [floorName];
   parts.push(record.anchorId);
 

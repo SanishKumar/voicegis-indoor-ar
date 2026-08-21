@@ -83,8 +83,8 @@ describe('resolving a scanned code to a starting point', () => {
   });
 
   it('refuses a printed code claiming to be an anchor that was never scannable', () => {
-    // The apriltag anchor is a real surveyed point, but a QR sticker encoding
-    // its payload is not the thing that was surveyed.
+    // The apriltag anchor is a distinct declared marker; a QR sticker encoding
+    // its payload is not that marker.
     expect(checkInFromScan('voicegis://asterion/g/entry', anchors, nodes)).toEqual({
       ok: false,
       reason: 'not-a-checkin-code',
@@ -158,6 +158,6 @@ describe('telling the visitor where they just checked in', () => {
       { space: () => null, floor: () => null },
     );
 
-    expect(label).toEqual({ place: 'a surveyed point', detail: 'anchor-x' });
+    expect(label).toEqual({ place: 'a check-in point', detail: 'anchor-x' });
   });
 });

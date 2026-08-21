@@ -85,9 +85,10 @@ export interface RejectionSummary {
   /**
    * The timestamp could not be placed on the session clock.
    *
-   * Either it went backwards, which no honest clock does, or it predates the
-   * origin the caller supplied. Both would store a `timeMs` the capture schema
-   * refuses, taking the whole walk down with them.
+   * It went backwards, which no honest clock does; or it predates the origin
+   * the caller supplied; or it and the origin are far enough apart that the
+   * subtraction is no longer finite. Each would store a `timeMs` the capture
+   * schema refuses, taking the whole walk down with it.
    */
   regressed: number;
   /** The recorder refused the reading. Should stay zero; counted, not assumed. */
@@ -154,9 +155,25 @@ export class HandsetCaptureAdapter {
   private refused = 0;
 
   constructor(recorder: SessionRecorder, options: HandsetCaptureOptions = {}) {
+    // Validated loudly, at construction, because these are programming errors
+    // rather than sensor behaviour and everything downstream of them is
+    // arithmetic. `originTimeStampMs: NaN` made every stored time NaN, which
+    // JSON writes as null and the capture schema then refuses - a whole walk
+    // lost to a value that was never a time.
+    const origin = options.originTimeStampMs;
+    if (origin !== undefined && !finite(origin)) {
+      throw new Error(`originTimeStampMs must be a finite number, received ${String(origin)}.`);
+    }
+    const limit = options.maxOrientationStalenessMs;
+    if (limit !== undefined && limit !== null && (!finite(limit) || limit < 0)) {
+      throw new Error(
+        `maxOrientationStalenessMs must be a finite, non-negative number or null, received ${String(limit)}.`,
+      );
+    }
+
     this.recorder = recorder;
-    this.originTimeStampMs = options.originTimeStampMs ?? null;
-    this.maxStalenessMs = options.maxOrientationStalenessMs ?? null;
+    this.originTimeStampMs = origin ?? null;
+    this.maxStalenessMs = limit ?? null;
   }
 
   /** The resolved staleness limit, so a walk can record what it was run under. */
@@ -172,7 +189,18 @@ export class HandsetCaptureAdapter {
    * count depend on how chattily the platform happened to deliver tilt.
    */
   handleOrientation(event: OrientationEventLike) {
-    if (!finite(event.alpha) || !finite(event.beta) || !finite(event.gamma)) return;
+    // The timestamp matters as much as the angles. A NaN here produced the
+    // worst outcome of the set: a capture that validated cleanly, reported a
+    // paired sample, and carried a lag distribution of NaN that JSON wrote out
+    // as null - a hole where the measurement should be, with nothing flagged.
+    if (
+      !finite(event.timeStamp) ||
+      !finite(event.alpha) ||
+      !finite(event.beta) ||
+      !finite(event.gamma)
+    ) {
+      return;
+    }
     // Deliberately does not adopt the session origin. Orientation is context
     // attached to samples and is never itself recorded, so letting it define
     // time zero dated the stream from an event that is not in it: an
@@ -248,12 +276,27 @@ export class HandsetCaptureAdapter {
         this.futureOrientation += 1;
         this.unpaired += 1;
         orientation = null;
+      } else if (!finite(staleness)) {
+        // Not orderable against this sample at all, so it is neither a lag nor
+        // a tilt worth attaching.
+        this.futureOrientation += 1;
+        this.unpaired += 1;
+        orientation = null;
       } else {
         this.stalenessMs.push(staleness);
         if (this.maxStalenessMs !== null && staleness > this.maxStalenessMs) {
           orientation = null;
         }
       }
+    }
+
+    const timeMs = event.timeStamp - (this.originTimeStampMs ?? event.timeStamp);
+    if (!finite(timeMs)) {
+      // Two finite timestamps far enough apart still subtract to Infinity. The
+      // stream cannot carry it, so the sample is refused rather than written as
+      // a value JSON turns into null.
+      this.regressed += 1;
+      return;
     }
 
     try {
@@ -266,7 +309,7 @@ export class HandsetCaptureAdapter {
       const gyroscope: Vector3 = [rotation.beta, rotation.gamma, rotation.alpha];
 
       this.recorder.recordImu({
-        timeMs: event.timeStamp - (this.originTimeStampMs ?? event.timeStamp),
+        timeMs,
         accelerometer,
         gyroscope,
         orientation,

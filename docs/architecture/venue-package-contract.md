@@ -136,17 +136,32 @@ surface without redesigning the entire application.
 Both are compiler artifacts served from `public/venues/` and selected through
 `public/venues/catalog.json`. Neither is imported by application source code.
 
-## Exact next step: Venue Studio v0
+## Venue Studio v0 — delivered
 
-Build one narrow authoring vertical slice:
+This was written as the next step and has since been built. It is recorded as
+done rather than deleted, because the scope it defined is what `#/studio`
+actually does:
 
-1. open an existing `BuildingSource` JSON file;
-2. render its floors, spaces, portals, connectors, POIs, and validation issues;
+1. open an existing `BuildingSource` JSON file — **done**;
+2. render its floors, spaces, portals, connectors, POIs, and validation issues —
+   **done**;
 3. allow deterministic edits to metadata and geometry with explicit
-   accessibility values;
-4. run the existing compiler unchanged in a worker or service;
-5. show the validation report and package hash;
-6. publish/download the verified `VenuePackage` and add its URL to a catalog.
+   accessibility values — **done**;
+4. run the existing compiler unchanged in a worker or service — **done**,
+   compiled in the browser;
+5. show the validation report and package hash — **done**;
+6. publish/download the verified `VenuePackage` and add its URL to a catalog —
+   **partly**. Download and a publish dry run exist; the catalog is still a
+   static artifact, so adding a release is not possible from Studio.
 
-Do not start scan reconstruction in this step. Studio v0 should first prove the
-human-review and publish boundary on canonical source data.
+Scan reconstruction was correctly left out and remains out.
+
+## Exact next step: a browser smoke suite
+
+The unit gate does not exercise the visitor journey. Three defects have reached
+review through a green build — a blank map after visiting the 3D surface, a
+scanner that stopped its own successor's camera, and navigation controls that
+overlap on a phone — and none of them were the kind a unit test was ever going
+to see. Onboarding, routing, surface switching, check-in rejection and mobile
+navigation should each have one browser-level test before this is shown to
+anyone unguided.
