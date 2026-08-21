@@ -97,9 +97,14 @@ means a flaky camera cannot take the demo down.
 ## Why the codes are generated, not authored
 
 `npm run codes` regenerates `public/check-in-codes.html` from the compiled
-packages. A printed sign can therefore only ever encode a payload the venue
-actually publishes; recompile a venue and a sign that stops resolving shows up
-as a diff rather than as a mystery in a corridor.
+packages, and `codes:check` fails the build if the committed sheet no longer
+matches them. So the sheet in the repository can only ever encode payloads the
+venue publishes.
+
+It cannot keep paper current. A sign already printed and stuck to a wall is
+outside version control, so recompiling a venue can strand it silently — the
+repository is consistent and the corridor is not. Reprinting after a venue
+change is a field procedure, not something a gate can enforce.
 
 Every payload is round-tripped through the same decoder an iPhone uses, in
 `qrRoundTrip.test.ts`, so a code that would not scan fails the build rather than

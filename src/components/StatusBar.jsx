@@ -63,9 +63,16 @@ export default function StatusBar() {
         <span>{activeFloor?.name ?? 'Floor unavailable'}</span>
       </div>
 
-      <div className="status-item status-network" title={isOnline ? 'Connected' : 'Offline-ready'}>
+      {/*
+        Reports the connection, not a capability. This said "Offline-ready",
+        which claimed something navigator.onLine cannot know and the app does
+        not do: there is no service worker, so a reload while offline fails at
+        the package fetch. Routing already loaded keeps working, which is worth
+        saying, but it is not the same promise.
+      */}
+      <div className="status-item status-network" title={isOnline ? 'Connected' : 'No connection'}>
         {isOnline ? <Wifi size={11} /> : <WifiOff size={11} />}
-        <span>{isOnline ? 'Connected' : 'Offline-ready'}</span>
+        <span>{isOnline ? 'Connected' : 'No connection'}</span>
       </div>
     </aside>
   );

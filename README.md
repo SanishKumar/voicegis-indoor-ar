@@ -54,9 +54,14 @@ not yet supported. Full script and the exact limits: [the 60-second demo](docs/d
 
 A code at a junction resolves against the anchors inside the compiled venue
 package, giving a position fix on the right floor with no beacons and no lookup
-service. Codes are generated from the package (`npm run codes`), so a printed
-sign can only encode a payload the venue actually publishes, and every payload is
-round-trip tested through the decoder iOS uses.
+service. Codes are generated from the package (`npm run codes`, gated by
+`codes:check`), so the sheet in this repository can only encode payloads the
+venue publishes, and every payload is round-trip tested through the decoder iOS
+uses.
+
+That guarantee stops at the printer. A sign already on a wall is outside version
+control, so recompiling a venue can strand it while the repository stays
+consistent; reprinting after a venue change is a field procedure.
 
 The fix is only as good as the sign's placement, which is a physical measurement
 per code and is not automated. Accuracy against a real building has not been

@@ -219,6 +219,17 @@ export class HandsetCaptureAdapter {
     this.latestOrientationAtMs = event.timeStamp;
   }
 
+  /**
+   * Records one inertial sample, or refuses it without a trace.
+   *
+   * Every decision is made before any state changes, and nothing is committed
+   * until the sample is actually in the stream. That ordering is the whole
+   * point: an earlier version updated the chronology and the pairing counters
+   * and *then* checked whether the derived session time was representable, so a
+   * refused sample still advanced the clock and still counted itself as
+   * recorded. An overflowing sample followed by a good one stored nothing,
+   * reported one recorded sample, and refused the good one as a regression.
+   */
   handleMotion(event: MotionEventLike) {
     const acceleration = event.accelerationIncludingGravity;
     const rotation = event.rotationRate;
@@ -248,49 +259,16 @@ export class HandsetCaptureAdapter {
       return;
     }
 
-    this.adoptOrigin(event.timeStamp);
-    if (this.originTimeStampMs !== null && event.timeStamp < this.originTimeStampMs) {
+    // The origin this sample would run under, not yet adopted.
+    const origin = this.originTimeStampMs ?? event.timeStamp;
+    if (event.timeStamp < origin) {
       // A sample from before time zero, which an explicit `originTimeStampMs`
-      // later than the first event produces. It cannot be placed on the session
-      // clock, and storing it wrote a negative `timeMs` that failed validation
-      // exactly as the orientation case did. Refused for the same reason.
+      // later than the first event produces.
       this.regressed += 1;
       return;
     }
-    this.lastMotionTimeStampMs = event.timeStamp;
 
-    let orientation = this.latestOrientation;
-    if (orientation === null || this.latestOrientationAtMs === null) {
-      this.unpaired += 1;
-      orientation = null;
-    } else {
-      const staleness = event.timeStamp - this.latestOrientationAtMs;
-      if (staleness < 0) {
-        // The orientation is from the future relative to this sample, which the
-        // two channels can genuinely produce: they are timestamped
-        // independently and delivered out of order. Kept out of the
-        // distribution as well as off the sample — a negative value dragged the
-        // median and p95 below zero and reported a lag that had not happened.
-        // Refused per sample rather than latched, so a clock hiccup does not
-        // cost the rest of the walk its tilt.
-        this.futureOrientation += 1;
-        this.unpaired += 1;
-        orientation = null;
-      } else if (!finite(staleness)) {
-        // Not orderable against this sample at all, so it is neither a lag nor
-        // a tilt worth attaching.
-        this.futureOrientation += 1;
-        this.unpaired += 1;
-        orientation = null;
-      } else {
-        this.stalenessMs.push(staleness);
-        if (this.maxStalenessMs !== null && staleness > this.maxStalenessMs) {
-          orientation = null;
-        }
-      }
-    }
-
-    const timeMs = event.timeStamp - (this.originTimeStampMs ?? event.timeStamp);
+    const timeMs = event.timeStamp - origin;
     if (!finite(timeMs)) {
       // Two finite timestamps far enough apart still subtract to Infinity. The
       // stream cannot carry it, so the sample is refused rather than written as
@@ -299,30 +277,57 @@ export class HandsetCaptureAdapter {
       return;
     }
 
-    try {
-      const accelerometer: Vector3 = [acceleration.x, acceleration.y, acceleration.z];
-      // The axis mapping is the trap in this whole file. `rotationRate.alpha`
-      // is the rate about Z, `.beta` about X and `.gamma` about Y — each named
-      // for the orientation angle it corresponds to, not for the position it
-      // takes in a vector. Copying them across in name order yields a
-      // plausible, entirely wrong gyroscope reading.
-      const gyroscope: Vector3 = [rotation.beta, rotation.gamma, rotation.alpha];
+    // Pairing is decided here and counted further down, so a sample the
+    // recorder ends up rejecting leaves the distribution untouched.
+    let orientation = this.latestOrientation;
+    let stalenessToRecord: number | null = null;
+    let unpaired = false;
+    let fromTheFuture = false;
 
-      this.recorder.recordImu({
-        timeMs,
-        accelerometer,
-        gyroscope,
-        orientation,
-      });
+    if (orientation === null || this.latestOrientationAtMs === null) {
+      unpaired = true;
+      orientation = null;
+    } else {
+      const staleness = event.timeStamp - this.latestOrientationAtMs;
+      if (staleness < 0 || !finite(staleness)) {
+        // Either the orientation is stamped after the sample it would explain -
+        // which the two channels genuinely produce, being timestamped
+        // independently and delivered out of order - or it is not orderable
+        // against it at all. Neither is a lag, so neither joins the
+        // distribution, and neither tilt is attached. Judged per sample rather
+        // than latched, so one hiccup does not cost the rest of the walk.
+        fromTheFuture = true;
+        unpaired = true;
+        orientation = null;
+      } else {
+        stalenessToRecord = staleness;
+        if (this.maxStalenessMs !== null && staleness > this.maxStalenessMs) {
+          orientation = null;
+        }
+      }
+    }
+
+    const accelerometer: Vector3 = [acceleration.x, acceleration.y, acceleration.z];
+    // The axis mapping is the trap in this whole file. `rotationRate.alpha`
+    // is the rate about Z, `.beta` about X and `.gamma` about Y — each named
+    // for the orientation angle it corresponds to, not for the position it
+    // takes in a vector. Copying them across in name order yields a
+    // plausible, entirely wrong gyroscope reading.
+    const gyroscope: Vector3 = [rotation.beta, rotation.gamma, rotation.alpha];
+
+    try {
+      this.recorder.recordImu({ timeMs, accelerometer, gyroscope, orientation });
     } catch {
       this.refused += 1;
+      return;
     }
-  }
 
-  private adoptOrigin(timeStampMs: number) {
-    if (this.originTimeStampMs === null && finite(timeStampMs)) {
-      this.originTimeStampMs = timeStampMs;
-    }
+    // Committed only now that the sample is in the stream.
+    this.originTimeStampMs = origin;
+    this.lastMotionTimeStampMs = event.timeStamp;
+    if (unpaired) this.unpaired += 1;
+    if (fromTheFuture) this.futureOrientation += 1;
+    if (stalenessToRecord !== null) this.stalenessMs.push(stalenessToRecord);
   }
 
   get pairing(): PairingSummary {

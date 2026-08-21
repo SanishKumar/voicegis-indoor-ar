@@ -525,3 +525,59 @@ describe('values that are not times', () => {
     }
   });
 });
+
+describe('a refused sample leaves no trace', () => {
+  it('does not let an overflowing sample advance the clock or count itself', () => {
+    // Reported by review. The chronology and the pairing counters were updated
+    // before the derived session time was checked, so a refused sample still
+    // moved the clock forward and still counted as recorded: nothing stored,
+    // one recorded sample, and the next perfectly good sample refused as a
+    // regression against a timestamp that was never accepted.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session, { originTimeStampMs: -Number.MAX_VALUE });
+
+    adapter.handleMotion(motion(Number.MAX_VALUE));
+    adapter.handleMotion(motion(-Number.MAX_VALUE + 1_000));
+
+    const built = session.buildSession();
+    expect(validateCaptureSession(built)).toEqual([]);
+    expect(built.events.filter((event) => event.type === 'imu')).toHaveLength(1);
+    expect(adapter.recordedSamples).toBe(1);
+    expect(adapter.rejections.regressed).toBe(1);
+  });
+
+  it('keeps recordedSamples equal to what the stream actually holds', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session, { originTimeStampMs: 1_000 });
+
+    adapter.handleMotion(motion(500));   // before the origin
+    adapter.handleMotion(motion(1_100)); // good
+    adapter.handleMotion(motion(900));   // regresses
+    adapter.handleMotion(motion(1_200)); // good
+    adapter.handleMotion({
+      timeStamp: 1_300,
+      accelerationIncludingGravity: null,
+      rotationRate: { alpha: 0, beta: 0, gamma: 0 },
+    }); // incomplete
+
+    const stored = session.buildSession().events.filter((event) => event.type === 'imu').length;
+    expect(stored).toBe(2);
+    expect(adapter.recordedSamples).toBe(stored);
+    expect(adapter.pairing.pairedCount + adapter.pairing.unpairedCount).toBe(stored);
+  });
+
+  it('does not let a refused sample block the next good one', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session, { originTimeStampMs: 0 });
+
+    adapter.handleMotion(motion(100));
+    adapter.handleMotion(motion(50)); // refused as a regression
+    adapter.handleMotion(motion(150)); // must still be accepted
+
+    const times = session
+      .buildSession()
+      .events.filter((event) => event.type === 'imu')
+      .map((event) => event.timeMs);
+    expect(times).toEqual([100, 150]);
+  });
+});
