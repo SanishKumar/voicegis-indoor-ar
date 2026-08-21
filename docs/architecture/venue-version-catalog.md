@@ -40,7 +40,10 @@ activation boundary.
 
 - The catalog is a static deployment artifact.
 - It contains one release for each bundled venue.
-- Studio is read-only and cannot add, promote, archive, or publish releases.
+- Studio cannot add, promote, archive, or publish releases *to the catalog*,
+  which is what makes the catalog static. Studio itself is not read-only: it
+  edits sources, imports DXF, compiles in the browser, downloads a verified
+  package, and runs a publish dry run. What it cannot do is change this file.
 - Catalog metadata is not a signature or trust root.
 - Package signing, authorization, remote storage, concurrent publishing, and
   durable release history remain future work.

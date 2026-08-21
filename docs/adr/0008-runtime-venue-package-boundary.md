@@ -23,8 +23,13 @@ recreates route, floor, POI, closure, and localization-scoped state. The routing
 worker receives the package associated with the request. Operational overlays
 remain separate and must match the active package.
 
-The product surfaces are separated into Visitor, Inspector, and future Studio
-routes. Package activation and diagnostics are Inspector responsibilities.
+The product surfaces are separated into Visitor, Inspector, and Studio routes.
+Package activation and diagnostics are Inspector responsibilities.
+
+> Studio was future work when this record was written and has since been built:
+> `#/studio` edits a `BuildingSource`, imports DXF, compiles in the browser and
+> runs a publish dry run. A `#/recorder` surface was added later for handset
+> sensor capture. The decision below is unchanged; only the tense is.
 
 ## Consequences
 

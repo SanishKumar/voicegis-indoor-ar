@@ -122,7 +122,7 @@ describe('pairing tilt with turn across two independent channels', () => {
     });
     expect(adapter.pairing).toMatchObject({
       pairedCount: 1,
-      unpairedCount: 0,
+      noOrientationCount: 0,
       medianStalenessMs: 40,
       worstStalenessMs: 40,
     });
@@ -140,7 +140,7 @@ describe('pairing tilt with turn across two independent channels', () => {
     const events = session.buildSession().events.filter((event) => event.type === 'imu');
     expect(events).toHaveLength(1);
     expect(events[0].orientation).toBeNull();
-    expect(adapter.pairing).toMatchObject({ pairedCount: 0, unpairedCount: 1 });
+    expect(adapter.pairing).toMatchObject({ pairedCount: 0, noOrientationCount: 1 });
   });
 
   it('summarises the staleness distribution the lag decision needs', () => {
@@ -173,7 +173,13 @@ describe('pairing tilt with turn across two independent channels', () => {
 
     const events = session.buildSession().events.filter((event) => event.type === 'imu');
     expect(events[0].orientation).toBeNull();
-    expect(adapter.pairing).toMatchObject({ pairedCount: 1, worstStalenessMs: 500 });
+    expect(adapter.pairing).toMatchObject({
+      pairedCount: 1,
+      worstStalenessMs: 500,
+      // Counted as paired because the lag was measurable, and separately as
+      // discarded because the tilt was dropped. Those are different facts.
+      discardedByLimitCount: 1,
+    });
     expect(adapter.orientationStalenessLimitMs).toBe(50);
   });
 
@@ -236,7 +242,7 @@ describe('what the adapter refuses', () => {
 
     const events = session.buildSession().events.filter((event) => event.type === 'imu');
     expect(events[0].orientation).toBeNull();
-    expect(adapter.pairing).toMatchObject({ unpairedCount: 1 });
+    expect(adapter.pairing).toMatchObject({ noOrientationCount: 1 });
   });
 });
 
@@ -343,7 +349,7 @@ describe('a tilt from the future is not a tilt', () => {
     expect(adapter.pairing.pairedCount).toBe(0);
     expect(adapter.pairing.medianStalenessMs).toBeNull();
     expect(adapter.pairing.worstStalenessMs).toBeNull();
-    expect(adapter.rejections.futureOrientation).toBe(1);
+    expect(adapter.pairing.unusableOrientationCount).toBe(1);
   });
 
   it('never reports a negative lag in the distribution', () => {
@@ -374,7 +380,7 @@ describe('a tilt from the future is not a tilt', () => {
     adapter.handleMotion(motion(300));
 
     expect(adapter.pairing.pairedCount).toBe(1);
-    expect(adapter.rejections.futureOrientation).toBe(1);
+    expect(adapter.pairing.unusableOrientationCount).toBe(1);
   });
 });
 
@@ -461,7 +467,7 @@ describe('values that are not times', () => {
     expect(imu[0].orientation).toBeNull();
     expect(adapter.pairing).toMatchObject({
       pairedCount: 0,
-      unpairedCount: 1,
+      noOrientationCount: 1,
       medianStalenessMs: null,
       p95StalenessMs: null,
       worstStalenessMs: null,
@@ -563,7 +569,11 @@ describe('a refused sample leaves no trace', () => {
     const stored = session.buildSession().events.filter((event) => event.type === 'imu').length;
     expect(stored).toBe(2);
     expect(adapter.recordedSamples).toBe(stored);
-    expect(adapter.pairing.pairedCount + adapter.pairing.unpairedCount).toBe(stored);
+    expect(
+      adapter.pairing.pairedCount +
+        adapter.pairing.noOrientationCount +
+        adapter.pairing.unusableOrientationCount,
+    ).toBe(stored);
   });
 
   it('does not let a refused sample block the next good one', () => {
@@ -579,5 +589,59 @@ describe('a refused sample leaves no trace', () => {
       .events.filter((event) => event.type === 'imu')
       .map((event) => event.timeMs);
     expect(times).toEqual([100, 150]);
+  });
+});
+
+describe('the pairing counts partition the samples that were stored', () => {
+  it('separates no orientation arriving from an orientation that was no use', () => {
+    // These were one number, and they are different facts about a walk: a
+    // handset that never reported tilt is a different problem from one whose
+    // tilt arrived out of order.
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleMotion(motion(100)); // nothing has arrived yet
+    adapter.handleOrientation(orientation(400, 90, 0));
+    adapter.handleMotion(motion(200)); // tilt is from the future
+    adapter.handleMotion(motion(500)); // usable
+
+    expect(adapter.pairing).toMatchObject({
+      pairedCount: 1,
+      noOrientationCount: 1,
+      unusableOrientationCount: 1,
+      discardedByLimitCount: 0,
+    });
+  });
+
+  it('adds up to what the stream holds, every time', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session);
+
+    adapter.handleMotion(motion(0));
+    adapter.handleOrientation(orientation(900, 90, 0));
+    adapter.handleMotion(motion(100));
+    adapter.handleMotion(motion(1_000));
+    adapter.handleMotion(motion(50)); // refused: regresses
+    adapter.handleMotion(motion(1_100));
+
+    const { pairedCount, noOrientationCount, unusableOrientationCount } = adapter.pairing;
+    const stored = session.buildSession().events.filter((event) => event.type === 'imu').length;
+
+    expect(pairedCount + noOrientationCount + unusableOrientationCount).toBe(stored);
+    expect(adapter.recordedSamples).toBe(stored);
+  });
+
+  it('counts a limit-discarded tilt as measured and as discarded, not as unusable', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session, { maxOrientationStalenessMs: 10 });
+
+    adapter.handleOrientation(orientation(0, 90, 0));
+    adapter.handleMotion(motion(500));
+
+    expect(adapter.pairing).toMatchObject({
+      pairedCount: 1,
+      unusableOrientationCount: 0,
+      discardedByLimitCount: 1,
+    });
   });
 });

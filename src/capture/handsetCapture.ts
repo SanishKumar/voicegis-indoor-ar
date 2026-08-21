@@ -63,22 +63,56 @@ export interface OrientationEventLike {
 }
 
 /**
- * How far behind each inertial sample its tilt was, in milliseconds.
+ * What happened to the tilt of every sample that reached the stream.
  *
- * `unpaired` counts samples recorded before any orientation had arrived at all.
- * Those are stored with a null orientation rather than dropped: the
- * accelerometer half is still a perfectly good footfall, and a null orientation
- * is refused explicitly downstream instead of silently becoming a heading.
+ * The three counts partition those samples, so they sum to `recordedSamples`.
+ * They used to not: a sample whose orientation was unusable was counted both as
+ * unpaired and, separately, as a rejection - which it never was, since the
+ * sample was recorded. "No orientation arrived" and "an orientation arrived and
+ * was no use" are different facts about a walk and now read as different
+ * numbers.
+ *
+ * A sample with no usable tilt is still stored, with a null orientation rather
+ * than being dropped: the accelerometer half is a perfectly good footfall, and a
+ * null orientation is refused explicitly downstream instead of silently
+ * becoming a heading.
  */
 export interface PairingSummary {
+  /**
+   * Samples whose lag against an orientation was measurable.
+   *
+   * This is the denominator of the distribution below. It counts a measured
+   * lag, not an attached tilt: a sample can be counted here and still carry no
+   * orientation, if the lag exceeded the caller's limit. `discardedByLimitCount`
+   * says how often that happened.
+   */
   pairedCount: number;
-  unpairedCount: number;
+  /** No orientation had arrived yet when the sample was recorded. */
+  noOrientationCount: number;
+  /**
+   * An orientation existed but could not be used for this sample: stamped after
+   * it, or not orderable against it at all.
+   */
+  unusableOrientationCount: number;
+  /**
+   * Lag measured, tilt then dropped for exceeding `maxOrientationStalenessMs`.
+   *
+   * A subset of `pairedCount`, not a fourth bucket. Zero unless a limit was set,
+   * which nothing does by default.
+   */
+  discardedByLimitCount: number;
   medianStalenessMs: number | null;
   p95StalenessMs: number | null;
   worstStalenessMs: number | null;
 }
 
-/** Samples that never reached the recorder, and why. */
+/**
+ * Samples that never reached the recorder, and why.
+ *
+ * Strictly things the stream does not contain. A tilt from the future used to be
+ * counted here, which was a category error: the sample was recorded, only
+ * without its orientation. That now lives in `PairingSummary`.
+ */
 export interface RejectionSummary {
   /** The event carried no acceleration, no rotation rate, or a null component. */
   incomplete: number;
@@ -93,14 +127,6 @@ export interface RejectionSummary {
   regressed: number;
   /** The recorder refused the reading. Should stay zero; counted, not assumed. */
   refused: number;
-  /**
-   * The only orientation available was stamped *after* the sample.
-   *
-   * The sample is still recorded, without tilt. A negative lag is not a lag:
-   * the orientation describes a pose the handset had not reached yet, and
-   * pairing it would explain a turn with the tilt that followed it.
-   */
-  futureOrientation: number;
 }
 
 export interface HandsetCaptureOptions {
@@ -148,8 +174,9 @@ export class HandsetCaptureAdapter {
 
   private lastMotionTimeStampMs: number | null = null;
   private readonly stalenessMs: number[] = [];
-  private unpaired = 0;
-  private futureOrientation = 0;
+  private noOrientation = 0;
+  private unusableOrientation = 0;
+  private discardedByLimit = 0;
   private incomplete = 0;
   private regressed = 0;
   private refused = 0;
@@ -281,11 +308,12 @@ export class HandsetCaptureAdapter {
     // recorder ends up rejecting leaves the distribution untouched.
     let orientation = this.latestOrientation;
     let stalenessToRecord: number | null = null;
-    let unpaired = false;
-    let fromTheFuture = false;
+    let noOrientation = false;
+    let unusableOrientation = false;
+    let discardedByLimit = false;
 
     if (orientation === null || this.latestOrientationAtMs === null) {
-      unpaired = true;
+      noOrientation = true;
       orientation = null;
     } else {
       const staleness = event.timeStamp - this.latestOrientationAtMs;
@@ -296,12 +324,12 @@ export class HandsetCaptureAdapter {
         // against it at all. Neither is a lag, so neither joins the
         // distribution, and neither tilt is attached. Judged per sample rather
         // than latched, so one hiccup does not cost the rest of the walk.
-        fromTheFuture = true;
-        unpaired = true;
+        unusableOrientation = true;
         orientation = null;
       } else {
         stalenessToRecord = staleness;
         if (this.maxStalenessMs !== null && staleness > this.maxStalenessMs) {
+          discardedByLimit = true;
           orientation = null;
         }
       }
@@ -325,8 +353,9 @@ export class HandsetCaptureAdapter {
     // Committed only now that the sample is in the stream.
     this.originTimeStampMs = origin;
     this.lastMotionTimeStampMs = event.timeStamp;
-    if (unpaired) this.unpaired += 1;
-    if (fromTheFuture) this.futureOrientation += 1;
+    if (noOrientation) this.noOrientation += 1;
+    if (unusableOrientation) this.unusableOrientation += 1;
+    if (discardedByLimit) this.discardedByLimit += 1;
     if (stalenessToRecord !== null) this.stalenessMs.push(stalenessToRecord);
   }
 
@@ -334,7 +363,9 @@ export class HandsetCaptureAdapter {
     const sorted = [...this.stalenessMs].sort((left, right) => left - right);
     return {
       pairedCount: sorted.length,
-      unpairedCount: this.unpaired,
+      noOrientationCount: this.noOrientation,
+      unusableOrientationCount: this.unusableOrientation,
+      discardedByLimitCount: this.discardedByLimit,
       medianStalenessMs: upperMedian(sorted),
       p95StalenessMs: percentile95(sorted),
       worstStalenessMs: sorted.length === 0 ? null : sorted[sorted.length - 1],
@@ -346,7 +377,6 @@ export class HandsetCaptureAdapter {
       incomplete: this.incomplete,
       regressed: this.regressed,
       refused: this.refused,
-      futureOrientation: this.futureOrientation,
     };
   }
 
@@ -358,7 +388,7 @@ export class HandsetCaptureAdapter {
    * liveness signal from two other numbers is a surface that will get it wrong.
    */
   get recordedSamples() {
-    return this.stalenessMs.length + this.unpaired;
+    return this.stalenessMs.length + this.noOrientation + this.unusableOrientation;
   }
 }
 

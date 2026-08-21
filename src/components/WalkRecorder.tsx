@@ -258,10 +258,11 @@ export default function WalkRecorder() {
           <Stat label="Tilt lag, median" value={formatMs(stats.pairing.medianStalenessMs)} />
           <Stat label="Tilt lag, p95" value={formatMs(stats.pairing.p95StalenessMs)} />
           <Stat label="Tilt lag, worst" value={formatMs(stats.pairing.worstStalenessMs)} />
-          <Stat label="No tilt yet" value={String(stats.pairing.unpairedCount)} />
+          {/* Pairing first, then the samples that never reached the stream. */}
+          <Stat label="No tilt yet" value={String(stats.pairing.noOrientationCount)} />
+          <Stat label="Tilt unusable" value={String(stats.pairing.unusableOrientationCount)} />
           <Stat label="Incomplete" value={String(stats.rejections.incomplete)} />
           <Stat label="Clock went back" value={String(stats.rejections.regressed)} />
-          <Stat label="Tilt from the future" value={String(stats.rejections.futureOrientation)} />
         </section>
       )}
 
