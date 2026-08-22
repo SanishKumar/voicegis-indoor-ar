@@ -25,6 +25,14 @@ function SurfaceLink({ surface, activeSurface }) {
       href={`#/${surface.id}`}
       className={active ? 'active' : ''}
       aria-current={active ? 'page' : undefined}
+      /*
+        Named explicitly, because the visible label is the first thing to go.
+        Below 700px the span is display:none and the icon is aria-hidden, which
+        left all four links with no accessible name whatsoever - a screen reader
+        announced four unlabelled links to nowhere. The name matches the visible
+        text where there is one, so the two never disagree.
+      */
+      aria-label={surface.label}
     >
       <Icon size={14} aria-hidden="true" />
       <span>{surface.label}</span>

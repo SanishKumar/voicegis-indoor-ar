@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { createQrDecoder } from '../capture/qrDecoder';
 import { initialScanGate, shouldSubmitScan } from '../capture/scanGate';
+import { useDialogFocus } from './useDialogFocus';
 
 /**
  * The camera half of a check-in: read a QR code, hand back its payload.
@@ -52,6 +53,9 @@ export default function QrCheckIn({
   // ticks, by which time the scanner may have been closed - or closed and
   // reopened, which is the harder case.
   const generationRef = useRef(0);
+  // aria-modal below is a promise that the page behind is unreachable; this is
+  // what keeps it true, and hands focus back to whatever opened the scanner.
+  const { containerRef } = useDialogFocus<HTMLDivElement>(true, { onEscape: onClose });
 
   useEffect(() => {
     const generation = (generationRef.current += 1);
@@ -159,7 +163,14 @@ export default function QrCheckIn({
   }, [onPayload]);
 
   return (
-    <div className="qr-checkin-overlay" role="dialog" aria-modal="true" aria-label="Scan a check-in code">
+    <div
+      ref={containerRef}
+      className="qr-checkin-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Scan a check-in code"
+      tabIndex={-1}
+    >
       <div className="qr-checkin">
         <button type="button" className="qr-checkin-close" onClick={onClose} aria-label="Close scanner">
           <X size={18} />

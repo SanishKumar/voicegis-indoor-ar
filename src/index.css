@@ -453,10 +453,18 @@ img, svg { display: block; max-width: 100%; }
   position: absolute; bottom: 0; left: 0; right: 0; max-height: var(--search-panel-max-height);
   z-index: calc(var(--z-overlay) + 1); background: var(--color-bg-secondary);
   border-top: 1px solid var(--color-border); border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  transform: translateY(120%); opacity: 0; pointer-events: none; transition: transform var(--transition-slow), opacity var(--transition-fast);
+  transform: translateY(120%); opacity: 0; pointer-events: none;
+  /* Hidden once the slide finishes, so a closed drawer holds no tab stops even
+     where `inert` is not honoured. Delayed by the slide duration rather than
+     applied immediately, or the panel would vanish instead of leaving. */
+  visibility: hidden;
+  transition: transform var(--transition-slow), opacity var(--transition-fast), visibility 0s linear 400ms;
   display: flex; flex-direction: column; box-shadow: var(--shadow-xl);
 }
-.search-panel.open { transform: translateY(0); opacity: 1; pointer-events: all; }
+.search-panel.open {
+  transform: translateY(0); opacity: 1; pointer-events: all; visibility: visible;
+  transition: transform var(--transition-slow), opacity var(--transition-fast), visibility 0s;
+}
 .search-panel-handle { width: 40px; height: 5px; background: var(--color-text-muted); border-radius: var(--radius-full); margin: var(--space-3) auto var(--space-4); opacity: 0.3; }
 
 .search-input-wrapper {

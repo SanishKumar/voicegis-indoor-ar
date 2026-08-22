@@ -5,10 +5,11 @@
  * Features search, category filtering, and a beautiful list.
  */
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Search, MapPin, X, ChevronRight, QrCode } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import QrCheckIn from './QrCheckIn.tsx';
+import { useDialogFocus } from './useDialogFocus.ts';
 import { scanProblemText } from '../capture/scanProblemText.ts';
 
 export default function LocationPicker({ isOpen, onClose }) {
@@ -59,14 +60,10 @@ export default function LocationPicker({ isOpen, onClose }) {
     [actions, onClose],
   );
 
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  // Escape used to be handled here on its own. It now comes with focus
+  // containment and restoration, because a dialog that closes on Escape but
+  // never took focus was only ever half a dialog.
+  const { containerRef } = useDialogFocus(isOpen, { onEscape: onClose });
 
   if (!isOpen) return null;
 
@@ -78,10 +75,12 @@ export default function LocationPicker({ isOpen, onClose }) {
       }}
     >
       <div
+        ref={containerRef}
         className="location-picker animate-slide-up"
         role="dialog"
         aria-modal="true"
         aria-labelledby="location-picker-title"
+        tabIndex={-1}
       >
         {/* Header */}
         <div className="lp-header">

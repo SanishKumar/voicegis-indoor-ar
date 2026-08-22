@@ -116,10 +116,21 @@ export default function SearchPanel() {
       />
 
       {/* Search Panel */}
+      {/*
+        `inert` while closed, not just invisible.
+
+        The panel slides out of view with opacity 0 and pointer-events none, but
+        it stayed in the document at full size with 33 focusable controls in it.
+        A keyboard user tabbing across the map fell into a drawer they could not
+        see and could not tell they were in. `inert` takes it out of the tab
+        order and the accessibility tree in one attribute; the stylesheet also
+        hides it once the slide finishes, for anything that does not honour it.
+      */}
       <section
         className={`search-panel ${isOpen ? 'open' : ''}`}
         id="search-panel"
         aria-label="Find a destination"
+        inert={isOpen ? undefined : ''}
       >
         <div className="search-panel-handle" />
 
