@@ -24,6 +24,20 @@ import { useCallback, useEffect, useRef } from 'react';
  * suite, where the page genuinely holds focus.
  */
 
+/**
+ * Dialogs currently trapping focus, outermost first.
+ *
+ * Every open dialog installs its own document-level key listener, so a single
+ * Escape ran every one of them: dismissing the scanner nested inside the
+ * location picker also threw away the picker that opened it. Only the dialog on
+ * top of this stack acts on a key, which is what makes nesting behave the way a
+ * user expects - one Escape, one dialog.
+ *
+ * Module scope on purpose. The stack has to be shared by every dialog on the
+ * page, and dialogs do not otherwise know about one another.
+ */
+const openDialogs: symbol[] = [];
+
 const FOCUSABLE = [
   'a[href]',
   'button:not([disabled])',
@@ -141,7 +155,13 @@ export function useDialogFocus<T extends HTMLElement>(
     const initial = focusableWithin(container)[0] ?? container;
     initial.focus();
 
+    const token = Symbol('dialog');
+    openDialogs.push(token);
+    const isTopmost = () => openDialogs[openDialogs.length - 1] === token;
+
     const onKeyDown = (event: KeyboardEvent) => {
+      // A dialog with something on top of it is not the one being driven.
+      if (!isTopmost()) return;
       if (event.key === 'Escape') {
         escapeRef.current?.();
         return;
@@ -180,6 +200,8 @@ export function useDialogFocus<T extends HTMLElement>(
 
     return () => {
       document.removeEventListener('keydown', onKeyDown, true);
+      const index = openDialogs.lastIndexOf(token);
+      if (index !== -1) openDialogs.splice(index, 1);
       // Only if it is still in the document and still focusable; a dialog that
       // replaced its own opener would otherwise throw or focus a detached node.
       if (returnTo !== null && returnTo.isConnected && typeof returnTo.focus === 'function') {

@@ -6,7 +6,7 @@
  */
 
 import { X, Navigation, MapPin, Clock } from 'lucide-react';
-import { useEffect } from 'react';
+import { useDialogFocus } from './useDialogFocus.ts';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
 
@@ -14,14 +14,13 @@ export default function POICard() {
   const { state, actions, previewRoute, venue } = useNavigation();
   const { selectedPOI, startNodeId } = state;
 
-  useEffect(() => {
-    if (!selectedPOI) return undefined;
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') actions.clearSelectedPOI();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [actions, selectedPOI]);
+  // Escape was handled here alone, which made this a dialog in name only: it
+  // announced aria-modal and then left focus on the document behind it, so a
+  // keyboard user was told a dialog had opened and could not reach it. The
+  // shared trap also means one Escape closes this and not whatever is under it.
+  const { containerRef } = useDialogFocus(Boolean(selectedPOI), {
+    onEscape: actions.clearSelectedPOI,
+  });
 
   if (!selectedPOI) return null;
 
@@ -55,11 +54,13 @@ export default function POICard() {
       id="poi-card-overlay"
     >
       <div
+        ref={containerRef}
         className="poi-card animate-slide-up"
         id="poi-card"
         role="dialog"
         aria-modal="true"
         aria-labelledby="poi-card-title"
+        tabIndex={-1}
       >
         {/* Close Button */}
         <button

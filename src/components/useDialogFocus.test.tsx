@@ -115,6 +115,89 @@ describe('focus containment', () => {
   });
 });
 
+describe('nested dialogs', () => {
+  /** A dialog inside a dialog, which is the scanner inside the location picker. */
+  function Nested() {
+    const [outer, setOuter] = useState(false);
+    const [inner, setInner] = useState(false);
+    const { containerRef: outerRef } = useDialogFocus<HTMLDivElement>(outer, {
+      onEscape: () => setOuter(false),
+    });
+    const { containerRef: innerRef } = useDialogFocus<HTMLDivElement>(inner, {
+      onEscape: () => setInner(false),
+    });
+    return (
+      <>
+        <button type="button" onClick={() => setOuter(true)}>
+          open outer
+        </button>
+        {outer && (
+          <div
+            ref={outerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="outer"
+            tabIndex={-1}
+          >
+            <button type="button" onClick={() => setInner(true)}>
+              open inner
+            </button>
+            {inner && (
+              <div
+                ref={innerRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="inner"
+                tabIndex={-1}
+              >
+                <button type="button">inner control</button>
+              </div>
+            )}
+          </div>
+        )}
+      </>
+    );
+  }
+
+  it('closes only the topmost dialog on Escape', () => {
+    // Each mounted dialog installs its own document-level Escape listener, so
+    // one keypress ran both close handlers: dismissing the scanner also threw
+    // away the picker that opened it.
+    render(<Nested />);
+    fireEvent.click(screen.getByText('open outer'));
+    fireEvent.click(screen.getByText('open inner'));
+    expect(screen.getByLabelText('inner')).toBeDefined();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByLabelText('inner')).toBeNull();
+    expect(screen.queryByLabelText('outer'), 'the outer dialog closed too').not.toBeNull();
+  });
+
+  it('closes the one underneath on a second Escape', () => {
+    render(<Nested />);
+    fireEvent.click(screen.getByText('open outer'));
+    fireEvent.click(screen.getByText('open inner'));
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByLabelText('outer')).toBeNull();
+  });
+
+  it('contains Tab in the topmost dialog only', () => {
+    render(<Nested />);
+    fireEvent.click(screen.getByText('open outer'));
+    fireEvent.click(screen.getByText('open inner'));
+
+    screen.getByText('inner control').focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+
+    // The outer trap must not drag focus back to its own first control.
+    expect(document.activeElement).toBe(screen.getByText('inner control'));
+  });
+});
+
 describe('focus restoration', () => {
   it('returns focus to the opener even when the dialog autofocuses a control', () => {
     // The real defect: React applies autoFocus during commit, before effects

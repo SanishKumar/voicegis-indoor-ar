@@ -2679,12 +2679,26 @@ body {
     width: auto;
   }
 
+  /*
+    Wraps rather than scrolls sideways.
+
+    This was a centred flex row with `overflow-x: auto`, and centring an
+    overflowing scroll container puts half the overflow *before* the scroll
+    origin, where it cannot be reached: at 375px the row ran from -25px to
+    400px, and at 320px from -53px to 373px, so the leading control was simply
+    unreachable. Wrapping keeps every control on screen, and letting them shrink
+    below their content width is what makes wrapping possible at all.
+  */
   .camera-preview-controls {
-    overflow-x: auto;
+    flex-wrap: wrap;
+    overflow-x: visible;
+    width: calc(100% - 24px);
   }
 
   .camera-preview-control {
-    min-width: max-content;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
   }
 }
 /* Venue Bootstrap v0 application boundaries */
@@ -6916,4 +6930,18 @@ body {
 
 @media (max-width: 700px) {
   .checkin-toast { top: 172px; }
+}
+
+.checkin-toast-problem {
+  border-color: var(--color-accent-amber);
+  background: color-mix(in srgb, var(--color-bg-primary) 92%, var(--color-accent-amber));
+}
+
+.checkin-toast-problem .checkin-toast-icon {
+  background: var(--color-accent-amber);
+}
+
+.checkin-toast-problem .checkin-toast-detail {
+  font-family: inherit;
+  white-space: normal;
 }

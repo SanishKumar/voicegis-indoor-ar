@@ -205,14 +205,24 @@ function checkInFromUrl(venue) {
 
   const pkg = venue.buildingPackage;
   const result = checkInFromScan(payload, pkg.localizationAnchors, pkg.routing.nodes);
-  return result.ok ? result : null;
+  // A link that did not resolve is reported rather than discarded. It used to
+  // return null here and the parameter was stripped regardless, so a code for
+  // another venue - the obvious mistake, since every venue's codes look alike -
+  // opened the app at the default start with no indication that anything had
+  // been asked for at all.
+  return result.ok ? { ok: true, result } : { ok: false, reason: result.reason, payload };
 }
 
 export function NavigationProvider({ children, venue }) {
   // Read once, before the reducer, so both the start node and the confirmation
   // can be seeded from it.
   const [urlCheckIn] = useState(() => checkInFromUrl(venue));
-  const [state, dispatch] = useReducer(navigationReducer, { venue, urlCheckIn }, createInitialState);
+  const resolvedUrlCheckIn = urlCheckIn?.ok ? urlCheckIn.result : null;
+  const [state, dispatch] = useReducer(
+    navigationReducer,
+    { venue, urlCheckIn: resolvedUrlCheckIn },
+    createInitialState,
+  );
   const { packageCacheStatus } = useVenue();
 
   const [theme, setTheme] = useState(() => {
@@ -262,16 +272,22 @@ export function NavigationProvider({ children, venue }) {
   // modal performed the scan, because each of those unmounts the moment the
   // scan succeeds and the visitor would never see the confirmation.
   const [checkIn, setCheckIn] = useState(() =>
-    urlCheckIn === null
+    resolvedUrlCheckIn === null
       ? null
       : {
-          anchorId: urlCheckIn.anchor.id,
-          floorId: urlCheckIn.anchor.floorId,
-          spaceId: urlCheckIn.anchor.spaceId,
-          nodeId: urlCheckIn.nodeId,
-          distanceMeters: urlCheckIn.distanceMeters,
+          anchorId: resolvedUrlCheckIn.anchor.id,
+          floorId: resolvedUrlCheckIn.anchor.floorId,
+          spaceId: resolvedUrlCheckIn.anchor.spaceId,
+          nodeId: resolvedUrlCheckIn.nodeId,
+          distanceMeters: resolvedUrlCheckIn.distanceMeters,
           scannedAt: Date.now(),
         },
+  );
+  // A check-in link this venue could not honour, kept so the visitor is told.
+  const [checkInProblem, setCheckInProblem] = useState(() =>
+    urlCheckIn !== null && !urlCheckIn.ok
+      ? { reason: urlCheckIn.reason, venueName: venue.config?.name ?? venue.buildingPackage.building.id }
+      : null,
   );
   const [operationalEvaluatedAt, setOperationalEvaluatedAt] = useState(null);
 
@@ -414,7 +430,10 @@ export function NavigationProvider({ children, venue }) {
 
     checkInWithPayload,
 
-    dismissCheckIn: useCallback(() => setCheckIn(null), []),
+    dismissCheckIn: useCallback(() => {
+      setCheckIn(null);
+      setCheckInProblem(null);
+    }, []),
 
     setDestination: useCallback((nodeId) => {
       dispatch({ type: ACTION.SET_DESTINATION, payload: nodeId });
@@ -477,6 +496,7 @@ export function NavigationProvider({ children, venue }) {
         accessibleRouting,
         toggleAccessibleRouting,
         checkIn,
+        checkInProblem,
         operationalOverlay,
         operationalEvaluatedAt,
         setOperationalOverlay,

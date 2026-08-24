@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { scanProblemText } from './scanProblemText';
 import {
   checkInFromScan,
   describeCheckIn,
@@ -159,5 +160,26 @@ describe('telling the visitor where they just checked in', () => {
     );
 
     expect(label).toEqual({ place: 'a check-in point', detail: 'anchor-x' });
+  });
+});
+
+describe('a deep link this venue cannot honour', () => {
+  it('reports a foreign venue as an unknown code rather than resolving it', () => {
+    // Every venue's payloads look alike, so opening one building's link while
+    // another is active is the obvious mistake. It used to resolve to null and
+    // the URL parameter was stripped regardless, landing the visitor at the
+    // default start with no sign anything had been asked for.
+    const result = checkInFromScan('voicegis://harbor-exchange/g/ferry-entry', anchors, nodes);
+
+    expect(result).toEqual({ ok: false, reason: 'unknown-code' });
+  });
+
+  it('gives every failure a sentence a visitor can act on', () => {
+    for (const reason of ['unknown-code', 'not-a-checkin-code', 'no-node-on-floor'] as const) {
+      const text = scanProblemText(reason);
+      expect(text.length, reason).toBeGreaterThan(10);
+      // Says what happened, not which branch of the code it came from.
+      expect(text, reason).not.toMatch(/payload|node|null|undefined/i);
+    }
   });
 });

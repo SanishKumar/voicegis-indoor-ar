@@ -1,6 +1,8 @@
-import { MapPin, X } from 'lucide-react';
+import { AlertTriangle, MapPin, X } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { describeCheckIn, type CheckInRecord } from '../capture/anchorCheckIn';
+import { scanProblemText } from '../capture/scanProblemText';
+import type { CheckInFailure } from '../capture/anchorCheckIn';
 
 /**
  * Confirms a check-in landed, and where.
@@ -21,6 +23,7 @@ import { describeCheckIn, type CheckInRecord } from '../capture/anchorCheckIn';
 
 interface NavigationBinding {
   checkIn: (CheckInRecord & { scannedAt: number }) | null;
+  checkInProblem: { reason: CheckInFailure; venueName: string } | null;
   actions: { dismissCheckIn: () => void };
   venue: {
     getSpaceById(id: string): { name?: string } | null;
@@ -29,8 +32,31 @@ interface NavigationBinding {
 }
 
 export default function CheckInToast() {
-  const { checkIn, actions, venue } = useNavigation() as NavigationBinding;
+  const { checkIn, checkInProblem, actions, venue } = useNavigation() as NavigationBinding;
   const dismiss = actions.dismissCheckIn;
+
+  // A check-in link this venue could not honour. Shown rather than swallowed:
+  // the codes of every venue look alike, so opening one building's link while
+  // another is active is the obvious mistake, and it used to land silently at
+  // the default start.
+  if (checkInProblem !== null) {
+    return (
+      <div className="checkin-toast checkin-toast-problem" role="alert">
+        <span className="checkin-toast-icon" aria-hidden="true">
+          <AlertTriangle size={16} />
+        </span>
+        <span className="checkin-toast-body">
+          <strong>That check-in link did not work here</strong>
+          <span className="checkin-toast-detail">
+            {scanProblemText(checkInProblem.reason)} Active venue: {checkInProblem.venueName}.
+          </span>
+        </span>
+        <button type="button" className="checkin-toast-close" onClick={dismiss} aria-label="Dismiss">
+          <X size={15} />
+        </button>
+      </div>
+    );
+  }
 
   if (!checkIn) return null;
 
