@@ -157,6 +157,8 @@ The development server prints the local URL after startup.
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `npm run check`                  | Run lint, type checking, tests, deterministic package checks, replay verification, and the production build |
 | `npm test`                       | Run the Vitest suite                                                                                        |
+| `npm run test:browser`           | Build and run the production-browser smoke suite in desktop and mobile Chromium                             |
+| `npm run test:browser:headed`    | Run the same browser journeys with a visible Chromium window                                                |
 | `npm run compile:asterion`       | Recompile the Asterion building package                                                                     |
 | `npm run compile:asterion:check` | Verify that the committed Asterion package is reproducible                                                  |
 | `npm run compile:harbor:check`   | Verify that the committed Harbor Exchange package is reproducible                                           |
@@ -164,9 +166,14 @@ The development server prints the local URL after startup.
 | `npm run replay:reference`       | Regenerate the reference localization replay report                                                         |
 | `npm run replay:check`           | Verify the committed replay report byte-for-byte                                                            |
 | `npm run codes`                  | Regenerate the printable check-in code sheet from the compiled venue packages                               |
-| `npm run dev:mobile`             | Serve over HTTPS on the LAN so a phone can reach `#/recorder` and use its motion sensors                     |
+| `npm run dev:mobile`             | Serve over HTTPS on the LAN so a phone can reach `#/recorder` and use its motion sensors                    |
 | `npm run evidence`               | Seal a capture and its predeclared manifest into an evidence artifact, or verify one                        |
 | `npm run build`                  | Create a production build in `dist/`                                                                        |
+
+The browser suite needs a one-time local `npx playwright install chromium`.
+CI installs Chromium independently and keeps this gate separate from
+`npm run check`, so a browser-installation failure cannot hide a compiler or
+unit-test failure.
 
 ## Repository structure
 

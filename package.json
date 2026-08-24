@@ -16,6 +16,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:browser": "npm run build && node scripts/runBrowserSmoke.js",
+    "test:browser:headed": "npm run build && node scripts/runBrowserSmoke.js --headed",
     "format": "prettier --write .",
     "compile:reference": "tsx packages/map-compiler/src/cli.ts buildings/reference-medical-centre/source/building.json buildings/reference-medical-centre/compiled",
     "compile:check": "tsx packages/map-compiler/src/cli.ts buildings/reference-medical-centre/source/building.json buildings/reference-medical-centre/compiled --check",
@@ -48,6 +50,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.10.0",

@@ -6,7 +6,14 @@ import tseslint from 'typescript-eslint';
 
 export default [
   {
-    ignores: ['coverage/**', 'dist/**', 'node_modules/**'],
+    ignores: [
+      'blob-report/**',
+      'coverage/**',
+      'dist/**',
+      'node_modules/**',
+      'playwright-report/**',
+      'test-results/**',
+    ],
   },
   {
     ...js.configs.recommended,
@@ -61,6 +68,21 @@ export default [
     files: ['*.config.js'],
     languageOptions: {
       globals: globals.node,
+    },
+  },
+  {
+    files: ['scripts/**/*.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
+    files: ['playwright.config.ts', 'e2e/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
     },
   },
   {

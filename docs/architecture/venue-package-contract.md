@@ -156,12 +156,34 @@ actually does:
 
 Scan reconstruction was correctly left out and remains out.
 
-## Exact next step: a browser smoke suite
+## Production browser smoke gate — delivered
 
-The unit gate does not exercise the visitor journey. Three defects have reached
+The unit gate did not exercise the visitor journey. Three defects reached
 review through a green build — a blank map after visiting the 3D surface, a
 scanner that stopped its own successor's camera, and navigation controls that
-overlap on a phone — and none of them were the kind a unit test was ever going
-to see. Onboarding, routing, surface switching, check-in rejection and mobile
-navigation should each have one browser-level test before this is shown to
-anyone unguided.
+overlapped on a phone — and none was the kind a DOM-free unit test could see.
+
+The separate `npm run test:browser` gate now builds the production bundle and
+runs Chromium at 1280×800 and 375×812. It covers:
+
+- first-run onboarding through a real route;
+- a verified check-in and the connector change between fastest and step-free
+  routing;
+- visible refusal of a foreign-venue check-in link;
+- all surface round-trips back to a non-empty visitor map;
+- surface-navigation hit testing, document scroll ownership and horizontal
+  overflow;
+- camera-control geometry at both 375 px and 320 px widths; and
+- topmost-only Escape handling and focus restoration for nested dialogs.
+
+Uncaught page exceptions and console errors fail the suite. Google Fonts are
+fulfilled locally so the result exercises the declared system-font fallback
+instead of depending on a third party. Traces and screenshots are retained on
+failure, and CI runs the browser gate independently from the deterministic Node
+gate.
+
+This is production-bundle browser coverage, not field validation. Chromium
+emulation cannot prove Safari camera permissions, phone motion sensors, QR
+recognition under corridor lighting, cold-start offline behavior or recovery
+from a failed venue bootstrap. Those remain device, deployment and product
+work rather than claims made by this gate.

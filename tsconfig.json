@@ -16,5 +16,12 @@
     "target": "ES2022",
     "types": ["node", "vite/client", "vitest/globals"]
   },
-  "include": ["packages", "src", "vite.config.js"]
+  "include": [
+    "packages",
+    "src",
+    "e2e",
+    "scripts/runBrowserSmoke.js",
+    "playwright.config.ts",
+    "vite.config.js"
+  ]
 }
