@@ -35,6 +35,23 @@ function persistRuntimeSource(source) {
   }
 }
 
+/**
+ * Forgets a venue source that failed to load.
+ *
+ * Both places a non-default source can come from, cleared together. A stored
+ * URL that no longer resolves is otherwise retried on every load forever, and a
+ * bad `?venue=` link survives a refresh, so the visitor cannot get back to a
+ * working venue by any action available to them.
+ */
+function clearFailedVenueSource() {
+  if (typeof localStorage !== 'undefined') localStorage.removeItem(ACTIVE_VENUE_URL_KEY);
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('venue')) return;
+  url.searchParams.delete('venue');
+  window.history.replaceState(null, '', url.toString());
+}
+
 async function loadCatalog() {
   const response = await fetch(CATALOG_URL, { headers: { Accept: 'application/json' } });
   if (!response.ok) throw new Error(`Venue catalog request failed (${response.status}).`);
@@ -229,38 +246,83 @@ export function VenueProvider({ children }) {
     }
   }, [activatePackage]);
 
+  const mountedRef = useRef(true);
   useEffect(() => {
-    let mounted = true;
-    void (async () => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  /**
+   * Loads the catalog and activates a venue, and can be run again.
+   *
+   * Previously this only ran once, inside an effect, so any failure was
+   * terminal: the visitor was shown the reason and nothing to do about it. A
+   * transient catalog request, a package URL that has moved, or a bad `?venue=`
+   * link all ended at the same dead end, and a stored bad URL made it permanent
+   * because every reload retried exactly the source that had just failed.
+   *
+   * `preferDefault` is the recovery path: it forgets the failed source first, so
+   * "Use default venue" cannot be defeated by the thing that broke.
+   */
+  const bootstrapVenue = useCallback(
+    async ({ preferDefault = false } = {}) => {
+      setStatus({
+        state: 'loading',
+        source: null,
+        detail: preferDefault ? 'Loading the default venue.' : 'Loading the venue catalog.',
+        error: null,
+        failedSource: null,
+      });
+
+      let attempted = null;
       try {
+        if (preferDefault) clearFailedVenueSource();
         const nextCatalog = await loadCatalog();
-        if (!mounted) return;
+        if (!mountedRef.current) return;
         const runtimeCatalog = createRuntimeCatalogEntries(nextCatalog);
         setVersionCatalog(nextCatalog);
         setCatalog(runtimeCatalog);
-        const queryVenueUrl = new URLSearchParams(window.location.search).get('venue');
-        const storedVenueUrl = localStorage.getItem(ACTIVE_VENUE_URL_KEY);
+
         const defaultVenue = runtimeCatalog.find(
           (candidate) => candidate.id === nextCatalog.defaultVenueId,
         );
-        const packageUrl = queryVenueUrl || storedVenueUrl || defaultVenue?.packageUrl;
+
+        if (!preferDefault) {
+          const queryVenueUrl = new URLSearchParams(window.location.search).get('venue');
+          const storedVenueUrl = localStorage.getItem(ACTIVE_VENUE_URL_KEY);
+          attempted = queryVenueUrl || storedVenueUrl || null;
+        }
+
+        const packageUrl = attempted || defaultVenue?.packageUrl;
         if (!packageUrl) throw new Error('Venue catalog has no loadable default package.');
         await activateFromUrl(packageUrl, { persist: false });
       } catch (error) {
-        if (!mounted) return;
+        if (!mountedRef.current) return;
         setStatus({
           state: 'error',
           source: null,
           detail: 'No VenuePackage could be activated.',
           error: error instanceof Error ? error.message : 'Venue bootstrap failed.',
+          // Named so the visitor can see what was tried, and so the recovery
+          // action only appears when there is actually something to discard.
+          failedSource: attempted,
         });
       }
-    })();
+    },
+    [activateFromUrl],
+  );
+
+  const retryBootstrap = useCallback(() => bootstrapVenue(), [bootstrapVenue]);
+  const useDefaultVenue = useCallback(() => bootstrapVenue({ preferDefault: true }), [bootstrapVenue]);
+
+  useEffect(() => {
+    void bootstrapVenue();
     return () => {
-      mounted = false;
       activationSequence.current += 1;
     };
-  }, [activateFromUrl]);
+  }, [bootstrapVenue]);
 
   const value = useMemo(
     () => ({
@@ -274,8 +336,12 @@ export function VenueProvider({ children }) {
       activateFromFile,
       activateVerifiedPackage,
       rollbackRuntimePackage,
+      retryBootstrap,
+      useDefaultVenue,
     }),
     [
+      retryBootstrap,
+      useDefaultVenue,
       activateFromFile,
       activateFromUrl,
       activateVerifiedPackage,

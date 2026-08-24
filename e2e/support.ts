@@ -2,6 +2,17 @@ import { expect, test as base, type Locator, type Page } from '@playwright/test'
 
 type SmokeFixtures = {
   browserErrors: string[];
+  allowedBrowserErrors: RegExp[];
+  /**
+   * Declares a browser error this test expects to cause.
+   *
+   * Needed by the tests that drive failure paths: intercepting a request with
+   * 503 or pointing at a missing package makes the browser log a console error
+   * by definition, so without this the only way to test recovery would be to
+   * stop failing on console errors everywhere. Allowances are per test and must
+   * be stated up front, so an error nobody predicted still fails the run.
+   */
+  allowBrowserError: (pattern: RegExp) => void;
 };
 
 /**
@@ -10,8 +21,20 @@ type SmokeFixtures = {
  * emits deprecation warnings that are useful but are not visitor failures.
  */
 export const test = base.extend<SmokeFixtures>({
+  // Playwright requires a destructuring pattern for the fixtures argument, so
+  // a fixture that needs none takes an empty one.
+  allowedBrowserErrors: async ({}, use) => {
+    await use([]);
+  },
+
+  allowBrowserError: async ({ allowedBrowserErrors }, use) => {
+    await use((pattern: RegExp) => {
+      allowedBrowserErrors.push(pattern);
+    });
+  },
+
   browserErrors: [
-    async ({ page }, use) => {
+    async ({ page, allowedBrowserErrors }, use) => {
       const errors: string[] = [];
 
       // The product must remain usable with its declared system-font fallback.
@@ -29,7 +52,10 @@ export const test = base.extend<SmokeFixtures>({
       });
 
       await use(errors);
-      expect(errors, 'the production page emitted browser errors').toEqual([]);
+      const unexpected = errors.filter(
+        (message) => !allowedBrowserErrors.some((pattern) => pattern.test(message)),
+      );
+      expect(unexpected, 'the production page emitted unexpected browser errors').toEqual([]);
     },
     { auto: true },
   ],

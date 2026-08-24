@@ -125,16 +125,38 @@ function RecorderApp() {
 }
 
 function ActiveVenueApplication() {
-  const { venue, status } = useVenue();
+  const { venue, status, retryBootstrap, useDefaultVenue } = useVenue();
   const surface = useSurfaceRoute();
 
   if (!venue) {
+    const failed = status.state === 'error';
     return (
-      <main className="venue-bootstrap-state" role="status">
-        <strong>
-          {status.state === 'error' ? 'Venue bootstrap failed' : 'Loading VenuePackage'}
-        </strong>
+      <main className="venue-bootstrap-state" role={failed ? 'alert' : 'status'}>
+        <strong>{failed ? 'Venue bootstrap failed' : 'Loading VenuePackage'}</strong>
         <p>{status.error ?? status.detail}</p>
+        {/*
+          A failure used to end here, with the reason and nothing to do about
+          it. Worse, a bad venue URL persists, so every reload retried exactly
+          the source that had just failed and the visitor could not get back to
+          a working venue by any action available to them.
+        */}
+        {status.failedSource && (
+          <p className="venue-bootstrap-source">
+            Tried <code>{status.failedSource}</code>
+          </p>
+        )}
+        {failed && (
+          <div className="venue-bootstrap-actions">
+            <button type="button" className="venue-bootstrap-retry" onClick={retryBootstrap}>
+              Retry venue loading
+            </button>
+            {status.failedSource && (
+              <button type="button" className="venue-bootstrap-default" onClick={useDefaultVenue}>
+                Use default venue
+              </button>
+            )}
+          </div>
+        )}
       </main>
     );
   }
