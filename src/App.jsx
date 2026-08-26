@@ -174,7 +174,13 @@ function ActiveVenueApplication() {
 
   return (
     <NavigationProvider key={venue.key} venue={venue}>
-      <SurfaceNav activeSurface={surface} />
+      {/*
+        Operator tooling is not offered to visitors. The inspector, the studio
+        and the recorder stay reachable by their own routes - an operator opens
+        one deliberately - but the public shell shows no control that leads to
+        them, and the visitor surface gets its full width back.
+      */}
+      {surface !== 'visitor' && <SurfaceNav activeSurface={surface} />}
       {surface === 'inspector' ? (
         <InspectorApp />
       ) : surface === 'studio' ? (

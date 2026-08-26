@@ -1,7 +1,19 @@
 import { Box, Map, PenTool, Radio } from 'lucide-react';
 
+/**
+ * Operator tooling, and the way back out of it.
+ *
+ * This used to be primary navigation on every surface, so a visitor looking for
+ * a toilet was offered a package inspector, a venue authoring workspace and a
+ * sensor recorder. None of those are for them, and three of the four entries
+ * being operator tools made the one that was theirs harder to find.
+ *
+ * It renders only on the operator surfaces now. "Visitor view" is kept as the
+ * first entry because an operator needs a way back, and without it the only
+ * exit is editing the URL.
+ */
 const SURFACES = [
-  { id: 'visitor', label: '2D map', icon: Map },
+  { id: 'visitor', label: 'Visitor view', icon: Map },
   { id: 'inspector', label: '3D + venues', icon: Box },
   { id: 'studio', label: 'Studio', icon: PenTool },
   { id: 'recorder', label: 'Record', icon: Radio },
@@ -9,7 +21,7 @@ const SURFACES = [
 
 export default function SurfaceNav({ activeSurface }) {
   return (
-    <nav className="surface-nav" aria-label="Application surface">
+    <nav className="surface-nav" aria-label="Operator tools">
       {SURFACES.map((surface) => (
         <SurfaceLink key={surface.id} surface={surface} activeSurface={activeSurface} />
       ))}

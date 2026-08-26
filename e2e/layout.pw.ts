@@ -7,8 +7,12 @@ import {
   test,
 } from './support';
 
-const surfaces = [
-  { link: '2D map', selector: '.visitor-shell' },
+/**
+ * The operator surfaces, which now carry the navigation between them. The
+ * visitor shell deliberately has none, so a round-trip starts from an operator
+ * route rather than from the map.
+ */
+const operatorSurfaces = [
   { link: '3D + venues', selector: '.inspector-surface' },
   { link: 'Studio', selector: '.studio-surface' },
   { link: 'Record', selector: '.walk-recorder' },
@@ -16,8 +20,9 @@ const surfaces = [
 
 test('every surface round-trips to a non-empty visitor map', async ({ page }) => {
   await openVisitor(page);
-
-  await page.getByRole('link', { name: '3D + venues' }).click();
+  // Operator tooling is not offered in the visitor shell, so the round-trip
+  // enters it the way an operator does: by its own route.
+  await page.goto('/#/inspector');
   await expect(page.locator('.inspector-surface')).toBeVisible();
 
   await page.getByRole('link', { name: 'Studio' }).click();
@@ -26,7 +31,7 @@ test('every surface round-trips to a non-empty visitor map', async ({ page }) =>
   await page.getByRole('link', { name: 'Record' }).click();
   await expect(page.getByRole('heading', { name: 'Record a walk' })).toBeVisible();
 
-  await page.getByRole('link', { name: '2D map' }).click();
+  await page.getByRole('link', { name: 'Visitor view' }).click();
   await expect(page.locator('.compiled-map')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Switch to map view' })).toHaveAttribute(
     'aria-pressed',
@@ -42,10 +47,14 @@ test('surface navigation stays in the viewport, owns its row, and never scrolls 
 }) => {
   await openVisitor(page);
 
+  // The visitor header owns its full width now that the nav has left it.
   const locationControl = page.getByRole('button', { name: /Change start location/ });
   await expectCenterHitTarget(locationControl);
+  await expect(page.getByRole('navigation', { name: 'Operator tools' })).toHaveCount(0);
 
-  for (const surface of surfaces) {
+  await page.goto('/#/inspector');
+
+  for (const surface of operatorSurfaces) {
     const link = page.getByRole('link', { name: surface.link });
     await link.click();
     await expect(link).toHaveAttribute('aria-current', 'page');
@@ -53,7 +62,7 @@ test('surface navigation stays in the viewport, owns its row, and never scrolls 
     const scrollOwner = page.locator(surface.selector);
     await expect(scrollOwner).toBeVisible();
 
-    const nav = page.getByRole('navigation', { name: 'Application surface' });
+    const nav = page.getByRole('navigation', { name: 'Operator tools' });
     const before = await nav.boundingBox();
     expect(before).not.toBeNull();
 
@@ -113,7 +122,7 @@ test('camera guidance controls fit at both supported narrow widths', async ({ pa
   }
 });
 
-test('visitor header recovery controls remain reachable at 320px', async ({ page }) => {
+test('visitor header recovery controls remain reachable and tappable at 320px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
   await openVisitor(page);
 
@@ -130,6 +139,12 @@ test('visitor header recovery controls remain reachable at 320px', async ({ page
   for (const control of controls) {
     await expectInsideViewport(control);
     await expectCenterHitTarget(control);
+    // Reachable was never the whole bar: these were 29x38 while passing the
+    // checks above, which is a control you can hit only if you aim.
+    const bounds = await control.boundingBox();
+    expect(bounds, 'control has no box').not.toBeNull();
+    expect(bounds!.width, `${await control.getAttribute('aria-label')} is too narrow`).toBeGreaterThanOrEqual(44);
+    expect(bounds!.height, `${await control.getAttribute('aria-label')} is too short`).toBeGreaterThanOrEqual(44);
   }
   await expect
     .poll(() =>

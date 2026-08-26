@@ -6,7 +6,11 @@ import { cleanup, render, screen } from '@testing-library/react';
 import SurfaceNav from './SurfaceNav.jsx';
 
 /**
- * Every surface link must be announceable.
+ * Every operator link must be announceable.
+ *
+ * This nav renders only on the operator surfaces now; the visitor shell shows
+ * no control that leads to them. "Visitor view" stays so an operator can get
+ * back without editing the URL.
  *
  * Below 700px the label span is `display: none` and the icon carries
  * `aria-hidden`, so the links had no accessible name at all: a screen reader
@@ -16,7 +20,7 @@ import SurfaceNav from './SurfaceNav.jsx';
 
 afterEach(cleanup);
 
-const SURFACES = ['2D map', '3D + venues', 'Studio', 'Record'];
+const SURFACES = ['Visitor view', '3D + venues', 'Studio', 'Record'];
 
 describe('surface navigation naming', () => {
   it('gives every link a name that does not depend on the label being visible', () => {

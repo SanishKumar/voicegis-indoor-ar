@@ -3837,7 +3837,9 @@ body {
   }
 
   .visitor-access-profile {
-    width: 42px;
+    flex: 0 0 auto;
+    width: 44px;
+    min-width: 44px;
     justify-content: center;
     padding: 0;
   }
@@ -3849,7 +3851,7 @@ body {
 
 @media (max-width: 700px) {
   .visitor-header {
-    height: 112px;
+    height: auto;
     min-height: 112px;
     display: grid;
     grid-template-columns: 1fr;
@@ -3877,22 +3879,42 @@ body {
   }
 
   .visitor-mode-switch,
+  /*
+    Every header control is a touch target here, so none of them may be smaller
+    than a fingertip. They had been shrinking to fit instead - 29x38 for the
+    utilities at 320px - which keeps the row on one line by making it unusable.
+    44x44 is the floor; the header grows a little rather than the controls
+    shrinking.
+  */
   .visitor-access-profile,
   .visitor-utility-actions {
-    height: 40px;
+    height: 44px;
+  }
+
+  .visitor-mode-switch {
+    height: 44px;
   }
 
   .visitor-mode-switch button {
+    flex: 0 0 auto;
     min-width: 62px;
+    min-height: 44px;
   }
 
+  /* `width` alone loses to flex shrinking, which is how these ended up at 34px
+     while the stylesheet said 38. The floor has to be a minimum the row cannot
+     compress, not a preferred size. */
   .visitor-access-profile {
-    width: 40px;
+    flex: 0 0 auto;
+    width: 44px;
+    min-width: 44px;
   }
 
   .visitor-utility-actions button {
-    width: 38px;
-    height: 38px;
+    flex: 0 0 auto;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
   }
 
   .visitor-shell .compiled-map-topbar {
@@ -4032,12 +4054,32 @@ body {
   }
 
   .visitor-mode-switch button {
-    min-width: 54px;
-    padding-inline: 7px;
+    /* Narrower than at 700px, but never below the 44px touch floor. */
+    min-width: 46px;
+    padding-inline: 4px;
   }
 
   .visitor-utility-actions button {
-    width: 34px;
+    width: 44px;
+    min-width: 44px;
+  }
+
+  .visitor-utility-actions,
+  .visitor-header-actions {
+    gap: 3px;
+  }
+
+  /*
+    Six controls at a 44px floor do not fit one row at 320px - the last ran to
+    347px, 27px past the edge - so the row wraps and the header grows. The
+    alternative was making the view toggles icon-only to claw back 23px, which
+    buys a single line by removing the labels that make them guessable. Height
+    is cheaper than legibility here.
+  */
+  .visitor-header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 6px;
   }
 
   .search-trigger-copy small {
