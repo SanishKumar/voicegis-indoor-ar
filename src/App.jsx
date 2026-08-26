@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { NavigationProvider, useNavigation } from './context/NavigationContext.jsx';
 import { VenueProvider, useVenue } from './context/VenueContext.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
@@ -16,9 +16,7 @@ import { VISITOR_VIEW, visitorViewFor } from './context/visitorView.ts';
 
 const SpatialTwinViewer = lazy(() => import('./components/SpatialTwinViewer.tsx'));
 const FloorplanViewer = lazy(() => import('./components/FloorplanViewer.tsx'));
-const BuildingSourceWorkspace = lazy(
-  () => import('./components/BuildingSourceWorkspace.tsx'),
-);
+const BuildingSourceWorkspace = lazy(() => import('./components/BuildingSourceWorkspace.tsx'));
 const WalkRecorder = lazy(() => import('./components/WalkRecorder.tsx'));
 
 function currentSurface() {
@@ -45,6 +43,19 @@ function VisitorApp() {
     showLocationPicker,
     setShowLocationPicker,
   } = useNavigation();
+  const previousOnboardingCompleteRef = useRef(onboardingComplete);
+
+  useEffect(() => {
+    const previous = previousOnboardingCompleteRef.current;
+    previousOnboardingCompleteRef.current = onboardingComplete;
+    if (previous === onboardingComplete) return;
+
+    // Both shells replace the focused control that initiated the transition.
+    // A route path later focuses guidance; otherwise the map's primary action
+    // is the useful successor. Returning to Welcome focuses its opening title.
+    const targetId = onboardingComplete ? 'btn-search-open' : 'welcome-step-heading';
+    document.getElementById(targetId)?.focus({ preventScroll: true });
+  }, [onboardingComplete]);
 
   if (!onboardingComplete) {
     return <WelcomeScreen onComplete={completeOnboarding} />;

@@ -112,3 +112,30 @@ test('camera guidance controls fit at both supported narrow widths', async ({ pa
       .toBe(true);
   }
 });
+
+test('visitor header recovery controls remain reachable at 320px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await openVisitor(page);
+
+  const controls = [
+    page.getByRole('button', { name: /Change start location/ }),
+    page.getByRole('button', { name: 'Switch to map view' }),
+    page.getByRole('button', { name: 'Switch to camera preview' }),
+    page.getByRole('button', { name: /routing/ }),
+    page.getByRole('button', { name: 'Toggle high contrast mode' }),
+    page.getByRole('button', { name: 'Toggle theme' }),
+    page.getByRole('button', { name: 'Go to welcome screen' }),
+  ];
+
+  for (const control of controls) {
+    await expectInsideViewport(control);
+    await expectCenterHitTarget(control);
+  }
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    )
+    .toBe(true);
+});

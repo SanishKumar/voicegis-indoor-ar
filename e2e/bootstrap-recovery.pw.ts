@@ -19,7 +19,7 @@ test('a failed catalog request can be retried without reloading', async ({
 }) => {
   // The 503 below is the point of the test, so the browser logging it is
   // expected rather than a defect.
-  allowBrowserError(/Failed to load resource.*503/);
+  allowBrowserError(/Failed to load resource.*503.*venues\/catalog\.json/);
   let attempts = 0;
   await page.route('**/venues/catalog.json', async (route) => {
     attempts += 1;
@@ -52,10 +52,20 @@ test('a missing package URL recovers to the default and stops being retried', as
   page,
   allowBrowserError,
 }) => {
-  allowBrowserError(/Failed to load resource.*404/);
+  allowBrowserError(/Failed to load resource.*404.*venues\/no-such-venue\.package\.json/);
   await page.addInitScript(() => {
     localStorage.setItem('onboarding_complete', 'true');
-    localStorage.removeItem('voicegis_active_venue_url');
+    // The query parameter wins this load, while the different stale stored
+    // source proves "Use default venue" clears both places a bad source hides.
+    // Seed it once: addInitScript runs again on reload, and reintroducing the
+    // value ourselves would test the fixture rather than recovery persistence.
+    if (sessionStorage.getItem('seeded_missing_venue') !== 'true') {
+      sessionStorage.setItem('seeded_missing_venue', 'true');
+      localStorage.setItem(
+        'voicegis_active_venue_url',
+        '/venues/another-missing-venue.package.json',
+      );
+    }
   });
 
   // A link to a package that is not there, which is what a stale printed URL or

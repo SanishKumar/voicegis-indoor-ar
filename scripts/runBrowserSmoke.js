@@ -17,28 +17,67 @@ const preview = spawn(
   [viteCli, 'preview', '--host', '127.0.0.1', '--port', '4187', '--strictPort'],
   {
     cwd: root,
-    stdio: ['ignore', 'ignore', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   },
 );
 
 preview.stderr.on('data', (chunk) => process.stderr.write(`[preview] ${chunk}`));
 
+/**
+ * Readiness belongs to the process this runner spawned.
+ *
+ * An HTTP-only probe accepted any server already listening on 4187. If this
+ * Vite process lost the strict-port race, the probe could still return 200
+ * before its exit event arrived, and Playwright attached to a server this run
+ * did not own. When that other run ended, the suite lost its server halfway
+ * through. Wait for this process's own ready line first; only then use HTTP to
+ * confirm the advertised endpoint responds.
+ */
+const previewReady = new Promise((resolve, reject) => {
+  let output = '';
+  let ready = false;
+
+  preview.stdout.on('data', (chunk) => {
+    output = `${output}${String(chunk)}`.slice(-8_000);
+    if (!ready && /Local:\s+http:\/\/127\.0\.0\.1:4187\//.test(output)) {
+      ready = true;
+      resolve(undefined);
+    }
+  });
+
+  preview.once('error', reject);
+  preview.once('exit', (code, signal) => {
+    if (ready) return;
+    reject(
+      new Error(
+        `production preview exited before it became ready (${signal ?? code ?? 'unknown'})`,
+      ),
+    );
+  });
+});
+
 async function waitForPreview() {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    if (preview.exitCode !== null) {
-      throw new Error(`production preview exited before it became ready (${preview.exitCode})`);
-    }
-    try {
-      const response = await fetch(previewUrl, { signal: AbortSignal.timeout(2_000) });
-      if (response.ok) return;
-    } catch {
-      // The server is still starting. Readiness is bounded by the deadline.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 200));
+  /** @type {NodeJS.Timeout | undefined} */
+  let deadline;
+  try {
+    await Promise.race([
+      previewReady,
+      new Promise((_, reject) => {
+        deadline = setTimeout(
+          () => reject(new Error(`production preview was not ready within 60 seconds`)),
+          60_000,
+        );
+      }),
+    ]);
+  } finally {
+    if (deadline !== undefined) clearTimeout(deadline);
   }
-  throw new Error(`production preview was not ready within 60 seconds: ${previewUrl}`);
+
+  const response = await fetch(previewUrl, { signal: AbortSignal.timeout(2_000) });
+  if (!response.ok) {
+    throw new Error(`production preview readiness endpoint returned ${response.status}`);
+  }
 }
 
 async function stopPreview() {

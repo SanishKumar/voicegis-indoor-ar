@@ -7,9 +7,10 @@
 
 import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { Search, X, Navigation, MapPin, ArrowRight } from 'lucide-react';
-import { useNavigation } from '../context/NavigationContext.jsx';
+import { NAV_STATUS, useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs, getAvailableCategories } from '../engine/searchIndex.js';
 import { formatDistance } from '../data/buildingConfig.js';
+import { useDialogFocus } from './useDialogFocus.ts';
 
 export default function SearchPanel() {
   const { state, actions, previewRoute, venue } = useNavigation();
@@ -17,6 +18,8 @@ export default function SearchPanel() {
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
   const inputRef = useRef(null);
+  const triggerRef = useRef(null);
+  const restoreTriggerRef = useRef(false);
   const pois = useMemo(() => venue.getPOIs(), [venue]);
   const categories = useMemo(() => getAvailableCategories(pois), [pois]);
   const results = useMemo(
@@ -25,31 +28,50 @@ export default function SearchPanel() {
   );
 
   const openPanel = useCallback(() => {
+    restoreTriggerRef.current = false;
     setIsOpen(true);
-    setTimeout(() => inputRef.current?.focus(), 350);
   }, []);
 
-  const closePanel = useCallback(() => {
+  const resetAndClose = useCallback(() => {
     setIsOpen(false);
     setQuery('');
     setActiveCategory(null);
   }, []);
 
+  const dismissPanel = useCallback(() => {
+    restoreTriggerRef.current = true;
+    resetAndClose();
+  }, [resetAndClose]);
+
+  const replacePanel = useCallback(() => {
+    restoreTriggerRef.current = false;
+    resetAndClose();
+  }, [resetAndClose]);
+
+  // A route can begin in this drawer or in the POI dialog layered above it.
+  // In either case the route/failure region owns focus next, and the drawer
+  // must release its modal trap before its DOM is removed.
+  const routeOwnsFocus = state.navStatus !== NAV_STATUS.IDLE || state.route !== null;
+
+  const { containerRef } = useDialogFocus(isOpen && !routeOwnsFocus, {
+    onEscape: dismissPanel,
+    initialFocusRef: inputRef,
+  });
+
   const handleResultClick = useCallback(
     (node) => {
       actions.selectPOI(node);
-      closePanel();
     },
-    [actions, closePanel],
+    [actions],
   );
 
   const handleNavigate = useCallback(
     (node, e) => {
       e.stopPropagation();
       actions.navigateTo(node.id);
-      closePanel();
+      replacePanel();
     },
-    [actions, closePanel],
+    [actions, replacePanel],
   );
 
   const toggleCategory = useCallback((cat) => {
@@ -68,16 +90,24 @@ export default function SearchPanel() {
   );
 
   useEffect(() => {
-    if (!isOpen) return undefined;
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') closePanel();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [closePanel, isOpen]);
+    if (isOpen || !restoreTriggerRef.current) return;
+    restoreTriggerRef.current = false;
+    triggerRef.current?.focus({ preventScroll: true });
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (routeOwnsFocus && isOpen) {
+      // The route state is external to this component. Its render already
+      // removes the drawer and deactivates the focus trap; retire the local
+      // session just after commit so it cannot reopen when guidance ends.
+      const closeTask = window.setTimeout(replacePanel, 0);
+      return () => window.clearTimeout(closeTask);
+    }
+    return undefined;
+  }, [isOpen, replacePanel, routeOwnsFocus]);
 
   // Don't show search trigger when navigating
-  if (state.navStatus === 'navigating' || state.navStatus === 'arrived') {
+  if (routeOwnsFocus) {
     return null;
   }
 
@@ -87,6 +117,7 @@ export default function SearchPanel() {
       {!isOpen && (
         <div className="search-trigger">
           <button
+            ref={triggerRef}
             type="button"
             className="search-trigger-pill animate-slide-up"
             onClick={openPanel}
@@ -111,8 +142,9 @@ export default function SearchPanel() {
       {/* Backdrop */}
       <div
         className={`search-overlay ${isOpen ? 'open' : ''}`}
-        onClick={closePanel}
+        onClick={dismissPanel}
         id="search-overlay"
+        aria-hidden="true"
       />
 
       {/* Search Panel */}
@@ -127,19 +159,24 @@ export default function SearchPanel() {
         hides it once the slide finishes, for anything that does not honour it.
       */}
       <section
+        ref={containerRef}
         className={`search-panel ${isOpen ? 'open' : ''}`}
         id="search-panel"
-        aria-label="Find a destination"
-        inert={isOpen ? undefined : ''}
+        role="dialog"
+        aria-modal={isOpen && !state.selectedPOI ? 'true' : undefined}
+        aria-labelledby="search-panel-title"
+        aria-hidden={state.selectedPOI ? 'true' : undefined}
+        tabIndex={-1}
+        inert={isOpen && !state.selectedPOI ? undefined : ''}
       >
         <div className="search-panel-handle" />
 
         <div className="search-panel-heading">
           <div>
             <span>Explore {venue.config.name}</span>
-            <h2>Find a destination</h2>
+            <h2 id="search-panel-title">Find a destination</h2>
           </div>
-          <button type="button" onClick={closePanel} aria-label="Close destination search">
+          <button type="button" onClick={dismissPanel} aria-label="Close destination search">
             <X size={18} />
           </button>
         </div>

@@ -10,7 +10,15 @@
  * @module context/NavigationContext
  */
 
-import { createContext, useContext, useReducer, useCallback, useState, useEffect } from 'react';
+import {
+  createContext,
+  useContext,
+  useReducer,
+  useCallback,
+  useState,
+  useEffect,
+  useRef,
+} from 'react';
 import { findRoute, shutdownRoutingWorker } from '../engine/routingEngine';
 import { calculateCompiledRoute } from '../engine/compiledRoutePolicy';
 import { useVenue } from './VenueContext.jsx';
@@ -223,6 +231,10 @@ export function NavigationProvider({ children, venue }) {
     { venue, urlCheckIn: resolvedUrlCheckIn },
     createInitialState,
   );
+  // A route calculation is asynchronous, but clearing or replacing it is an
+  // immediate user action. Results from an older generation must not resurrect
+  // guidance after Cancel, a changed start, or a return to onboarding.
+  const routeRequestGenerationRef = useRef(0);
   const { packageCacheStatus } = useVenue();
 
   const [theme, setTheme] = useState(() => {
@@ -286,7 +298,10 @@ export function NavigationProvider({ children, venue }) {
   // A check-in link this venue could not honour, kept so the visitor is told.
   const [checkInProblem, setCheckInProblem] = useState(() =>
     urlCheckIn !== null && !urlCheckIn.ok
-      ? { reason: urlCheckIn.reason, venueName: venue.config?.name ?? venue.buildingPackage.building.id }
+      ? {
+          reason: urlCheckIn.reason,
+          venueName: venue.config?.name ?? venue.buildingPackage.building.id,
+        }
       : null,
   );
   const [operationalEvaluatedAt, setOperationalEvaluatedAt] = useState(null);
@@ -299,6 +314,12 @@ export function NavigationProvider({ children, venue }) {
   }, []);
 
   const resetOnboarding = useCallback(() => {
+    // Welcome is a map-first planning flow. Leaving the visitor in Guide view
+    // made every non-routing completion render CameraPreview with no search
+    // target, defeating both the button's meaning and the focus handoff.
+    routeRequestGenerationRef.current += 1;
+    dispatch({ type: ACTION.CLEAR_ROUTE });
+    dispatch({ type: ACTION.SET_VIEW, payload: VIEW_TYPE.MAP });
     setOnboardingComplete(false);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('onboarding_complete');
@@ -310,7 +331,13 @@ export function NavigationProvider({ children, venue }) {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  useEffect(() => () => shutdownRoutingWorker(), []);
+  useEffect(
+    () => () => {
+      routeRequestGenerationRef.current += 1;
+      shutdownRoutingWorker();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (highContrast) {
@@ -323,6 +350,8 @@ export function NavigationProvider({ children, venue }) {
 
   const requestRoute = useCallback(
     async (destNodeId, startId, stepFree, startFloorId) => {
+      const requestGeneration = routeRequestGenerationRef.current + 1;
+      routeRequestGenerationRef.current = requestGeneration;
       dispatch({
         type: ACTION.SET_ROUTE_START,
         payload: {
@@ -338,8 +367,10 @@ export function NavigationProvider({ children, venue }) {
           destNodeId,
           routeOptionsFor(stepFree, operationalOverlay, operationalEvaluatedAt),
         );
+        if (routeRequestGenerationRef.current !== requestGeneration) return;
         dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: route });
       } catch (err) {
+        if (routeRequestGenerationRef.current !== requestGeneration) return;
         console.error('Routing error:', err);
         dispatch({
           type: ACTION.SET_ROUTE_RESULT,
@@ -379,6 +410,7 @@ export function NavigationProvider({ children, venue }) {
   }, [accessibleRouting, requestRoute, state.destinationNodeId, state.route, state.startNodeId]);
 
   const setOperationalOverlay = useCallback((overlay, evaluatedAt = new Date().toISOString()) => {
+    routeRequestGenerationRef.current += 1;
     setOperationalOverlayState(overlay);
     setOperationalEvaluatedAt(overlay ? evaluatedAt : null);
     dispatch({ type: ACTION.CLEAR_ROUTE });
@@ -399,6 +431,7 @@ export function NavigationProvider({ children, venue }) {
       if (!result.ok) return result;
 
       const node = venue.getNodeById(result.nodeId);
+      routeRequestGenerationRef.current += 1;
       dispatch({
         type: ACTION.SET_START,
         payload: { nodeId: result.nodeId, floorId: node ? String(node.floor) : undefined },
@@ -420,6 +453,7 @@ export function NavigationProvider({ children, venue }) {
     setStart: useCallback(
       (nodeId) => {
         const node = venue.getNodeById(nodeId);
+        routeRequestGenerationRef.current += 1;
         dispatch({
           type: ACTION.SET_START,
           payload: { nodeId, floorId: node ? String(node.floor) : undefined },
@@ -451,6 +485,7 @@ export function NavigationProvider({ children, venue }) {
     },
 
     clearRoute: useCallback(() => {
+      routeRequestGenerationRef.current += 1;
       dispatch({ type: ACTION.CLEAR_ROUTE });
     }, []),
 

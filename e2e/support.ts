@@ -48,14 +48,33 @@ export const test = base.extend<SmokeFixtures>({
 
       page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
       page.on('console', (message) => {
-        if (message.type() === 'error') errors.push(`console: ${message.text()}`);
+        if (message.type() !== 'error') return;
+        const source = message.location().url;
+        errors.push(`console: ${message.text()}${source ? ` at ${source}` : ''}`);
       });
 
       await use(errors);
-      const unexpected = errors.filter(
-        (message) => !allowedBrowserErrors.some((pattern) => pattern.test(message)),
-      );
+      const matchCounts = allowedBrowserErrors.map(() => 0);
+      const unexpected = errors.filter((message) => {
+        const allowanceIndex = allowedBrowserErrors.findIndex((pattern) => {
+          // Global/sticky expressions carry state between calls. An allowance
+          // is a predicate, so reset that state before and after using it.
+          pattern.lastIndex = 0;
+          const matched = pattern.test(message);
+          pattern.lastIndex = 0;
+          return matched;
+        });
+        if (allowanceIndex === -1) return true;
+        matchCounts[allowanceIndex] += 1;
+        return false;
+      });
       expect(unexpected, 'the production page emitted unexpected browser errors').toEqual([]);
+      allowedBrowserErrors.forEach((pattern, index) => {
+        expect(
+          matchCounts[index],
+          `expected browser error ${String(pattern)} must occur exactly once`,
+        ).toBe(1);
+      });
     },
     { auto: true },
   ],

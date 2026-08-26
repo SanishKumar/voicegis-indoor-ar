@@ -1106,6 +1106,34 @@ export default function SpatialTwinViewer() {
     [buildingPackage, floorSelection, showRestricted],
   );
   const selectedSpace = visibleSpaces.find((space) => space.id === selectedSpaceId);
+  const visibleSpacesByFloor = useMemo(
+    () =>
+      buildingPackage.floors
+        .map((floor) => ({
+          floor,
+          spaces: visibleSpaces.filter((space) => space.floorId === floor.id),
+        }))
+        .filter(({ spaces }) => spaces.length > 0),
+    [buildingPackage.floors, visibleSpaces],
+  );
+
+  // A filter used to leave an invisible selection alive in state. It vanished
+  // from the inspector, then silently returned when the filter was reversed.
+  // Clear it in the same interaction that changes visibility, so no render ever
+  // carries a hidden selectedSpaceId and keyboard/WebGL state remain atomic.
+  const chooseFloor = (nextFloor: FloorSelection) => {
+    setFloorSelection(nextFloor);
+    if (selectedSpace && nextFloor !== 'all' && selectedSpace.floorId !== nextFloor) {
+      setSelectedSpaceId(null);
+    }
+  };
+  const toggleRestricted = () => {
+    const nextShowRestricted = !showRestricted;
+    setShowRestricted(nextShowRestricted);
+    if (!nextShowRestricted && selectedSpace && isSpaceRestricted(selectedSpace)) {
+      setSelectedSpaceId(null);
+    }
+  };
   const graphSummary = useMemo(() => getGraphSummary(buildingPackage), [buildingPackage]);
   const buildingBounds = useMemo(() => computeBuildingBounds(buildingPackage), [buildingPackage]);
   const explodedHeight = Math.max(
@@ -1126,6 +1154,13 @@ export default function SpatialTwinViewer() {
   const selectedAnchors = selectedSpace
     ? buildingPackage.localizationAnchors.filter((anchor) => anchor.spaceId === selectedSpace.id)
     : [];
+  const selectedFloor = selectedSpace
+    ? buildingPackage.floors.find((floor) => floor.id === selectedSpace.floorId)
+    : undefined;
+  const selectedSpaceIsRestricted = selectedSpace ? isSpaceRestricted(selectedSpace) : false;
+  const selectionStatus = selectedSpace
+    ? `Selected ${selectedSpace.name}, ${selectedFloor?.name ?? selectedSpace.floorId}, ${selectedSpaceIsRestricted ? 'restricted' : 'public'}, ${selectedSpace.accessible ? 'accessible' : 'not accessible'}.`
+    : 'No space selected.';
 
   return (
     <SpatialPackageContext.Provider value={buildingPackage}>
@@ -1146,14 +1181,14 @@ export default function SpatialTwinViewer() {
               <ToggleButton
                 active={floorSelection === 'all'}
                 label="All"
-                onClick={() => setFloorSelection('all')}
+                onClick={() => chooseFloor('all')}
               />
               {buildingPackage.floors.map((floor) => (
                 <ToggleButton
                   key={floor.id}
                   active={floorSelection === floor.id}
                   label={floor.level === 0 ? 'G' : `L${floor.level}`}
-                  onClick={() => setFloorSelection(floor.id)}
+                  onClick={() => chooseFloor(floor.id)}
                 />
               ))}
             </div>
@@ -1172,11 +1207,7 @@ export default function SpatialTwinViewer() {
               label="Labels"
               onClick={() => setShowLabels((value) => !value)}
             />
-            <ToggleButton
-              active={showRestricted}
-              label="Restricted"
-              onClick={() => setShowRestricted((value) => !value)}
-            />
+            <ToggleButton active={showRestricted} label="Restricted" onClick={toggleRestricted} />
             <ToggleButton
               active={showRouting}
               label="Routing graph"
@@ -1193,8 +1224,9 @@ export default function SpatialTwinViewer() {
         <div className="twin-stage">
           <div
             className="twin-canvas"
-            role="application"
-            aria-label="Interactive 3D model. Drag to orbit, scroll to zoom, and select a space."
+            role="region"
+            aria-label="3D model view"
+            aria-describedby="twin-model-help"
           >
             <div className="twin-viewport-status" aria-hidden="true">
               <span>
@@ -1235,7 +1267,38 @@ export default function SpatialTwinViewer() {
             </Canvas>
           </div>
 
-          <aside className="twin-inspector" aria-live="polite">
+          <aside className="twin-inspector" aria-label="Semantic space inspector">
+            <div className="twin-space-browser">
+              <label htmlFor="twin-space-select">Inspect a space</label>
+              <select
+                id="twin-space-select"
+                value={selectedSpaceId ?? ''}
+                onChange={(event) => setSelectedSpaceId(event.target.value || null)}
+              >
+                <option value="">No space selected</option>
+                {visibleSpacesByFloor.map(({ floor, spaces }) => (
+                  <optgroup key={floor.id} label={floor.name}>
+                    {spaces.map((space) => (
+                      <option key={space.id} value={space.id}>
+                        {space.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <p id="twin-model-help" className="twin-model-help">
+                Pointer: drag to orbit and scroll to zoom. Keyboard: use this selector to highlight
+                a modeled space and inspect the same compiled metadata.
+              </p>
+              <p
+                className="twin-selection-status"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {selectionStatus}
+              </p>
+            </div>
             {selectedSpace ? (
               <>
                 <div className="twin-inspector-header">
@@ -1246,16 +1309,11 @@ export default function SpatialTwinViewer() {
                 <dl className="twin-property-grid">
                   <div>
                     <dt>Floor</dt>
-                    <dd>
-                      {
-                        buildingPackage.floors.find((floor) => floor.id === selectedSpace.floorId)
-                          ?.name
-                      }
-                    </dd>
+                    <dd>{selectedFloor?.name}</dd>
                   </div>
                   <div>
                     <dt>Access</dt>
-                    <dd>{selectedSpace.public ? 'Public' : 'Restricted'}</dd>
+                    <dd>{selectedSpaceIsRestricted ? 'Restricted' : 'Public'}</dd>
                   </div>
                   <div>
                     <dt>Mobility</dt>

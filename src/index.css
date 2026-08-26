@@ -514,7 +514,7 @@ img, svg { display: block; max-width: 100%; }
    Navigation Panel & POI Card (Floating)
    -------------------------------------------------------------------------- */
 .poi-card-overlay {
-  position: absolute; inset: 0; background: rgba(0, 0, 0, 0.2); z-index: var(--z-overlay);
+  position: absolute; inset: 0; background: rgba(0, 0, 0, 0.2); z-index: calc(var(--z-overlay) + 2);
   display: flex; align-items: flex-end; justify-content: center; padding: var(--space-4);
   opacity: 0; pointer-events: none; transition: opacity var(--transition-normal);
 }
@@ -1190,6 +1190,46 @@ img, svg { display: block; max-width: 100%; }
   padding: var(--space-5);
   background: #0b1221;
   border-left: 1px solid rgba(148, 163, 184, 0.16);
+}
+.twin-space-browser {
+  display: grid;
+  gap: 8px;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+.twin-space-browser label {
+  color: #67e8f9;
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.twin-space-browser select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 34px 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 5px;
+  color: #f1f5f9;
+  background: #222326;
+  font: inherit;
+}
+.twin-space-browser select:focus-visible {
+  outline: 3px solid rgba(103, 232, 249, 0.42);
+  outline-offset: 2px;
+  border-color: #67e8f9;
+}
+.twin-model-help,
+.twin-selection-status {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+}
+.twin-selection-status {
+  min-height: 1.45em;
+  color: #cbd5e1;
 }
 .twin-inspector-header { padding-bottom: var(--space-4); border-bottom: 1px solid rgba(148, 163, 184, 0.14); }
 .twin-space-type {
@@ -2774,6 +2814,12 @@ body {
   backdrop-filter: blur(18px);
 }
 
+.venue-package-manager.collapsed {
+  width: min(330px, calc(100vw - 36px));
+  max-height: none;
+  overflow: hidden;
+}
+
 .venue-package-manager-title,
 .venue-package-manager-title > div,
 .venue-package-catalog button > span {
@@ -2786,6 +2832,31 @@ body {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+}
+
+.venue-package-manager-toggle {
+  min-width: 54px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  color: #d8d5ff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.venue-package-manager-toggle:hover {
+  background: rgba(141, 128, 255, 0.16);
+}
+
+.venue-package-manager-toggle svg:last-child {
+  transition: transform var(--transition-fast);
+}
+
+.venue-package-manager.expanded .venue-package-manager-toggle svg:last-child {
+  transform: rotate(180deg);
 }
 
 .venue-package-manager-title span,
@@ -2898,9 +2969,13 @@ body {
 
 @media (max-width: 760px) {
   .venue-package-manager {
-    right: 10px;
-    bottom: 60px;
+    position: relative;
+    z-index: auto;
+    right: auto;
+    bottom: auto;
     width: calc(100vw - 20px);
+    max-height: none;
+    margin: 10px auto 16px;
   }
 }
 
@@ -3963,10 +4038,6 @@ body {
 
   .visitor-utility-actions button {
     width: 34px;
-  }
-
-  .visitor-utility-actions button:last-child {
-    display: none;
   }
 
   .search-trigger-copy small {

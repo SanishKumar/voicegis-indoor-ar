@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type RefObject } from 'react';
 
 /**
  * Keeps keyboard focus inside a dialog, and gives it back afterwards.
@@ -36,7 +36,40 @@ import { useCallback, useEffect, useRef } from 'react';
  * Module scope on purpose. The stack has to be shared by every dialog on the
  * page, and dialogs do not otherwise know about one another.
  */
-const openDialogs: symbol[] = [];
+interface OpenDialog {
+  token: symbol;
+  container: HTMLElement;
+  activationOrder: number;
+  focusInitial: () => void;
+}
+
+const openDialogs: OpenDialog[] = [];
+let dialogActivationOrder = 0;
+
+/**
+ * Returns the dialog that should own keyboard input.
+ *
+ * Passive effects run child-first, so registration order alone can put an
+ * outer dialog above a child mounted in the same commit. DOM containment is
+ * authoritative for real nesting; activation order only breaks ties between
+ * unrelated overlays (including portal siblings).
+ */
+function topmostDialog(): OpenDialog | undefined {
+  const connected = openDialogs.filter(({ container }) => container.isConnected);
+  const deepest = connected.filter(
+    (candidate) =>
+      !connected.some(
+        (other) => other !== candidate && candidate.container.contains(other.container),
+      ),
+  );
+  return deepest.reduce<OpenDialog | undefined>(
+    (latest, candidate) =>
+      latest === undefined || candidate.activationOrder > latest.activationOrder
+        ? candidate
+        : latest,
+    undefined,
+  );
+}
 
 const FOCUSABLE = [
   'a[href]',
@@ -78,6 +111,8 @@ function focusableWithin(container: HTMLElement): HTMLElement[] {
 export interface DialogFocusOptions {
   /** Called on Escape. Omit if the dialog should not close that way. */
   onEscape?: () => void;
+  /** A meaningful first control, when DOM order is not the right default. */
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }
 
 /**
@@ -89,7 +124,7 @@ export interface DialogFocusOptions {
  */
 export function useDialogFocus<T extends HTMLElement>(
   active: boolean,
-  { onEscape }: DialogFocusOptions = {},
+  { onEscape, initialFocusRef }: DialogFocusOptions = {},
 ) {
   const containerRef = useRef<T | null>(null);
   /**
@@ -152,12 +187,27 @@ export function useDialogFocus<T extends HTMLElement>(
       break;
     }
 
-    const initial = focusableWithin(container)[0] ?? container;
-    initial.focus();
-
+    const preferred = initialFocusRef?.current;
+    const initial =
+      preferred !== null &&
+      preferred !== undefined &&
+      container.contains(preferred) &&
+      canTakeFocus(preferred)
+        ? preferred
+        : (focusableWithin(container)[0] ?? container);
     const token = Symbol('dialog');
-    openDialogs.push(token);
-    const isTopmost = () => openDialogs[openDialogs.length - 1] === token;
+    const dialog: OpenDialog = {
+      token,
+      container,
+      activationOrder: (dialogActivationOrder += 1),
+      focusInitial: () => initial.focus(),
+    };
+    openDialogs.push(dialog);
+    // Re-evaluate after every registration. If a child and parent mounted in
+    // the same commit, the parent effect runs last but containment still sends
+    // focus back to the child.
+    topmostDialog()?.focusInitial();
+    const isTopmost = () => topmostDialog() === dialog;
 
     const onKeyDown = (event: KeyboardEvent) => {
       // A dialog with something on top of it is not the one being driven.
@@ -200,7 +250,7 @@ export function useDialogFocus<T extends HTMLElement>(
 
     return () => {
       document.removeEventListener('keydown', onKeyDown, true);
-      const index = openDialogs.lastIndexOf(token);
+      const index = openDialogs.lastIndexOf(dialog);
       if (index !== -1) openDialogs.splice(index, 1);
       // Only if it is still in the document and still focusable; a dialog that
       // replaced its own opener would otherwise throw or focus a detached node.
@@ -208,7 +258,7 @@ export function useDialogFocus<T extends HTMLElement>(
         returnTo.focus();
       }
     };
-  }, [active]);
+  }, [active, initialFocusRef]);
 
   /** Exposed for tests and for callers that need to re-assert containment. */
   const focusFirst = useCallback(() => {

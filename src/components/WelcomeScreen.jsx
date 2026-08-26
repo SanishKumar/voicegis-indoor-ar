@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Navigation, MapPin, ArrowRight, QrCode, Search, ChevronRight } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs } from '../engine/searchIndex.js';
@@ -13,6 +13,18 @@ export default function WelcomeScreen({ onComplete }) {
   const [activeCategory, setActiveCategory] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [scanProblem, setScanProblem] = useState(null);
+  const stepHeadingRef = useRef(null);
+  const previousStepRef = useRef(step);
+
+  // A step replaces the button that had focus. Without an explicit target the
+  // browser falls back to <body>, so the visitor has to rediscover where the
+  // flow moved. Focus only transitions after a real step change; the first
+  // screen keeps normal document-entry behavior.
+  useEffect(() => {
+    if (previousStepRef.current === step) return;
+    previousStepRef.current = step;
+    stepHeadingRef.current?.focus({ preventScroll: true });
+  }, [step]);
 
   const handleStart = () => setStep(1);
 
@@ -81,7 +93,12 @@ export default function WelcomeScreen({ onComplete }) {
               </div>
             </div>
 
-            <h1 className="welcome-title">
+            <h1
+              ref={stepHeadingRef}
+              className="welcome-title"
+              id="welcome-step-heading"
+              tabIndex={-1}
+            >
               Find your destination without learning the venue first.
             </h1>
             <p className="welcome-subtitle">
@@ -124,7 +141,14 @@ export default function WelcomeScreen({ onComplete }) {
             className="welcome-features animate-fade-in"
             style={{ width: '100%', maxWidth: '400px' }}
           >
-            <h2 className="welcome-features-title">Where are you right now?</h2>
+            <h2
+              ref={stepHeadingRef}
+              className="welcome-features-title"
+              id="welcome-step-heading"
+              tabIndex={-1}
+            >
+              Where are you right now?
+            </h2>
             <p className="welcome-features-subtitle">Set your starting point to get directions.</p>
 
             <button
@@ -214,7 +238,14 @@ export default function WelcomeScreen({ onComplete }) {
             className="welcome-features animate-fade-in"
             style={{ width: '100%', maxWidth: '400px' }}
           >
-            <h2 className="welcome-features-title">Where do you need to go?</h2>
+            <h2
+              ref={stepHeadingRef}
+              className="welcome-features-title"
+              id="welcome-step-heading"
+              tabIndex={-1}
+            >
+              Where do you need to go?
+            </h2>
             <p className="welcome-features-subtitle">Search or pick a quick category.</p>
 
             <div className="lp-search" style={{ marginBottom: '16px', width: '100%' }}>

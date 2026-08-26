@@ -5,6 +5,7 @@
  * progress indicator, and step controls.
  */
 
+import { useEffect, useRef } from 'react';
 import {
   ArrowUp,
   CornerUpLeft,
@@ -66,6 +67,55 @@ function StepIcon({ type, size = 20 }) {
 export default function NavigationPanel() {
   const { state, actions, venue } = useNavigation();
   const { route, navStatus, currentStepIndex, destinationNodeId } = state;
+  const panelRef = useRef(null);
+  const destNode = venue.getNodeById(destinationNodeId);
+
+  const clearRouteAndReturnToSearch = () => {
+    actions.clearRoute();
+    // Clearing guidance renders the stable map trigger again. Restore only for
+    // this explicit dismissal; inferring intent from every route clear stole
+    // focus from unrelated flows such as changing the starting location.
+    window.setTimeout(() => {
+      document.getElementById('btn-search-open')?.focus({ preventScroll: true });
+    }, 0);
+  };
+
+  // Route creation replaces the control that launched it. Focus the new
+  // calculation/guidance region once, rather than dropping the visitor on
+  // <body> or stealing focus again on every instruction change.
+  useEffect(() => {
+    if (navStatus !== NAV_STATUS.ROUTING && !route) return;
+    panelRef.current?.focus({ preventScroll: true });
+  }, [navStatus, route]);
+
+  if (navStatus === NAV_STATUS.ROUTING && !route) {
+    const destinationName = destNode?.poi?.name || 'destination';
+    return (
+      <div
+        ref={panelRef}
+        className="nav-panel route-pending-panel open"
+        id="route-pending-panel"
+        role="status"
+        aria-label={`Calculating route to ${destinationName}`}
+        aria-live="polite"
+        tabIndex={-1}
+      >
+        <div className="nav-panel-handle" />
+        <div className="route-failure-message">
+          <div className="nav-panel-dest-icon" aria-hidden="true">
+            <Navigation size={18} />
+          </div>
+          <div>
+            <strong>Calculating route</strong>
+            <p>Checking the active venue paths to {destinationName}…</p>
+          </div>
+          <button className="nav-panel-close-btn" onClick={clearRouteAndReturnToSearch}>
+            <X size={12} /> Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!route) {
     return null;
@@ -79,7 +129,13 @@ export default function NavigationPanel() {
       : route.error;
 
     return (
-      <div className="nav-panel route-failure-panel open" id="route-failure-panel" role="alert">
+      <div
+        ref={panelRef}
+        className="nav-panel route-failure-panel open"
+        id="route-failure-panel"
+        role="alert"
+        tabIndex={-1}
+      >
         <div className="nav-panel-handle" />
         <div className="route-failure-message">
           <div className="route-failure-icon">
@@ -89,7 +145,7 @@ export default function NavigationPanel() {
             <strong>No compliant route</strong>
             <p>{failureMessage}</p>
           </div>
-          <button className="nav-panel-close-btn" onClick={() => actions.clearRoute()}>
+          <button className="nav-panel-close-btn" onClick={clearRouteAndReturnToSearch}>
             <X size={12} /> Dismiss
           </button>
         </div>
@@ -97,7 +153,6 @@ export default function NavigationPanel() {
     );
   }
 
-  const destNode = venue.getNodeById(destinationNodeId);
   const destinationFloor = destNode ? venue.getFloorById(String(destNode.floor)) : null;
   const steps = route.steps;
   const currentStep = steps[currentStepIndex];
@@ -124,7 +179,14 @@ export default function NavigationPanel() {
     : `${shortFloorLabel(venue, destNode?.floor)} · same floor`;
 
   return (
-    <div className={`nav-panel open`} id="nav-panel">
+    <div
+      ref={panelRef}
+      className="nav-panel open"
+      id="nav-panel"
+      role="region"
+      aria-label={`Directions to ${destNode?.poi?.name || 'destination'}`}
+      tabIndex={-1}
+    >
       {/* Handle */}
       <div className="nav-panel-handle" />
 
@@ -148,7 +210,7 @@ export default function NavigationPanel() {
         </div>
         <button
           className="nav-panel-close-btn"
-          onClick={() => actions.clearRoute()}
+          onClick={clearRouteAndReturnToSearch}
           id="btn-cancel-nav"
         >
           <X size={12} /> Cancel

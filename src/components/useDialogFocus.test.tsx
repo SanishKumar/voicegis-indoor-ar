@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useDialogFocus } from './useDialogFocus';
@@ -17,13 +17,7 @@ import { useDialogFocus } from './useDialogFocus';
  * focus itself — rather than what a browser would do unaided.
  */
 
-function Dialog({
-  onEscape,
-  controls = 2,
-}: {
-  onEscape?: () => void;
-  controls?: number;
-}) {
+function Dialog({ onEscape, controls = 2 }: { onEscape?: () => void; controls?: number }) {
   const { containerRef } = useDialogFocus<HTMLDivElement>(true, { onEscape });
   return (
     <div ref={containerRef} role="dialog" aria-modal="true" aria-label="Test dialog" tabIndex={-1}>
@@ -59,6 +53,35 @@ describe('focus containment', () => {
     fireEvent.click(screen.getByText('open the dialog'));
 
     expect(document.activeElement).toBe(screen.getByText('control 1'));
+  });
+
+  it('can start on the meaningful control instead of the first one in DOM order', () => {
+    function PreferredFocus() {
+      const [open, setOpen] = useState(false);
+      const searchRef = useRef<HTMLInputElement | null>(null);
+      const { containerRef } = useDialogFocus<HTMLDivElement>(open, {
+        onEscape: () => setOpen(false),
+        initialFocusRef: searchRef,
+      });
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            open search
+          </button>
+          {open && (
+            <div ref={containerRef} role="dialog" aria-label="Search" tabIndex={-1}>
+              <button type="button">close</button>
+              <input ref={searchRef} aria-label="query" />
+            </div>
+          )}
+        </>
+      );
+    }
+
+    render(<PreferredFocus />);
+    fireEvent.click(screen.getByText('open search'));
+
+    expect(document.activeElement).toBe(screen.getByLabelText('query'));
   });
 
   it('wraps forwards from the last control to the first', () => {
@@ -132,25 +155,14 @@ describe('nested dialogs', () => {
           open outer
         </button>
         {outer && (
-          <div
-            ref={outerRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label="outer"
-            tabIndex={-1}
-          >
+          <div ref={outerRef} role="dialog" aria-modal="true" aria-label="outer" tabIndex={-1}>
             <button type="button" onClick={() => setInner(true)}>
               open inner
             </button>
             {inner && (
-              <div
-                ref={innerRef}
-                role="dialog"
-                aria-modal="true"
-                aria-label="inner"
-                tabIndex={-1}
-              >
-                <button type="button">inner control</button>
+              <div ref={innerRef} role="dialog" aria-modal="true" aria-label="inner" tabIndex={-1}>
+                <button type="button">inner first</button>
+                <button type="button">inner last</button>
               </div>
             )}
           </div>
@@ -190,11 +202,64 @@ describe('nested dialogs', () => {
     fireEvent.click(screen.getByText('open outer'));
     fireEvent.click(screen.getByText('open inner'));
 
-    screen.getByText('inner control').focus();
-    fireEvent.keyDown(document, { key: 'Tab' });
+    const outerControl = screen.getByText('open inner');
+    const outerFocus = vi.fn();
+    outerControl.addEventListener('focus', outerFocus);
+    screen.getByText('inner last').focus();
+    const dispatched = fireEvent.keyDown(document, { key: 'Tab' });
 
     // The outer trap must not drag focus back to its own first control.
-    expect(document.activeElement).toBe(screen.getByText('inner control'));
+    // One inner control was also vacuous because jsdom performs no native Tab
+    // movement: neither trap acting produced the same final focus as a correct
+    // single-control wrap. Two controls plus preventDefault proves the inner
+    // trap acted while the spy proves the outer did not.
+    expect(outerFocus).not.toHaveBeenCalled();
+    expect(dispatched).toBe(false);
+    expect(document.activeElement).toBe(screen.getByText('inner first'));
+  });
+
+  it('keeps a child mounted in the same commit above its parent', () => {
+    function ChildDialog() {
+      const [open, setOpen] = useState(true);
+      const { containerRef } = useDialogFocus<HTMLDivElement>(open, {
+        onEscape: () => setOpen(false),
+      });
+      if (!open) return null;
+      return (
+        <div ref={containerRef} role="dialog" aria-label="same-commit child" tabIndex={-1}>
+          <button type="button">child control</button>
+        </div>
+      );
+    }
+
+    function ParentDialog() {
+      const [open, setOpen] = useState(false);
+      const { containerRef } = useDialogFocus<HTMLDivElement>(open, {
+        onEscape: () => setOpen(false),
+      });
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            open same-commit pair
+          </button>
+          {open && (
+            <div ref={containerRef} role="dialog" aria-label="same-commit parent" tabIndex={-1}>
+              <button type="button">parent control</button>
+              <ChildDialog />
+            </div>
+          )}
+        </>
+      );
+    }
+
+    render(<ParentDialog />);
+    fireEvent.click(screen.getByText('open same-commit pair'));
+
+    expect(document.activeElement).toBe(screen.getByText('child control'));
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByLabelText('same-commit child')).toBeNull();
+    expect(screen.queryByLabelText('same-commit parent')).not.toBeNull();
   });
 });
 

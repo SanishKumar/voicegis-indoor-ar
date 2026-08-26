@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Database, FileUp, Link2, ShieldCheck, X } from 'lucide-react';
+import { ChevronDown, Database, FileUp, Link2, ShieldCheck, X } from 'lucide-react';
 import { useVenue } from '../context/VenueContext.jsx';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { resolveOperationalOverlay } from '../engine/operationalOverlay';
@@ -9,6 +9,7 @@ export default function VenuePackageManager() {
   const { venue, operationalOverlay, setOperationalOverlay } = useNavigation();
   const [packageUrl, setPackageUrl] = useState('');
   const [operationMessage, setOperationMessage] = useState(null);
+  const [expanded, setExpanded] = useState(false);
 
   const switchToUrl = async (url) => {
     setOperationMessage(null);
@@ -56,80 +57,97 @@ export default function VenuePackageManager() {
   const buildingPackage = venue.buildingPackage;
 
   return (
-    <aside className="venue-package-manager" aria-label="VenuePackage runtime controls">
+    <aside
+      className={`venue-package-manager ${expanded ? 'expanded' : 'collapsed'}`}
+      aria-label="VenuePackage runtime controls"
+    >
       <div className="venue-package-manager-title">
         <div>
           <span>Runtime boundary</span>
           <strong>{buildingPackage.building.name}</strong>
         </div>
-        <ShieldCheck size={20} />
+        <button
+          type="button"
+          className="venue-package-manager-toggle"
+          aria-label={`${expanded ? 'Close' : 'Open'} venue runtime controls`}
+          aria-expanded={expanded}
+          aria-controls="venue-package-manager-body"
+          onClick={() => setExpanded((value) => !value)}
+        >
+          <ShieldCheck size={18} />
+          <ChevronDown size={16} aria-hidden="true" />
+        </button>
       </div>
 
-      <div className="venue-package-facts">
-        <span>{buildingPackage.floors.length} floors</span>
-        <span>{buildingPackage.pois.length} POIs</span>
-        <span>{buildingPackage.localizationAnchors.length} anchors</span>
-        <code>{buildingPackage.manifest.contentHash.slice(0, 12)}</code>
-      </div>
+      {expanded && (
+        <div className="venue-package-manager-body" id="venue-package-manager-body">
+          <div className="venue-package-facts">
+            <span>{buildingPackage.floors.length} floors</span>
+            <span>{buildingPackage.pois.length} POIs</span>
+            <span>{buildingPackage.localizationAnchors.length} anchors</span>
+            <code>{buildingPackage.manifest.contentHash.slice(0, 12)}</code>
+          </div>
 
-      <div className="venue-package-catalog">
-        {catalog.map((candidate) => (
-          <button
-            type="button"
-            key={candidate.id}
-            className={candidate.id === buildingPackage.building.id ? 'active' : ''}
-            disabled={status.state === 'switching'}
-            onClick={() => switchToUrl(candidate.packageUrl)}
+          <div className="venue-package-catalog">
+            {catalog.map((candidate) => (
+              <button
+                type="button"
+                key={candidate.id}
+                className={candidate.id === buildingPackage.building.id ? 'active' : ''}
+                disabled={status.state === 'switching'}
+                onClick={() => switchToUrl(candidate.packageUrl)}
+              >
+                <Database size={14} />
+                <span>
+                  <strong>{candidate.name}</strong>
+                  <small>{candidate.description}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <form
+            className="venue-package-url"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (packageUrl.trim()) void switchToUrl(packageUrl.trim());
+            }}
           >
-            <Database size={14} />
-            <span>
-              <strong>{candidate.name}</strong>
-              <small>{candidate.description}</small>
-            </span>
-          </button>
-        ))}
-      </div>
+            <Link2 size={14} />
+            <input
+              type="url"
+              value={packageUrl}
+              onChange={(event) => setPackageUrl(event.target.value)}
+              placeholder="https://…/building.package.json"
+              aria-label="VenuePackage URL"
+            />
+            <button type="submit">Load URL</button>
+          </form>
 
-      <form
-        className="venue-package-url"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (packageUrl.trim()) void switchToUrl(packageUrl.trim());
-        }}
-      >
-        <Link2 size={14} />
-        <input
-          type="url"
-          value={packageUrl}
-          onChange={(event) => setPackageUrl(event.target.value)}
-          placeholder="https://…/building.package.json"
-          aria-label="VenuePackage URL"
-        />
-        <button type="submit">Load URL</button>
-      </form>
+          <div className="venue-artifact-actions">
+            <label>
+              <FileUp size={14} />
+              Load package artifact
+              <input type="file" accept="application/json,.json" onChange={loadPackageFile} />
+            </label>
+            <label>
+              <FileUp size={14} />
+              Load closure overlay
+              <input type="file" accept="application/json,.json" onChange={loadOverlayFile} />
+            </label>
+            {operationalOverlay && (
+              <button type="button" onClick={() => setOperationalOverlay(null)}>
+                <X size={14} />
+                Clear overlay
+              </button>
+            )}
+          </div>
 
-      <div className="venue-artifact-actions">
-        <label>
-          <FileUp size={14} />
-          Load package artifact
-          <input type="file" accept="application/json,.json" onChange={loadPackageFile} />
-        </label>
-        <label>
-          <FileUp size={14} />
-          Load closure overlay
-          <input type="file" accept="application/json,.json" onChange={loadOverlayFile} />
-        </label>
-        {operationalOverlay && (
-          <button type="button" onClick={() => setOperationalOverlay(null)}>
-            <X size={14} />
-            Clear overlay
-          </button>
-        )}
-      </div>
-
-      <p className={status.error || operationMessage ? 'venue-runtime-message' : undefined}>
-        {operationMessage ?? status.error ?? status.detail}
-      </p>
+          <p className={status.error || operationMessage ? 'venue-runtime-message' : undefined}>
+            {operationMessage ?? status.error ?? status.detail}
+          </p>
+        </div>
+      )}
     </aside>
   );
 }
