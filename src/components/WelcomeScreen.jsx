@@ -19,6 +19,11 @@ const STEP = { DESTINATION: 0, POSITION: 1 };
  * There is no longer a "Skip". Skipping used to leave the runtime with no start
  * and therefore no route, so it was an exit that led nowhere. Browsing the map
  * without a route is still available, but it is named for what it does.
+ *
+ * Class names describe the part, not the visual language dressing it. The first
+ * styling of this screen was named after its design system, so replacing that
+ * system meant editing markup that had not changed - the stylesheet owns the
+ * look, and a later change of direction should not reach this file at all.
  */
 export default function WelcomeScreen({ onComplete }) {
   const { actions, venue } = useNavigation();
@@ -89,21 +94,38 @@ export default function WelcomeScreen({ onComplete }) {
     [actions, destination, onComplete],
   );
 
+  const destinationRow = (node, label, onClick) => (
+    <li key={node.id}>
+      <button type="button" className="onboard-row" aria-label={label} onClick={onClick}>
+        <span className="onboard-row-text">
+          <span className="onboard-row-name">{node.poi.name}</span>
+          <span className="onboard-row-meta">{floorNameFor(node)}</span>
+        </span>
+        <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
+      </button>
+    </li>
+  );
+
   return (
-    <div className="wf-screen">
-      <div className="wf-stage" aria-hidden="true" />
+    <div className="onboard">
+      <div className="onboard-canvas" aria-hidden="true" />
 
-      <div className="wf-content">
+      <div className="onboard-content">
         {step === STEP.DESTINATION && (
-          <section className="wf-step" aria-labelledby="welcome-step-heading">
-            <p className="wf-eyebrow">{venue.buildingPackage.building.name}</p>
-            <h2 ref={stepHeadingRef} className="wf-title" id="welcome-step-heading" tabIndex={-1}>
-              Where are you going?
+          <section className="onboard-step" aria-labelledby="welcome-step-heading">
+            <p className="onboard-eyebrow">{venue.buildingPackage.building.name}</p>
+            <h2
+              ref={stepHeadingRef}
+              className="onboard-title"
+              id="welcome-step-heading"
+              tabIndex={-1}
+            >
+              Where are you <span className="onboard-title-accent">going?</span>
             </h2>
-            <p className="wf-sub">Search, or pick from the list.</p>
+            <p className="onboard-sub">Search, or pick from the list.</p>
 
-            <div className="wf-field">
-              <Search size={15} strokeWidth={1.25} aria-hidden="true" />
+            <div className="onboard-field">
+              <Search size={18} strokeWidth={2} aria-hidden="true" />
               <input
                 type="text"
                 placeholder="Search rooms, clinics and services"
@@ -113,54 +135,49 @@ export default function WelcomeScreen({ onComplete }) {
               />
             </div>
 
-            <p className="wf-label">{query ? 'Results' : 'Destinations'}</p>
+            <p className="onboard-label">{query ? 'Results' : 'Destinations'}</p>
             {suggestions.length > 0 ? (
-              <ul className="wf-list">
-                {suggestions.map(({ node }) => (
-                  <li key={node.id}>
-                    <button
-                      type="button"
-                      className="wf-row"
-                      aria-label={`${node.poi.name}, ${floorNameFor(node)}`}
-                      onClick={() => chooseDestination(node)}
-                    >
-                      <span className="wf-row-text">
-                        <span className="wf-row-name">{node.poi.name}</span>
-                        <span className="wf-row-meta">{floorNameFor(node)}</span>
-                      </span>
-                      <ChevronRight size={15} strokeWidth={1.25} aria-hidden="true" />
-                    </button>
-                  </li>
-                ))}
+              <ul className="onboard-list">
+                {suggestions.map(({ node }) =>
+                  destinationRow(node, `${node.poi.name}, ${floorNameFor(node)}`, () =>
+                    chooseDestination(node),
+                  ),
+                )}
               </ul>
             ) : (
-              <p className="wf-empty">Nothing here matches that. Try a shorter word.</p>
+              <p className="onboard-empty">Nothing here matches that. Try a shorter word.</p>
             )}
 
-            <button type="button" className="wf-text-action" onClick={onComplete}>
+            <button type="button" className="onboard-ghost" onClick={onComplete}>
               Browse the map instead
+              <span className="onboard-ghost-mark" aria-hidden="true" />
             </button>
           </section>
         )}
 
         {step === STEP.POSITION && (
-          <section className="wf-step" aria-labelledby="welcome-step-heading">
-            <p className="wf-eyebrow">Going to</p>
-            <p className="wf-chip">{destination?.name}</p>
-            <h2 ref={stepHeadingRef} className="wf-title" id="welcome-step-heading" tabIndex={-1}>
-              Now, where are you?
+          <section className="onboard-step" aria-labelledby="welcome-step-heading">
+            <p className="onboard-eyebrow">Going to</p>
+            <p className="onboard-chip">{destination?.name}</p>
+            <h2
+              ref={stepHeadingRef}
+              className="onboard-title"
+              id="welcome-step-heading"
+              tabIndex={-1}
+            >
+              Now, where <span className="onboard-title-accent">are you?</span>
             </h2>
-            <p className="wf-sub">A code gives your exact spot. It is the accurate way.</p>
+            <p className="onboard-sub">A code gives your exact spot. It is the accurate way.</p>
 
             <button
               type="button"
-              className="wf-primary"
+              className="onboard-pill"
               onClick={() => {
                 setScanProblem(null);
                 setScanning(true);
               }}
             >
-              <QrCode size={16} strokeWidth={1.25} aria-hidden="true" />
+              <QrCode size={18} strokeWidth={2} aria-hidden="true" />
               Scan a check-in code
             </button>
 
@@ -172,32 +189,22 @@ export default function WelcomeScreen({ onComplete }) {
               />
             )}
 
-            <p className="wf-label">Or start from a landmark</p>
-            <ul className="wf-list">
-              {landmarks.map((node) => (
-                <li key={node.id}>
-                  <button
-                    type="button"
-                    className="wf-row"
-                    aria-label={`Start from ${node.poi.name}, ${floorNameFor(node)}`}
-                    onClick={() => startFrom(node.id)}
-                  >
-                    <span className="wf-row-text">
-                      <span className="wf-row-name">{node.poi.name}</span>
-                      <span className="wf-row-meta">{floorNameFor(node)}</span>
-                    </span>
-                    <ChevronRight size={15} strokeWidth={1.25} aria-hidden="true" />
-                  </button>
-                </li>
-              ))}
+            <p className="onboard-label">Or start from a landmark</p>
+            <ul className="onboard-list">
+              {landmarks.map((node) =>
+                destinationRow(node, `Start from ${node.poi.name}, ${floorNameFor(node)}`, () =>
+                  startFrom(node.id),
+                ),
+              )}
             </ul>
 
             <button
               type="button"
-              className="wf-secondary"
+              className="onboard-ghost"
               onClick={() => setStep(STEP.DESTINATION)}
             >
               Back
+              <span className="onboard-ghost-mark" aria-hidden="true" />
             </button>
           </section>
         )}

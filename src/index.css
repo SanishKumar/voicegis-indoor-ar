@@ -6784,196 +6784,214 @@ body {
 }
 
 /* ==========================================================================
-   Wayfinder
+   Visitor onboarding
    --------------------------------------------------------------------------
-   A black stage with one whispered title over it. The discipline is
-   subtraction: no shadows, no gradients, no radii, no card layers, and no
-   chromatic UI colour at all. Colour belongs to the illustration layer - for
-   this product that is the map itself, which is why `.wf-stage` is a layer
-   rather than a background colour on the screen.
+   Bauhaus poster: cream paper, near-black ink, one blue accent, oversized
+   geometric display type with POSITIVE tracking that widens as the type grows.
+   Flat throughout - no shadow, no gradient, no elevation. The only radius in
+   the system is the pill on buttons and tags; everything else is sharp.
 
-   Weight 300 carries display type only. Anything a visitor has to read while
-   walking a corridor - rows, buttons, field text - sits at 400, which the
-   reference allows and which thin white-on-black at 14px does not survive.
+   Two places this bends the reference, both because it is an app screen on a
+   phone rather than a poster:
+
+   - Display sizes clamp from 38px instead of starting at 52px. Tracking stays
+     in `em` so it still widens with size, which is the part that carries the
+     voice.
+   - Section rhythm uses 32-48px rather than 96px. A 96px gap inside a
+     one-screen flow pushes the list below the fold on a phone, and the
+     spacious feel survives the smaller step.
    ========================================================================== */
 :root {
-  --wf-void: #000000;
-  --wf-smolder: #0b0502;
-  --wf-charcoal: #1a1a1a;
-  --wf-bone: #ffffff;
-  --wf-ash: #e3e3e2;
-  --wf-driftwood: #c0bfbe;
+  --ed-cream: #fff9f0;
+  --ed-ink: #000609;
+  --ed-blue: #0a65db;
+  /* Ink at reduced strength for secondary copy. Not a fourth colour - the
+     palette stays cream, ink, blue. */
+  --ed-ink-soft: rgba(0, 6, 9, 0.62);
 
-  /* Enreal is licensed; Jost is the reference's own substitute and slots in
-     first if it is ever self-hosted. Until then the stack leans on the
-     geometric faces that ship with the platform, because a webfont link would
-     break the cold-offline guarantee the service worker exists to make. */
-  --wf-font: Jost, "Century Gothic", "URW Gothic", Questrial, ui-sans-serif, system-ui, sans-serif;
-  --wf-tracking: 0.042em;
+  /* degular-display and usual are both licensed, and every substitute the
+     reference names is hosted. A font request would break the cold-offline
+     guarantee the service worker exists to make, so the licensed names lead
+     the stack and self-hosting one later is a single-line change. */
+  --ed-display: "degular-display", "Archivo Black", "Space Grotesk", "Segoe UI Variable Display",
+    "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --ed-body: "usual", Inter, "IBM Plex Sans", "DM Sans", "Segoe UI", ui-sans-serif, system-ui,
+    sans-serif;
 
-  --wf-4: 4px;
-  --wf-8: 8px;
-  --wf-10: 10px;
-  --wf-16: 16px;
-  --wf-30: 30px;
-  --wf-40: 40px;
+  --ed-16: 16px;
+  --ed-20: 20px;
+  --ed-24: 24px;
+  --ed-32: 32px;
+  --ed-40: 40px;
+  --ed-48: 48px;
 }
 
-.wf-screen {
+.onboard {
   position: fixed;
   inset: 0;
   z-index: 1000;
   display: flex;
-  align-items: center;
+  /* Centred with `margin: auto` on the child rather than `align-items:
+     center`. A centred flex child that outgrows its scroll container overflows
+     above the scrollable area, where it cannot be reached - the heading sat at
+     y=-69 on a 900px viewport and no amount of scrolling brought it back. */
+  align-items: flex-start;
   justify-content: center;
   overflow-y: auto;
-  background: var(--wf-void);
-  color: var(--wf-bone);
-  font-family: var(--wf-font);
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font-family: var(--ed-body);
 }
 
-/* The stage the composition floats on. Black today; the map surface renders
-   here once it lands, and nothing above it may tint or dim it. */
-.wf-stage {
+/* The paper the composition is printed on. Cream today; the map surface
+   renders here once it lands, which is why it is a layer and not a background
+   colour on the screen itself. */
+.onboard-canvas {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: var(--wf-void);
+  background: var(--ed-cream);
 }
 
-.wf-content {
+.onboard-content {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 420px;
-  padding: var(--wf-40) var(--wf-16);
+  max-width: 520px;
+  margin: auto;
+  padding: var(--ed-48) var(--ed-24);
 }
 
-.wf-step {
+.onboard-step {
   display: flex;
   flex-direction: column;
 }
 
-.wf-eyebrow {
-  margin: 0 0 var(--wf-10);
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: var(--wf-tracking);
-  text-transform: uppercase;
-  color: var(--wf-driftwood);
+.onboard-eyebrow {
+  margin: 0 0 var(--ed-16);
+  font-size: var(--ed-16);
+  font-weight: 700;
+  line-height: 1.78;
+  color: var(--ed-ink-soft);
 }
 
-.wf-title {
-  margin: 0 0 var(--wf-10);
-  font-size: clamp(28px, 7.5vw, 40px);
-  font-weight: 300;
-  line-height: 1.2;
-  letter-spacing: var(--wf-tracking);
-  text-transform: uppercase;
+.onboard-title {
+  margin: 0 0 var(--ed-16);
+  font-family: var(--ed-display);
+  font-size: clamp(38px, 11vw, 80px);
+  font-weight: 700;
+  line-height: 1.1;
+  /* Positive, and in em so it widens as the type grows. Tightening this is
+     the one thing the voice does not survive. */
+  letter-spacing: 0.013em;
+  color: var(--ed-ink);
   text-wrap: balance;
 }
 
-.wf-title:focus-visible {
-  outline: 1px solid var(--wf-ash);
-  outline-offset: var(--wf-8);
+.onboard-title-accent {
+  color: var(--ed-blue);
 }
 
-.wf-sub {
-  margin: 0 0 var(--wf-30);
-  font-size: 14px;
+.onboard-title:focus-visible {
+  outline: 1px solid var(--ed-ink);
+  outline-offset: var(--ed-16);
+}
+
+.onboard-sub {
+  margin: 0 0 var(--ed-40);
+  max-width: 480px;
+  font-size: 18px;
   font-weight: 400;
-  line-height: 1.75;
-  color: var(--wf-driftwood);
+  line-height: 1.82;
+  color: var(--ed-ink);
 }
 
-.wf-chip {
+/* A tag, so it takes the system's only radius. */
+.onboard-chip {
   align-self: flex-start;
-  margin: 0 0 var(--wf-16);
-  padding: var(--wf-4) var(--wf-10);
-  border: 1px solid var(--wf-ash);
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: var(--wf-tracking);
+  margin: 0 0 var(--ed-24);
+  padding: 6px 20px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  font-size: var(--ed-16);
+  font-weight: 700;
+  line-height: 1.78;
 }
 
-.wf-field {
+.onboard-field {
   display: flex;
   align-items: center;
-  gap: var(--wf-8);
-  margin-bottom: var(--wf-30);
-  padding: var(--wf-10) var(--wf-16);
-  border: 1px solid var(--wf-ash);
-  color: var(--wf-bone);
+  gap: 12px;
+  margin-bottom: var(--ed-40);
+  padding: var(--ed-16) var(--ed-20);
+  border: 1px solid var(--ed-ink);
+  background: var(--ed-cream);
+  color: var(--ed-blue);
 }
 
-.wf-field:focus-within {
-  border-color: var(--wf-bone);
+.onboard-field:focus-within {
+  outline: 1px solid var(--ed-ink);
+  outline-offset: 2px;
 }
 
-.wf-field input {
+.onboard-field input {
   flex: 1;
   min-width: 0;
   border: none;
   background: none;
   outline: none;
-  color: var(--wf-bone);
+  color: var(--ed-ink);
   font: inherit;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 400;
-  letter-spacing: var(--wf-tracking);
 }
 
-.wf-field input::placeholder {
-  color: var(--wf-driftwood);
+.onboard-field input::placeholder {
+  color: var(--ed-ink-soft);
 }
 
-.wf-label {
-  margin: 0 0 var(--wf-8);
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: var(--wf-tracking);
-  text-transform: uppercase;
-  color: var(--wf-driftwood);
+.onboard-label {
+  margin: 0 0 var(--ed-16);
+  font-size: var(--ed-16);
+  font-weight: 700;
+  line-height: 1.78;
+  color: var(--ed-ink);
 }
 
-.wf-list {
-  margin: 0 0 var(--wf-30);
+.onboard-list {
+  margin: 0 0 var(--ed-40);
   padding: 0;
   list-style: none;
-  border-top: 1px solid var(--wf-charcoal);
+  border-top: 1px solid var(--ed-ink);
 }
 
-.wf-row {
+.onboard-row {
   display: flex;
   align-items: center;
-  gap: var(--wf-16);
+  gap: var(--ed-16);
   width: 100%;
   min-height: 56px;
-  padding: var(--wf-16) var(--wf-4);
+  padding: var(--ed-20) 0;
   border: none;
-  border-bottom: 1px solid var(--wf-charcoal);
+  border-bottom: 1px solid var(--ed-ink);
   background: none;
-  color: var(--wf-bone);
+  color: var(--ed-ink);
   font: inherit;
-  font-size: 16px;
-  font-weight: 400;
-  letter-spacing: var(--wf-tracking);
   text-align: left;
   cursor: pointer;
 }
 
-.wf-row:hover {
-  background: var(--wf-smolder);
+.onboard-row:hover .onboard-row-name {
+  color: var(--ed-blue);
 }
 
-.wf-row:focus-visible {
-  outline: 1px solid var(--wf-bone);
+.onboard-row:focus-visible {
+  outline: 1px solid var(--ed-ink);
   outline-offset: -1px;
 }
 
-/* Name over floor rather than beside it: at 320px the two competed for the
-   same line and long clinic names wrapped to three. */
-.wf-row-text {
+.onboard-row-text {
   display: flex;
   flex: 1;
   min-width: 0;
@@ -6981,82 +6999,89 @@ body {
   gap: 2px;
 }
 
-.wf-row-meta {
-  font-size: 13px;
-  letter-spacing: normal;
-  color: var(--wf-driftwood);
+/* A single-line list label rather than body copy, so it sits tighter than the
+   1.78 floor the reference sets for paragraphs. */
+.onboard-row-name {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
-.wf-primary,
-.wf-secondary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--wf-8);
-  width: 100%;
-  min-height: 56px;
-  padding: var(--wf-16);
-  font: inherit;
-  font-size: 16px;
+.onboard-row-meta {
+  font-size: var(--ed-16);
   font-weight: 400;
-  letter-spacing: var(--wf-tracking);
+  line-height: 1.5;
+  color: var(--ed-ink-soft);
+}
+
+/* The border is the button: outlined pill, cream fill, never a filled block. */
+.onboard-pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  margin-bottom: var(--ed-40);
+  padding: 14px 30px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font: inherit;
+  font-size: var(--ed-16);
+  font-weight: 700;
   cursor: pointer;
 }
 
-.wf-primary {
-  margin-bottom: var(--wf-30);
-  border: none;
-  background: var(--wf-bone);
-  color: var(--wf-void);
+.onboard-pill:hover {
+  border-color: var(--ed-blue);
+  color: var(--ed-blue);
 }
 
-.wf-primary:hover {
-  background: var(--wf-ash);
-}
-
-.wf-secondary {
-  border: 1px solid var(--wf-ash);
-  background: var(--wf-charcoal);
-  color: var(--wf-bone);
-}
-
-.wf-secondary:hover {
-  background: var(--wf-smolder);
-}
-
-.wf-primary:focus-visible,
-.wf-secondary:focus-visible {
-  outline: 1px solid var(--wf-bone);
+.onboard-pill:focus-visible {
+  outline: 1px solid var(--ed-ink);
   outline-offset: 3px;
 }
 
-.wf-text-action {
-  align-self: center;
+.onboard-ghost {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   min-height: 44px;
-  padding: var(--wf-8);
+  padding: 0;
   border: none;
   background: none;
-  color: var(--wf-driftwood);
+  color: var(--ed-ink);
   font: inherit;
-  font-size: 14px;
-  font-weight: 400;
-  letter-spacing: var(--wf-tracking);
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  font-size: var(--ed-16);
+  font-weight: 700;
   cursor: pointer;
 }
 
-.wf-text-action:hover {
-  color: var(--wf-bone);
+/* Drawn rather than typed: a glyph would depend on the host charset and on the
+   face carrying it. */
+.onboard-ghost-mark {
+  width: 0;
+  height: 0;
+  border-left: 7px solid currentColor;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
 }
 
-.wf-text-action:focus-visible {
-  outline: 1px solid var(--wf-bone);
-  outline-offset: 2px;
+.onboard-ghost:hover {
+  color: var(--ed-blue);
 }
 
-.wf-empty {
-  margin: 0 0 var(--wf-30);
-  font-size: 14px;
-  color: var(--wf-driftwood);
+.onboard-ghost:focus-visible {
+  outline: 1px solid var(--ed-ink);
+  outline-offset: 3px;
+}
+
+.onboard-empty {
+  margin: 0 0 var(--ed-40);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.82;
+  color: var(--ed-ink-soft);
 }
