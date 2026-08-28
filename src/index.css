@@ -7094,3 +7094,37 @@ body {
 .visitor-shell .search-panel {
   box-shadow: none;
 }
+
+/* Zoom controls, matching the floor stack. Wheel and pinch reach neither a
+   keyboard nor a switch, so the same three moves are real buttons. */
+.compiled-map-zoom {
+  position: absolute;
+  right: var(--ed-16);
+  bottom: var(--ed-16);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compiled-map-zoom button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  cursor: pointer;
+}
+
+.compiled-map-zoom button:hover {
+  border-color: var(--ed-blue);
+  color: var(--ed-blue);
+}
+
+.compiled-map-zoom button:focus-visible {
+  outline: 1px solid var(--ed-ink);
+  outline-offset: 3px;
+}

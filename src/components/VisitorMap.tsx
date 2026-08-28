@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Maximize, Minus, Plus } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { createVenueScene, type VenueScene } from '../map/venueScene';
 
@@ -74,6 +75,9 @@ export default function VisitorMap() {
   }, [ready, state.selectedPOI, state.activeFloorId]);
 
   const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    // Letting go after dragging the map is not a tap on whatever happens to be
+    // under the cursor.
+    if (sceneRef.current?.wasDragged() === true) return;
     const poiId = sceneRef.current?.pickPoi(event.clientX, event.clientY) ?? null;
     if (poiId === null) return;
     const node = venue.getNodeById(`poi:${poiId}`);
@@ -84,6 +88,24 @@ export default function VisitorMap() {
     <div className="compiled-map">
       <canvas ref={canvasRef} className="compiled-map-canvas" onClick={handleClick} />
       <div ref={labelRef} className="compiled-map-labels" aria-hidden="true" />
+
+      {/* Wheel and pinch are not available to a keyboard, so the same moves
+          have buttons. */}
+      <div className="compiled-map-zoom" role="group" aria-label="Map view">
+        <button type="button" aria-label="Zoom in" onClick={() => sceneRef.current?.zoomBy(0.75)}>
+          <Plus size={18} strokeWidth={2} aria-hidden="true" />
+        </button>
+        <button type="button" aria-label="Zoom out" onClick={() => sceneRef.current?.zoomBy(1.35)}>
+          <Minus size={18} strokeWidth={2} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          aria-label="Reset the map view"
+          onClick={() => sceneRef.current?.resetView()}
+        >
+          <Maximize size={16} strokeWidth={2} aria-hidden="true" />
+        </button>
+      </div>
 
       <div className="compiled-map-floors" role="group" aria-label="Floors">
         {[...floors]

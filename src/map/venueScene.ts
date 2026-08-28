@@ -26,7 +26,7 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
-import { placeCartographicLabels } from '../engine/floorplanCartography';
+import { resolveCartographicLabels } from '../engine/floorplanCartography';
 
 /**
  * The visitor map as a lit model rather than a drawing.
@@ -61,6 +61,22 @@ const SPACE_PRIORITY: Record<string, number> = {
   restricted: 3,
   'vertical-circulation': 9,
 };
+
+/*
+ * How far in the map has to be before a label competes for space. Destinations
+ * and the ways between floors are what someone is hunting for, so they are
+ * always eligible; room names arrive once you have zoomed to a wing; corridor
+ * names last, because at an overview they are noise the eye has to step over.
+ */
+const SPACE_MIN_SCALE: Record<string, number> = {
+  entrance: 0,
+  'vertical-circulation': 0,
+  lobby: 0.9,
+  room: 1.25,
+  service: 1.25,
+  restricted: 1.25,
+  corridor: 1.8,
+};
 const WALL_FILL = 0xfdfaf3;
 const SLAB_TOP = 0xdccfb6;
 const SLAB_SIDE = 0x9b8e76;
@@ -76,6 +92,10 @@ export interface VenueScene {
   setSelectedSpace(spaceId: string | null): void;
   /** POI id under a client point, or null. */
   pickPoi(clientX: number, clientY: number): string | null;
+  /** True when the last pointer sequence was a drag rather than a tap. */
+  wasDragged(): boolean;
+  zoomBy(factor: number): void;
+  resetView(): void;
   frame(): void;
   dispose(): void;
 }
@@ -202,7 +222,13 @@ export function createVenueScene(
     group: Group;
     spaceMeshes: Map<string, Mesh>;
     poiTargets: Array<{ id: string; object: Object3D }>;
-    labels: Array<{ id: string; text: string; priority: number; anchor: Vector3 }>;
+    labels: Array<{
+      id: string;
+      text: string;
+      priority: number;
+      minScale: number;
+      anchor: Vector3;
+    }>;
   }
 
   const floors = new Map<string, FloorView>();
@@ -256,6 +282,7 @@ export function createVenueScene(
         id: `space:${space.id}`,
         text: space.name,
         priority: SPACE_PRIORITY[space.type] ?? 5,
+        minScale: SPACE_MIN_SCALE[space.type] ?? 1.25,
         anchor: vec(
           [(Math.min(...sx) + Math.max(...sx)) / 2, (Math.min(...sy) + Math.max(...sy)) / 2],
           1.5,
@@ -305,6 +332,7 @@ export function createVenueScene(
         id: `poi:${poi.id}`,
         text: poi.name,
         priority: 12,
+        minScale: 0,
         anchor: vec(poi.position as Coordinate, 2.2),
       });
     }
@@ -319,7 +347,10 @@ export function createVenueScene(
   let activeFloorId = buildingPackage.floors[0]?.id ?? '';
   let selectedSpaceId: string | null = null;
 
-  const camera3 = { azimuth: -0.62, polar: 0.86, distance: span * 1.55 };
+  const HOME_DISTANCE = span * 1.55;
+  const MIN_DISTANCE = span * 0.32;
+  const MAX_DISTANCE = span * 2.4;
+  const camera3 = { azimuth: -0.62, polar: 0.86, distance: HOME_DISTANCE };
   const target = new Vector3(0, 0, 0);
 
   function applyCamera() {
@@ -405,11 +436,15 @@ export function createVenueScene(
         width: size[0],
         height: size[1],
         priority: label.priority,
+        minScale: label.minScale,
       });
     }
 
     const placed = new Set<string>();
-    for (const label of placeCartographicLabels(candidates, [], 6)) {
+    // Scale is how far in the camera has come from its opening distance, which
+    // is what decides which tier of labels is allowed to compete.
+    const scale = HOME_DISTANCE / camera3.distance;
+    for (const label of resolveCartographicLabels(candidates, [], 6, scale).placed) {
       const element = labelElements.get(label.id);
       if (element === undefined) continue;
       // `bounds`, not `center`. The placer moves a colliding label to whichever
@@ -430,6 +465,79 @@ export function createVenueScene(
       if (!placed.has(id)) element.style.opacity = '0';
     }
   }
+
+  /*
+   * Orbit, pan and zoom, on pointer events so a mouse and a finger take the
+   * same path. A drag must not also select: the pointer is only treated as a
+   * click if it barely moved, otherwise letting go over a destination after
+   * dragging the map would open something the visitor never aimed at.
+   */
+  const DRAG_SLOP = 6;
+  const pointers = new Map<number, { x: number; y: number }>();
+  let dragged = false;
+  let panning = false;
+  let pinchDistance = 0;
+
+  const clampDistance = (value: number) => Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, value));
+
+  const spread = () => {
+    const [a, b] = [...pointers.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
+
+  canvas.addEventListener('pointerdown', (event) => {
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    dragged = false;
+    panning = event.shiftKey || event.button === 1;
+    if (pointers.size === 2) pinchDistance = spread();
+    canvas.setPointerCapture(event.pointerId);
+  });
+
+  canvas.addEventListener('pointermove', (event) => {
+    const previous = pointers.get(event.pointerId);
+    if (previous === undefined) return;
+    const dx = event.clientX - previous.x;
+    const dy = event.clientY - previous.y;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (Math.abs(dx) > DRAG_SLOP || Math.abs(dy) > DRAG_SLOP) dragged = true;
+
+    if (pointers.size === 2) {
+      const next = spread();
+      if (pinchDistance > 0 && next > 0) {
+        camera3.distance = clampDistance(camera3.distance * (pinchDistance / next));
+        dragged = true;
+      }
+      pinchDistance = next;
+      return;
+    }
+
+    if (panning) {
+      const scale = camera3.distance * 0.0016;
+      target.x -= (dx * Math.cos(camera3.azimuth) - dy * Math.sin(camera3.azimuth)) * scale;
+      target.z += (dx * Math.sin(camera3.azimuth) + dy * Math.cos(camera3.azimuth)) * scale;
+      return;
+    }
+
+    camera3.azimuth -= dx * 0.005;
+    camera3.polar = Math.min(1.45, Math.max(0.2, camera3.polar - dy * 0.005));
+  });
+
+  const releasePointer = (event: PointerEvent) => {
+    pointers.delete(event.pointerId);
+    if (pointers.size < 2) pinchDistance = 0;
+    if (pointers.size === 0) panning = false;
+  };
+  canvas.addEventListener('pointerup', releasePointer);
+  canvas.addEventListener('pointercancel', releasePointer);
+
+  canvas.addEventListener(
+    'wheel',
+    (event) => {
+      event.preventDefault();
+      camera3.distance = clampDistance(camera3.distance * (1 + Math.sign(event.deltaY) * 0.12));
+    },
+    { passive: false },
+  );
 
   const raycaster = new Raycaster();
   const pointer = new Vector2();
@@ -481,6 +589,21 @@ export function createVenueScene(
       if (spaceId === null) return;
       const mesh = view.spaceMeshes.get(spaceId);
       if (mesh) (mesh.material as MeshStandardMaterial).color.setHex(SELECTED_FILL);
+    },
+
+    wasDragged() {
+      return dragged;
+    },
+
+    zoomBy(factor) {
+      camera3.distance = clampDistance(camera3.distance * factor);
+    },
+
+    resetView() {
+      camera3.azimuth = -0.62;
+      camera3.polar = 0.86;
+      camera3.distance = HOME_DISTANCE;
+      target.set(0, 0, 0);
     },
 
     pickPoi(clientX, clientY) {
