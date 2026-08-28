@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { expect, test } from './support';
 
 /**
@@ -38,11 +39,12 @@ test('a failed catalog request can be retried without reloading', async ({
   await page.goto('/#/visitor');
 
   const failure = page.getByRole('alert');
-  await expect(failure).toContainText('Venue bootstrap failed');
+  await expect(failure).toContainText("We couldn't load this venue");
+  await failure.getByText('Technical details').click();
   await expect(failure).toContainText('503');
 
   // The whole point: an action exists, and it recovers in place.
-  await page.getByRole('button', { name: 'Retry venue loading' }).click();
+  await page.getByRole('button', { name: 'Try again' }).click();
 
   await expect(page.locator('.compiled-map')).toBeVisible();
   expect(attempts).toBeGreaterThan(1);
@@ -56,7 +58,7 @@ test('a missing package URL recovers to the default and stops being retried', as
   await page.addInitScript(() => {
     localStorage.setItem('onboarding_complete', 'true');
     // The query parameter wins this load, while the different stale stored
-    // source proves "Use default venue" clears both places a bad source hides.
+    // source proves "Open default venue" clears both places a bad source hides.
     // Seed it once: addInitScript runs again on reload, and reintroducing the
     // value ourselves would test the fixture rather than recovery persistence.
     if (sessionStorage.getItem('seeded_missing_venue') !== 'true') {
@@ -73,10 +75,11 @@ test('a missing package URL recovers to the default and stops being retried', as
   await page.goto('/?venue=%2Fvenues%2Fno-such-venue.package.json#/visitor');
 
   const failure = page.getByRole('alert');
-  await expect(failure).toContainText('Venue bootstrap failed');
+  await expect(failure).toContainText("We couldn't load this venue");
+  await failure.getByText('Technical details').click();
   await expect(failure).toContainText('no-such-venue');
 
-  await page.getByRole('button', { name: 'Use default venue' }).click();
+  await page.getByRole('button', { name: 'Open default venue' }).click();
 
   await expect(page.locator('.compiled-map')).toBeVisible();
   await expect(page.locator('.status-bar')).toContainText('Ground');
@@ -88,4 +91,28 @@ test('a missing package URL recovers to the default and stops being retried', as
 
   await page.reload();
   await expect(page.locator('.compiled-map')).toBeVisible();
+});
+
+test('the catalog binds its URL to the declared venue and full package hash', async ({ page }) => {
+  await page.route('**/venues/asterion-medical-center.package.json', (route) =>
+    route.fulfill({
+      path: path.resolve('public/venues/harbor-exchange.package.json'),
+      contentType: 'application/json',
+    }),
+  );
+  await page.addInitScript(() => {
+    localStorage.setItem('onboarding_complete', 'true');
+    localStorage.removeItem('voicegis_active_venue_url');
+  });
+
+  await page.goto('/#/visitor');
+
+  const failure = page.getByRole('alert');
+  await expect(failure).toContainText("We couldn't load this venue");
+  await failure.getByText('Technical details').click();
+  await expect(failure).toContainText(
+    'VenuePackage does not match the catalog release that selected it.',
+  );
+  await expect(page.locator('.compiled-map')).toHaveCount(0);
+  await expect(page.getByText('Harbor Exchange', { exact: true })).toHaveCount(0);
 });

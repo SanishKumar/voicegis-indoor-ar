@@ -34,26 +34,22 @@ export const test = base.extend<SmokeFixtures>({
   },
 
   browserErrors: [
-    async ({ page, allowedBrowserErrors }, use) => {
+    async ({ context, allowedBrowserErrors }, use) => {
       const errors: string[] = [];
 
-      // The product must remain usable with its declared system-font fallback.
-      // Fulfilling these requests avoids making the smoke gate depend on Google.
-      await page.route('https://fonts.googleapis.com/**', (route) =>
-        route.fulfill({ status: 200, contentType: 'text/css', body: '' }),
-      );
-      await page.route('https://fonts.gstatic.com/**', (route) =>
-        route.fulfill({ status: 200, contentType: 'font/woff2', body: '' }),
-      );
-
-      page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
-      page.on('console', (message) => {
-        if (message.type() !== 'error') return;
-        const source = message.location().url;
-        errors.push(`console: ${message.text()}${source ? ` at ${source}` : ''}`);
-      });
+      const listen = (candidatePage: Page) => {
+        candidatePage.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
+        candidatePage.on('console', (message) => {
+          if (message.type() !== 'error') return;
+          const source = message.location().url;
+          errors.push(`console: ${message.text()}${source ? ` at ${source}` : ''}`);
+        });
+      };
+      context.pages().forEach(listen);
+      context.on('page', listen);
 
       await use(errors);
+      context.off('page', listen);
       const matchCounts = allowedBrowserErrors.map(() => 0);
       const unexpected = errors.filter((message) => {
         const allowanceIndex = allowedBrowserErrors.findIndex((pattern) => {

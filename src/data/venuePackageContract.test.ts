@@ -27,6 +27,52 @@ describe('VenuePackage runtime contract', () => {
     expect(loaded.manifest.contentHash).toBe(HARBOR_PACKAGE.manifest.contentHash);
   });
 
+  it('binds a catalog-selected URL to both its venue and full content hash', async () => {
+    const fetchPackage = async () =>
+      new Response(JSON.stringify(HARBOR_PACKAGE), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+    await expect(
+      loadVenuePackageFromUrl(
+        '/venues/asterion-medical-center.package.json',
+        fetchPackage as typeof fetch,
+        {
+          buildingId: ASTERION_PACKAGE.building.id,
+          contentHash: ASTERION_PACKAGE.manifest.contentHash,
+        },
+      ),
+    ).rejects.toMatchObject({
+      name: 'VenuePackageVerificationError',
+      issues: expect.arrayContaining([
+        expect.objectContaining({ code: 'catalog-building-mismatch' }),
+        expect.objectContaining({ code: 'catalog-content-hash-mismatch' }),
+      ]),
+    });
+  });
+
+  it('refuses a self-consistent package that is not the catalogued release hash', async () => {
+    const fetchPackage = async () =>
+      new Response(JSON.stringify(ASTERION_PACKAGE), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+    await expect(
+      loadVenuePackageFromUrl(
+        '/venues/asterion-medical-center.package.json',
+        fetchPackage as typeof fetch,
+        {
+          buildingId: ASTERION_PACKAGE.building.id,
+          contentHash: 'b'.repeat(64),
+        },
+      ),
+    ).rejects.toMatchObject({
+      issues: [expect.objectContaining({ code: 'catalog-content-hash-mismatch' })],
+    });
+  });
+
   it('rejects tampering before runtime activation', async () => {
     const tampered = structuredClone(HARBOR_PACKAGE);
     tampered.building.name = 'Tampered Harbor';

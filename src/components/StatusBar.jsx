@@ -4,15 +4,24 @@
  * Quiet visitor status line with route, floor, and connectivity context.
  */
 
-import { MapPin, Wifi, WifiOff, Layers } from 'lucide-react';
+import { Download, Layers, MapPin, Wifi, WifiOff } from 'lucide-react';
 import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { startPointLabel } from '../capture/startLabel.ts';
-import { useState, useEffect } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import {
+  getOfflineAvailability,
+  subscribeOfflineAvailability,
+} from '../offline/offlineAvailability.ts';
 
 export default function StatusBar() {
-  const { state, venue, checkIn } = useNavigation();
+  const { state, venue, checkIn, packageCacheStatus } = useNavigation();
   const { navStatus, activeFloorId, startNodeId } = state;
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const offlineAvailability = useSyncExternalStore(
+    subscribeOfflineAvailability,
+    getOfflineAvailability,
+    getOfflineAvailability,
+  );
   const startNode = venue.getNodeById(startNodeId);
   const activeFloor = venue.getFloorById(activeFloorId);
   const labelNames = {
@@ -46,6 +55,24 @@ export default function StatusBar() {
         ? 'status-dot active'
         : 'status-dot';
 
+  const offlineReady =
+    offlineAvailability === 'available' && packageCacheStatus.state === 'verified';
+  const offlineState = offlineReady
+    ? 'available'
+    : offlineAvailability === 'preparing'
+      ? 'preparing'
+      : 'online-only';
+  const connectivityLabel = !isOnline
+    ? offlineReady
+      ? 'Working offline'
+      : 'No connection'
+    : offlineReady
+      ? 'Offline ready'
+      : offlineAvailability === 'preparing'
+        ? 'Saving offline…'
+        : 'Online only';
+  const ConnectivityIcon = !isOnline ? WifiOff : offlineReady ? Download : Wifi;
+
   return (
     <aside className="status-bar visitor-status-bar" id="status-bar" aria-label="Map status">
       <div className="status-item status-primary">
@@ -63,16 +90,15 @@ export default function StatusBar() {
         <span>{activeFloor?.name ?? 'Floor unavailable'}</span>
       </div>
 
-      {/*
-        Reports the connection, not a capability. This said "Offline-ready",
-        which claimed something navigator.onLine cannot know and the app does
-        not do: there is no service worker, so a reload while offline fails at
-        the package fetch. Routing already loaded keeps working, which is worth
-        saying, but it is not the same promise.
-      */}
-      <div className="status-item status-network" title={isOnline ? 'Connected' : 'No connection'}>
-        {isOnline ? <Wifi size={11} /> : <WifiOff size={11} />}
-        <span>{isOnline ? 'Connected' : 'No connection'}</span>
+      <div
+        className="status-item status-offline"
+        data-offline-state={offlineState}
+        role="status"
+        aria-live="polite"
+        title={`${connectivityLabel}. ${packageCacheStatus.detail}`}
+      >
+        <ConnectivityIcon size={11} />
+        <span>{connectivityLabel}</span>
       </div>
     </aside>
   );

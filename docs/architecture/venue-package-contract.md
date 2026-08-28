@@ -176,14 +176,20 @@ runs Chromium at 1280×800 and 375×812. It covers:
 - camera-control geometry at both 375 px and 320 px widths; and
 - topmost-only Escape handling and focus restoration for nested dialogs.
 
-Uncaught page exceptions and console errors fail the suite. Google Fonts are
-fulfilled locally so the result exercises the declared system-font fallback
-instead of depending on a third party. Traces and screenshots are retained on
-failure, and CI runs the browser gate independently from the deterministic Node
-gate.
+Uncaught page exceptions and console errors fail the suite. The visitor shell
+uses the system font stack and makes no Google Fonts request. Traces and
+screenshots are retained on failure, and CI runs the browser gate independently
+from the deterministic Node gate.
 
-This is production-bundle browser coverage, not field validation. Chromium
-emulation cannot prove Safari camera permissions, phone motion sensors, QR
-recognition under corridor lighting, cold-start offline behavior or recovery
-from a failed venue bootstrap. Those remain device, deployment and product
-work rather than claims made by this gate.
+The public-build browser job clears the ordinary HTTP cache, closes the network,
+opens a fresh page, and confirms its document and script came from the generated
+service worker before switching floors, checking in, and routing. It exercises
+cache eviction and exact-revision repair, removes venue responses to reach the
+independently verified IndexedDB fallback, and swaps in a different but
+self-consistent venue package to prove identity is bound as well as bytes. A
+separate run proves complete updates wait, failed installs do not displace the
+known-good revision, and the UI never calls a worker merely being active
+"offline ready." This remains browser coverage, not field validation: Chromium
+cannot prove Safari camera permissions, phone motion sensors, QR recognition
+under corridor lighting, or the cache headers of a host that has not been
+deployed.

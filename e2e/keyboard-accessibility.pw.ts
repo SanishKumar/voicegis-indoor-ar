@@ -31,6 +31,10 @@ test('onboarding moves focus to every newly displayed step', async ({ page }) =>
 });
 
 test('every onboarding exit without a route hands focus to the map search', async ({ page }) => {
+  // This case deliberately completes three independent onboarding exits. On
+  // mobile Chromium it remains ~20 s in isolation and can exceed the global
+  // 30 s budget when the second browser project is rendering 3D concurrently.
+  test.setTimeout(45_000);
   await page.goto('/#/visitor');
   const searchTrigger = page.getByRole('button', {
     name: 'Search rooms and departments',

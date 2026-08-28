@@ -1,6 +1,8 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import basicSsl from '@vitejs/plugin-basic-ssl'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import basicSsl from '@vitejs/plugin-basic-ssl';
+import { fileURLToPath } from 'node:url';
+import { offlineServiceWorkerPlugin } from './scripts/offlineServiceWorkerPlugin.js';
 
 /**
  * `npm run dev:mobile` serves over HTTPS on every network interface.
@@ -19,9 +21,17 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
  * accepted once per device. That is the whole cost of the mobile path.
  */
 export default defineConfig(({ mode }) => {
-  const mobile = mode === 'mobile'
+  const mobile = mode === 'mobile';
+  const publicBuild = mode === 'public';
   return {
-    plugins: mobile ? [react(), basicSsl()] : [react()],
+    plugins: mobile ? [react(), basicSsl()] : [react(), offlineServiceWorkerPlugin(publicBuild)],
+    resolve: {
+      alias: {
+        '#voicegis-app': fileURLToPath(
+          new URL(publicBuild ? './src/PublicApp.jsx' : './src/App.jsx', import.meta.url),
+        ),
+      },
+    },
     server: {
       port: Number(process.env.PORT) || 3000,
       open: !mobile,
@@ -32,5 +42,5 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       sourcemap: true,
     },
-  }
-})
+  };
+});

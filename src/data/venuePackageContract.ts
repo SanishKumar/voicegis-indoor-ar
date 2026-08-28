@@ -402,9 +402,44 @@ export async function verifyVenuePackage(value: unknown): Promise<CompiledBuildi
   return buildingPackage;
 }
 
+export interface VenuePackageExpectation {
+  buildingId: string;
+  contentHash: string;
+}
+
+function verifyVenuePackageExpectation(
+  buildingPackage: CompiledBuildingPackage,
+  expectation: VenuePackageExpectation | undefined,
+) {
+  if (expectation === undefined) return;
+
+  const issues: VenuePackageIssue[] = [];
+  if (buildingPackage.building.id !== expectation.buildingId) {
+    issues.push({
+      path: '/building/id',
+      code: 'catalog-building-mismatch',
+      message: `VenuePackage building id does not match catalog entry ${expectation.buildingId}.`,
+    });
+  }
+  if (buildingPackage.manifest.contentHash !== expectation.contentHash) {
+    issues.push({
+      path: '/manifest/contentHash',
+      code: 'catalog-content-hash-mismatch',
+      message: 'VenuePackage content hash does not match the catalog release.',
+    });
+  }
+  if (issues.length > 0) {
+    throw new VenuePackageVerificationError(
+      'VenuePackage does not match the catalog release that selected it.',
+      issues,
+    );
+  }
+}
+
 export async function loadVenuePackageFromUrl(
   url: string,
   fetchImplementation: typeof fetch = fetch,
+  expectation?: VenuePackageExpectation,
 ): Promise<CompiledBuildingPackage> {
   const response = await fetchImplementation(url, { headers: { Accept: 'application/json' } });
   if (!response.ok) {
@@ -412,7 +447,9 @@ export async function loadVenuePackageFromUrl(
       `VenuePackage request failed (${response.status} ${response.statusText}).`,
     );
   }
-  return verifyVenuePackage(await response.json());
+  const buildingPackage = await verifyVenuePackage(await response.json());
+  verifyVenuePackageExpectation(buildingPackage, expectation);
+  return buildingPackage;
 }
 
 export async function loadVenuePackageFromFile(file: Pick<File, 'name' | 'text'>) {

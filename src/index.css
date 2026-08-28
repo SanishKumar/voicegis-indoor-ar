@@ -3789,7 +3789,7 @@ body {
   font-weight: 700;
 }
 
-.visitor-status-bar .status-network {
+.visitor-status-bar .status-offline {
   margin-left: auto;
 }
 
@@ -4090,9 +4090,6 @@ body {
     display: none;
   }
 
-  .visitor-status-bar .status-network span {
-    display: none;
-  }
 }
 
 /* Persistent product navigation: 2D map, 3D twin + venue tools, and Studio. */
@@ -4107,8 +4104,9 @@ body {
 }
 
 .surface-nav a {
-  min-height: 34px;
+  min-height: 44px;
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 6px;
   padding: 0 11px;
@@ -4135,7 +4133,7 @@ body {
 
 @media (max-width: 700px) {
   .surface-nav a {
-    min-width: 40px;
+    min-width: 44px;
     justify-content: center;
   }
 
@@ -7063,6 +7061,27 @@ body {
   color: var(--color-text-muted);
   font-size: 12px;
   word-break: break-all;
+}
+
+.venue-bootstrap-details {
+  width: min(100%, 540px);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  text-align: left;
+}
+
+.venue-bootstrap-details summary {
+  width: max-content;
+  min-height: 44px;
+  margin: 0 auto;
+  padding: 12px 4px;
+  color: var(--color-text-secondary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.venue-bootstrap-details p {
+  margin: 6px 0;
 }
 
 .venue-bootstrap-actions {

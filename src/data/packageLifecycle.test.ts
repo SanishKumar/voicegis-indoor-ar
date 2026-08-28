@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
-import { ASTERION_PACKAGE } from '../test/venueFixtures';
+import { ASTERION_PACKAGE, HARBOR_PACKAGE } from '../test/venueFixtures';
 import {
   PackageIntegrityError,
   PackageLifecycle,
@@ -103,5 +103,22 @@ describe('verified package lifecycle', () => {
       activeHash: first.contentHash,
       previousHash: null,
     });
+  });
+
+  it('refuses a self-consistent foreign package hidden under valid record metadata', async () => {
+    const store = new MemoryPackageStore();
+    const lifecycle = new PackageLifecycle(store);
+    const installed = await lifecycle.install(ASTERION_PACKAGE, '2026-07-22T00:00:00.000Z');
+    await lifecycle.activate(
+      installed.buildingId,
+      installed.contentHash,
+      '2026-07-22T00:01:00.000Z',
+    );
+    const swapped = store.packages.get(installed.key)!;
+    swapped.buildingPackage = structuredClone(HARBOR_PACKAGE);
+
+    await expect(lifecycle.getActive(ASTERION_PACKAGE.building.id)).rejects.toThrow(
+      'Cached package metadata does not match',
+    );
   });
 });

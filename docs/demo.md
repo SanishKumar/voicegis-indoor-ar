@@ -16,8 +16,8 @@ Three things that claim does **not** include, because they would not survive a
 careful reader:
 
 - **It is not survey-free.** No beacons are installed and no RF fingerprinting
-  is needed, but each code still has to be *placed where the package says it
-  is*. That is a tape measure against two walls per sign. What is avoided is
+  is needed, but each code still has to be _placed where the package says it
+  is_. That is a tape measure against two walls per sign. What is avoided is
   hardware and a radio survey, not knowing where things are.
 - **The bundled venues are synthetic.** Asterion and the reference building are
   authored fixtures, so any distance quoted below is a property of a constructed
@@ -71,28 +71,36 @@ means a flaky camera cannot take the demo down.
 
 1. **Scan.** A code at a corridor junction resolves to the anchor the package
    declares: floor, position, heading. The app says where it thinks you are —
-   *Checked in at Family Care Concourse · Level 2 · anchor-l2-east*. The anchor
+   _Checked in at Family Care Concourse · Level 2 · anchor-l2-east_. The anchor
    id is shown because one space can hold two codes at opposite ends.
 
    How closely that matches the real world is a property of how carefully the
    sign was placed, and has never been measured in a building. Do not quote a
    figure for it.
+
 2. **Route.** Ask for "pharmacy". The route is computed over the compiled graph,
    on-device, and drawn across the floor plan with turn-by-turn steps.
 3. **Step-free.** Toggle accessible routing and the route changes under you.
    Checked in on Level 2, the pharmacy on the ground floor is 79 m via the South
    Public Stair, or 91 m via the Panoramic Atrium Lift with step-free on. If a
-   step-free path cannot be *proven* — a lift out of service, a portal with no
+   step-free path cannot be _proven_ — a lift out of service, a portal with no
    accessible attribute — it refuses rather than quietly routing you up a
    staircase.
-4. **No network round-trip.** With the app already loaded, turn off the network
-   and do it again: check-in, routing and floor switching are unchanged, because
-   all of it is computed against the package already in memory.
+4. **Cold reload offline.** Build and preview the deployable visitor shell once
+   while online (`npm run build`, then `npm run preview`) and wait for **Offline
+   ready** in the status bar. In Chromium DevTools, set **Network → Offline**;
+   turning off Wi-Fi alone does not disconnect a server on `localhost`. Close
+   the tab, open a fresh one at the same preview URL, and repeat check-in,
+   routing, and floor switching. The app shell and bundled releases come from
+   the revisioned service-worker cache; the active IndexedDB package is
+   independently re-hashed before fallback activation.
 
-   This is not yet a cold-start offline app. There is no service worker, so a
-   reload with the network down fails at the point it fetches the venue package.
-   The registry stores verified packages in IndexedDB; wiring that to a service
-   worker so a first paint can come from cache is not done.
+   This does not make a first-ever offline visit possible. Installation needs
+   one completed online load, arbitrary remote VenuePackage URLs remain subject
+   to their origin and availability, and production hosting must be HTTPS at the
+   domain root. The automated browser gate repeats fresh-page check-in and
+   routing, and floor switching with Chromium's network disabled. It separately
+   proves that a corrupted IndexedDB package is refused.
 
 ## Why the codes are generated, not authored
 

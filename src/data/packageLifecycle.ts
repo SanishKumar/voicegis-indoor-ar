@@ -77,6 +77,34 @@ export async function verifyPackageIntegrity(
   return actualHash === buildingPackage.manifest.contentHash;
 }
 
+async function verifyCachedRecord(
+  record: CachedPackageRecord,
+  expectedBuildingId: string,
+  expectedContentHash: string,
+): Promise<void> {
+  const expectedKey = packageKey(expectedBuildingId, expectedContentHash);
+  if (
+    record.key !== expectedKey ||
+    record.buildingId !== expectedBuildingId ||
+    record.contentHash !== expectedContentHash ||
+    record.buildingPackage.building.id !== expectedBuildingId ||
+    record.buildingPackage.manifest.contentHash !== expectedContentHash
+  ) {
+    throw new PackageIntegrityError(`Cached package metadata does not match ${expectedKey}.`);
+  }
+  if (!(await verifyPackageIntegrity(record.buildingPackage))) {
+    throw new PackageIntegrityError(`Cached package failed verification: ${expectedKey}.`);
+  }
+}
+
+function verifyActivationState(state: PackageActivationState, buildingId: string) {
+  if (state.buildingId !== buildingId) {
+    throw new PackageIntegrityError(
+      `Cached activation metadata does not match building ${buildingId}.`,
+    );
+  }
+}
+
 export class PackageLifecycle {
   constructor(private readonly store: PackageStore) {}
 
@@ -110,11 +138,10 @@ export class PackageLifecycle {
     const key = packageKey(buildingId, contentHash);
     const record = await this.store.getPackage(key);
     if (!record) throw new PackageLifecycleError(`Package is not installed: ${key}.`);
-    if (!(await verifyPackageIntegrity(record.buildingPackage))) {
-      throw new PackageIntegrityError(`Cached package failed verification: ${key}.`);
-    }
+    await verifyCachedRecord(record, buildingId, contentHash);
 
     const current = await this.store.getActivation(buildingId);
+    if (current) verifyActivationState(current, buildingId);
     const state: PackageActivationState = {
       buildingId,
       activeHash: contentHash,
@@ -133,14 +160,13 @@ export class PackageLifecycle {
     if (!current?.previousHash) {
       throw new PackageLifecycleError(`No previous package is available for ${buildingId}.`);
     }
+    verifyActivationState(current, buildingId);
 
     const previous = await this.store.getPackage(packageKey(buildingId, current.previousHash));
     if (!previous) {
       throw new PackageLifecycleError(`Previous package is missing for ${buildingId}.`);
     }
-    if (!(await verifyPackageIntegrity(previous.buildingPackage))) {
-      throw new PackageIntegrityError(`Previous package failed verification for ${buildingId}.`);
-    }
+    await verifyCachedRecord(previous, buildingId, current.previousHash);
 
     const nextState: PackageActivationState = {
       buildingId,
@@ -155,11 +181,17 @@ export class PackageLifecycle {
   async getActive(buildingId: string): Promise<CachedPackageRecord | null> {
     const state = await this.store.getActivation(buildingId);
     if (!state) return null;
+    verifyActivationState(state, buildingId);
     const record = await this.store.getPackage(packageKey(buildingId, state.activeHash));
     if (!record) throw new PackageLifecycleError(`Active package is missing for ${buildingId}.`);
-    if (!(await verifyPackageIntegrity(record.buildingPackage))) {
-      throw new PackageIntegrityError(`Active package failed verification for ${buildingId}.`);
-    }
+    await verifyCachedRecord(record, buildingId, state.activeHash);
+    return record;
+  }
+
+  async getInstalled(buildingId: string, contentHash: string): Promise<CachedPackageRecord | null> {
+    const record = await this.store.getPackage(packageKey(buildingId, contentHash));
+    if (!record) return null;
+    await verifyCachedRecord(record, buildingId, contentHash);
     return record;
   }
 }

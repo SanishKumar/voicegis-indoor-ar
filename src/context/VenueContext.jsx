@@ -8,7 +8,11 @@ import {
   useState,
 } from 'react';
 import { createCompiledBuildingRuntime } from '../data/compiledBuilding';
-import { cacheAndActivateVenuePackage } from '../data/packageCacheRuntime';
+import {
+  cacheAndActivateVenuePackage,
+  loadCachedVenuePackage,
+  rememberCachedVenuePackage,
+} from '../data/packageCacheRuntime';
 import {
   loadVenuePackageFromFile,
   loadVenuePackageFromUrl,
@@ -20,6 +24,7 @@ import {
   recordRuntimeActivation,
   summarizeRuntimePackage,
 } from '../data/runtimeActivationHistory';
+import { LatestActivationQueue } from '../data/latestActivationQueue';
 import { createRuntimeCatalogEntries, parseVenueVersionCatalog } from '../data/venueVersionCatalog';
 
 const VenueContext = createContext(null);
@@ -78,10 +83,19 @@ export function VenueProvider({ children }) {
   const [rollbackCandidate, setRollbackCandidate] = useState(null);
   const activationSequence = useRef(0);
   const activationHistory = useRef(createRuntimeActivationHistory());
+  const cacheActivationQueue = useRef(new LatestActivationQueue());
 
   const activatePackage = useCallback(async (buildingPackage, source, sequence, options = {}) => {
-    const cacheStatus = await cacheAndActivateVenuePackage(buildingPackage);
+    const cacheStatus = await cacheActivationQueue.current.run(
+      () => sequence === activationSequence.current,
+      () => cacheAndActivateVenuePackage(buildingPackage),
+    );
+    if (cacheStatus === null) return null;
     if (sequence !== activationSequence.current) return null;
+
+    if (cacheStatus.state === 'verified') {
+      rememberCachedVenuePackage(buildingPackage, source, options.cacheAsDefault === true);
+    }
 
     const runtime = createCompiledBuildingRuntime(buildingPackage);
     const nextHistory =
@@ -111,9 +125,11 @@ export function VenueProvider({ children }) {
         error: null,
       }));
       try {
-        const buildingPackage = await loadVenuePackageFromUrl(url);
+        const buildingPackage = await loadVenuePackageFromUrl(url, fetch, options.expectation);
         if (sequence !== activationSequence.current) return null;
-        const runtime = await activatePackage(buildingPackage, url, sequence);
+        const runtime = await activatePackage(buildingPackage, url, sequence, {
+          cacheAsDefault: options.cacheAsDefault,
+        });
         if (runtime && options.persist !== false && typeof localStorage !== 'undefined') {
           persistRuntimeSource(url);
         }
@@ -264,7 +280,7 @@ export function VenueProvider({ children }) {
    * because every reload retried exactly the source that had just failed.
    *
    * `preferDefault` is the recovery path: it forgets the failed source first, so
-   * "Use default venue" cannot be defeated by the thing that broke.
+   * "Open default venue" cannot be defeated by the thing that broke.
    */
   const bootstrapVenue = useCallback(
     async ({ preferDefault = false } = {}) => {
@@ -276,9 +292,12 @@ export function VenueProvider({ children }) {
         failedSource: null,
       });
 
-      let attempted = null;
+      if (preferDefault) clearFailedVenueSource();
+      const queryVenueUrl = new URLSearchParams(window.location.search).get('venue');
+      const storedVenueUrl = localStorage.getItem(ACTIVE_VENUE_URL_KEY);
+      const attempted = preferDefault ? null : queryVenueUrl || storedVenueUrl || null;
+      let expectation;
       try {
-        if (preferDefault) clearFailedVenueSource();
         const nextCatalog = await loadCatalog();
         if (!mountedRef.current) return;
         const runtimeCatalog = createRuntimeCatalogEntries(nextCatalog);
@@ -289,17 +308,51 @@ export function VenueProvider({ children }) {
           (candidate) => candidate.id === nextCatalog.defaultVenueId,
         );
 
-        if (!preferDefault) {
-          const queryVenueUrl = new URLSearchParams(window.location.search).get('venue');
-          const storedVenueUrl = localStorage.getItem(ACTIVE_VENUE_URL_KEY);
-          attempted = queryVenueUrl || storedVenueUrl || null;
-        }
-
         const packageUrl = attempted || defaultVenue?.packageUrl;
         if (!packageUrl) throw new Error('Venue catalog has no loadable default package.');
-        await activateFromUrl(packageUrl, { persist: false });
+        const catalogVenue = nextCatalog.venues.find((candidate) =>
+          candidate.releases.some((release) => release.packageUrl === packageUrl),
+        );
+        const catalogRelease = catalogVenue?.releases.find(
+          (release) => release.packageUrl === packageUrl,
+        );
+        expectation =
+          catalogVenue && catalogRelease
+            ? {
+                buildingId: catalogVenue.id,
+                contentHash: catalogRelease.contentHash,
+              }
+            : undefined;
+        await activateFromUrl(packageUrl, {
+          persist: false,
+          expectation,
+          cacheAsDefault: packageUrl === defaultVenue?.packageUrl,
+        });
       } catch (error) {
         if (!mountedRef.current) return;
+
+        try {
+          const cached = await loadCachedVenuePackage({
+            requiredSource: attempted,
+            preferDefault,
+          });
+          const matchesCatalog =
+            !expectation ||
+            (cached?.buildingPackage.building.id === expectation.buildingId &&
+              cached.buildingPackage.manifest.contentHash === expectation.contentHash);
+          if (cached !== null && matchesCatalog) {
+            const sequence = ++activationSequence.current;
+            await activatePackage(cached.buildingPackage, cached.source, sequence, {
+              cacheAsDefault: preferDefault,
+              detail: `${cached.buildingPackage.building.name} was restored from the last verified offline package.`,
+            });
+            return;
+          }
+        } catch {
+          // The network error below remains the useful primary diagnosis. A
+          // missing, stale, or corrupted cached package is never activated.
+        }
+
         setStatus({
           state: 'error',
           source: null,
@@ -311,11 +364,14 @@ export function VenueProvider({ children }) {
         });
       }
     },
-    [activateFromUrl],
+    [activateFromUrl, activatePackage],
   );
 
   const retryBootstrap = useCallback(() => bootstrapVenue(), [bootstrapVenue]);
-  const useDefaultVenue = useCallback(() => bootstrapVenue({ preferDefault: true }), [bootstrapVenue]);
+  const useDefaultVenue = useCallback(
+    () => bootstrapVenue({ preferDefault: true }),
+    [bootstrapVenue],
+  );
 
   useEffect(() => {
     void bootstrapVenue();

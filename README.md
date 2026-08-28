@@ -44,9 +44,11 @@ to any published public destination — when the selected profile can prove a ro
 — with no beacons, no RF fingerprinting and no positioning service. Check-in and
 routing run against the compiled package on the device.
 
-The bundled venues are synthetic fixtures, each code still has to be physically
-placed where the package says it is, and a cold reload with the network down is
-not yet supported. Full script and the exact limits: [the 60-second demo](docs/demo.md).
+The bundled venues are synthetic fixtures, and each code still has to be
+physically placed where the package says it is. The deployable visitor build can
+cold-reload after one completed online installation while the browser retains
+the verified cache; a first-ever visit still needs a connection. Full script and
+the exact limits: [the 60-second demo](docs/demo.md).
 
 ## Core capabilities
 
@@ -157,8 +159,10 @@ The development server prints the local URL after startup.
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `npm run check`                  | Run lint, type checking, tests, deterministic package checks, replay verification, and the production build |
 | `npm test`                       | Run the Vitest suite                                                                                        |
-| `npm run test:browser`           | Build and run the production-browser smoke suite in desktop and mobile Chromium                             |
-| `npm run test:browser:headed`    | Run the same browser journeys with a visible Chromium window                                                |
+| `npm run test:browser`           | Run operator journeys plus the public build's real cold-offline browser gate                                |
+| `npm run test:browser:operator`  | Run the engineering/operator production-browser journeys                                                    |
+| `npm run test:browser:offline`   | Prove cold-offline load, floor switching, routing, cache repair, and atomic worker updates in Chromium      |
+| `npm run test:browser:headed`    | Run the operator production-browser journeys with a visible Chromium window                                 |
 | `npm run compile:asterion`       | Recompile the Asterion building package                                                                     |
 | `npm run compile:asterion:check` | Verify that the committed Asterion package is reproducible                                                  |
 | `npm run compile:harbor:check`   | Verify that the committed Harbor Exchange package is reproducible                                           |
@@ -168,12 +172,22 @@ The development server prints the local URL after startup.
 | `npm run codes`                  | Regenerate the printable check-in code sheet from the compiled venue packages                               |
 | `npm run dev:mobile`             | Serve over HTTPS on the LAN so a phone can reach `#/recorder` and use its motion sensors                    |
 | `npm run evidence`               | Seal a capture and its predeclared manifest into an evidence artifact, or verify one                        |
-| `npm run build`                  | Create a production build in `dist/`                                                                        |
+| `npm run build`                  | Create the public visitor application and its offline cache in `dist/`                                      |
+| `npm run build:operator`         | Create the Inspector/Studio/Recorder engineering build                                                      |
 
 The browser suite needs a one-time local `npx playwright install chromium`.
 CI installs Chromium independently and keeps this gate separate from
 `npm run check`, so a browser-installation failure cannot hide a compiler or
 unit-test failure.
+
+The visitor build is a static, root-hosted HTTPS site. Its generated service
+worker caches the visitor JavaScript entry graph and bundled venue releases;
+Inspector, Studio, and Recorder route components and rendering dependencies are
+outside that graph. The shared venue provider still contains unexposed package
+activation/rollback helpers, and the shared stylesheet still contains operator
+selectors, so this is a UI/rendering split rather than a minimal privilege
+boundary. See [deployment](docs/deployment.md) for cache headers, update order,
+and the exact offline boundary.
 
 ## Repository structure
 

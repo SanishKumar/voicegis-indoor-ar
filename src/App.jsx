@@ -1,21 +1,12 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { NavigationProvider, useNavigation } from './context/NavigationContext.jsx';
+import { NavigationProvider } from './context/NavigationContext.jsx';
 import { VenueProvider, useVenue } from './context/VenueContext.jsx';
-import WelcomeScreen from './components/WelcomeScreen.jsx';
-import Header from './components/Header.jsx';
-import SearchPanel from './components/SearchPanel.jsx';
-import POICard from './components/POICard.jsx';
-import NavigationPanel from './components/NavigationPanel.jsx';
-import LocationPicker from './components/LocationPicker.jsx';
-import CameraPreview from './components/CameraPreview.jsx';
-import StatusBar from './components/StatusBar.jsx';
 import SurfaceNav from './components/SurfaceNav.jsx';
 import VenuePackageManager from './components/VenuePackageManager.jsx';
-import CheckInToast from './components/CheckInToast.tsx';
-import { VISITOR_VIEW, visitorViewFor } from './context/visitorView.ts';
+import VenueBootstrapState from './components/VenueBootstrapState.jsx';
+import VisitorApp from './components/VisitorApp.jsx';
 
 const SpatialTwinViewer = lazy(() => import('./components/SpatialTwinViewer.tsx'));
-const FloorplanViewer = lazy(() => import('./components/FloorplanViewer.tsx'));
 const BuildingSourceWorkspace = lazy(() => import('./components/BuildingSourceWorkspace.tsx'));
 const WalkRecorder = lazy(() => import('./components/WalkRecorder.tsx'));
 
@@ -33,55 +24,6 @@ function useSurfaceRoute() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
   return surface;
-}
-
-function VisitorApp() {
-  const {
-    state,
-    onboardingComplete,
-    completeOnboarding,
-    showLocationPicker,
-    setShowLocationPicker,
-  } = useNavigation();
-  const previousOnboardingCompleteRef = useRef(onboardingComplete);
-
-  useEffect(() => {
-    const previous = previousOnboardingCompleteRef.current;
-    previousOnboardingCompleteRef.current = onboardingComplete;
-    if (previous === onboardingComplete) return;
-
-    // Both shells replace the focused control that initiated the transition.
-    // A route path later focuses guidance; otherwise the map's primary action
-    // is the useful successor. Returning to Welcome focuses its opening title.
-    const targetId = onboardingComplete ? 'btn-search-open' : 'welcome-step-heading';
-    document.getElementById(targetId)?.focus({ preventScroll: true });
-  }, [onboardingComplete]);
-
-  if (!onboardingComplete) {
-    return <WelcomeScreen onComplete={completeOnboarding} />;
-  }
-
-  return (
-    <div className="visitor-shell">
-      <Header />
-      <main className="main-content visitor-map-stage" id="main-content">
-        {visitorViewFor(state.activeView) === VISITOR_VIEW.MAP && (
-          <>
-            <Suspense fallback={<div className="map-loading">Loading compiled floor map…</div>}>
-              <FloorplanViewer />
-            </Suspense>
-            <SearchPanel />
-            <POICard />
-            <NavigationPanel />
-          </>
-        )}
-        <CameraPreview />
-      </main>
-      <CheckInToast />
-      <StatusBar />
-      <LocationPicker isOpen={showLocationPicker} onClose={() => setShowLocationPicker(false)} />
-    </div>
-  );
 }
 
 function InspectorApp() {
@@ -138,37 +80,29 @@ function RecorderApp() {
 function ActiveVenueApplication() {
   const { venue, status, retryBootstrap, useDefaultVenue } = useVenue();
   const surface = useSurfaceRoute();
+  const previousSurfaceRef = useRef(surface);
+
+  useEffect(() => {
+    const previousSurface = previousSurfaceRef.current;
+    previousSurfaceRef.current = surface;
+    if (previousSurface === 'visitor' || surface !== 'visitor') return;
+
+    // The operator navigation owns focus when its "Visitor view" link is
+    // activated. That whole navigation is then removed from the DOM. Hand
+    // focus to the visitor surface after either a link activation or browser
+    // history navigation so it never falls through to <body>.
+    const visitorTarget =
+      document.getElementById('btn-search-open') ?? document.getElementById('welcome-step-heading');
+    visitorTarget?.focus({ preventScroll: true });
+  }, [surface]);
 
   if (!venue) {
-    const failed = status.state === 'error';
     return (
-      <main className="venue-bootstrap-state" role={failed ? 'alert' : 'status'}>
-        <strong>{failed ? 'Venue bootstrap failed' : 'Loading VenuePackage'}</strong>
-        <p>{status.error ?? status.detail}</p>
-        {/*
-          A failure used to end here, with the reason and nothing to do about
-          it. Worse, a bad venue URL persists, so every reload retried exactly
-          the source that had just failed and the visitor could not get back to
-          a working venue by any action available to them.
-        */}
-        {status.failedSource && (
-          <p className="venue-bootstrap-source">
-            Tried <code>{status.failedSource}</code>
-          </p>
-        )}
-        {failed && (
-          <div className="venue-bootstrap-actions">
-            <button type="button" className="venue-bootstrap-retry" onClick={retryBootstrap}>
-              Retry venue loading
-            </button>
-            {status.failedSource && (
-              <button type="button" className="venue-bootstrap-default" onClick={useDefaultVenue}>
-                Use default venue
-              </button>
-            )}
-          </div>
-        )}
-      </main>
+      <VenueBootstrapState
+        status={status}
+        retryBootstrap={retryBootstrap}
+        useDefaultVenue={useDefaultVenue}
+      />
     );
   }
 
