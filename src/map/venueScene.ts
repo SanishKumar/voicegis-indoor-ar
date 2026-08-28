@@ -86,6 +86,14 @@ const SELECTED_FILL = 0x0a65db;
 const WALL_THICKNESS = 0.22;
 const WALL_HEIGHT = 1.4;
 
+/*
+ * How far apart the storeys are pulled when a route crosses between them.
+ * Real storey heights are about four metres and the walls are 1.4, so at true
+ * elevation the slab above hides the floor below completely. This is a way of
+ * reading a building, not a model of one.
+ */
+const EXPLODE = 3.1;
+
 export interface VenueScene {
   setActiveFloor(floorId: string): void;
   setRoute(points: ReadonlyArray<{ x: number; y: number; floor: string }>): void;
@@ -219,7 +227,13 @@ export function createVenueScene(
 
   interface FloorView {
     id: string;
+    elevation: number;
+    /** Where this floor is easing toward, so the stack opens rather than cuts. */
+    targetY: number;
+    targetOpacity: number;
     group: Group;
+    materials: MeshStandardMaterial[];
+    routeGroup: Group;
     spaceMeshes: Map<string, Mesh>;
     poiTargets: Array<{ id: string; object: Object3D }>;
     labels: Array<{
@@ -241,6 +255,11 @@ export function createVenueScene(
       .filter((portal) => portal.floorId === floor.id)
       .map((portal) => ({ position: portal.position as Coordinate, width: portal.width }));
     const pois = buildingPackage.pois.filter((poi) => poi.floorId === floor.id);
+    const materials: MeshStandardMaterial[] = [];
+    const track = <T extends MeshStandardMaterial>(material: T) => {
+      materials.push(material);
+      return material;
+    };
     // A room containing a destination is already named by that destination's
     // pill. Labelling both draws the same words twice, a few pixels apart.
     const spacesNamedByAPoi = new Set(pois.map((poi) => poi.spaceId));
@@ -256,7 +275,7 @@ export function createVenueScene(
     // rotateX sends the extrusion to -Y, so the slab already hangs below zero
     // with its top face at zero. Lifting it would bury everything on it.
     slab.rotateX(Math.PI / 2);
-    const slabMesh = new Mesh(slab, [surface(SLAB_TOP), surface(SLAB_SIDE)]);
+    const slabMesh = new Mesh(slab, [track(surface(SLAB_TOP)), track(surface(SLAB_SIDE))]);
     slabMesh.receiveShadow = true;
     group.add(slabMesh);
 
@@ -268,7 +287,7 @@ export function createVenueScene(
       geometry.translate(0, 0.24, 0);
       const mesh = new Mesh(
         geometry,
-        surface(SPACE_FILL[space.type] ?? SPACE_FILL.room, { side: DoubleSide }),
+        track(surface(SPACE_FILL[space.type] ?? SPACE_FILL.room, { side: DoubleSide })),
       );
       mesh.receiveShadow = true;
       mesh.userData.spaceId = space.id;
@@ -307,7 +326,7 @@ export function createVenueScene(
     addWalls(floor.outline as Coordinate[], WALL_FILL);
     for (const [color, geometries] of wallsByColor) {
       if (geometries.length === 0) continue;
-      const mesh = new Mesh(mergeGeometries(geometries), surface(color));
+      const mesh = new Mesh(mergeGeometries(geometries), track(surface(color)));
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
@@ -317,14 +336,14 @@ export function createVenueScene(
     for (const poi of pois) {
       const head = new Mesh(
         new SphereGeometry(0.5, 12, 10),
-        surface(0xc86b4a, { emissive: 0xc86b4a, emissiveIntensity: 0.25 }),
+        track(surface(0xc86b4a, { emissive: 0xc86b4a, emissiveIntensity: 0.25 })),
       );
       head.position.copy(vec(poi.position as Coordinate, 1.6));
       head.userData.poiId = poi.id;
       group.add(head);
       poiTargets.push({ id: poi.id, object: head });
 
-      const stem = new Mesh(new CylinderGeometry(0.06, 0.06, 1.5, 6), surface(0x4a4034));
+      const stem = new Mesh(new CylinderGeometry(0.06, 0.06, 1.5, 6), track(surface(0x4a4034)));
       stem.position.copy(vec(poi.position as Coordinate, 0.8));
       group.add(stem);
 
@@ -337,14 +356,31 @@ export function createVenueScene(
       });
     }
 
+    const routeGroup = new Group();
+    group.add(routeGroup);
+
     scene.add(group);
-    floors.set(floor.id, { id: floor.id, group, spaceMeshes, poiTargets, labels });
+    floors.set(floor.id, {
+      id: floor.id,
+      elevation: floor.elevation,
+      targetY: 0,
+      targetOpacity: 1,
+      group,
+      materials,
+      routeGroup,
+      spaceMeshes,
+      poiTargets,
+      labels,
+    });
   }
 
-  const routeGroup = new Group();
-  scene.add(routeGroup);
+  /* The climbs between storeys belong to no single floor. */
+  const hopsGroup = new Group();
+  scene.add(hopsGroup);
 
   let activeFloorId = buildingPackage.floors[0]?.id ?? '';
+  let routePoints: ReadonlyArray<{ x: number; y: number; floor: string }> = [];
+  let routeFloors: string[] = [];
   let selectedSpaceId: string | null = null;
 
   const HOME_DISTANCE = span * 1.55;
@@ -362,15 +398,101 @@ export function createVenueScene(
     camera.lookAt(target);
   }
 
-  function clearRoute() {
-    for (const child of [...routeGroup.children]) {
-      routeGroup.remove(child);
+  function emptyGroup(group: Group) {
+    for (const child of [...group.children]) {
+      group.remove(child);
       const mesh = child as Mesh;
       mesh.geometry?.dispose();
       const material = mesh.material;
       if (Array.isArray(material)) material.forEach((entry) => entry.dispose());
       else material?.dispose();
     }
+  }
+
+  function clearRoute() {
+    emptyGroup(hopsGroup);
+    for (const view of floors.values()) emptyGroup(view.routeGroup);
+  }
+
+  const routeMaterial = () =>
+    new MeshStandardMaterial({
+      color: ROUTE_COLOR,
+      emissive: ROUTE_COLOR,
+      emissiveIntensity: 0.45,
+      roughness: 0.4,
+      flatShading: true,
+    });
+
+  /** Where a floor sits when the stack is showing, relative to the active one. */
+  function stackY(view: FloorView) {
+    const active = floors.get(activeFloorId);
+    if (active === undefined) return 0;
+    return (view.elevation - active.elevation) * EXPLODE;
+  }
+
+  /*
+   * The stack is not a mode with a switch. It appears when the route crosses
+   * storeys, because that is the only time the other floors are answering a
+   * question the visitor has, and it collapses again the moment they are not.
+   */
+  const stacked = () => routeFloors.length > 1;
+
+  function rebuildRoute() {
+    clearRoute();
+    if (routePoints.length < 2) return;
+
+    const showing = stacked() ? routeFloors : [activeFloorId];
+    for (const floorId of showing) {
+      const view = floors.get(floorId);
+      if (view === undefined) continue;
+      const leg = routePoints.filter((point) => String(point.floor) === floorId);
+      if (leg.length < 2) continue;
+      const curve = new CatmullRomCurve3(
+        leg.map((point) => vec([point.x, point.y], 0.2)),
+        false,
+        'catmullrom',
+        0.12,
+      );
+      const tube = new Mesh(
+        new TubeGeometry(curve, leg.length * 12, 0.28, 8, false),
+        routeMaterial(),
+      );
+      tube.castShadow = true;
+      view.routeGroup.add(tube);
+    }
+
+    if (!stacked()) return;
+    for (let index = 0; index < routeFloors.length - 1; index += 1) {
+      const from = floors.get(routeFloors[index]);
+      const to = floors.get(routeFloors[index + 1]);
+      if (from === undefined || to === undefined) continue;
+      // The point the path leaves this floor from is where the climb starts.
+      const exit = [...routePoints].reverse().find((point) => String(point.floor) === from.id);
+      if (exit === undefined) continue;
+      const bottom = Math.min(stackY(from), stackY(to));
+      const height = Math.abs(stackY(to) - stackY(from));
+      if (height <= 0) continue;
+      const hop = new Mesh(new CylinderGeometry(0.3, 0.3, height, 8), routeMaterial());
+      hop.position.copy(vec([exit.x, exit.y], bottom + height / 2 + 0.2));
+      hopsGroup.add(hop);
+    }
+  }
+
+  /** Target height and opacity for every floor, given route and active floor. */
+  function layout() {
+    let shown = 0;
+    for (const view of floors.values()) {
+      const inStack = stacked() && routeFloors.includes(view.id);
+      const active = view.id === activeFloorId;
+      view.group.visible = active || inStack;
+      if (view.group.visible) shown += 1;
+      view.targetY = inStack ? stackY(view) : 0;
+      view.targetOpacity = active ? 1 : 0.22;
+    }
+    hopsGroup.visible = stacked();
+    // What the scene decided, published where it can be observed. Asserting on
+    // the route's floor count instead would only prove the input.
+    canvas.parentElement?.setAttribute('data-floors-shown', String(shown));
   }
 
   /*
@@ -546,31 +668,23 @@ export function createVenueScene(
     setActiveFloor(floorId) {
       if (!floors.has(floorId)) return;
       activeFloorId = floorId;
-      for (const view of floors.values()) view.group.visible = view.id === floorId;
+      // Stack heights are relative to whichever floor is being read, so the
+      // one in hand stays put and the others move around it.
+      layout();
+      rebuildRoute();
     },
 
     setRoute(points) {
-      clearRoute();
-      const onFloor = points.filter((point) => String(point.floor) === activeFloorId);
-      if (onFloor.length < 2) return;
-      const curve = new CatmullRomCurve3(
-        onFloor.map((point) => vec([point.x, point.y], 0.2)),
-        false,
-        'catmullrom',
-        0.12,
-      );
-      const tube = new Mesh(
-        new TubeGeometry(curve, onFloor.length * 12, 0.28, 8, false),
-        new MeshStandardMaterial({
-          color: ROUTE_COLOR,
-          emissive: ROUTE_COLOR,
-          emissiveIntensity: 0.45,
-          roughness: 0.4,
-          flatShading: true,
-        }),
-      );
-      tube.castShadow = true;
-      routeGroup.add(tube);
+      routePoints = points;
+      routeFloors = [];
+      for (const point of points) {
+        const floorId = String(point.floor);
+        if (routeFloors[routeFloors.length - 1] !== floorId) routeFloors.push(floorId);
+      }
+      // A route that leaves a floor and comes back is still those two floors.
+      routeFloors = [...new Set(routeFloors)];
+      layout();
+      rebuildRoute();
     },
 
     setSelectedSpace(spaceId) {
@@ -632,6 +746,20 @@ export function createVenueScene(
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
       }
+      for (const view of floors.values()) {
+        view.group.position.y += (view.targetY - view.group.position.y) * 0.16;
+        const ghosted = view.targetOpacity < 0.995;
+        for (const material of view.materials) {
+          material.opacity += (view.targetOpacity - material.opacity) * 0.16;
+          material.transparent = material.opacity < 0.995;
+          material.depthWrite = material.opacity > 0.6;
+        }
+        // A ghosted storey must not throw shadows across the one being read.
+        view.group.traverse((object) => {
+          const mesh = object as Mesh;
+          if (mesh.isMesh === true) mesh.castShadow = !ghosted;
+        });
+      }
       applyCamera();
       renderer.render(scene, camera);
       drawLabels(width, height);
@@ -653,6 +781,7 @@ export function createVenueScene(
   };
 
   handle.setActiveFloor(activeFloorId);
+  layout();
   applyCamera();
   return handle;
 }

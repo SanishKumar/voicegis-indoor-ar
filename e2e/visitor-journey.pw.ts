@@ -81,3 +81,37 @@ test('Escape closes only the topmost dialog and restores focus', async ({ page }
   await expect(locationDialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
 });
+
+test('the stack opens only when the route actually crosses storeys', async ({ page }) => {
+  await precompleteOnboarding(page);
+  await page.goto('/#/visitor');
+  const map = page.locator('.compiled-map');
+  await expect(map).toBeVisible();
+
+  // Nothing routed yet, so there is nothing to stack: one storey drawn.
+  await expect(map).toHaveAttribute('data-route-floors', '0');
+  await expect(map).toHaveAttribute('data-floors-shown', '1');
+
+  const routeTo = async (name: string) => {
+    await page.getByRole('button', { name: 'Search rooms and departments', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Search rooms and departments' }).fill(name);
+    await page.getByRole('button', { name: `Navigate to ${name}` }).click();
+    await expect(page.getByLabel('Fastest available route')).toBeVisible();
+  };
+
+  // Same floor as the entrance: one storey, so the map stays flat.
+  await routeTo('Outpatient Registration');
+  await expect(map).toHaveAttribute('data-route-floors', '1');
+  await expect(map).toHaveAttribute('data-floors-shown', '1');
+
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  // Level 2: the route has to climb, and the stack is what shows that.
+  await routeTo('Maternity Clinic');
+  const crossed = Number(await map.getAttribute('data-route-floors'));
+  expect(crossed).toBeGreaterThan(1);
+  // The scene's own count, not the route's: this is what proves it stacked.
+  await expect
+    .poll(async () => Number(await map.getAttribute('data-floors-shown')))
+    .toBeGreaterThan(1);
+});

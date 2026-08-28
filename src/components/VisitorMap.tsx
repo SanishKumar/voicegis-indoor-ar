@@ -37,6 +37,17 @@ export default function VisitorMap() {
   const buildingPackage = venue.buildingPackage;
   const floors = buildingPackage.floors;
 
+  /*
+   * How many storeys the active route touches. The scene opens the stack when
+   * this is more than one, so publishing it makes that behaviour observable
+   * from the outside instead of only visible in a screenshot.
+   */
+  const routeFloorCount = new Set(
+    (state.route?.found === true ? (state.route.path ?? []) : []).map((point) =>
+      String(point.floor),
+    ),
+  ).size;
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const labelLayer = labelRef.current;
@@ -85,7 +96,7 @@ export default function VisitorMap() {
   };
 
   return (
-    <div className="compiled-map">
+    <div className="compiled-map" data-route-floors={routeFloorCount}>
       <canvas ref={canvasRef} className="compiled-map-canvas" onClick={handleClick} />
       <div ref={labelRef} className="compiled-map-labels" aria-hidden="true" />
 
