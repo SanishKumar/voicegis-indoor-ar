@@ -525,21 +525,10 @@ img, svg { display: block; max-width: 100%; }
   box-shadow: var(--shadow-xl); transform: translateY(20px); transition: transform var(--transition-slow);
 }
 .poi-card-overlay.open .poi-card { transform: translateY(0); }
-
-.nav-panel {
-  position: absolute; bottom: var(--space-4); left: var(--space-4); right: var(--space-4);
-  z-index: var(--z-nav); background: var(--color-bg-card); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--color-border); border-radius: var(--radius-2xl); box-shadow: var(--shadow-xl);
-  transform: translateY(150%); transition: transform var(--transition-spring); max-height: 55vh; display: flex; flex-direction: column;
-}
 @media (min-width: 768px) {
-  .nav-panel { max-width: 400px; left: auto; }
   .search-trigger { max-width: 400px; left: auto; right: var(--space-4); transform: none; }
   .search-panel { max-width: 420px; left: auto; right: var(--space-4); bottom: var(--space-4); border-radius: var(--radius-2xl); border: 1px solid var(--color-border); }
 }
-.nav-panel.open { transform: translateY(0); }
-.nav-panel-header { display: flex; align-items: center; justify-content: space-between; padding: var(--space-4); border-bottom: 1px solid var(--color-border); }
-.nav-panel-dest-icon { width: 40px; height: 40px; border-radius: var(--radius-full); background: var(--color-accent-green-dim); color: var(--color-accent-green); display: flex; align-items: center; justify-content: center; }
 
 /* --------------------------------------------------------------------------
    Camera Preview & Status Bar
@@ -577,58 +566,6 @@ img, svg { display: block; max-width: 100%; }
 /* --------------------------------------------------------------------------
    Navigation Panel Internals (Restored & Upgraded)
    -------------------------------------------------------------------------- */
-.nav-panel-destination { display: flex; align-items: center; gap: var(--space-3); }
-.nav-panel-dest-name { font-weight: var(--font-weight-bold); font-size: var(--font-size-md); }
-.nav-panel-dest-floor {
-  margin-top: 2px;
-  color: var(--color-accent-purple);
-  font-size: 0.625rem;
-  font-weight: var(--font-weight-semibold);
-}
-.nav-panel-dest-eta { font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: 2px; }
-.nav-route-summary {
-  display: grid;
-  gap: 3px;
-  margin: var(--space-3) var(--space-4) 0;
-  padding: 9px 11px;
-  border: 1px solid var(--color-border);
-  border-left: 3px solid var(--color-accent-purple);
-  border-radius: 5px;
-  background: var(--color-bg-primary);
-}
-.nav-route-summary span {
-  color: var(--color-text-muted);
-  font-size: 0.5625rem;
-  font-weight: var(--font-weight-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.nav-route-summary strong {
-  color: var(--color-text-primary);
-  font-size: var(--font-size-xs);
-  line-height: 1.4;
-}
-.nav-panel-close-btn { display: flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: var(--radius-full); background: var(--color-bg-tertiary); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); transition: all var(--transition-fast); }
-.nav-panel-close-btn:hover { background: var(--color-bg-secondary); color: var(--color-accent-red); }
-
-.nav-progress-bar { height: 4px; background: var(--color-bg-tertiary); width: 100%; }
-.nav-progress-fill { height: 100%; background: var(--color-accent-blue); transition: width var(--transition-normal); }
-
-.nav-current-step { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4); margin: var(--space-4); background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-md); }
-.nav-step-direction-icon { width: 48px; height: 48px; border-radius: var(--radius-full); background: var(--color-accent-blue-dim); color: var(--color-accent-blue); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.nav-step-instruction { font-size: var(--font-size-lg); font-weight: var(--font-weight-bold); line-height: 1.2; margin-bottom: 4px; }
-.nav-step-distance { font-size: var(--font-size-md); color: var(--color-text-muted); font-weight: var(--font-weight-medium); }
-
-.nav-steps-list { flex: 1; overflow-y: auto; padding: 0 var(--space-4) var(--space-4); margin-top: var(--space-2); }
-.nav-step-item { display: flex; gap: var(--space-3); padding: var(--space-3) 0; position: relative; }
-.nav-step-item::before { content: ''; position: absolute; left: 11px; top: 32px; bottom: -8px; width: 2px; background: var(--color-bg-tertiary); z-index: 1; }
-.nav-step-item:last-child::before { display: none; }
-.nav-step-num { width: 24px; height: 24px; border-radius: var(--radius-full); background: var(--color-bg-tertiary); color: var(--color-text-muted); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: var(--font-weight-bold); z-index: 2; flex-shrink: 0; margin-top: 2px; }
-.nav-step-text { flex: 1; font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: 1.4; padding-top: 4px; }
-.nav-step-item.active .nav-step-num { background: var(--color-accent-blue); color: white; box-shadow: 0 0 0 4px var(--color-accent-blue-dim); }
-.nav-step-item.active .nav-step-text { color: var(--color-text-primary); font-weight: var(--font-weight-semibold); }
-.nav-step-item.completed .nav-step-num { background: var(--color-accent-green); color: white; }
-.nav-step-item.completed .nav-step-text { color: var(--color-text-muted); text-decoration: line-through; }
 
 /* --------------------------------------------------------------------------
    Camera Preview Internals
@@ -817,13 +754,6 @@ img, svg { display: block; max-width: 100%; }
   .search-trigger {
     bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
   }
-  .nav-panel {
-    bottom: env(safe-area-inset-bottom, 0px);
-    left: 0;
-    right: 0;
-    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
-    max-height: 50vh;
-  }
   .search-panel {
     bottom: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -841,9 +771,6 @@ img, svg { display: block; max-width: 100%; }
     padding: 10px 16px;
   }
   .lp-chip {
-    padding: 10px 16px;
-  }
-  .nav-panel-close-btn {
     padding: 10px 16px;
   }
 }
@@ -1437,14 +1364,6 @@ img, svg { display: block; max-width: 100%; }
 }
 .compiled-map-zoom button + button { border-left: 1px solid var(--color-border); }
 .compiled-map-zoom button:hover { color: var(--color-text-primary); background: var(--color-bg-tertiary); }
-.nav-step-floor {
-  margin-top: 2px;
-  color: var(--color-accent-purple);
-  font-size: 0.625rem;
-  font-weight: var(--font-weight-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
 .route-receipt {
   margin: var(--space-3) var(--space-4) 0;
   padding: 9px 11px;
@@ -1469,27 +1388,6 @@ img, svg { display: block; max-width: 100%; }
 .route-receipt dl div { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: var(--space-2); }
 .route-receipt dt { color: var(--color-text-muted); }
 .route-receipt dd { min-width: 0; overflow-wrap: anywhere; color: var(--color-text-primary); }
-.route-failure-panel { padding-bottom: var(--space-3); }
-.route-failure-message {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-4);
-}
-.route-failure-message > div:nth-child(2) { flex: 1; min-width: 0; }
-.route-failure-message strong { color: var(--color-text-primary); }
-.route-failure-message p { margin-top: 3px; color: var(--color-text-muted); font-size: var(--font-size-xs); line-height: var(--line-height-normal); }
-.route-failure-icon {
-  width: 38px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border-radius: var(--radius-full);
-  color: var(--color-accent-red);
-  background: var(--color-accent-red-dim);
-}
 
 @media (max-width: 640px) {
   .compiled-map-topbar { top: var(--space-3); left: var(--space-3); right: var(--space-3); }
@@ -1524,23 +1422,6 @@ img, svg { display: block; max-width: 100%; }
 
 body {
   letter-spacing: -0.006em;
-}
-
-.glass,
-.app-header,
-.search-trigger-pill,
-.search-panel,
-.poi-card,
-.nav-panel,
-.compiled-floor-switcher,
-.compiled-map-proof,
-.compiled-map-floor-meta,
-.compiled-map-legend,
-.compiled-map-zoom,
-.compiled-map-operations > button,
-.location-picker {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .app-header {
@@ -1681,11 +1562,6 @@ body {
   box-shadow: 0 18px 60px rgba(24, 25, 29, 0.18);
 }
 
-.search-panel-handle,
-.nav-panel-handle {
-  display: none;
-}
-
 .search-input-wrapper,
 .lp-search {
   border: 1px solid var(--color-border);
@@ -1714,24 +1590,6 @@ body {
   font-size: 0.875rem;
 }
 
-.poi-card,
-.nav-panel {
-  border-radius: 8px;
-  background: var(--color-bg-secondary);
-  box-shadow: 0 18px 60px rgba(24, 25, 29, 0.18);
-}
-
-.nav-panel-dest-icon,
-.nav-step-direction-icon,
-.route-failure-icon {
-  border-radius: 5px;
-}
-
-.nav-panel-close-btn,
-.btn {
-  border-radius: 5px;
-}
-
 .btn-primary,
 .btn-success {
   color: #fff;
@@ -1747,16 +1605,6 @@ body {
 .btn-success:hover {
   box-shadow: none;
   transform: translateY(-1px);
-}
-
-.nav-current-step {
-  border-radius: 6px;
-  background: var(--color-bg-primary);
-  box-shadow: none;
-}
-
-.nav-step-item.active .nav-step-num {
-  box-shadow: none;
 }
 
 .route-receipt {
@@ -3148,87 +2996,6 @@ body {
   background: var(--visitor-panel);
 }
 
-.visitor-shell .nav-panel {
-  right: auto;
-  bottom: 22px;
-  left: 22px;
-  width: min(460px, calc(100% - 44px));
-  max-width: none;
-  max-height: calc(100% - 44px);
-  border-color: var(--visitor-line);
-  border-radius: 18px;
-  background: var(--visitor-panel);
-  box-shadow: 0 24px 70px rgba(12, 22, 19, 0.24);
-}
-
-.visitor-shell .nav-panel-header {
-  padding: 18px 18px 14px;
-}
-
-.visitor-shell .nav-panel-dest-icon,
-.visitor-shell .nav-step-direction-icon {
-  border-radius: 12px;
-  color: var(--visitor-accent-strong);
-  background: var(--visitor-accent-soft);
-}
-
-.visitor-shell .nav-progress-fill {
-  background: var(--visitor-route);
-}
-
-.visitor-shell .nav-route-summary {
-  border-left-color: var(--visitor-accent);
-  border-radius: 10px;
-}
-
-.visitor-shell .nav-current-step {
-  margin: 14px 16px;
-  border-color: var(--visitor-line);
-  border-radius: 14px;
-  background: var(--color-bg-primary);
-}
-
-.nav-all-steps {
-  min-height: 0;
-  margin: 0 16px 16px;
-  overflow: auto;
-  border: 1px solid var(--visitor-line);
-  border-radius: 12px;
-}
-
-.nav-all-steps summary {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  list-style: none;
-}
-
-.nav-all-steps summary::-webkit-details-marker {
-  display: none;
-}
-
-.nav-all-steps summary span {
-  margin-left: auto;
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-
-.nav-all-steps[open] summary {
-  border-bottom: 1px solid var(--visitor-line);
-}
-
-.visitor-shell .nav-steps-list {
-  max-height: 210px;
-  padding: 6px 12px 12px;
-  margin: 0;
-}
-
 [data-contrast="high"] .visitor-shell {
   --visitor-accent: #00ffbf;
   --visitor-accent-strong: #00664d;
@@ -3330,19 +3097,6 @@ body {
 
   .search-trigger-action {
     display: none;
-  }
-
-  .visitor-shell .search-panel,
-  .visitor-shell .nav-panel {
-    right: 0;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    max-height: min(78vh, calc(100% - 12px));
-    border-right: 0;
-    border-bottom: 0;
-    border-left: 0;
-    border-radius: 20px 20px 0 0;
   }
 
   .visitor-shell .poi-card-overlay {
@@ -6965,5 +6719,327 @@ body {
 
   .visitor-location-copy strong {
     max-width: 110px;
+  }
+}
+
+/* ==========================================================================
+   Journey panel - the leg strip
+   --------------------------------------------------------------------------
+   Cream card on ink hairlines, flat, sharp except the pill controls. The strip
+   is a spine: a rule runs down the marks, a leg that is done is quiet, the leg
+   in hand is the only thing in blue.
+   ========================================================================== */
+.nav-panel {
+  position: absolute;
+  z-index: 900;
+  bottom: var(--ed-16);
+  left: var(--ed-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ed-16);
+  width: min(380px, calc(100% - 32px));
+  max-height: min(70vh, 620px);
+  overflow-y: auto;
+  padding: var(--ed-24);
+  border: 1px solid var(--ed-ink);
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font-family: var(--ed-body);
+}
+
+.nav-panel:focus-visible {
+  outline: 1px solid var(--ed-ink);
+  outline-offset: 3px;
+}
+
+.nav-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ed-16);
+}
+
+.nav-panel-dest-eyebrow {
+  margin: 0 0 2px;
+  font-size: var(--ed-16);
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ed-ink-soft);
+}
+
+.nav-panel-dest-name {
+  margin: 0;
+  font-family: var(--ed-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.009em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.nav-panel-close-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 44px;
+  padding: 8px 18px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font: inherit;
+  font-size: var(--ed-16);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nav-panel-close-btn:hover {
+  border-color: var(--ed-blue);
+  color: var(--ed-blue);
+}
+
+.nav-panel-close-btn:focus-visible {
+  outline: 1px solid var(--ed-ink);
+  outline-offset: 3px;
+}
+
+/* Minutes and legs lead; metres come last, because nobody counts metres in a
+   corridor but everybody knows whether they have four minutes. */
+.nav-journey-facts {
+  display: flex;
+  gap: var(--ed-24);
+  margin: 0;
+  padding: var(--ed-16) 0;
+  border-top: 1px solid var(--ed-ink);
+  border-bottom: 1px solid var(--ed-ink);
+}
+
+.nav-journey-facts dt {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ed-ink-soft);
+}
+
+.nav-journey-facts dd {
+  margin: 0;
+  font-family: var(--ed-display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.009em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-route-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--ed-16);
+  line-height: 1.5;
+}
+
+.nav-route-summary span {
+  color: var(--ed-ink-soft);
+}
+
+.nav-route-summary strong {
+  font-weight: 700;
+}
+
+.nav-arrived {
+  margin: 0;
+  padding: var(--ed-16);
+  border: 1px solid var(--ed-blue);
+  color: var(--ed-blue);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------------------------
+   The strip
+   -------------------------------------------------------------------------- */
+.nav-legs {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-leg {
+  position: relative;
+  display: flex;
+  gap: var(--ed-16);
+  padding-bottom: var(--ed-20);
+}
+
+.nav-leg:last-child {
+  padding-bottom: 0;
+}
+
+/* The spine. Drawn between marks rather than behind them, so the last leg
+   does not trail a line into nothing. */
+.nav-leg:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 30px;
+  bottom: 4px;
+  left: 14px;
+  width: 1px;
+  background: var(--ed-ink);
+}
+
+.nav-leg-mark {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  flex: none;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+}
+
+.nav-leg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.nav-leg-headline {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.nav-leg-meta {
+  font-size: var(--ed-16);
+  line-height: 1.5;
+  color: var(--ed-ink-soft);
+}
+
+/* Behind you: still legible, no longer competing. */
+.nav-leg.is-done .nav-leg-headline,
+.nav-leg.is-done .nav-leg-meta {
+  color: var(--ed-ink-soft);
+  font-weight: 400;
+}
+
+/* In hand: the only blue on the panel. */
+.nav-leg.is-current .nav-leg-mark {
+  border-color: var(--ed-blue);
+  background: var(--ed-blue);
+  color: var(--ed-cream);
+}
+
+.nav-leg.is-current .nav-leg-headline {
+  color: var(--ed-blue);
+}
+
+.nav-leg-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.nav-leg-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 18px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font: inherit;
+  font-size: var(--ed-16);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nav-leg-step:hover:not(:disabled) {
+  border-color: var(--ed-blue);
+  color: var(--ed-blue);
+}
+
+.nav-leg-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.nav-leg-step:focus-visible {
+  outline: 1px solid var(--ed-ink);
+  outline-offset: 3px;
+}
+
+/* --------------------------------------------------------------------------
+   Pending and failure
+   -------------------------------------------------------------------------- */
+.route-failure-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.route-failure-message strong {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.route-failure-message p {
+  margin: 4px 0 0;
+  font-size: var(--ed-16);
+  line-height: 1.6;
+  color: var(--ed-ink-soft);
+}
+
+.route-failure-message .nav-panel-close-btn {
+  margin-left: auto;
+}
+
+.nav-panel-dest-icon,
+.route-failure-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  color: var(--ed-blue);
+}
+
+.route-failure-panel .route-failure-icon {
+  border-color: var(--ed-ink);
+  color: var(--ed-ink);
+}
+
+@media (max-width: 560px) {
+  .nav-panel {
+    right: var(--ed-16);
+    width: auto;
+    padding: var(--ed-20);
+  }
+
+  .nav-panel-dest-name {
+    font-size: 24px;
+  }
+
+  .route-failure-message {
+    flex-wrap: wrap;
+  }
+
+  .route-failure-message .nav-panel-close-btn {
+    margin-left: 0;
   }
 }

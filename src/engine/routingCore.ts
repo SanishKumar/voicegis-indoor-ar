@@ -322,10 +322,14 @@ export function generateRouteSteps(
 
   const firstCorridor = segments[0].corridor;
   const startName = path[0].poi?.name ?? 'your location';
+  // A start point that is itself the first corridor produced "Start at Civic
+  // Plaza Entrance and continue on Civic Plaza Entrance", which reads as a
+  // fault in the map rather than an instruction.
+  const continuesElsewhere = firstCorridor !== undefined && firstCorridor !== startName;
   const steps: RouteStep[] = [
     {
       type: STEP_TYPE.START,
-      instruction: firstCorridor
+      instruction: continuesElsewhere
         ? `Start at ${startName} and continue on ${firstCorridor}`
         : `Start at ${startName}`,
       distance: 0,

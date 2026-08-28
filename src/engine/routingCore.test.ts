@@ -186,3 +186,58 @@ describe('A* routing core', () => {
     expect(edges).toHaveLength(4);
   });
 });
+
+describe('start instruction', () => {
+  const corridorNamedAfterItsEntrance = (): {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+  } => ({
+    nodes: [
+      {
+        id: 'entrance',
+        x: 0,
+        y: 0,
+        floor: 'g',
+        type: 'poi',
+        poi: { name: 'Civic Plaza Entrance', category: 'entrance' },
+      },
+      { id: 'middle', x: 0, y: 1, floor: 'g', type: 'junction' },
+      {
+        id: 'desk',
+        x: 0,
+        y: 2,
+        floor: 'g',
+        type: 'poi',
+        poi: { name: 'Reception', category: 'service' },
+      },
+    ],
+    edges: [
+      // The first corridor carries the same name as the point it starts from,
+      // which is ordinary in a compiled package: an entrance is both a place
+      // and the hall leading out of it.
+      { from: 'entrance', to: 'middle', distance: 5, corridor: 'Civic Plaza Entrance' },
+      { from: 'middle', to: 'desk', distance: 5, corridor: 'Central Concourse' },
+    ],
+  });
+
+  it('does not tell the visitor to continue onto where they already are', () => {
+    const { nodes, edges } = corridorNamedAfterItsEntrance();
+    const result = calculateRoute('entrance', 'desk', nodes, edges);
+
+    expect(result.found).toBe(true);
+    if (!result.found) return;
+    expect(result.steps[0].instruction).toBe('Start at Civic Plaza Entrance');
+  });
+
+  it('still names the first corridor when it is somewhere else', () => {
+    const { nodes, edges } = corridorNamedAfterItsEntrance();
+    edges[0].corridor = 'Central Concourse';
+    const result = calculateRoute('entrance', 'desk', nodes, edges);
+
+    expect(result.found).toBe(true);
+    if (!result.found) return;
+    expect(result.steps[0].instruction).toBe(
+      'Start at Civic Plaza Entrance and continue on Central Concourse',
+    );
+  });
+});

@@ -1,67 +1,41 @@
 /**
  * NavigationPanel.jsx
  *
- * Active navigation bottom sheet with turn-by-turn directions,
- * progress indicator, and step controls.
+ * The journey, as the legs a person can hold in their head: walk, change
+ * floor, walk. Turns are folded into the walk that contains them and counted
+ * rather than listed, because eleven instructions behind a "View all
+ * directions" link is not something anyone carries down a corridor.
  */
 
 import { useEffect, useRef } from 'react';
 import {
+  AlertTriangle,
   ArrowUp,
-  CornerUpLeft,
-  CornerUpRight,
-  ArrowUpLeft,
-  ArrowUpRight,
-  MapPin,
-  CircleDot,
-  X,
+  Building2,
   ChevronLeft,
   ChevronRight,
-  Navigation,
-  Building2,
+  CircleDot,
   Footprints,
-  AlertTriangle,
-  List,
+  MapPin,
+  Navigation,
+  X,
 } from 'lucide-react';
 import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
 import { STEP_TYPE } from '../engine/routingEngine';
+import { groupRouteLegs, legIndexForStep } from '../engine/routeLegs';
 
 function shortFloorLabel(venue, floorId) {
   const floor = venue.getFloorById(String(floorId));
   return floor?.level === 0 ? 'G' : `L${floor?.level ?? floorId}`;
 }
 
-/**
- * Get the Lucide icon component for a step type.
- */
-function StepIcon({ type, size = 20 }) {
-  switch (type) {
-    case STEP_TYPE.START:
-      return <CircleDot size={size} />;
-    case STEP_TYPE.STRAIGHT:
-      return <ArrowUp size={size} />;
-    case STEP_TYPE.TURN_LEFT:
-      return <CornerUpLeft size={size} />;
-    case STEP_TYPE.TURN_RIGHT:
-      return <CornerUpRight size={size} />;
-    case STEP_TYPE.SLIGHT_LEFT:
-      return <ArrowUpLeft size={size} />;
-    case STEP_TYPE.SLIGHT_RIGHT:
-      return <ArrowUpRight size={size} />;
-    case STEP_TYPE.U_TURN:
-      return <CornerUpLeft size={size} />;
-    case STEP_TYPE.ELEVATOR:
-      return <Building2 size={size} />;
-    case STEP_TYPE.STAIRS:
-    case STEP_TYPE.RAMP:
-    case STEP_TYPE.ESCALATOR:
-      return <Footprints size={size} />;
-    case STEP_TYPE.ARRIVE:
-      return <MapPin size={size} />;
-    default:
-      return <ArrowUp size={size} />;
-  }
+function LegIcon({ leg, size = 18 }) {
+  if (leg.kind === 'start') return <CircleDot size={size} strokeWidth={2} />;
+  if (leg.kind === 'arrive') return <MapPin size={size} strokeWidth={2} />;
+  if (leg.connector === STEP_TYPE.ELEVATOR) return <Building2 size={size} strokeWidth={2} />;
+  if (leg.kind === 'vertical') return <Footprints size={size} strokeWidth={2} />;
+  return <ArrowUp size={size} strokeWidth={2} />;
 }
 
 export default function NavigationPanel() {
@@ -100,26 +74,23 @@ export default function NavigationPanel() {
         aria-live="polite"
         tabIndex={-1}
       >
-        <div className="nav-panel-handle" />
         <div className="route-failure-message">
           <div className="nav-panel-dest-icon" aria-hidden="true">
-            <Navigation size={18} />
+            <Navigation size={18} strokeWidth={2} />
           </div>
           <div>
             <strong>Calculating route</strong>
             <p>Checking the active venue paths to {destinationName}…</p>
           </div>
           <button className="nav-panel-close-btn" onClick={clearRouteAndReturnToSearch}>
-            <X size={12} /> Cancel
+            <X size={14} strokeWidth={2} /> Cancel
           </button>
         </div>
       </div>
     );
   }
 
-  if (!route) {
-    return null;
-  }
+  if (!route) return null;
 
   if (!route.found) {
     const isClosureFailure =
@@ -136,36 +107,31 @@ export default function NavigationPanel() {
         role="alert"
         tabIndex={-1}
       >
-        <div className="nav-panel-handle" />
         <div className="route-failure-message">
-          <div className="route-failure-icon">
-            <AlertTriangle size={20} />
+          <div className="route-failure-icon" aria-hidden="true">
+            <AlertTriangle size={20} strokeWidth={2} />
           </div>
           <div>
             <strong>No compliant route</strong>
             <p>{failureMessage}</p>
           </div>
           <button className="nav-panel-close-btn" onClick={clearRouteAndReturnToSearch}>
-            <X size={12} /> Dismiss
+            <X size={14} strokeWidth={2} /> Dismiss
           </button>
         </div>
       </div>
     );
   }
 
-  const destinationFloor = destNode ? venue.getFloorById(String(destNode.floor)) : null;
   const steps = route.steps;
-  const currentStep = steps[currentStepIndex];
-  const currentFloor = currentStep?.floorId
-    ? venue.getFloorById(String(currentStep.floorId))
-    : null;
-  const progress = steps.length > 1 ? (currentStepIndex / (steps.length - 1)) * 100 : 0;
+  const legs = groupRouteLegs(steps);
+  const currentLegIndex = legIndexForStep(legs, currentStepIndex);
   const isArrived = navStatus === NAV_STATUS.ARRIVED;
 
-  // Calculate remaining distance
   const remainingDistance = steps
     .slice(currentStepIndex)
-    .reduce((sum, s) => sum + (s.distance || 0), 0);
+    .reduce((total, step) => total + (step.distance || 0), 0);
+
   const connectorReceipt = route.receipt?.selectedConnectors?.[0];
   const connector = connectorReceipt
     ? venue.buildingPackage.verticalConnectors.find(
@@ -178,6 +144,18 @@ export default function NavigationPanel() {
     ? `${shortFloorLabel(venue, connectorReceipt.fromFloorId)} → ${connector?.name ?? connectorReceipt.sourceId} → ${shortFloorLabel(venue, connectorReceipt.toFloorId)}`
     : `${shortFloorLabel(venue, destNode?.floor)} · same floor`;
 
+  /** Moves guidance to the first step of an adjacent leg. */
+  const goToLeg = (index) => {
+    const leg = legs[index];
+    if (leg === undefined) return;
+    const target = leg.stepIndices[0];
+    const move = target > currentStepIndex ? actions.nextStep : actions.prevStep;
+    for (let cursor = currentStepIndex; cursor !== target;) {
+      move();
+      cursor += target > currentStepIndex ? 1 : -1;
+    }
+  };
+
   return (
     <div
       ref={panelRef}
@@ -187,145 +165,99 @@ export default function NavigationPanel() {
       aria-label={`Directions to ${destNode?.poi?.name || 'destination'}`}
       tabIndex={-1}
     >
-      {/* Handle */}
-      <div className="nav-panel-handle" />
-
-      {/* Header */}
       <div className="nav-panel-header">
         <div className="nav-panel-destination">
-          <div className="nav-panel-dest-icon">
-            <Navigation size={18} />
-          </div>
-          <div>
-            <div className="nav-panel-dest-name">{destNode?.poi?.name || 'Destination'}</div>
-            {destinationFloor && (
-              <div className="nav-panel-dest-floor">{destinationFloor.name}</div>
-            )}
-            <div className="nav-panel-dest-eta">
-              {isArrived
-                ? '✅ You have arrived!'
-                : `${formatDistance(remainingDistance)} · ~${estimateWalkTime(remainingDistance, venue.config.walkSpeedMps)}`}
-            </div>
-          </div>
+          <p className="nav-panel-dest-eyebrow">Going to</p>
+          <h2 className="nav-panel-dest-name">{destNode?.poi?.name || 'Destination'}</h2>
         </div>
         <button
           className="nav-panel-close-btn"
           onClick={clearRouteAndReturnToSearch}
           id="btn-cancel-nav"
         >
-          <X size={12} /> Cancel
+          <X size={14} strokeWidth={2} /> Cancel
         </button>
       </div>
 
-      {/* Progress Bar */}
-      <div className="nav-progress-bar">
-        <div className="nav-progress-fill" style={{ width: `${progress}%` }} />
-      </div>
+      <dl className="nav-journey-facts">
+        <div>
+          <dt>Time</dt>
+          <dd>{estimateWalkTime(remainingDistance, venue.config.walkSpeedMps)}</dd>
+        </div>
+        <div>
+          <dt>Leg</dt>
+          <dd>
+            {Math.max(currentLegIndex + 1, 1)}/{legs.length}
+          </dd>
+        </div>
+        <div>
+          <dt>Remaining</dt>
+          <dd>{formatDistance(remainingDistance)}</dd>
+        </div>
+      </dl>
 
-      <div className="nav-route-summary" aria-label={routeProfile}>
+      <p className="nav-route-summary" aria-label={routeProfile}>
         <span>{routeProfile}</span>
         <strong>{journeyLabel}</strong>
-      </div>
+      </p>
 
-      {/* Current Step (Hero) */}
-      {currentStep && !isArrived && (
-        <div className="nav-current-step animate-slide-down" id="current-step" aria-live="polite">
-          <div className="nav-step-direction-icon" aria-hidden="true">
-            <StepIcon type={currentStep.type} size={24} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div className="nav-step-instruction">{currentStep.instruction}</div>
-            {currentFloor && <div className="nav-step-floor">{currentFloor.name}</div>}
-            {currentStep.distance > 0 && (
-              <div className="nav-step-distance">{formatDistance(currentStep.distance)}</div>
-            )}
-          </div>
-          {/* Step navigation */}
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button
-              className="btn btn-icon btn-ghost"
-              onClick={() => actions.prevStep()}
-              disabled={currentStepIndex === 0}
-              aria-label="Previous route instruction"
-              style={{ width: '32px', height: '32px', opacity: currentStepIndex === 0 ? 0.3 : 1 }}
-              id="btn-prev-step"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              className="btn btn-icon btn-ghost"
-              onClick={() => actions.nextStep()}
-              disabled={currentStepIndex >= steps.length - 1}
-              aria-label="Next route instruction"
-              style={{
-                width: '32px',
-                height: '32px',
-                opacity: currentStepIndex >= steps.length - 1 ? 0.3 : 1,
-              }}
-              id="btn-next-step"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Arrived State */}
       {isArrived && (
-        <div
-          className="nav-current-step"
-          style={{
-            background: 'var(--color-accent-green-dim)',
-            borderColor: 'rgba(16, 185, 129, 0.2)',
-          }}
-          aria-live="assertive"
-        >
-          <div
-            className="nav-step-direction-icon"
-            style={{ background: 'var(--color-accent-green)' }}
-            aria-hidden="true"
-          >
-            <MapPin size={24} />
-          </div>
-          <div>
-            <div className="nav-step-instruction">You have arrived!</div>
-            <div className="nav-step-distance" style={{ color: 'var(--color-accent-green)' }}>
-              {destNode?.poi?.name}
-            </div>
-          </div>
-        </div>
+        <p className="nav-arrived" aria-live="assertive">
+          You have arrived at {destNode?.poi?.name}.
+        </p>
       )}
 
-      <details className="nav-all-steps">
-        <summary>
-          <List size={15} />
-          View all directions
-          <span>{steps.length} steps</span>
-        </summary>
-        <div className="nav-steps-list" id="nav-steps-list" role="list">
-          {steps.map((step, i) => {
-            let itemClass = 'nav-step-item';
-            if (i < currentStepIndex) itemClass += ' completed';
-            if (i === currentStepIndex) itemClass += ' active';
+      <ol className="nav-legs" id="nav-steps-list">
+        {legs.map((leg, index) => {
+          const floor = leg.floorId ? venue.getFloorById(leg.floorId) : null;
+          const legState =
+            index < currentLegIndex ? 'done' : index === currentLegIndex ? 'current' : 'ahead';
+          return (
+            <li
+              key={`${leg.kind}-${leg.stepIndices[0]}`}
+              className={`nav-leg nav-leg-${leg.kind} is-${legState}`}
+              aria-current={legState === 'current' && !isArrived ? 'step' : undefined}
+            >
+              <span className="nav-leg-mark" aria-hidden="true">
+                <LegIcon leg={leg} />
+              </span>
+              <span className="nav-leg-body">
+                <span className="nav-leg-headline">{leg.headline}</span>
+                <span className="nav-leg-meta">
+                  {floor?.name}
+                  {leg.distanceMeters > 0 && ` · ${formatDistance(leg.distanceMeters)}`}
+                  {leg.turns > 0 && ` · ${leg.turns} ${leg.turns === 1 ? 'turn' : 'turns'}`}
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
 
-            return (
-              <div key={i} className={itemClass} role="listitem">
-                <div className="nav-step-num" aria-hidden="true">
-                  {i < currentStepIndex ? '✓' : i + 1}
-                </div>
-                <div className="nav-step-text">
-                  {step.instruction}
-                  {step.distance > 0 && (
-                    <span style={{ color: 'var(--color-text-muted)', marginLeft: '8px' }}>
-                      ({formatDistance(step.distance)})
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+      {!isArrived && (
+        <div className="nav-leg-controls">
+          <button
+            className="nav-leg-step"
+            onClick={() => goToLeg(currentLegIndex - 1)}
+            disabled={currentLegIndex <= 0}
+            aria-label="Previous leg"
+            id="btn-prev-step"
+          >
+            <ChevronLeft size={16} strokeWidth={2} />
+            Back
+          </button>
+          <button
+            className="nav-leg-step"
+            onClick={() => goToLeg(currentLegIndex + 1)}
+            disabled={currentLegIndex >= legs.length - 1}
+            aria-label="Next leg"
+            id="btn-next-step"
+          >
+            Next
+            <ChevronRight size={16} strokeWidth={2} />
+          </button>
         </div>
-      </details>
+      )}
     </div>
   );
 }
