@@ -11,7 +11,7 @@ import SearchPanel from './SearchPanel.jsx';
 import StatusBar from './StatusBar.jsx';
 import WelcomeScreen from './WelcomeScreen.jsx';
 
-const FloorplanViewer = lazy(() => import('./FloorplanViewer.tsx'));
+const VisitorMap = lazy(() => import('./VisitorMap.tsx'));
 
 export default function VisitorApp() {
   const {
@@ -66,8 +66,8 @@ export default function VisitorApp() {
       <main className="main-content visitor-map-stage" id="main-content">
         {visitorViewFor(state.activeView) === VISITOR_VIEW.MAP && (
           <>
-            <Suspense fallback={<div className="map-loading">Loading compiled floor map…</div>}>
-              <FloorplanViewer />
+            <Suspense fallback={<div className="map-loading">Loading the venue model…</div>}>
+              <VisitorMap />
             </Suspense>
             <SearchPanel />
             <POICard />
