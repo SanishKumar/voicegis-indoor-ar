@@ -6,9 +6,11 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { announcesPreviewOn } from './previewReadyLine.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const previewUrl = 'http://127.0.0.1:4187/venues/catalog.json';
+const previewPort = 4187;
+const previewUrl = `http://127.0.0.1:${previewPort}/venues/catalog.json`;
 const viteCli = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
 const playwrightCli = path.join(root, 'node_modules', '@playwright', 'test', 'cli.js');
 const commandArguments = process.argv.slice(2);
@@ -51,7 +53,7 @@ function startPreview(outDir) {
       '--host',
       '127.0.0.1',
       '--port',
-      '4187',
+      String(previewPort),
       '--strictPort',
     ],
     {
@@ -79,7 +81,7 @@ function startPreview(outDir) {
 
     preview?.stdout?.on('data', (chunk) => {
       output = `${output}${String(chunk)}`.slice(-8_000);
-      if (!ready && /Local:\s+http:\/\/127\.0\.0\.1:4187\//.test(output)) {
+      if (!ready && announcesPreviewOn(output, previewPort)) {
         ready = true;
         resolve(undefined);
       }
