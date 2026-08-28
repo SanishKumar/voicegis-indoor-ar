@@ -35,6 +35,27 @@ export default function VisitorApp() {
     document.getElementById(targetId)?.focus({ preventScroll: true });
   }, [onboardingComplete]);
 
+  /*
+   * The header's height is a layout fact other fixed elements need, and it is
+   * not a constant: the control row wraps at narrow widths and the venue name
+   * is as tall as the venue names it is given. The check-in toast used to
+   * clear it with a hard-coded 74px, which stopped clearing it the moment the
+   * header grew, and the toast then sat on top of the routing control and
+   * swallowed its clicks. Measured and published instead of assumed.
+   */
+  useEffect(() => {
+    const header = document.getElementById('app-header');
+    if (header === null) return undefined;
+    const publish = () => {
+      const { height } = header.getBoundingClientRect();
+      document.documentElement.style.setProperty('--visitor-header-height', `${height}px`);
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+
   if (!onboardingComplete) {
     return <WelcomeScreen onComplete={completeOnboarding} />;
   }

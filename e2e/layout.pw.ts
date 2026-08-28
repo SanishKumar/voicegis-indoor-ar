@@ -33,10 +33,9 @@ test('every surface round-trips to a non-empty visitor map', async ({ page }) =>
 
   await page.getByRole('link', { name: 'Visitor view' }).click();
   await expect(page.locator('.compiled-map')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Switch to map view' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  // The Plan/Guide switch is gone, so arriving back on the visitor surface is
+  // proven by its own chrome rather than by a toggle's pressed state.
+  await expect(page.getByRole('button', { name: 'Which way?' })).toBeVisible();
   await expect
     .poll(() => page.locator('#main-content').evaluate((main) => main.childElementCount))
     .toBeGreaterThan(0);
@@ -92,7 +91,7 @@ test('surface navigation stays in the viewport, owns its row, and never scrolls 
 test('camera guidance controls fit at both supported narrow widths', async ({ page }) => {
   await openPharmacyRoute(page);
   await page.getByRole('button', { name: 'Dismiss' }).click();
-  await page.getByRole('button', { name: 'Switch to camera preview' }).click();
+  await page.getByRole('button', { name: 'Which way?' }).click();
 
   const controls = page.locator('.camera-preview-controls button');
   await expect.poll(() => controls.count()).toBeGreaterThanOrEqual(3);
@@ -122,16 +121,16 @@ test('camera guidance controls fit at both supported narrow widths', async ({ pa
   }
 });
 
-test('visitor header recovery controls remain reachable and tappable at 320px', async ({ page }) => {
+test('visitor header recovery controls remain reachable and tappable at 320px', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 320, height: 700 });
   await openVisitor(page);
 
   const controls = [
     page.getByRole('button', { name: /Change start location/ }),
-    page.getByRole('button', { name: 'Switch to map view' }),
-    page.getByRole('button', { name: 'Switch to camera preview' }),
+    page.getByRole('button', { name: 'Which way?' }),
     page.getByRole('button', { name: /routing/ }),
-    page.getByRole('button', { name: 'Toggle high contrast mode' }),
     page.getByRole('button', { name: 'Toggle theme' }),
     page.getByRole('button', { name: 'Go to welcome screen' }),
   ];
@@ -143,8 +142,14 @@ test('visitor header recovery controls remain reachable and tappable at 320px', 
     // checks above, which is a control you can hit only if you aim.
     const bounds = await control.boundingBox();
     expect(bounds, 'control has no box').not.toBeNull();
-    expect(bounds!.width, `${await control.getAttribute('aria-label')} is too narrow`).toBeGreaterThanOrEqual(44);
-    expect(bounds!.height, `${await control.getAttribute('aria-label')} is too short`).toBeGreaterThanOrEqual(44);
+    expect(
+      bounds!.width,
+      `${await control.getAttribute('aria-label')} is too narrow`,
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      bounds!.height,
+      `${await control.getAttribute('aria-label')} is too short`,
+    ).toBeGreaterThanOrEqual(44);
   }
   await expect
     .poll(() =>

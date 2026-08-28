@@ -43,7 +43,7 @@ test('every onboarding exit without a route hands focus to the map search', asyn
 
   // Reset from Guide, not only from the already-correct map state. Welcome is
   // a planning flow and must normalize the surface it returns to.
-  await page.getByRole('button', { name: 'Switch to camera preview' }).click();
+  await page.getByRole('button', { name: 'Which way?' }).click();
   await expectInsideViewport(resetOnboarding);
   await expectCenterHitTarget(resetOnboarding);
   await resetOnboarding.click();

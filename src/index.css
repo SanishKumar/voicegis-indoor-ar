@@ -2688,215 +2688,6 @@ body {
   background: #e8ebe6;
 }
 
-.visitor-header {
-  height: 74px;
-  min-height: 74px;
-  gap: 24px;
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--visitor-line);
-  background: var(--visitor-panel);
-  box-shadow: 0 1px 0 rgba(23, 33, 31, 0.03);
-}
-
-.visitor-brand {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-}
-
-.visitor-brand-mark {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  flex: 0 0 42px;
-  place-items: center;
-  border-radius: 12px;
-  color: #fff;
-  background: var(--visitor-accent-strong);
-}
-
-.visitor-brand-copy {
-  min-width: 0;
-  display: grid;
-  line-height: 1.12;
-}
-
-.visitor-brand-copy span {
-  color: var(--color-text-muted);
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.visitor-brand-copy strong {
-  max-width: 230px;
-  overflow: hidden;
-  color: var(--color-text-primary);
-  font-size: 0.9375rem;
-  font-weight: 720;
-  letter-spacing: -0.02em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.visitor-floor-context {
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 10px;
-  border-left: 1px solid var(--visitor-line);
-  color: var(--color-text-secondary);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.visitor-header-actions {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.visitor-location-control {
-  min-width: 210px;
-  max-width: 270px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 5px 13px 5px 6px;
-  border: 1px solid var(--visitor-line);
-  border-radius: 12px;
-  color: var(--color-text-primary);
-  background: transparent;
-  text-align: left;
-  transition:
-    border-color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.visitor-location-control:hover {
-  border-color: var(--visitor-accent);
-  background: var(--visitor-accent-soft);
-}
-
-.visitor-location-icon {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  flex: 0 0 34px;
-  place-items: center;
-  border-radius: 9px;
-  color: var(--visitor-accent-strong);
-  background: var(--visitor-accent-soft);
-}
-
-.visitor-location-copy {
-  min-width: 0;
-  display: grid;
-}
-
-.visitor-location-copy small {
-  color: var(--color-text-muted);
-  font-size: 0.5625rem;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.visitor-location-copy strong {
-  overflow: hidden;
-  font-size: 0.75rem;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.visitor-mode-switch {
-  height: 42px;
-  display: inline-flex;
-  align-items: stretch;
-  padding: 3px;
-  border: 1px solid var(--visitor-line);
-  border-radius: 11px;
-  background: var(--color-bg-primary);
-}
-
-.visitor-mode-switch button {
-  min-width: 74px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 10px;
-  border-radius: 8px;
-  color: var(--color-text-muted);
-  font-size: 0.6875rem;
-  font-weight: 650;
-}
-
-.visitor-mode-switch button:hover {
-  color: var(--color-text-primary);
-}
-
-.visitor-mode-switch button.active {
-  color: #fff;
-  background: var(--visitor-accent-strong);
-  box-shadow: 0 2px 8px rgba(14, 83, 71, 0.2);
-}
-
-.visitor-access-profile {
-  height: 42px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 12px;
-  border: 1px solid var(--visitor-line);
-  border-radius: 11px;
-  color: var(--color-text-secondary);
-  font-size: 0.6875rem;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.visitor-access-profile:hover,
-.visitor-access-profile.active {
-  color: var(--visitor-accent-strong);
-  border-color: var(--visitor-accent);
-  background: var(--visitor-accent-soft);
-}
-
-.visitor-utility-actions {
-  height: 42px;
-  display: inline-flex;
-  align-items: center;
-  overflow: hidden;
-  border: 1px solid var(--visitor-line);
-  border-radius: 11px;
-}
-
-.visitor-utility-actions button {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  color: var(--color-text-muted);
-}
-
-.visitor-utility-actions button + button {
-  border-left: 1px solid var(--visitor-line);
-}
-
-.visitor-utility-actions button:hover,
-.visitor-utility-actions button.active {
-  color: var(--visitor-accent-strong);
-  background: var(--visitor-accent-soft);
-}
-
 .visitor-shell .compiled-map-topbar {
   top: 50%;
   right: 20px;
@@ -3438,32 +3229,6 @@ body {
   margin: 0;
 }
 
-.visitor-status-bar {
-  height: 36px;
-  min-height: 36px;
-  justify-content: flex-start;
-  gap: 20px;
-  padding: 0 18px;
-  border-color: var(--visitor-line);
-  background: var(--visitor-panel);
-}
-
-.visitor-status-bar .status-item {
-  color: var(--color-text-muted);
-  font-family: var(--font-family);
-  font-size: 0.625rem;
-  letter-spacing: 0;
-}
-
-.visitor-status-bar .status-primary {
-  color: var(--color-text-primary);
-  font-weight: 700;
-}
-
-.visitor-status-bar .status-offline {
-  margin-left: auto;
-}
-
 [data-contrast="high"] .visitor-shell {
   --visitor-accent: #00ffbf;
   --visitor-accent-strong: #00664d;
@@ -3472,121 +3237,11 @@ body {
   --visitor-line: #fff;
 }
 
-@media (max-width: 1180px) {
-  .visitor-floor-context {
-    display: none;
-  }
-
-  .visitor-location-control {
-    min-width: 170px;
-    max-width: 210px;
-  }
-
-  .visitor-mode-switch button {
-    min-width: 64px;
-  }
-}
-
-@media (max-width: 940px) {
-  .visitor-brand-copy span,
-  .visitor-location-copy small {
-    display: none;
-  }
-
-  .visitor-brand-copy strong {
-    max-width: 150px;
-  }
-
-  .visitor-location-control {
-    min-width: 44px;
-    width: 44px;
-    padding: 4px;
-  }
-
-  .visitor-location-copy {
-    display: none;
-  }
-
-  .visitor-access-profile {
-    flex: 0 0 auto;
-    width: 44px;
-    min-width: 44px;
-    justify-content: center;
-    padding: 0;
-  }
-
-  .visitor-access-profile span {
-    display: none;
-  }
-}
-
 @media (max-width: 700px) {
-  .visitor-header {
-    height: auto;
-    min-height: 112px;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 7px;
-    padding: 9px 12px;
-  }
-
-  .visitor-brand-mark {
-    width: 34px;
-    height: 34px;
-    flex-basis: 34px;
-    border-radius: 10px;
-  }
-
-  .visitor-brand-copy span {
-    display: block;
-  }
-
-  .visitor-brand-copy strong {
-    max-width: calc(100vw - 80px);
-  }
-
-  .visitor-header-actions {
-    justify-content: space-between;
-  }
-
-  .visitor-mode-switch,
-  /*
-    Every header control is a touch target here, so none of them may be smaller
-    than a fingertip. They had been shrinking to fit instead - 29x38 for the
-    utilities at 320px - which keeps the row on one line by making it unusable.
-    44x44 is the floor; the header grows a little rather than the controls
-    shrinking.
-  */
-  .visitor-access-profile,
-  .visitor-utility-actions {
-    height: 44px;
-  }
-
-  .visitor-mode-switch {
-    height: 44px;
-  }
-
-  .visitor-mode-switch button {
-    flex: 0 0 auto;
-    min-width: 62px;
-    min-height: 44px;
-  }
 
   /* `width` alone loses to flex shrinking, which is how these ended up at 34px
      while the stylesheet said 38. The floor has to be a minimum the row cannot
      compress, not a preferred size. */
-  .visitor-access-profile {
-    flex: 0 0 auto;
-    width: 44px;
-    min-width: 44px;
-  }
-
-  .visitor-utility-actions button {
-    flex: 0 0 auto;
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
-  }
 
   .visitor-shell .compiled-map-topbar {
     top: 50%;
@@ -3693,52 +3348,9 @@ body {
   .visitor-shell .poi-card-overlay {
     padding: 12px;
   }
-
-  .visitor-status-bar {
-    gap: 12px;
-    padding: 0 12px;
-  }
-
-  .visitor-status-bar .status-location {
-    min-width: 0;
-    flex: 1;
-  }
-
-  .visitor-status-bar .status-location span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .visitor-status-bar .status-floor {
-    display: none;
-  }
 }
 
 @media (max-width: 430px) {
-  .visitor-brand-copy span {
-    display: none;
-  }
-
-  .visitor-header-actions {
-    gap: 4px;
-  }
-
-  .visitor-mode-switch button {
-    /* Narrower than at 700px, but never below the 44px touch floor. */
-    min-width: 46px;
-    padding-inline: 4px;
-  }
-
-  .visitor-utility-actions button {
-    width: 44px;
-    min-width: 44px;
-  }
-
-  .visitor-utility-actions,
-  .visitor-header-actions {
-    gap: 3px;
-  }
 
   /*
     Six controls at a 44px floor do not fit one row at 320px - the last ran to
@@ -3747,11 +3359,6 @@ body {
     buys a single line by removing the labels that make them guessable. Height
     is cheaper than legibility here.
   */
-  .visitor-header-actions {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    row-gap: 6px;
-  }
 
   .search-trigger-copy small {
     display: none;
@@ -6645,7 +6252,7 @@ body {
 .checkin-toast {
   position: fixed;
   z-index: 1400;
-  top: 74px;
+  top: calc(var(--visitor-header-height, 74px) + 12px);
   left: 50%;
   display: flex;
   gap: 11px;
@@ -6708,10 +6315,6 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .checkin-toast { animation: none; }
-}
-
-@media (max-width: 700px) {
-  .checkin-toast { top: 172px; }
 }
 
 .checkin-toast-problem {
@@ -7084,4 +6687,283 @@ body {
   font-weight: 400;
   line-height: 1.82;
   color: var(--ed-ink-soft);
+}
+
+/* ==========================================================================
+   Visitor chrome - header and status line
+   --------------------------------------------------------------------------
+   Same poster language as the onboarding screen: cream paper, ink hairlines,
+   one blue accent, flat throughout. Every control is an outlined pill with a
+   cream fill, and an icon-only control is simply a pill on a square, which is
+   a circle.
+
+   The header wraps rather than shrinking its controls. An earlier version kept
+   the row intact by letting buttons fall to 29x38, which is a control you can
+   press only if you aim; the browser suite measures every one of them at 320px
+   against a 44x44 floor, so growing taller is the only direction left.
+   ========================================================================== */
+.visitor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px var(--ed-16);
+  height: auto;
+  padding: 12px var(--ed-16);
+  border-bottom: 1px solid var(--ed-ink);
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font-family: var(--ed-body);
+}
+
+/* Shrinkable, so a long venue name truncates instead of pushing the control
+   row onto a second line. "Asterion University Medical Center" measured 611px
+   here and wrapped the header to 124px at 1280. */
+.visitor-brand {
+  display: flex;
+  align-items: center;
+  flex: 1 1 200px;
+  gap: 12px;
+  min-width: 0;
+}
+
+.visitor-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  color: var(--ed-blue);
+}
+
+.visitor-brand-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.visitor-brand-copy span {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ed-ink-soft);
+}
+
+.visitor-brand-copy strong {
+  overflow: hidden;
+  font-family: var(--ed-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.009em;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visitor-floor-context {
+  padding-left: var(--ed-16);
+  border-left: 1px solid var(--ed-ink);
+  font-size: var(--ed-16);
+  line-height: 1.5;
+  color: var(--ed-ink-soft);
+}
+
+.visitor-header-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* The border is the button. */
+.visitor-location-control,
+.visitor-heading-check,
+.visitor-access-profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 18px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font: inherit;
+  font-size: var(--ed-16);
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.visitor-location-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--ed-blue);
+}
+
+.visitor-location-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.visitor-location-copy small {
+  flex: none;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ed-ink-soft);
+}
+
+.visitor-location-copy strong {
+  overflow: hidden;
+  max-width: 150px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visitor-location-control:hover,
+.visitor-heading-check:hover,
+.visitor-access-profile:hover,
+.visitor-access-profile.active {
+  border-color: var(--ed-blue);
+  color: var(--ed-blue);
+}
+
+.visitor-utility-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* A pill on a square is a circle - the system's one radius, applied. */
+.visitor-utility-actions button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  cursor: pointer;
+}
+
+.visitor-utility-actions button:hover {
+  border-color: var(--ed-blue);
+  color: var(--ed-blue);
+}
+
+.visitor-location-control:focus-visible,
+.visitor-heading-check:focus-visible,
+.visitor-access-profile:focus-visible,
+.visitor-utility-actions button:focus-visible {
+  outline: 1px solid var(--ed-ink);
+  outline-offset: 3px;
+}
+
+/* --------------------------------------------------------------------------
+   Status line
+   -------------------------------------------------------------------------- */
+.visitor-status-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px var(--ed-20);
+  height: auto;
+  min-height: 44px;
+  padding: 8px var(--ed-16);
+  border-top: 1px solid var(--ed-ink);
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font-family: var(--ed-body);
+}
+
+.visitor-status-bar .status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--ed-16);
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--ed-ink);
+}
+
+.visitor-status-bar .status-primary {
+  font-weight: 700;
+}
+
+.visitor-status-bar .status-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 9999px;
+  background: var(--ed-ink-soft);
+}
+
+.visitor-status-bar .status-dot.navigating,
+.visitor-status-bar .status-dot.active {
+  background: var(--ed-blue);
+}
+
+/* Pushed to the end and never allowed to shrink: the browser suite measures
+   this label at 320px and fails if it is clipped or leaves the viewport. */
+.visitor-status-bar .status-offline {
+  flex: none;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.visitor-status-bar .status-offline[data-offline-state='available'] {
+  color: var(--ed-blue);
+}
+
+.visitor-status-bar .status-offline[data-offline-state='online-only'] {
+  color: var(--ed-ink-soft);
+}
+
+/* Start point and floor are already named in the header; below this width they
+   are only competing for the row the readiness label has to keep. */
+@media (max-width: 640px) {
+  .visitor-status-bar .status-location,
+  .visitor-status-bar .status-floor {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .visitor-brand-copy span,
+  .visitor-floor-context {
+    display: none;
+  }
+}
+
+/* Below this the labelled pills stack into three rows and the header eats a
+   third of a 700px viewport. The labels go and the pills become circles; every
+   one of them already carries an explicit accessible name, so nothing is lost
+   to a screen reader. */
+@media (max-width: 560px) {
+  .visitor-heading-check span,
+  .visitor-access-profile span,
+  .visitor-location-copy small {
+    display: none;
+  }
+
+  .visitor-heading-check,
+  .visitor-access-profile {
+    width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .visitor-location-copy strong {
+    max-width: 110px;
+  }
 }
