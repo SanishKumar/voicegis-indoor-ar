@@ -7,7 +7,7 @@
  * directions" link is not something anyone carries down a corridor.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowUp,
@@ -42,6 +42,13 @@ export default function NavigationPanel() {
   const { state, actions, venue } = useNavigation();
   const { route, navStatus, currentStepIndex, destinationNodeId } = state;
   const panelRef = useRef(null);
+  /*
+   * On a phone the whole strip covered four fifths of the map, which is the
+   * one thing a visitor came to look at. Collapsed, the panel shows the leg in
+   * hand and nothing else - which is what the journey is meant to be read as
+   * anyway. Wide screens have room for the lot and ignore this.
+   */
+  const [expanded, setExpanded] = useState(false);
   const destNode = venue.getNodeById(destinationNodeId);
 
   const clearRouteAndReturnToSearch = () => {
@@ -53,6 +60,32 @@ export default function NavigationPanel() {
       document.getElementById('btn-search-open')?.focus({ preventScroll: true });
     }, 0);
   };
+
+  /*
+   * The panel's height is a layout fact the map's own controls need. As a
+   * bottom sheet it sits over the floor stack and the zoom column, and those
+   * have to move above it - so it is measured and published rather than
+   * guessed at, the same way the header is. Cleared on unmount so the controls
+   * fall back to their normal places once guidance ends.
+   */
+  useEffect(() => {
+    const panel = panelRef.current;
+    const root = document.documentElement;
+    if (panel === null) {
+      root.style.removeProperty('--visitor-sheet-height');
+      return undefined;
+    }
+    const publish = () => {
+      root.style.setProperty('--visitor-sheet-height', `${panel.getBoundingClientRect().height}px`);
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(panel);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--visitor-sheet-height');
+    };
+  }, [route, navStatus, expanded]);
 
   // Route creation replaces the control that launched it. Focus the new
   // calculation/guidance region once, rather than dropping the visitor on
@@ -159,7 +192,7 @@ export default function NavigationPanel() {
   return (
     <div
       ref={panelRef}
-      className="nav-panel open"
+      className={`nav-panel open ${expanded ? 'is-expanded' : 'is-collapsed'}`}
       id="nav-panel"
       role="region"
       aria-label={`Directions to ${destNode?.poi?.name || 'destination'}`}
@@ -233,6 +266,17 @@ export default function NavigationPanel() {
           );
         })}
       </ol>
+
+      {legs.length > 1 && (
+        <button
+          type="button"
+          className="nav-legs-toggle"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((open) => !open)}
+        >
+          {expanded ? 'Show just this leg' : `Show all ${legs.length} legs`}
+        </button>
+      )}
 
       {!isArrived && (
         <div className="nav-leg-controls">

@@ -7128,3 +7128,128 @@ body {
   outline: 1px solid var(--ed-ink);
   outline-offset: 3px;
 }
+
+/* --------------------------------------------------------------------------
+   Journey panel on small screens
+   --------------------------------------------------------------------------
+   A 380px card floating over a 390px phone covered 80% of the map. Below this
+   width the panel becomes a sheet across the bottom, and collapsed it carries
+   only the leg being walked - which is how the journey is meant to be read.
+   -------------------------------------------------------------------------- */
+.nav-legs-toggle {
+  display: none;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 8px 18px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font: inherit;
+  font-size: var(--ed-16);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nav-legs-toggle:hover {
+  border-color: var(--ed-blue);
+  color: var(--ed-blue);
+}
+
+.nav-legs-toggle:focus-visible {
+  outline: 1px solid var(--ed-ink);
+  outline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+  .nav-panel {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    border-right: none;
+    border-bottom: none;
+    border-left: none;
+    gap: 12px;
+    padding: var(--ed-20);
+  }
+
+  .nav-panel.is-collapsed {
+    max-height: 40vh;
+  }
+
+  .nav-panel.is-expanded {
+    max-height: 70vh;
+  }
+
+  /* Which lift the route picked is real information - it is how a visitor
+     knows whether they are being sent up a stair or a lift - so it stays. It
+     just folds onto one line instead of two. */
+  .nav-panel.is-collapsed .nav-route-summary {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0 8px;
+  }
+
+  .nav-panel.is-collapsed .nav-panel-dest-name {
+    font-size: 20px;
+  }
+
+  .nav-panel.is-collapsed .nav-journey-facts {
+    padding: 10px 0;
+  }
+
+  .nav-panel.is-collapsed .nav-journey-facts dd {
+    font-size: 20px;
+  }
+
+  .nav-legs-toggle {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Collapsed shows the leg in hand. The rest are still in the document for a
+     screen reader to walk, just not competing for the map's space. */
+  .nav-panel.is-collapsed .nav-leg:not(.is-current) {
+    display: none;
+  }
+
+  .nav-panel.is-collapsed .nav-leg::after {
+    display: none;
+  }
+
+  .nav-panel.is-collapsed .nav-leg {
+    padding-bottom: 0;
+  }
+}
+
+/* The control row wrapped into two lines from here down, taking the header to
+   121px. The labels go earlier so it stays one row on a tablet. */
+@media (max-width: 860px) {
+  .visitor-heading-check span,
+  .visitor-access-profile span,
+  .visitor-location-copy small {
+    display: none;
+  }
+
+  .visitor-heading-check,
+  .visitor-access-profile {
+    width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
+/* The bottom sheet sits over the map's own controls. They move above whatever
+   the sheet currently is, rather than a guess at what it might be. */
+@media (max-width: 900px) {
+  .compiled-map-zoom {
+    bottom: calc(var(--visitor-sheet-height, 0px) + 12px);
+  }
+
+  .compiled-map-floors {
+    top: auto;
+    bottom: calc(var(--visitor-sheet-height, 0px) + 168px);
+    transform: none;
+  }
+}
