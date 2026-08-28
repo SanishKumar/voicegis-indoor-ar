@@ -10,30 +10,25 @@ import {
 test('onboarding moves focus to every newly displayed step', async ({ page }) => {
   await page.goto('/#/visitor');
 
-  const welcomeHeading = page.getByRole('heading', {
-    name: 'Find your destination without learning the venue first.',
-  });
-  await expect(welcomeHeading).toBeVisible();
+  // Destination is asked first now, so it is also the screen the flow returns
+  // to. Searching rather than taking a suggestion keeps the target fixed
+  // regardless of how the venue orders its most-asked-for list.
+  const destinationHeading = page.getByRole('heading', { name: 'Where are you going?' });
+  await expect(destinationHeading).toBeVisible();
 
-  await page.getByRole('button', { name: 'Plan a route' }).click();
-  const locationHeading = page.getByRole('heading', { name: 'Where are you right now?' });
-  await expect(locationHeading).toBeFocused();
+  await page.getByRole('textbox', { name: 'Search destination rooms' }).fill('Outpatient Pharmacy');
+  await page.getByRole('button', { name: /Outpatient Pharmacy/ }).click();
+  const positionHeading = page.getByRole('heading', { name: 'Now, where are you?' });
+  await expect(positionHeading).toBeFocused();
 
-  await page.getByRole('button', { name: /Civic Plaza Entrance/ }).click();
-  const destinationHeading = page.getByRole('heading', { name: 'Where do you need to go?' });
+  await page.getByRole('button', { name: 'Back' }).click();
   await expect(destinationHeading).toBeFocused();
-
-  await page.getByRole('button', { name: 'Back' }).click();
-  await expect(locationHeading).toBeFocused();
-
-  await page.getByRole('button', { name: 'Back' }).click();
-  await expect(welcomeHeading).toBeFocused();
 });
 
 test('every onboarding exit without a route hands focus to the map search', async ({ page }) => {
-  // This case deliberately completes three independent onboarding exits. On
-  // mobile Chromium it remains ~20 s in isolation and can exceed the global
-  // 30 s budget when the second browser project is rendering 3D concurrently.
+  // "Skip" and "Just show map" are gone: skipping used to leave the runtime
+  // with no start and therefore no route. One honest exit remains, and it is
+  // exercised from a cold start and again after a reset.
   test.setTimeout(45_000);
   await page.goto('/#/visitor');
   const searchTrigger = page.getByRole('button', {
@@ -41,8 +36,9 @@ test('every onboarding exit without a route hands focus to the map search', asyn
     exact: true,
   });
   const resetOnboarding = page.getByRole('button', { name: 'Go to welcome screen' });
+  const destinationHeading = page.getByRole('heading', { name: 'Where are you going?' });
 
-  await page.getByRole('button', { name: 'Open the plan directly' }).click();
+  await page.getByRole('button', { name: 'Browse the map instead' }).click();
   await expect(searchTrigger).toBeFocused();
 
   // Reset from Guide, not only from the already-correct map state. Welcome is
@@ -51,24 +47,9 @@ test('every onboarding exit without a route hands focus to the map search', asyn
   await expectInsideViewport(resetOnboarding);
   await expectCenterHitTarget(resetOnboarding);
   await resetOnboarding.click();
-  await expect(
-    page.getByRole('heading', {
-      name: 'Find your destination without learning the venue first.',
-    }),
-  ).toBeFocused();
-  await page.getByRole('button', { name: 'Plan a route' }).click();
-  await page.getByRole('button', { name: 'Skip' }).click();
-  await expect(searchTrigger).toBeFocused();
+  await expect(destinationHeading).toBeFocused();
 
-  await resetOnboarding.click();
-  await expect(
-    page.getByRole('heading', {
-      name: 'Find your destination without learning the venue first.',
-    }),
-  ).toBeFocused();
-  await page.getByRole('button', { name: 'Plan a route' }).click();
-  await page.getByRole('button', { name: /Civic Plaza Entrance/ }).click();
-  await page.getByRole('button', { name: 'Just show map' }).click();
+  await page.getByRole('button', { name: 'Browse the map instead' }).click();
   await expect(searchTrigger).toBeFocused();
 });
 

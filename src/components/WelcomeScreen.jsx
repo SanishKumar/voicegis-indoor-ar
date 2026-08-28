@@ -1,22 +1,36 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Navigation, MapPin, ArrowRight, QrCode, Search, ChevronRight } from 'lucide-react';
+import { ChevronRight, QrCode, Search } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs } from '../engine/searchIndex.js';
 import QrCheckIn from './QrCheckIn.tsx';
 import { scanProblemText } from '../capture/scanProblemText.ts';
 
+const STEP = { DESTINATION: 0, POSITION: 1 };
+
+/**
+ * Onboarding, asked in the order a visitor can actually answer.
+ *
+ * This used to run welcome -> location -> destination, which opens by asking
+ * "Where are you right now?" - the one question a lost visitor cannot answer,
+ * and the reason they opened the app at all. They can always name where they
+ * are going, so that is asked first; the position question then arrives with
+ * the destination already on screen, which is what makes it worth answering.
+ *
+ * There is no longer a "Skip". Skipping used to leave the runtime with no start
+ * and therefore no route, so it was an exit that led nowhere. Browsing the map
+ * without a route is still available, but it is named for what it does.
+ */
 export default function WelcomeScreen({ onComplete }) {
   const { actions, venue } = useNavigation();
-  const buildingPackage = venue.buildingPackage;
-  const [step, setStep] = useState(0); // 0 = welcome, 1 = location, 2 = destination
+  const [step, setStep] = useState(STEP.DESTINATION);
+  const [destination, setDestination] = useState(null);
   const [query, setQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [scanProblem, setScanProblem] = useState(null);
   const stepHeadingRef = useRef(null);
   const previousStepRef = useRef(step);
 
-  // A step replaces the button that had focus. Without an explicit target the
+  // A step replaces the control that had focus. Without an explicit target the
   // browser falls back to <body>, so the visitor has to rediscover where the
   // flow moved. Focus only transitions after a real step change; the first
   // screen keeps normal document-entry behavior.
@@ -26,21 +40,35 @@ export default function WelcomeScreen({ onComplete }) {
     stepHeadingRef.current?.focus({ preventScroll: true });
   }, [step]);
 
-  const handleStart = () => setStep(1);
+  const pois = useMemo(() => venue.getPOIs(), [venue]);
 
-  const handleLocationSelect = (nodeId) => {
-    actions.setStart(nodeId);
-    setStep(2);
+  const suggestions = useMemo(() => searchPOIs(pois, query).slice(0, 5), [pois, query]);
+
+  const landmarks = useMemo(() => {
+    const preferred = pois
+      .filter((node) => node.poi.category === 'entrance' || node.poi.category === 'service')
+      .sort(
+        (a, b) => Number(b.poi.category === 'entrance') - Number(a.poi.category === 'entrance'),
+      );
+    return (preferred.length > 0 ? preferred : pois).slice(0, 4);
+  }, [pois]);
+
+  const floorNameFor = useCallback((node) => venue.getFloorById(node.floor)?.name ?? '', [venue]);
+
+  const chooseDestination = (node) => {
+    setDestination({ id: node.id, name: node.poi.name });
+    setStep(STEP.POSITION);
   };
 
-  const handleDestinationSelect = (nodeId) => {
-    actions.navigateTo(nodeId);
-    onComplete();
-  };
-
-  const skipToMap = () => {
-    onComplete();
-  };
+  /** Both halves are known here, so the route is requested in one move. */
+  const startFrom = useCallback(
+    (startNodeId) => {
+      actions.setStart(startNodeId);
+      if (destination !== null) void actions.navigateTo(destination.id, startNodeId);
+      onComplete();
+    },
+    [actions, destination, onComplete],
+  );
 
   const handleScannedPayload = useCallback(
     (payload) => {
@@ -53,114 +81,87 @@ export default function WelcomeScreen({ onComplete }) {
       }
       setScanProblem(null);
       setScanning(false);
-      setStep(2);
+      // The check-in has already set the start; only the route is still owed.
+      if (destination !== null) void actions.navigateTo(destination.id, result.nodeId);
+      onComplete();
       return true;
     },
-    [actions],
-  );
-
-  const pois = useMemo(() => venue.getPOIs(), [venue]);
-  const landmarks = useMemo(() => {
-    const preferred = pois
-      .filter((n) => n.poi.category === 'entrance' || n.poi.category === 'service')
-      .sort(
-        (a, b) => Number(b.poi.category === 'entrance') - Number(a.poi.category === 'entrance'),
-      );
-    return (preferred.length > 0 ? preferred : pois).slice(0, 4);
-  }, [pois]);
-
-  const searchResults = useMemo(() => {
-    if (!query && !activeCategory) return [];
-    return searchPOIs(pois, query, { category: activeCategory }).slice(0, 5);
-  }, [activeCategory, pois, query]);
-
-  const quickCategories = useMemo(
-    () => [...new Set(pois.map((node) => node.poi.category))].slice(0, 3),
-    [pois],
+    [actions, destination, onComplete],
   );
 
   return (
-    <div className="welcome-screen">
-      <div className="welcome-bg" />
+    <div className="wf-screen">
+      <div className="wf-stage" aria-hidden="true" />
 
-      <div className="welcome-content">
-        {step === 0 && (
-          <div className="welcome-hero animate-fade-in">
-            <div className="welcome-eyebrow">VenuePackage runtime / bootstrap v0</div>
-            <div className="welcome-logo-container">
-              <div className="welcome-logo">
-                <MapPin size={30} strokeWidth={1.8} />
-              </div>
+      <div className="wf-content">
+        {step === STEP.DESTINATION && (
+          <section className="wf-step" aria-labelledby="welcome-step-heading">
+            <p className="wf-eyebrow">{venue.buildingPackage.building.name}</p>
+            <h2 ref={stepHeadingRef} className="wf-title" id="welcome-step-heading" tabIndex={-1}>
+              Where are you going?
+            </h2>
+            <p className="wf-sub">Search, or pick from the list.</p>
+
+            <div className="wf-field">
+              <Search size={15} strokeWidth={1.25} aria-hidden="true" />
+              <input
+                type="text"
+                placeholder="Search rooms, clinics and services"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                aria-label="Search destination rooms"
+              />
             </div>
 
-            <h1
-              ref={stepHeadingRef}
-              className="welcome-title"
-              id="welcome-step-heading"
-              tabIndex={-1}
-            >
-              Find your destination without learning the venue first.
-            </h1>
-            <p className="welcome-subtitle">
-              Deterministic routing over the active verified package, with accessible paths and
-              venue-independent spatial views.
-            </p>
+            <p className="wf-label">{query ? 'Results' : 'Destinations'}</p>
+            {suggestions.length > 0 ? (
+              <ul className="wf-list">
+                {suggestions.map(({ node }) => (
+                  <li key={node.id}>
+                    <button
+                      type="button"
+                      className="wf-row"
+                      aria-label={`${node.poi.name}, ${floorNameFor(node)}`}
+                      onClick={() => chooseDestination(node)}
+                    >
+                      <span className="wf-row-text">
+                        <span className="wf-row-name">{node.poi.name}</span>
+                        <span className="wf-row-meta">{floorNameFor(node)}</span>
+                      </span>
+                      <ChevronRight size={15} strokeWidth={1.25} aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="wf-empty">Nothing here matches that. Try a shorter word.</p>
+            )}
 
-            <div className="welcome-cta-group">
-              <button className="welcome-cta" onClick={handleStart} id="btn-welcome-start">
-                Plan a route
-                <ArrowRight size={18} />
-              </button>
-            </div>
-
-            <div className="welcome-proof-grid" aria-label="Benchmark facts">
-              <div>
-                <strong>{String(buildingPackage.floors.length).padStart(2, '0')}</strong>
-                <span>connected levels</span>
-              </div>
-              <div>
-                <strong>{buildingPackage.routing.edges.length}</strong>
-                <span>routing edges</span>
-              </div>
-              <div>
-                <strong>
-                  {String(buildingPackage.localizationAnchors.length).padStart(2, '0')}
-                </strong>
-                <span>localization anchors</span>
-              </div>
-            </div>
-
-            <button className="welcome-text-action" onClick={skipToMap}>
-              Open the plan directly
+            <button type="button" className="wf-text-action" onClick={onComplete}>
+              Browse the map instead
             </button>
-          </div>
+          </section>
         )}
 
-        {step === 1 && (
-          <div
-            className="welcome-features animate-fade-in"
-            style={{ width: '100%', maxWidth: '400px' }}
-          >
-            <h2
-              ref={stepHeadingRef}
-              className="welcome-features-title"
-              id="welcome-step-heading"
-              tabIndex={-1}
-            >
-              Where are you right now?
+        {step === STEP.POSITION && (
+          <section className="wf-step" aria-labelledby="welcome-step-heading">
+            <p className="wf-eyebrow">Going to</p>
+            <p className="wf-chip">{destination?.name}</p>
+            <h2 ref={stepHeadingRef} className="wf-title" id="welcome-step-heading" tabIndex={-1}>
+              Now, where are you?
             </h2>
-            <p className="welcome-features-subtitle">Set your starting point to get directions.</p>
+            <p className="wf-sub">A code gives your exact spot. It is the accurate way.</p>
 
             <button
-              className="welcome-feature-card"
-              style={{ marginBottom: '16px', justifyContent: 'center' }}
+              type="button"
+              className="wf-primary"
               onClick={() => {
                 setScanProblem(null);
                 setScanning(true);
               }}
             >
-              <QrCode size={24} style={{ marginRight: '8px' }} />
-              <span style={{ fontSize: '16px', fontWeight: 'bold' }}>Scan a check-in code</span>
+              <QrCode size={16} strokeWidth={1.25} aria-hidden="true" />
+              Scan a check-in code
             </button>
 
             {scanning && (
@@ -171,178 +172,34 @@ export default function WelcomeScreen({ onComplete }) {
               />
             )}
 
-            <div
-              style={{
-                textAlign: 'left',
-                width: '100%',
-                marginBottom: '8px',
-                color: 'var(--color-text-muted)',
-                fontSize: '14px',
-              }}
-            >
-              Or select a landmark:
-            </div>
-
-            <div
-              className="lp-results"
-              style={{
-                background: 'var(--color-bg-glass)',
-                borderRadius: '16px',
-                border: '1px solid var(--color-border)',
-                padding: '8px',
-                marginBottom: '24px',
-              }}
-            >
-              {landmarks.map((node) => {
-                const cat = venue.getCategory(node.poi.category);
-                return (
+            <p className="wf-label">Or start from a landmark</p>
+            <ul className="wf-list">
+              {landmarks.map((node) => (
+                <li key={node.id}>
                   <button
-                    key={node.id}
-                    className="lp-result-item"
-                    onClick={() => handleLocationSelect(node.id)}
+                    type="button"
+                    className="wf-row"
+                    aria-label={`Start from ${node.poi.name}, ${floorNameFor(node)}`}
+                    onClick={() => startFrom(node.id)}
                   >
-                    <div
-                      className="lp-result-icon"
-                      style={{ background: cat?.bgColor, color: cat?.color }}
-                    >
-                      {node.poi.icon}
-                    </div>
-                    <div className="lp-result-info">
-                      <div className="lp-result-name">{node.poi.name}</div>
-                    </div>
-                    <ChevronRight size={16} className="lp-result-arrow" />
+                    <span className="wf-row-text">
+                      <span className="wf-row-name">{node.poi.name}</span>
+                      <span className="wf-row-meta">{floorNameFor(node)}</span>
+                    </span>
+                    <ChevronRight size={15} strokeWidth={1.25} aria-hidden="true" />
                   </button>
-                );
-              })}
-            </div>
+                </li>
+              ))}
+            </ul>
 
-            <div className="welcome-cta-group">
-              <button className="welcome-cta-secondary" onClick={() => setStep(0)}>
-                Back
-              </button>
-              <button className="welcome-cta-secondary" onClick={skipToMap}>
-                Skip
-              </button>
-            </div>
-
-            <div className="welcome-dots">
-              <span className="welcome-dot" />
-              <span className="welcome-dot active" />
-              <span className="welcome-dot" />
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div
-            className="welcome-features animate-fade-in"
-            style={{ width: '100%', maxWidth: '400px' }}
-          >
-            <h2
-              ref={stepHeadingRef}
-              className="welcome-features-title"
-              id="welcome-step-heading"
-              tabIndex={-1}
+            <button
+              type="button"
+              className="wf-secondary"
+              onClick={() => setStep(STEP.DESTINATION)}
             >
-              Where do you need to go?
-            </h2>
-            <p className="welcome-features-subtitle">Search or pick a quick category.</p>
-
-            <div className="lp-search" style={{ marginBottom: '16px', width: '100%' }}>
-              <Search size={18} className="lp-search-icon" />
-              <input
-                type="text"
-                placeholder="Search rooms..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="lp-search-input"
-                aria-label="Search destination rooms"
-              />
-            </div>
-
-            <div
-              className="lp-categories"
-              style={{ flexWrap: 'wrap', justifyContent: 'center', marginBottom: '16px' }}
-            >
-              {quickCategories.map((catId) => {
-                const cat = venue.getCategory(catId);
-                return (
-                  <button
-                    key={catId}
-                    className={`lp-chip ${activeCategory === catId ? 'active' : ''}`}
-                    style={{
-                      background: cat.bgColor,
-                      color: cat.color,
-                      border: `1px solid ${cat.color}`,
-                    }}
-                    onClick={() =>
-                      setActiveCategory((current) => (current === catId ? null : catId))
-                    }
-                    aria-pressed={activeCategory === catId}
-                  >
-                    {cat.icon} {cat.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {(query || activeCategory) && (
-              <div
-                className="lp-results"
-                style={{
-                  background: 'var(--color-bg-glass)',
-                  borderRadius: '16px',
-                  border: '1px solid var(--color-border)',
-                  padding: '8px',
-                  marginBottom: '24px',
-                  minHeight: '200px',
-                }}
-              >
-                {searchResults.length > 0 ? (
-                  searchResults.map(({ node }) => {
-                    const cat = venue.getCategory(node.poi.category);
-                    return (
-                      <button
-                        key={node.id}
-                        className="lp-result-item"
-                        onClick={() => handleDestinationSelect(node.id)}
-                      >
-                        <div
-                          className="lp-result-icon"
-                          style={{ background: cat?.bgColor, color: cat?.color }}
-                        >
-                          {node.poi.icon}
-                        </div>
-                        <div className="lp-result-info">
-                          <div className="lp-result-name">{node.poi.name}</div>
-                        </div>
-                        <Navigation size={14} style={{ color: 'var(--color-accent-blue)' }} />
-                      </button>
-                    );
-                  })
-                ) : (
-                  <div style={{ padding: '16px', color: 'var(--color-text-muted)' }}>
-                    No results found.
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="welcome-cta-group">
-              <button className="welcome-cta-secondary" onClick={() => setStep(1)}>
-                Back
-              </button>
-              <button className="welcome-cta" onClick={skipToMap}>
-                Just show map
-              </button>
-            </div>
-
-            <div className="welcome-dots">
-              <span className="welcome-dot" />
-              <span className="welcome-dot" />
-              <span className="welcome-dot active" />
-            </div>
-          </div>
+              Back
+            </button>
+          </section>
         )}
       </div>
     </div>

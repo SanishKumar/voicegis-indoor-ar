@@ -1,21 +1,16 @@
 import { expect, openPharmacyRoute, precompleteOnboarding, test } from './support';
 
-test('a first-time visitor can choose a start and route to a destination', async ({ page }) => {
+test('a first-time visitor names a destination, then a start, and gets a route', async ({
+  page,
+}) => {
   await page.goto('/#/visitor');
 
-  await expect(
-    page.getByRole('heading', {
-      name: 'Find your destination without learning the venue first.',
-    }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Plan a route' }).click();
-  await expect(page.getByRole('heading', { name: 'Where are you right now?' })).toBeVisible();
-
-  await page.getByRole('button', { name: /Civic Plaza Entrance/ }).click();
-  await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
-
+  await expect(page.getByRole('heading', { name: 'Where are you going?' })).toBeVisible();
   await page.getByRole('textbox', { name: 'Search destination rooms' }).fill('Outpatient Pharmacy');
   await page.getByRole('button', { name: /Outpatient Pharmacy/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Now, where are you?' })).toBeVisible();
+  await page.getByRole('button', { name: /Civic Plaza Entrance/ }).click();
 
   await expect(page.locator('.compiled-map')).toBeVisible();
   await expect(page.getByLabel('Fastest available route')).toBeVisible();

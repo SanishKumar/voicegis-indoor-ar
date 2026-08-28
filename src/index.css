@@ -666,166 +666,27 @@ img, svg { display: block; max-width: 100%; }
 /* --------------------------------------------------------------------------
    Welcome Screen
    -------------------------------------------------------------------------- */
-.welcome-screen {
-  position: fixed; inset: 0; z-index: 1000;
-  display: flex; align-items: center; justify-content: center;
-  overflow: hidden;
-}
-
-.welcome-bg {
-  position: absolute; inset: 0;
-  background: linear-gradient(135deg, #0F172A 0%, #1E293B 30%, #0F172A 60%, #1E1B4B 100%);
-  z-index: 0;
-}
-:root:not([data-theme="dark"]) .welcome-bg {
-  background: linear-gradient(135deg, #F8FAFC 0%, #E0E7FF 30%, #F8FAFC 60%, #EDE9FE 100%);
-}
 
 /* Floating decorative orbs */
-.welcome-orb {
-  position: absolute; border-radius: 50%;
-  filter: blur(80px); opacity: 0.4; z-index: 1;
-  animation: orb-float 8s ease-in-out infinite alternate;
-}
-.welcome-orb-1 {
-  width: 400px; height: 400px; top: -100px; right: -100px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.5), transparent 70%);
-}
-.welcome-orb-2 {
-  width: 300px; height: 300px; bottom: -50px; left: -80px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.5), transparent 70%);
-  animation-delay: -3s;
-}
-.welcome-orb-3 {
-  width: 250px; height: 250px; top: 40%; left: 50%;
-  background: radial-gradient(circle, rgba(6, 182, 212, 0.3), transparent 70%);
-  animation-delay: -5s;
-}
 @keyframes orb-float {
   0% { transform: translate(0, 0) scale(1); }
   100% { transform: translate(30px, -20px) scale(1.1); }
 }
 
-.welcome-content {
-  position: relative; z-index: 2;
-  width: 100%; max-width: 520px; padding: var(--space-6);
-  display: flex; flex-direction: column; align-items: center;
-}
-
 /* Logo */
-.welcome-logo-container {
-  position: relative; margin-bottom: var(--space-8);
-  display: flex; align-items: center; justify-content: center;
-}
-.welcome-logo {
-  width: 80px; height: 80px; border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, var(--color-accent-blue), var(--color-accent-purple));
-  color: white; display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.4);
-  position: relative; z-index: 2;
-  animation: logo-glow-pulse 3s ease-in-out infinite;
-}
 @keyframes logo-glow-pulse {
   0%, 100% { box-shadow: 0 8px 32px rgba(59, 130, 246, 0.4); }
   50% { box-shadow: 0 8px 40px rgba(59, 130, 246, 0.7); }
 }
 
-.welcome-title {
-  font-size: var(--font-size-3xl); font-weight: var(--font-weight-extrabold);
-  text-align: center; margin-bottom: var(--space-3);
-  color: var(--color-text-primary); letter-spacing: -0.02em;
-}
-.welcome-title-accent {
-  background: linear-gradient(135deg, var(--color-accent-blue), var(--color-accent-purple));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-}
-
-.welcome-subtitle {
-  font-size: var(--font-size-md); color: var(--color-text-secondary);
-  text-align: center; line-height: var(--line-height-relaxed);
-  margin-bottom: var(--space-10); max-width: 380px;
-}
-
 /* CTA Button */
-.welcome-cta-group { display: flex; gap: var(--space-4); justify-content: center; width: 100%; margin: 0 auto; }
-.welcome-cta {
-  display: flex; align-items: center; justify-content: center; gap: var(--space-3);
-  padding: 16px 32px; border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-accent-blue), var(--color-accent-purple));
-  color: white; font-size: var(--font-size-md); font-weight: var(--font-weight-bold);
-  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.4);
-  transition: all var(--transition-normal); letter-spacing: 0.02em; border: none; cursor: pointer;
-}
-.welcome-cta:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 40px rgba(59, 130, 246, 0.5);
-}
-.welcome-cta:active { transform: translateY(0); }
-
-.welcome-cta-secondary {
-  display: flex; align-items: center; justify-content: center;
-  padding: 16px 32px; border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(8px);
-  color: var(--color-text-primary); font-size: var(--font-size-md); font-weight: var(--font-weight-bold);
-  border: 1px solid var(--color-border);
-  transition: all var(--transition-normal); cursor: pointer;
-}
-.welcome-cta-secondary:hover {
-  background: rgba(255, 255, 255, 0.2); transform: translateY(-2px);
-}
 
 /* Dots */
-.welcome-dots { display: flex; gap: var(--space-2); margin-top: var(--space-8); justify-content: center; width: 100%; }
-.welcome-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--color-text-muted); opacity: 0.3;
-  transition: all var(--transition-normal);
-}
-.welcome-dot.active {
-  width: 24px; border-radius: var(--radius-full);
-  background: var(--color-accent-blue); opacity: 1;
-}
 
 /* Features */
-.welcome-features { width: 100%; max-width: 480px; text-align: center; margin: 0 auto; display: flex; flex-direction: column; align-items: center; }
-.welcome-features-title {
-  font-size: var(--font-size-2xl); font-weight: var(--font-weight-extrabold);
-  color: var(--color-text-primary); margin-bottom: var(--space-2);
-}
-.welcome-features-subtitle {
-  font-size: var(--font-size-base); color: var(--color-text-muted);
-  margin-bottom: var(--space-8);
-}
-
-.welcome-feature-grid { display: flex; flex-direction: column; gap: var(--space-4); margin-bottom: var(--space-8); width: 100%; }
-.welcome-feature-card {
-  display: flex; align-items: center; gap: var(--space-4);
-  padding: var(--space-5); border-radius: var(--radius-xl);
-  background: var(--color-bg-glass); backdrop-filter: blur(16px);
-  border: 1px solid var(--color-border); text-align: left;
-  animation: card-slide-in 0.5s ease-out both;
-  transition: all var(--transition-fast); width: 100%;
-}
-
-.welcome-feature-card:hover {
-  transform: translateX(6px); border-color: var(--color-border-focus);
-  box-shadow: var(--shadow-md);
-}
 @keyframes card-slide-in {
   from { opacity: 0; transform: translateX(-20px); }
   to { opacity: 1; transform: translateX(0); }
-}
-.welcome-feature-icon {
-  width: 52px; height: 52px; border-radius: var(--radius-lg);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.welcome-feature-name {
-  font-size: var(--font-size-md); font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary); margin-bottom: 2px;
-}
-.welcome-feature-desc {
-  font-size: var(--font-size-sm); color: var(--color-text-muted);
-  line-height: var(--line-height-normal);
 }
 
 /* --------------------------------------------------------------------------
@@ -1971,177 +1832,6 @@ body {
   box-shadow: 0 4px 14px rgba(24, 25, 29, 0.07);
 }
 
-.welcome-screen {
-  background: var(--color-bg-primary);
-}
-
-.welcome-bg {
-  background-color: var(--color-bg-primary);
-  background-image:
-    linear-gradient(var(--color-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
-  background-size: 48px 48px;
-  opacity: 0.42;
-}
-
-:root:not([data-theme="dark"]) .welcome-bg {
-  background-color: var(--color-bg-primary);
-  background-image:
-    linear-gradient(var(--color-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
-}
-
-.welcome-content {
-  max-width: 760px;
-  padding: 32px;
-  align-items: flex-start;
-}
-
-.welcome-hero {
-  width: 100%;
-  padding: 46px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-  box-shadow: 0 20px 70px rgba(24, 25, 29, 0.1);
-}
-
-.welcome-eyebrow {
-  margin-bottom: 54px;
-  color: var(--color-accent-blue);
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.welcome-logo-container {
-  justify-content: flex-start;
-  margin-bottom: 24px;
-}
-
-.welcome-logo {
-  width: 56px;
-  height: 56px;
-  border: 1px solid #6c61e9;
-  border-radius: 6px;
-  background: var(--color-accent-blue);
-  box-shadow: none;
-  animation: none;
-}
-
-.welcome-title {
-  max-width: 620px;
-  margin-bottom: 16px;
-  color: var(--color-text-primary);
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  font-weight: 680;
-  line-height: 1.02;
-  letter-spacing: -0.045em;
-  text-align: left;
-}
-
-.welcome-title-accent {
-  color: inherit;
-  background: none;
-  -webkit-text-fill-color: currentColor;
-}
-
-.welcome-subtitle {
-  max-width: 580px;
-  margin-bottom: 30px;
-  color: var(--color-text-secondary);
-  font-size: 0.9375rem;
-  line-height: 1.65;
-  text-align: left;
-}
-
-.welcome-cta-group {
-  justify-content: flex-start;
-}
-
-.welcome-cta,
-.welcome-cta-secondary {
-  min-height: 44px;
-  padding: 0 18px;
-  border-radius: 5px;
-  box-shadow: none;
-}
-
-.welcome-cta {
-  background: var(--color-accent-blue);
-}
-
-.welcome-cta:hover,
-.welcome-cta-secondary:hover {
-  box-shadow: none;
-  transform: translateY(-1px);
-}
-
-.welcome-proof-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  margin-top: 52px;
-  border-top: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.welcome-proof-grid > div {
-  display: grid;
-  gap: 2px;
-  padding: 18px 0;
-}
-
-.welcome-proof-grid > div + div {
-  padding-left: 18px;
-  border-left: 1px solid var(--color-border);
-}
-
-.welcome-proof-grid strong {
-  color: var(--color-text-primary);
-  font-size: 1.4rem;
-  font-weight: 650;
-}
-
-.welcome-proof-grid span {
-  color: var(--color-text-muted);
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.625rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.welcome-text-action {
-  margin-top: 20px;
-  color: var(--color-text-secondary);
-  font-size: 0.75rem;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-
-.welcome-features {
-  padding: 30px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-}
-
-.welcome-feature-card {
-  border-radius: 5px;
-  background: var(--color-bg-primary);
-  backdrop-filter: none;
-}
-
-.welcome-dot {
-  width: 18px;
-  height: 2px;
-  border-radius: 0;
-}
-
-.welcome-dot.active {
-  width: 34px;
-  border-radius: 0;
-}
-
 .location-picker-overlay {
   backdrop-filter: none;
   background: rgba(18, 19, 22, 0.56);
@@ -2199,25 +1889,6 @@ body {
 }
 
 @media (max-width: 680px) {
-  .welcome-content {
-    padding: 14px;
-  }
-
-  .welcome-hero {
-    padding: 28px 22px;
-  }
-
-  .welcome-eyebrow {
-    margin-bottom: 36px;
-  }
-
-  .welcome-proof-grid {
-    margin-top: 36px;
-  }
-
-  .welcome-proof-grid > div {
-    padding-block: 14px;
-  }
 
   .header-actions {
     gap: 3px;
@@ -7110,4 +6781,282 @@ body {
 .venue-bootstrap-default {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
+}
+
+/* ==========================================================================
+   Wayfinder
+   --------------------------------------------------------------------------
+   A black stage with one whispered title over it. The discipline is
+   subtraction: no shadows, no gradients, no radii, no card layers, and no
+   chromatic UI colour at all. Colour belongs to the illustration layer - for
+   this product that is the map itself, which is why `.wf-stage` is a layer
+   rather than a background colour on the screen.
+
+   Weight 300 carries display type only. Anything a visitor has to read while
+   walking a corridor - rows, buttons, field text - sits at 400, which the
+   reference allows and which thin white-on-black at 14px does not survive.
+   ========================================================================== */
+:root {
+  --wf-void: #000000;
+  --wf-smolder: #0b0502;
+  --wf-charcoal: #1a1a1a;
+  --wf-bone: #ffffff;
+  --wf-ash: #e3e3e2;
+  --wf-driftwood: #c0bfbe;
+
+  /* Enreal is licensed; Jost is the reference's own substitute and slots in
+     first if it is ever self-hosted. Until then the stack leans on the
+     geometric faces that ship with the platform, because a webfont link would
+     break the cold-offline guarantee the service worker exists to make. */
+  --wf-font: Jost, "Century Gothic", "URW Gothic", Questrial, ui-sans-serif, system-ui, sans-serif;
+  --wf-tracking: 0.042em;
+
+  --wf-4: 4px;
+  --wf-8: 8px;
+  --wf-10: 10px;
+  --wf-16: 16px;
+  --wf-30: 30px;
+  --wf-40: 40px;
+}
+
+.wf-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  background: var(--wf-void);
+  color: var(--wf-bone);
+  font-family: var(--wf-font);
+}
+
+/* The stage the composition floats on. Black today; the map surface renders
+   here once it lands, and nothing above it may tint or dim it. */
+.wf-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--wf-void);
+}
+
+.wf-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  padding: var(--wf-40) var(--wf-16);
+}
+
+.wf-step {
+  display: flex;
+  flex-direction: column;
+}
+
+.wf-eyebrow {
+  margin: 0 0 var(--wf-10);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: var(--wf-tracking);
+  text-transform: uppercase;
+  color: var(--wf-driftwood);
+}
+
+.wf-title {
+  margin: 0 0 var(--wf-10);
+  font-size: clamp(28px, 7.5vw, 40px);
+  font-weight: 300;
+  line-height: 1.2;
+  letter-spacing: var(--wf-tracking);
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.wf-title:focus-visible {
+  outline: 1px solid var(--wf-ash);
+  outline-offset: var(--wf-8);
+}
+
+.wf-sub {
+  margin: 0 0 var(--wf-30);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.75;
+  color: var(--wf-driftwood);
+}
+
+.wf-chip {
+  align-self: flex-start;
+  margin: 0 0 var(--wf-16);
+  padding: var(--wf-4) var(--wf-10);
+  border: 1px solid var(--wf-ash);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: var(--wf-tracking);
+}
+
+.wf-field {
+  display: flex;
+  align-items: center;
+  gap: var(--wf-8);
+  margin-bottom: var(--wf-30);
+  padding: var(--wf-10) var(--wf-16);
+  border: 1px solid var(--wf-ash);
+  color: var(--wf-bone);
+}
+
+.wf-field:focus-within {
+  border-color: var(--wf-bone);
+}
+
+.wf-field input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--wf-bone);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: var(--wf-tracking);
+}
+
+.wf-field input::placeholder {
+  color: var(--wf-driftwood);
+}
+
+.wf-label {
+  margin: 0 0 var(--wf-8);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: var(--wf-tracking);
+  text-transform: uppercase;
+  color: var(--wf-driftwood);
+}
+
+.wf-list {
+  margin: 0 0 var(--wf-30);
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--wf-charcoal);
+}
+
+.wf-row {
+  display: flex;
+  align-items: center;
+  gap: var(--wf-16);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--wf-16) var(--wf-4);
+  border: none;
+  border-bottom: 1px solid var(--wf-charcoal);
+  background: none;
+  color: var(--wf-bone);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: var(--wf-tracking);
+  text-align: left;
+  cursor: pointer;
+}
+
+.wf-row:hover {
+  background: var(--wf-smolder);
+}
+
+.wf-row:focus-visible {
+  outline: 1px solid var(--wf-bone);
+  outline-offset: -1px;
+}
+
+/* Name over floor rather than beside it: at 320px the two competed for the
+   same line and long clinic names wrapped to three. */
+.wf-row-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wf-row-meta {
+  font-size: 13px;
+  letter-spacing: normal;
+  color: var(--wf-driftwood);
+}
+
+.wf-primary,
+.wf-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wf-8);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--wf-16);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: var(--wf-tracking);
+  cursor: pointer;
+}
+
+.wf-primary {
+  margin-bottom: var(--wf-30);
+  border: none;
+  background: var(--wf-bone);
+  color: var(--wf-void);
+}
+
+.wf-primary:hover {
+  background: var(--wf-ash);
+}
+
+.wf-secondary {
+  border: 1px solid var(--wf-ash);
+  background: var(--wf-charcoal);
+  color: var(--wf-bone);
+}
+
+.wf-secondary:hover {
+  background: var(--wf-smolder);
+}
+
+.wf-primary:focus-visible,
+.wf-secondary:focus-visible {
+  outline: 1px solid var(--wf-bone);
+  outline-offset: 3px;
+}
+
+.wf-text-action {
+  align-self: center;
+  min-height: 44px;
+  padding: var(--wf-8);
+  border: none;
+  background: none;
+  color: var(--wf-driftwood);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: var(--wf-tracking);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.wf-text-action:hover {
+  color: var(--wf-bone);
+}
+
+.wf-text-action:focus-visible {
+  outline: 1px solid var(--wf-bone);
+  outline-offset: 2px;
+}
+
+.wf-empty {
+  margin: 0 0 var(--wf-30);
+  font-size: 14px;
+  color: var(--wf-driftwood);
 }
