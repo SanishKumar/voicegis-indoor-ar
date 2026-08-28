@@ -7253,3 +7253,23 @@ body {
     transform: none;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Check-in confirmation
+   --------------------------------------------------------------------------
+   This was a fixed banner that cleared the header by an offset. It covered the
+   routing control, then the floor selector, then the routing control again -
+   three different controls over three changes, because an overlay that
+   negotiates its own position has to be right about every layout it will ever
+   sit above. It is part of the layout now: it takes a row between the header
+   and the map, pushes the map down, and cannot cover anything.
+   -------------------------------------------------------------------------- */
+.visitor-shell .checkin-toast {
+  position: static;
+  z-index: auto;
+  transform: none;
+  max-width: none;
+  width: 100%;
+  border-width: 0 0 1px;
+  animation: none;
+}

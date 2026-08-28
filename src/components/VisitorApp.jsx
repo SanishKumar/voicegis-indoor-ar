@@ -63,6 +63,7 @@ export default function VisitorApp() {
   return (
     <div className="visitor-shell">
       <Header />
+      <CheckInToast />
       <main className="main-content visitor-map-stage" id="main-content">
         {visitorViewFor(state.activeView) === VISITOR_VIEW.MAP && (
           <>
@@ -76,7 +77,6 @@ export default function VisitorApp() {
         )}
         <CameraPreview />
       </main>
-      <CheckInToast />
       <StatusBar />
       <LocationPicker isOpen={showLocationPicker} onClose={() => setShowLocationPicker(false)} />
     </div>

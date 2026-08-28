@@ -109,12 +109,16 @@ function ActiveVenueApplication() {
   return (
     <NavigationProvider key={venue.key} venue={venue}>
       {/*
-        Operator tooling is not offered to visitors. The inspector, the studio
-        and the recorder stay reachable by their own routes - an operator opens
-        one deliberately - but the public shell shows no control that leads to
-        them, and the visitor surface gets its full width back.
+        The operator build carries this nav on every surface, the visitor one
+        included: an operator checking their work on the visitor view needs a
+        way back to the studio that is not the address bar.
+
+        This is not the boundary that matters. The public build never contains
+        any of it - `SurfaceNav` is on the compiler's forbidden-module list, so
+        a build that reached it fails outright - and the public shell is tested
+        for its absence separately, including when the route is guessed.
       */}
-      {surface !== 'visitor' && <SurfaceNav activeSurface={surface} />}
+      <SurfaceNav activeSurface={surface} />
       {surface === 'inspector' ? (
         <InspectorApp />
       ) : surface === 'studio' ? (

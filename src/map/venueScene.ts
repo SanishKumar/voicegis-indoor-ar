@@ -7,6 +7,9 @@ import {
   DirectionalLight,
   ExtrudeGeometry,
   Group,
+  IcosahedronGeometry,
+  InstancedMesh,
+  Object3D,
   HemisphereLight,
   Mesh,
   MeshStandardMaterial,
@@ -22,7 +25,6 @@ import {
   Vector2,
   Vector3,
   WebGLRenderer,
-  type Object3D,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
@@ -81,6 +83,7 @@ const WALL_FILL = 0xfdfaf3;
 const SLAB_TOP = 0xdccfb6;
 const SLAB_SIDE = 0x9b8e76;
 const ROUTE_COLOR = 0x0f8f74;
+const SHAFT_COLOR = 0xc9743f;
 const SELECTED_FILL = 0x0a65db;
 
 const WALL_THICKNESS = 0.22;
@@ -106,6 +109,29 @@ export interface VenueScene {
   resetView(): void;
   frame(): void;
   dispose(): void;
+}
+
+/*
+ * Furniture placement is seeded, not random: the same venue must draw the same
+ * room every time it is opened, or the map appears to rearrange itself between
+ * visits.
+ */
+function seededRandom(seed: number) {
+  let value = seed;
+  return () => {
+    value = (value * 1664525 + 1013904223) % 4294967296;
+    return value / 4294967296;
+  };
+}
+
+function pointInPolygon([x, y]: Coordinate, polygon: readonly Coordinate[]) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
 }
 
 function surface(color: number, extra: Record<string, unknown> = {}) {
@@ -332,6 +358,70 @@ export function createVenueScene(
       group.add(mesh);
     }
 
+    /*
+     * The furniture is what stops a floor plate reading as an empty diagram.
+     * It is illustration, not survey: the package does not record where chairs
+     * are, so these are placed inside the right rooms and never claimed to be
+     * anything more.
+     */
+    const random = seededRandom(20260828);
+    const seats: Coordinate[] = [];
+    const planters: Coordinate[] = [];
+    for (const space of spaces) {
+      if (!['lobby', 'entrance', 'room', 'service'].includes(space.type)) continue;
+      const polygon = space.polygon as Coordinate[];
+      const px = polygon.map((point) => point[0]);
+      const py = polygon.map((point) => point[1]);
+      const wanted = space.type === 'lobby' || space.type === 'entrance' ? 8 : 3;
+      let tries = 0;
+      let placed = 0;
+      while (placed < wanted && tries < 120) {
+        tries += 1;
+        const candidate: Coordinate = [
+          Math.min(...px) + 1 + random() * (Math.max(...px) - Math.min(...px) - 2),
+          Math.min(...py) + 1 + random() * (Math.max(...py) - Math.min(...py) - 2),
+        ];
+        if (!pointInPolygon(candidate, polygon)) continue;
+        (random() > 0.62 ? planters : seats).push(candidate);
+        placed += 1;
+      }
+    }
+
+    const addInstances = (
+      geometry: ConstructorParameters<typeof InstancedMesh>[0],
+      material: MeshStandardMaterial,
+      points: Coordinate[],
+      place: (object: Object3D, point: Coordinate) => void,
+    ) => {
+      if (points.length === 0) return;
+      const mesh = new InstancedMesh(geometry, track(material), points.length);
+      const scratch = new Object3D();
+      points.forEach((point, index) => {
+        place(scratch, point);
+        scratch.updateMatrix();
+        mesh.setMatrixAt(index, scratch.matrix);
+      });
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    };
+
+    addInstances(new BoxGeometry(1.5, 0.42, 0.6), surface(0xb98d63), seats, (object, point) => {
+      object.position.copy(vec(point, 0.24));
+      object.rotation.set(0, random() > 0.5 ? 0 : Math.PI / 2, 0);
+    });
+    addInstances(
+      new CylinderGeometry(0.32, 0.38, 0.42, 6),
+      surface(0xc0714f),
+      planters,
+      (object, point) => object.position.copy(vec(point, 0.24)),
+    );
+    addInstances(new IcosahedronGeometry(0.5, 0), surface(0x6f9556), planters, (object, point) => {
+      object.position.copy(vec(point, 0.78));
+      object.scale.set(1, 1.25, 1);
+      object.rotation.set(0, random() * Math.PI, 0);
+    });
+
     const poiTargets: FloorView['poiTargets'] = [];
     for (const poi of pois) {
       const head = new Mesh(
@@ -378,6 +468,12 @@ export function createVenueScene(
   const hopsGroup = new Group();
   scene.add(hopsGroup);
 
+  /* The lifts and stairs themselves, drawn as the shafts they are. They only
+     mean anything once the stack is open, because that is the only time there
+     is a gap between storeys for them to cross. */
+  const shaftsGroup = new Group();
+  scene.add(shaftsGroup);
+
   let activeFloorId = buildingPackage.floors[0]?.id ?? '';
   let routePoints: ReadonlyArray<{ x: number; y: number; floor: string }> = [];
   let routeFloors: string[] = [];
@@ -411,6 +507,7 @@ export function createVenueScene(
 
   function clearRoute() {
     emptyGroup(hopsGroup);
+    emptyGroup(shaftsGroup);
     for (const view of floors.values()) emptyGroup(view.routeGroup);
   }
 
@@ -462,6 +559,36 @@ export function createVenueScene(
     }
 
     if (!stacked()) return;
+
+    // Every connector that touches the storeys on show, not only the one the
+    // route picked: seeing the alternatives is half of reading a stack.
+    for (const connector of buildingPackage.verticalConnectors) {
+      const stops = connector.stops
+        .filter((stop) => routeFloors.includes(stop.floorId))
+        .map((stop) => ({ stop, view: floors.get(stop.floorId) }))
+        .filter(
+          (entry): entry is { stop: typeof entry.stop; view: FloorView } =>
+            entry.view !== undefined,
+        )
+        .sort((left, right) => stackY(left.view) - stackY(right.view));
+      if (stops.length < 2) continue;
+      const bottom = stackY(stops[0].view);
+      const height = stackY(stops[stops.length - 1].view) - bottom;
+      if (height <= 0) continue;
+      const shaft = new Mesh(
+        new CylinderGeometry(0.5, 0.5, height, connector.kind === 'elevator' ? 12 : 4),
+        new MeshStandardMaterial({
+          color: SHAFT_COLOR,
+          flatShading: true,
+          roughness: 0.8,
+          transparent: true,
+          opacity: 0.4,
+        }),
+      );
+      shaft.position.copy(vec(stops[0].stop.position as Coordinate, bottom + height / 2));
+      shaftsGroup.add(shaft);
+    }
+
     for (let index = 0; index < routeFloors.length - 1; index += 1) {
       const from = floors.get(routeFloors[index]);
       const to = floors.get(routeFloors[index + 1]);
@@ -490,6 +617,7 @@ export function createVenueScene(
       view.targetOpacity = active ? 1 : 0.22;
     }
     hopsGroup.visible = stacked();
+    shaftsGroup.visible = stacked();
     // What the scene decided, published where it can be observed. Asserting on
     // the route's floor count instead would only prove the input.
     canvas.parentElement?.setAttribute('data-floors-shown', String(shown));

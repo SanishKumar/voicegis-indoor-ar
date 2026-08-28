@@ -38,14 +38,16 @@ async function touchTargets(page: import('@playwright/test').Page, containerSele
   }, containerSelector);
 }
 
-test('the visitor shell offers no route into operator tooling', async ({ page }) => {
+test('the operator build reaches its tooling from the visitor view', async ({ page }) => {
   await openVisitor(page);
 
-  // Not merely hidden from view: absent from the accessible tree and the DOM,
-  // so it cannot be reached by tab, by screen reader, or by a stray click.
-  await expect(page.getByRole('navigation', { name: 'Operator tools' })).toHaveCount(0);
+  // Only in this build. The public shell's absence of all of it is proven
+  // against the real public bundle in the offline suite, and by the compiler
+  // refusing to emit a public build that so much as imports these modules.
+  const nav = page.getByRole('navigation', { name: 'Operator tools' });
+  await expect(nav).toBeVisible();
   for (const route of OPERATOR_ROUTES) {
-    await expect(page.locator(`a[href="${route}"]`)).toHaveCount(0);
+    await expect(nav.locator(`a[href="${route}"]`)).toHaveCount(1);
   }
 });
 
@@ -65,7 +67,8 @@ test('operator routes stay reachable directly and offer a way back', async ({ pa
     .getByRole('link', { name: 'Visitor view' })
     .click();
   await expect(page.locator('.compiled-map')).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Operator tools' })).toHaveCount(0);
+  // The nav stays: this build is for operators, and they came from a tool.
+  await expect(page.getByRole('navigation', { name: 'Operator tools' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Search rooms and departments' })).toBeFocused();
 });
 

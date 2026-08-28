@@ -46,10 +46,14 @@ test('surface navigation stays in the viewport, owns its row, and never scrolls 
 }) => {
   await openVisitor(page);
 
-  // The visitor header owns its full width now that the nav has left it.
+  // The operator build carries the nav here too. What must stay true is the
+  // defect this test exists for: the nav shares the surface with the visitor
+  // header without covering any of its controls.
   const locationControl = page.getByRole('button', { name: /Change start location/ });
   await expectCenterHitTarget(locationControl);
-  await expect(page.getByRole('navigation', { name: 'Operator tools' })).toHaveCount(0);
+  await expectCenterHitTarget(page.getByRole('button', { name: 'Which way?' }));
+  await expectCenterHitTarget(page.getByRole('button', { name: /routing/ }));
+  await expect(page.getByRole('navigation', { name: 'Operator tools' })).toBeVisible();
 
   await page.goto('/#/inspector');
 
