@@ -4,7 +4,7 @@
  * Visitor navigation shell with venue context and preferences.
  */
 
-import { Accessibility, Compass, Sun, Moon, MapPin, Home, Navigation2 } from 'lucide-react';
+import { Accessibility, Compass, MapPin, Home, Navigation2 } from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
 import { startPointLabel } from '../capture/startLabel.ts';
 
@@ -12,8 +12,6 @@ export default function Header() {
   const {
     state,
     actions,
-    theme,
-    toggleTheme,
     setShowLocationPicker,
     resetOnboarding,
     accessibleRouting,
@@ -93,13 +91,6 @@ export default function Header() {
         </button>
 
         <div className="visitor-utility-actions">
-          <button onClick={toggleTheme} aria-label="Toggle theme" title="Theme">
-            {theme === 'dark' ? (
-              <Sun size={17} strokeWidth={2} />
-            ) : (
-              <Moon size={17} strokeWidth={2} />
-            )}
-          </button>
           <button
             onClick={resetOnboarding}
             aria-label="Go to welcome screen"

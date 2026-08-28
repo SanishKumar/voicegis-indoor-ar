@@ -2311,15 +2311,6 @@ body {
   background: var(--color-bg-primary);
 }
 
-:root[data-theme="dark"] .visitor-shell {
-  --visitor-accent: #65c8b1;
-  --visitor-accent-strong: #8dd8c7;
-  --visitor-accent-soft: #213b35;
-  --visitor-ink: #f2f5f1;
-  --visitor-panel: rgba(28, 35, 33, 0.97);
-  --visitor-line: #394541;
-}
-
 .visitor-map-stage {
   isolation: isolate;
   background: #e8ebe6;
@@ -6760,4 +6751,346 @@ body {
   .map-pill {
     transition: none;
   }
+}
+
+/* ==========================================================================
+   Visitor panels - search, destination card, location picker, check-in toast
+   --------------------------------------------------------------------------
+   These four surfaces were the last on the old system. Rather than rewrite a
+   hundred rules, the tokens they already consume are remapped onto the poster
+   palette inside the visitor shell only - the operator surfaces keep the
+   originals. Radius and shadow are tokens too, so flattening the system is a
+   token change rather than thirty-six separate edits.
+   ========================================================================== */
+.visitor-shell {
+  /* Surfaces: one paper, no tints, no glass. */
+  --color-bg-primary: var(--ed-cream);
+  --color-bg-secondary: var(--ed-cream);
+  --color-bg-tertiary: var(--ed-cream);
+  --color-bg-card: var(--ed-cream);
+  --color-bg-glass: var(--ed-cream);
+  --color-bg-glass-light: var(--ed-cream);
+
+  --color-text-primary: var(--ed-ink);
+  --color-text-secondary: var(--ed-ink);
+  --color-text-muted: var(--ed-ink-soft);
+  --color-text-inverse: var(--ed-cream);
+
+  --color-border: var(--ed-ink);
+  --color-border-focus: var(--ed-blue);
+
+  /* One chromatic functional colour. The accents that carried meaning by hue -
+     green for success, amber for caution, red for refusal - carry it in words
+     instead, which is the only way it survives being colour-blind or printed. */
+  --color-accent-blue: var(--ed-blue);
+  --color-accent-blue-light: var(--ed-blue);
+  --color-accent-purple: var(--ed-blue);
+  --color-accent-cyan: var(--ed-blue);
+  --color-accent-green: var(--ed-ink);
+  --color-accent-amber: var(--ed-ink);
+  --color-accent-red: var(--ed-ink);
+  --color-accent-pink: var(--ed-ink);
+  --color-accent-blue-dim: transparent;
+  --color-accent-green-dim: transparent;
+  --color-accent-amber-dim: transparent;
+  --color-accent-red-dim: transparent;
+
+  --visitor-accent: var(--ed-blue);
+  --visitor-accent-strong: var(--ed-blue);
+  --visitor-accent-soft: transparent;
+  --visitor-route: var(--ed-blue);
+  --visitor-destination: var(--ed-blue);
+  --visitor-ink: var(--ed-ink);
+  --visitor-panel: var(--ed-cream);
+  --visitor-line: var(--ed-ink);
+
+  /* Sharp everywhere except the pill, which stays the system's one radius. */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+  --shadow-glow-blue: none;
+  --shadow-glow-green: none;
+
+  font-family: var(--ed-body);
+  background: var(--ed-cream);
+}
+
+.visitor-map-stage {
+  background: var(--ed-cream);
+}
+
+/* No frosted glass over the model. */
+.visitor-shell .search-panel,
+.visitor-shell .location-picker,
+.visitor-shell .poi-card,
+.visitor-shell .checkin-toast {
+  backdrop-filter: none;
+  border: 1px solid var(--ed-ink);
+  background: var(--ed-cream);
+}
+
+.visitor-shell .location-picker-overlay {
+  background: rgba(0, 6, 9, 0.35);
+  backdrop-filter: none;
+}
+
+/* Grab handles belonged to a sheet that slid; these are panels. */
+.visitor-shell .search-panel-handle {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   Type
+   -------------------------------------------------------------------------- */
+.visitor-shell .search-panel-heading,
+.visitor-shell .lp-title,
+.visitor-shell .poi-card-title {
+  font-family: var(--ed-display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.009em;
+  line-height: 1.2;
+}
+
+.visitor-shell .search-result-name,
+.visitor-shell .lp-result-name {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.visitor-shell .search-result-desc,
+.visitor-shell .lp-result-desc,
+.visitor-shell .search-result-distance,
+.visitor-shell .poi-card-desc,
+.visitor-shell .lp-subtitle {
+  font-size: var(--ed-16);
+  line-height: 1.6;
+  color: var(--ed-ink-soft);
+}
+
+.visitor-shell .search-section-label {
+  font-size: var(--ed-16);
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ed-ink);
+}
+
+/* --------------------------------------------------------------------------
+   Controls
+   -------------------------------------------------------------------------- */
+.visitor-shell .search-trigger,
+.visitor-shell .lp-scan-cta,
+.visitor-shell .poi-card-primary,
+.visitor-shell .poi-card-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 12px 24px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font: inherit;
+  font-size: var(--ed-16);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.visitor-shell .search-trigger:hover,
+.visitor-shell .lp-scan-cta:hover,
+.visitor-shell .poi-card-primary:hover,
+.visitor-shell .poi-card-secondary:hover {
+  border-color: var(--ed-blue);
+  color: var(--ed-blue);
+}
+
+.visitor-shell .search-trigger:focus-visible,
+.visitor-shell .lp-scan-cta:focus-visible,
+.visitor-shell .poi-card-primary:focus-visible,
+.visitor-shell .poi-card-secondary:focus-visible {
+  outline: 1px solid var(--ed-ink);
+  outline-offset: 3px;
+}
+
+.visitor-shell .poi-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.visitor-shell .poi-card-primary,
+.visitor-shell .poi-card-secondary {
+  flex: 1;
+}
+
+/* Rows are hairline-separated, like every other list in the system. */
+.visitor-shell .search-result-item,
+.visitor-shell .lp-result-item {
+  min-height: 56px;
+  border: none;
+  border-bottom: 1px solid var(--ed-ink);
+  border-radius: 0;
+  background: none;
+}
+
+.visitor-shell .search-result-item:hover .search-result-name,
+.visitor-shell .lp-result-item:hover .lp-result-name {
+  color: var(--ed-blue);
+}
+
+.visitor-shell .search-result-icon,
+.visitor-shell .lp-result-icon,
+.visitor-shell .poi-card-icon,
+.visitor-shell .checkin-toast-icon {
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream) !important;
+  color: var(--ed-blue) !important;
+}
+
+.visitor-shell .search-input-wrapper,
+.visitor-shell .lp-search {
+  border: 1px solid var(--ed-ink);
+  border-radius: 0;
+  background: var(--ed-cream);
+}
+
+.visitor-shell .search-input,
+.visitor-shell .lp-search-input {
+  font-size: 18px;
+  color: var(--ed-ink);
+}
+
+.visitor-shell .category-chips button,
+.visitor-shell .lp-categories button,
+.visitor-shell .lp-chip {
+  border: 1px solid var(--ed-ink) !important;
+  border-radius: 9999px;
+  background: var(--ed-cream) !important;
+  color: var(--ed-ink) !important;
+  font-weight: 700;
+}
+
+.visitor-shell .lp-chip.active,
+.visitor-shell .category-chips button.active {
+  border-color: var(--ed-blue) !important;
+  color: var(--ed-blue) !important;
+}
+
+.visitor-shell .search-clear-btn,
+.visitor-shell .poi-card-close,
+.visitor-shell .lp-close,
+.visitor-shell .checkin-toast-close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  cursor: pointer;
+}
+
+.visitor-shell .search-clear-btn:hover,
+.visitor-shell .poi-card-close:hover,
+.visitor-shell .lp-close:hover,
+.visitor-shell .checkin-toast-close:hover {
+  border-color: var(--ed-blue);
+  color: var(--ed-blue);
+}
+
+/* --------------------------------------------------------------------------
+   Check-in toast
+   -------------------------------------------------------------------------- */
+.visitor-shell .checkin-toast {
+  gap: 12px;
+  padding: 12px 14px;
+  border-color: var(--ed-ink);
+}
+
+.visitor-shell .checkin-toast-body {
+  font-size: var(--ed-16);
+  line-height: 1.5;
+}
+
+.visitor-shell .checkin-toast-detail {
+  font-size: 13px;
+  color: var(--ed-ink-soft);
+}
+
+/* A refusal is not a different colour, it is different words - but it still
+   earns a heavier rule than a confirmation. */
+.visitor-shell .checkin-toast-problem {
+  border-width: 2px;
+  border-color: var(--ed-ink);
+}
+
+/* The route action was a filled blue block. Nothing in this system is a filled
+   coloured button - the border is the button - and it needs a real target. */
+.visitor-shell .search-route-button {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font-size: var(--ed-16);
+  font-weight: 700;
+}
+
+.visitor-shell .search-route-button:hover {
+  border-color: var(--ed-blue);
+  color: var(--ed-blue);
+}
+
+.visitor-shell .search-route-button:focus-visible {
+  outline: 1px solid var(--ed-ink);
+  outline-offset: 3px;
+}
+
+/* Every control in the panels clears the 44px floor. The category chips were
+   36px tall and the search panel's close button 40x40 - passable with a mouse,
+   a miss with a thumb. The header suite measures its own row; these sit outside
+   it, so they are pinned here. */
+.visitor-shell .category-chip,
+.visitor-shell .lp-chip {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  font-weight: 700;
+}
+
+.visitor-shell .search-panel-heading > button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  cursor: pointer;
+}
+
+.visitor-shell .search-panel-heading > button:hover {
+  border-color: var(--ed-blue);
+  color: var(--ed-blue);
+}
+
+/* A literal shadow rather than a token, so remapping the tokens missed it. */
+.visitor-shell .search-panel {
+  box-shadow: none;
 }

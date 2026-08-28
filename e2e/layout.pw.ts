@@ -131,7 +131,6 @@ test('visitor header recovery controls remain reachable and tappable at 320px', 
     page.getByRole('button', { name: /Change start location/ }),
     page.getByRole('button', { name: 'Which way?' }),
     page.getByRole('button', { name: /routing/ }),
-    page.getByRole('button', { name: 'Toggle theme' }),
     page.getByRole('button', { name: 'Go to welcome screen' }),
   ];
 

@@ -117,7 +117,7 @@ export default function POICard() {
         {/* Actions */}
         <div className="poi-card-actions">
           <button
-            className="btn btn-success btn-lg"
+            className="poi-card-primary"
             onClick={handleNavigate}
             id="btn-navigate-to"
             style={{ flex: 1 }}
@@ -127,7 +127,7 @@ export default function POICard() {
           </button>
           {selectedPOI.id !== startNodeId && (
             <button
-              className="btn btn-ghost"
+              className="poi-card-secondary"
               onClick={handleSetAsStart}
               id="btn-set-start"
               title="Set as starting point"
