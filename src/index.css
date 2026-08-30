@@ -475,7 +475,7 @@ img, svg { display: block; max-width: 100%; }
 .search-input-wrapper:focus-within { border-color: var(--color-accent-blue); background: var(--color-bg-secondary); }
 .search-input { flex: 1; padding: 0; font-size: var(--font-size-md); color: var(--color-text-primary); }
 
-.category-chips { display: flex; gap: var(--space-2); padding: var(--space-4); overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.category-chips { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-4); overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; flex: 0 0 auto; }
 .category-chips::-webkit-scrollbar { display: none; }
 .category-chip {
   padding: var(--space-2) var(--space-4); border-radius: var(--radius-full); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold);
@@ -681,11 +681,21 @@ img, svg { display: block; max-width: 100%; }
   color: var(--color-text-primary); background: transparent;
 }
 
+/* A row that scrolls sideways still has to keep its height. As a flex child it
+   defaults to shrinkable, so on a short window the column stole the row's
+   height and the 44px chips were sliced off part-way down - a strip of pill
+   tops with no readable label and nothing you could reliably tap. */
 .lp-categories {
-  display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-5);
-  overflow-x: auto; scrollbar-width: none;
+  display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-5);
+  overflow-x: auto; scrollbar-width: none; flex: 0 0 auto;
 }
 .lp-categories::-webkit-scrollbar { display: none; }
+
+/* Only the results list is allowed to absorb the leftover height. Everything
+   above it is a fixed control and keeps the size it asked for. */
+.lp-header,
+.lp-scan-cta,
+.lp-search { flex: 0 0 auto; }
 .lp-chip {
   padding: 6px 12px; border-radius: var(--radius-full);
   font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold);
@@ -1815,94 +1825,121 @@ body {
   background: #ff5c39;
 }
 
-/* Route-aware camera guidance. This remains a preview until pose + anchors exist. */
+/* ==========================================================================
+   Route-aware camera guidance
+   --------------------------------------------------------------------------
+   The last surface still on the old system, and the most visible one: opening
+   the camera from a cream visitor app landed in an instrument panel from an
+   earlier product - near-black translucent panels, monospace at ten pixels,
+   4px corners, and three hues the palette does not contain (a signal orange, a
+   lilac, and a salmon used for every "not ready" row).
+
+   Everything laid over the video is paper now. An opaque cream panel with an
+   ink hairline stays legible over any footage, which a translucent dark panel
+   over a dark corridor does not. Readiness is carried by words and weight
+   rather than by a warning colour - the same way every other refusal in this
+   product is stated - so it survives being read by someone who cannot
+   separate the hues.
+
+   This remains a preview until pose and anchors exist.
+   ========================================================================== */
 .camera-preview {
-  background: #111214;
+  background: var(--ed-ink);
 }
 
 .camera-preview-status {
   top: 14px;
   left: 14px;
   transform: none;
-  padding: 7px 9px;
-  border-color: rgba(255, 255, 255, 0.24);
-  border-radius: 4px;
-  background: rgba(24, 25, 28, 0.92);
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.625rem;
-  letter-spacing: 0.03em;
+  padding: 8px 14px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font-family: var(--ed-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: normal;
 }
 
 .camera-preview-status strong {
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .camera-preview-status span {
-  padding-left: 8px;
-  border-left: 1px solid rgba(255, 255, 255, 0.22);
-  color: #ffb3a2;
+  padding-left: 10px;
+  border-left: 1px solid var(--ed-ink);
+  color: var(--ed-ink-soft);
+  font-weight: 400;
 }
 
 .camera-preview-telemetry {
   position: absolute;
-  top: 57px;
+  top: 62px;
   left: 14px;
   z-index: 12;
-  width: 220px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 4px;
-  color: #f2f0ea;
-  background: rgba(24, 25, 28, 0.9);
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  width: 232px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 0;
+  color: var(--ed-ink);
+  background: var(--ed-cream);
+  font-family: var(--ed-body);
 }
 
 .camera-preview-telemetry > div {
   display: grid;
   grid-template-columns: 18px 1fr auto;
   align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 0 9px;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
 }
 
 .camera-preview-telemetry > div + div {
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1px solid var(--ed-ink);
 }
 
 .camera-preview-telemetry svg {
-  color: #9b93f4;
+  color: var(--ed-blue);
 }
 
 .camera-preview-telemetry span {
-  color: rgba(255, 255, 255, 0.58);
-  font-size: 0.5625rem;
-  text-transform: uppercase;
+  color: var(--ed-ink-soft);
+  font-size: 11px;
+  text-transform: none;
 }
 
 .camera-preview-telemetry strong {
-  font-size: 0.625rem;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Not ready is said in ink, and marked by a rule rather than a colour. */
+.camera-preview-telemetry .not-ready {
+  border-left: 3px solid var(--ed-ink);
+  padding-left: 7px;
 }
 
 .camera-preview-telemetry .not-ready svg,
 .camera-preview-telemetry .not-ready strong {
-  color: #ff8b70;
+  color: var(--ed-ink);
 }
 
 .camera-preview-instruction {
   top: 14px;
   right: 14px;
   left: auto;
-  width: min(460px, calc(100% - 270px));
+  width: min(460px, calc(100% - 282px));
   max-width: none;
   transform: none;
   align-items: stretch;
   gap: 0;
   padding: 0;
   overflow: hidden;
-  border-color: rgba(255, 255, 255, 0.24);
-  border-radius: 4px;
-  background: rgba(24, 25, 28, 0.92);
+  border: 1px solid var(--ed-ink);
+  border-radius: 0;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
   backdrop-filter: none;
   box-shadow: none;
 }
@@ -1912,15 +1949,15 @@ body {
   height: auto;
   min-height: 84px;
   border-radius: 0;
-  color: #fff;
-  background: #ff5c39;
+  color: var(--ed-cream);
+  background: var(--ed-blue);
   box-shadow: none;
 }
 
 .camera-preview-instruction-copy {
   flex: 1;
   min-width: 0;
-  padding: 11px 13px;
+  padding: 12px 14px;
 }
 
 .camera-preview-step-kicker {
@@ -1928,74 +1965,89 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 5px;
-  color: #aaa8a2;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.5625rem;
-  letter-spacing: 0.07em;
+  margin-bottom: 6px;
+  color: var(--ed-ink-soft);
+  font-family: var(--ed-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .camera-preview-step-kicker span {
-  color: #ffb3a2;
+  color: var(--ed-ink-soft);
 }
 
 .camera-preview-instruction-text {
-  font-size: 0.875rem;
-  font-weight: 650;
+  color: var(--ed-ink);
+  font-family: var(--ed-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.009em;
 }
 
 .camera-preview-instruction-distance {
-  color: #bdbbb5;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.625rem;
+  color: var(--ed-ink-soft);
+  font-family: var(--ed-body);
+  font-size: 12px;
 }
 
 .camera-preview-progress {
-  height: 2px;
-  margin-top: 9px;
-  background: rgba(255, 255, 255, 0.18);
+  height: 3px;
+  margin-top: 10px;
+  background: rgba(0, 6, 9, 0.16);
 }
 
 .camera-preview-progress span {
   display: block;
   height: 100%;
-  background: #ff5c39;
+  background: var(--ed-blue);
 }
 
 .camera-preview-controls {
   bottom: 14px;
   width: min(720px, calc(100% - 28px));
   max-width: none;
-  gap: 6px;
+  gap: 8px;
 }
 
 .camera-preview-control {
-  min-height: 42px;
-  padding: 0 15px;
-  border-color: rgba(255, 255, 255, 0.24);
-  border-radius: 4px;
-  background: rgba(24, 25, 28, 0.92);
+  min-height: 48px;
+  padding: 0 18px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font-family: var(--ed-body);
+  font-weight: 700;
   backdrop-filter: none;
   box-shadow: none;
 }
 
-.camera-preview-control:hover {
-  background: rgba(35, 36, 40, 0.96);
-  transform: translateY(-1px);
+.camera-preview-control:hover:not(:disabled) {
+  border-color: var(--ed-blue);
+  background: var(--ed-cream);
+  color: var(--ed-blue);
+  transform: none;
+}
+
+.camera-preview-control:focus-visible {
+  outline: 1px solid var(--ed-ink);
+  outline-offset: 3px;
 }
 
 .camera-preview-control.heading {
-  color: #d7d3ff;
-  border-color: rgba(155, 147, 244, 0.5);
+  color: var(--ed-ink);
+  border-color: var(--ed-ink);
 }
 
 .camera-preview-fallback {
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    #18191c;
-  background-size: 42px 42px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+}
+
+.camera-preview-fallback-icon {
+  color: var(--ed-ink);
 }
 
 @media (max-width: 680px) {
@@ -2013,11 +2065,11 @@ body {
 
   .camera-preview-telemetry > div + div {
     border-top: 0;
-    border-left: 1px solid rgba(255, 255, 255, 0.14);
+    border-left: 1px solid var(--ed-ink);
   }
 
   .camera-preview-telemetry > div:nth-child(n + 3) {
-    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    border-top: 1px solid var(--ed-ink);
   }
 
   .camera-preview-instruction {
@@ -5216,13 +5268,46 @@ body {
 
 .walk-recorder {
   width: 100%;
-  max-width: 640px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 24px 20px 48px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   color: var(--color-text-primary);
+}
+
+.walk-recorder-columns {
+  display: grid;
+  gap: 24px;
+}
+
+/* Setup on the left, readout on the right. Narrow screens keep the stack, and
+   the source order already puts the controls before the numbers they make. */
+@media (min-width: 960px) {
+  .walk-recorder-columns {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    column-gap: 48px;
+    align-items: start;
+  }
+}
+
+/* The readout column says what recording will measure rather than sitting
+   blank, so the panel is legible before there is anything to put in it. */
+.walk-recorder-idle {
+  margin: 24px 0 0;
+  padding: 16px;
+  border: 1px solid var(--ed-ink);
+  color: var(--ed-ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+@media (min-width: 960px) {
+  .walk-recorder-idle,
+  .walk-recorder-columns .walk-recorder-stats {
+    margin-top: 0;
+  }
 }
 
 .walk-recorder-head h1 {
@@ -5286,15 +5371,24 @@ body {
   color: var(--ed-cream);
 }
 
+/*
+ * The readout was drawing its rules by showing a dark backing sheet through
+ * 1px grid gaps. Two things followed from that, both fatal on a cream surface:
+ * the cells inherited the old dark-theme `--color-bg-primary`, so ink-coloured
+ * measurements sat on a near-black tile and could not be read at all; and the
+ * backing sheet also showed through wherever the last row ran out of cells, so
+ * ten measurements in three columns painted a large empty slab under the
+ * table. Cells carry their own rules now: an unfilled cell paints nothing.
+ */
 .walk-recorder-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
+  gap: 0;
   margin: 24px 0 0;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--ed-ink);
+  border-width: 1px 0 0 1px;
   border-radius: 0;
-  background: var(--color-border);
-  overflow: hidden;
+  background: transparent;
 }
 
 .walk-recorder-stat {
@@ -5302,17 +5396,20 @@ body {
   flex-direction: column;
   gap: 3px;
   padding: 12px 14px;
-  background: var(--color-bg-primary);
+  border-right: 1px solid var(--ed-ink);
+  border-bottom: 1px solid var(--ed-ink);
+  background: var(--ed-cream);
 }
 
 .walk-recorder-stat-label {
-  color: var(--color-text-muted);
+  color: var(--ed-ink-soft);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 
 .walk-recorder-stat-value {
+  color: var(--ed-ink);
   font-size: 17px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -6152,6 +6249,10 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* The shared rule sets monospace on the item itself, so the shell's own face
+     never reached it by inheritance and the visitor's readiness line was the
+     one run of typewriter text left on the surface. */
+  font-family: inherit;
   font-size: var(--ed-16);
   font-weight: 400;
   line-height: 1.5;
@@ -6940,6 +7041,79 @@ body {
   color: var(--ed-blue) !important;
 }
 
+/* --------------------------------------------------------------------------
+   Destination card
+   --------------------------------------------------------------------------
+   The header is a real three-part row: badge, name, dismiss. The badge had no
+   size anywhere in the system, so as a block-level child of a flex row it took
+   the full width of the card and collapsed to the height of the single letter
+   inside it - a long empty capsule above the title, with the close button
+   sitting on top of it.
+   -------------------------------------------------------------------------- */
+.visitor-shell .poi-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.visitor-shell .poi-card-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  font-size: var(--ed-16);
+  font-weight: 700;
+}
+
+.visitor-shell .poi-card-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.visitor-shell .poi-card-close {
+  flex: 0 0 auto;
+}
+
+/* One accent, and the category reads as a word rather than a hue. */
+.visitor-shell .poi-card-category {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 10px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/*
+ * Icons in this system are laid out as blocks, which is right nearly
+ * everywhere and wrong inside a line of text: the glyph took a line of its
+ * own and pushed "30m by route" onto the next one, so each fact read as two
+ * orphaned fragments. The row states the arrangement it needs.
+ */
+.visitor-shell .poi-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 12px;
+}
+
+.visitor-shell .poi-card-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ed-ink-soft);
+  font-size: var(--ed-16);
+}
+
+.visitor-shell .poi-card-meta-item svg {
+  flex: 0 0 auto;
+  color: var(--ed-blue);
+}
+
 .visitor-shell .search-input-wrapper,
 .visitor-shell .lp-search {
   border: 1px solid var(--ed-ink);
@@ -7528,6 +7702,33 @@ body {
   background: var(--ed-cream);
   border: 1px solid var(--ed-ink);
   color: var(--ed-blue);
+}
+
+/* The icon was drawn cream on a cream tile, so the validation state - the one
+   thing this panel exists to report - was an empty square. The earlier rule
+   painted the glyph to contrast a filled tile; the tile is paper now, so the
+   glyph has to be ink-side. */
+.studio-surface .studio-validation-icon svg {
+  color: inherit;
+}
+
+/*
+ * Compiling is the primary act on this surface, so the button is filled rather
+ * than outlined. It has to be stated here, past `.studio-surface button`:
+ * that rule turns every hovered control's text blue, and the button's own
+ * hover fills the background blue, so the label was blue on blue and the
+ * control read as a blank pill. A filled button states both halves together.
+ */
+.studio-surface .studio-compile-button {
+  border: 1px solid var(--ed-ink);
+  background: var(--ed-ink);
+  color: var(--ed-cream);
+}
+
+.studio-surface .studio-compile-button:hover:not(:disabled) {
+  border-color: var(--ed-blue);
+  background: var(--ed-blue);
+  color: var(--ed-cream);
 }
 
 /* The one place semantic colour survived. It is a warning that the capture is

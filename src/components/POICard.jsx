@@ -62,38 +62,37 @@ export default function POICard() {
         aria-labelledby="poi-card-title"
         tabIndex={-1}
       >
-        {/* Close Button */}
-        <button
-          className="poi-card-close"
-          onClick={() => actions.clearSelectedPOI()}
-          id="btn-poi-close"
-          aria-label="Close destination details"
-          style={{
-            position: 'relative',
-            marginLeft: 'auto',
-            display: 'block',
-            marginBottom: '-24px',
-          }}
-        >
-          <X size={16} />
-        </button>
-
-        {/* Header */}
+        {/*
+         * The close button used to be floated above the header with a negative
+         * bottom margin, which dragged the header up underneath it. It is a
+         * member of the header row instead, so nothing overlaps and the row
+         * can distribute its own space.
+         *
+         * The category's own colours are no longer applied inline. They came
+         * from the venue's category table - a per-category hue - and inline
+         * styles outrank the stylesheet, so this card kept painting itself
+         * purple after every other surface had moved to one accent. The
+         * category is named in words here, which is what survives being
+         * printed or read by someone who cannot separate the hues.
+         */}
         <div className="poi-card-header">
-          <div className="poi-card-icon" style={{ background: cat?.bgColor, color: cat?.color }}>
+          <div className="poi-card-icon" aria-hidden="true">
             {poi.icon}
           </div>
-          <div>
+          <div className="poi-card-heading">
             <h2 className="poi-card-title" id="poi-card-title">
               {poi.name}
             </h2>
-            <span
-              className="poi-card-category"
-              style={{ background: cat?.bgColor, color: cat?.color }}
-            >
-              {cat?.icon} {cat?.label}
-            </span>
+            <span className="poi-card-category">{cat?.label}</span>
           </div>
+          <button
+            className="poi-card-close"
+            onClick={() => actions.clearSelectedPOI()}
+            id="btn-poi-close"
+            aria-label="Close destination details"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         {/* Description */}
@@ -126,14 +125,18 @@ export default function POICard() {
             Navigate Here
           </button>
           {selectedPOI.id !== startNodeId && (
+            // Half the action row was an icon with no label - the same width as
+            // "Navigate Here" and no way to tell what it did without hovering
+            // for a tooltip a phone never shows. The name it already carries
+            // for assistive technology is now on the face of the button.
             <button
               className="poi-card-secondary"
               onClick={handleSetAsStart}
               id="btn-set-start"
-              title="Set as starting point"
               aria-label={`Set ${poi.name} as starting point`}
             >
               <MapPin size={16} />
+              Start here
             </button>
           )}
         </div>

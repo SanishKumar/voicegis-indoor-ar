@@ -213,7 +213,7 @@ export default function BuildingSourceFloorCanvas({
           }}
         >
           <Layer>
-            <Rect width={dimensions.width} height={dimensions.height} fill="#f4f6f3" />
+            <Rect width={dimensions.width} height={dimensions.height} fill="#fff9f0" />
 
             {gridX.map((x) => {
               const [canvasX] = toCanvas([x, bounds.minY]);
@@ -221,7 +221,7 @@ export default function BuildingSourceFloorCanvas({
                 <Line
                   key={`grid-x-${x}`}
                   points={[canvasX, offsetY, canvasX, offsetY + drawnHeight]}
-                  stroke="#dfe5e0"
+                  stroke="rgba(0, 6, 9, 0.10)"
                   strokeWidth={1}
                   listening={false}
                 />
@@ -233,7 +233,7 @@ export default function BuildingSourceFloorCanvas({
                 <Line
                   key={`grid-y-${y}`}
                   points={[offsetX, canvasY, offsetX + drawnWidth, canvasY]}
-                  stroke="#dfe5e0"
+                  stroke="rgba(0, 6, 9, 0.10)"
                   strokeWidth={1}
                   listening={false}
                 />
@@ -243,13 +243,10 @@ export default function BuildingSourceFloorCanvas({
             <Line
               points={flatPoints(activeFloor.outline)}
               closed
-              fill="#fafbf8"
-              stroke="#53615b"
+              fill="#fff9f0"
+              stroke="#000609"
               strokeWidth={3}
               lineJoin="round"
-              shadowColor="rgba(23, 33, 31, 0.12)"
-              shadowBlur={12}
-              shadowOffsetY={4}
               listening={false}
             />
 
@@ -261,7 +258,7 @@ export default function BuildingSourceFloorCanvas({
                   points={flatPoints(space.polygon)}
                   closed
                   fill={SPACE_COLORS[space.type]}
-                  stroke={selected ? '#176b5b' : space.public ? '#aeb9b3' : '#bf727b'}
+                  stroke={selected ? '#0a65db' : space.public ? 'rgba(0, 6, 9, 0.28)' : '#000609'}
                   strokeWidth={selected ? 3 : 1.35}
                   lineJoin="round"
                   onClick={() => setSelectedSpaceId(space.id)}
@@ -272,30 +269,7 @@ export default function BuildingSourceFloorCanvas({
                   onMouseLeave={(event) => {
                     event.target.getStage()!.container().style.cursor = 'default';
                   }}
-                  shadowColor={selected ? 'rgba(23, 107, 91, 0.24)' : undefined}
-                  shadowBlur={selected ? 10 : 0}
-                  shadowEnabled={selected}
                   perfectDrawEnabled={false}
-                />
-              );
-            })}
-
-            {floorSpaces.map((space) => {
-              const centre = toCanvas(polygonCentre(space.polygon));
-              return (
-                <Text
-                  key={`label-${space.id}`}
-                  x={centre[0] - 62}
-                  y={centre[1] - 6}
-                  width={124}
-                  text={space.name}
-                  align="center"
-                  fontFamily="Inter, Segoe UI, sans-serif"
-                  fontSize={Math.max(9, Math.min(12, scale * 0.38))}
-                  fontStyle={selectedSpace?.id === space.id ? 'bold' : 'normal'}
-                  fill="#34413c"
-                  ellipsis
-                  listening={false}
                 />
               );
             })}
@@ -308,8 +282,8 @@ export default function BuildingSourceFloorCanvas({
                   x={point[0]}
                   y={point[1]}
                   radius={4}
-                  fill="#ffffff"
-                  stroke="#65736d"
+                  fill="#fff9f0"
+                  stroke="#000609"
                   strokeWidth={2}
                   listening={false}
                 />
@@ -323,9 +297,64 @@ export default function BuildingSourceFloorCanvas({
                   x={point[0]}
                   y={point[1]}
                   radius={3.5}
-                  fill="#df5b3f"
-                  stroke="#ffffff"
+                  fill="#0a65db"
+                  stroke="#fff9f0"
                   strokeWidth={1.5}
+                  listening={false}
+                />
+              );
+            })}
+
+            {/*
+             * Room names are drawn last and clear of the centre.
+             *
+             * They used to be a fixed 124px box centred on the space, over a
+             * POI marker painted afterwards. Both faults showed at once: the
+             * marker punched a hole through the middle of the name, so
+             * "Emergency Reception" read as "Emergenc●Reception"; and a 124px
+             * box around a 70px room ran the name straight into its
+             * neighbours, so the lower corridor read as one unbroken string.
+             *
+             * A name is now confined to the width of the room it belongs to
+             * and sits above the marker. Rooms too narrow to show a useful
+             * amount are left unlabelled rather than given a stub - the space
+             * picker above the canvas names them exactly, and a fragment reads
+             * as a different room.
+             */}
+            {floorSpaces.map((space) => {
+              const canvasPoints = space.polygon.map(toCanvas);
+              const left = Math.min(...canvasPoints.map((point) => point[0]));
+              const right = Math.max(...canvasPoints.map((point) => point[0]));
+              const width = right - left - 8;
+              const selected = selectedSpace?.id === space.id;
+              if (width < 40 && !selected) return null;
+
+              const fontSize = Math.max(9, Math.min(12, scale * 0.38));
+              // Two lines, because a room is taller than it is wide and most of
+              // these names are two words. Truncating "Emergency Reception" to
+              // "Emergency…" to fit one line throws away the half that
+              // distinguishes it from the next room along. Bottom-aligned in a
+              // fixed block so one-line and two-line names share a baseline
+              // just above the marker.
+              const block = fontSize * 2.5;
+              const centre = toCanvas(polygonCentre(space.polygon));
+              return (
+                <Text
+                  key={`label-${space.id}`}
+                  x={left + 4}
+                  y={centre[1] - block - 5}
+                  width={Math.max(width, 40)}
+                  height={block}
+                  text={space.name}
+                  align="center"
+                  verticalAlign="bottom"
+                  fontFamily="Inter, Segoe UI, sans-serif"
+                  fontSize={fontSize}
+                  lineHeight={1.15}
+                  fontStyle={selected ? 'bold' : 'normal'}
+                  fill="#000609"
+                  ellipsis
+                  wrap="word"
                   listening={false}
                 />
               );
@@ -339,8 +368,8 @@ export default function BuildingSourceFloorCanvas({
                   x={canvasPoint[0]}
                   y={canvasPoint[1]}
                   radius={7}
-                  fill="#ffffff"
-                  stroke="#176b5b"
+                  fill="#fff9f0"
+                  stroke="#0a65db"
                   strokeWidth={3}
                   draggable
                   hitStrokeWidth={12}

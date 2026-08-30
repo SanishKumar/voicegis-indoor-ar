@@ -3,6 +3,7 @@ import {
   AmbientLight,
   BoxGeometry,
   CatmullRomCurve3,
+  ConeGeometry,
   CylinderGeometry,
   DirectionalLight,
   ExtrudeGeometry,
@@ -82,8 +83,17 @@ const SPACE_MIN_SCALE: Record<string, number> = {
 const WALL_FILL = 0xfdfaf3;
 const SLAB_TOP = 0xdccfb6;
 const SLAB_SIDE = 0x9b8e76;
-const ROUTE_COLOR = 0x0f8f74;
-const SHAFT_COLOR = 0xc9743f;
+/*
+ * The route is the one thing on the model a visitor is actually following, so
+ * it carries the accent the rest of the product uses for the thing you act on.
+ * It was a green that appears nowhere else, beside orange connector shafts and
+ * orange destination markers - three saturated hues competing on a surface
+ * whose interface has exactly one. The shafts drop back to a neutral: which
+ * lift you take is stated in words in the route summary, and the model only
+ * has to show that a way up exists there.
+ */
+const ROUTE_COLOR = 0x0a65db;
+const SHAFT_COLOR = 0xb3aca0;
 const SELECTED_FILL = 0x0a65db;
 
 const WALL_THICKNESS = 0.22;
@@ -428,43 +438,69 @@ export function createVenueScene(
       group.add(mesh);
     };
 
-    addInstances(new BoxGeometry(1.5, 0.42, 0.6), surface(0xb98d63), seats, (object, point) => {
+    /*
+     * Furniture is scenery and is coloured like scenery. In tan, terracotta
+     * and olive it competed with the markers for attention and, at a metre
+     * across and head height, the planters read as trees growing indoors. Warm
+     * neutrals put it back where it belongs - enough to stop a floor plate
+     * looking like an empty diagram, quiet enough that the only saturated
+     * things on the model are the route and the destinations.
+     */
+    addInstances(new BoxGeometry(1.5, 0.42, 0.6), surface(0xc4bfb4), seats, (object, point) => {
       object.position.copy(vec(point, 0.24));
       object.rotation.set(0, random() > 0.5 ? 0 : Math.PI / 2, 0);
     });
     addInstances(
-      new CylinderGeometry(0.32, 0.38, 0.42, 6),
-      surface(0xc0714f),
+      new CylinderGeometry(0.22, 0.26, 0.46, 10),
+      surface(0xada79c),
       planters,
-      (object, point) => object.position.copy(vec(point, 0.24)),
+      (object, point) => object.position.copy(vec(point, 0.23)),
     );
-    addInstances(new IcosahedronGeometry(0.5, 0), surface(0x6f9556), planters, (object, point) => {
-      object.position.copy(vec(point, 0.78));
-      object.scale.set(1, 1.25, 1);
+    addInstances(new IcosahedronGeometry(0.3, 0), surface(0x8d9c84), planters, (object, point) => {
+      object.position.copy(vec(point, 0.62));
+      object.scale.set(1, 1.15, 1);
       object.rotation.set(0, random() * Math.PI, 0);
     });
 
+    /*
+     * A destination is a pin: a tapered body with its point on the floor and a
+     * head on top, in the one accent the system carries.
+     *
+     * It used to be a 0.5m orange sphere floating at 1.6m on a thin brown
+     * stem. At the scale a room is drawn, that is a lollipop - and standing in
+     * a row inside a hospital ward next to green blobs on pots, it read as a
+     * potted tree rather than a marker. Nothing about the old shape said
+     * "destination", and the orange was the largest off-palette surface left
+     * in the product.
+     */
     const poiTargets: FloorView['poiTargets'] = [];
     for (const poi of pois) {
-      const head = new Mesh(
-        new SphereGeometry(0.5, 12, 10),
-        track(surface(0xc86b4a, { emissive: 0xc86b4a, emissiveIntensity: 0.25 })),
-      );
-      head.position.copy(vec(poi.position as Coordinate, 1.6));
-      head.userData.poiId = poi.id;
-      group.add(head);
-      poiTargets.push({ id: poi.id, object: head });
+      const pinMaterial = track(surface(0x0a65db, { emissive: 0x0a65db, emissiveIntensity: 0.18 }));
 
-      const stem = new Mesh(new CylinderGeometry(0.06, 0.06, 1.5, 6), track(surface(0x4a4034)));
-      stem.position.copy(vec(poi.position as Coordinate, 0.8));
-      group.add(stem);
+      const body = new Mesh(new ConeGeometry(0.32, 0.8, 14), pinMaterial);
+      body.rotation.x = Math.PI;
+      body.position.copy(vec(poi.position as Coordinate, 0.45));
+      body.userData.poiId = poi.id;
+      body.castShadow = true;
+      group.add(body);
+      poiTargets.push({ id: poi.id, object: body });
+
+      const head = new Mesh(new SphereGeometry(0.3, 16, 12), pinMaterial);
+      head.position.copy(vec(poi.position as Coordinate, 0.95));
+      head.userData.poiId = poi.id;
+      head.castShadow = true;
+      group.add(head);
+      // Both halves answer a tap. The head is the part a finger actually lands
+      // on, and picking resolves through userData rather than identity, so a
+      // second entry for the same POI costs nothing.
+      poiTargets.push({ id: poi.id, object: head });
 
       labels.push({
         id: `poi:${poi.id}`,
         text: poi.name,
         priority: 12,
         minScale: 0,
-        anchor: vec(poi.position as Coordinate, 2.2),
+        anchor: vec(poi.position as Coordinate, 1.45),
       });
     }
 

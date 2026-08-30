@@ -187,7 +187,11 @@ export default function WalkRecorder() {
     recorder.recordLifecycle('session-end', performance.now() - originRef.current);
     const session = recorder.buildSession();
     readStats();
-    setFinished({ session, issues: validateCaptureSession(session), sessionId: sessionIdRef.current });
+    setFinished({
+      session,
+      issues: validateCaptureSession(session),
+      sessionId: sessionIdRef.current,
+    });
     setPhase('stopped');
   }, [readStats]);
 
@@ -216,85 +220,112 @@ export default function WalkRecorder() {
         </p>
       </header>
 
-      <p className="walk-recorder-warning" role="note">
-        <strong>This is not evidence.</strong> A browser reports inertial samples in the device
-        frame, which the evidence policy refuses outright, so every capture recorded here seals as{' '}
-        <code>unsupported-sensor-model</code>. What it does produce is a real measurement of how far
-        behind each sample its orientation arrives — the number the policy decision is waiting on.
-      </p>
+      {/*
+       * Two panels rather than one column. What you set up (the caveat, the
+       * sensor state, the button) is a fixed, narrow thing; what you read back
+       * is a table that wants room. Stacked in a single 640px column they left
+       * most of a desktop window empty, and the measurements - the entire point
+       * of the surface - sat below the fold behind the button that produces
+       * them.
+       */}
+      <div className="walk-recorder-columns">
+        <div className="walk-recorder-primary">
+          <p className="walk-recorder-warning" role="note">
+            <strong>This is not evidence.</strong> A browser reports inertial samples in the device
+            frame, which the evidence policy refuses outright, so every capture recorded here seals
+            as <code>unsupported-sensor-model</code>. What it does produce is a real measurement of
+            how far behind each sample its orientation arrives — the number the policy decision is
+            waiting on.
+          </p>
 
-      {access && (
-        <p
-          className={
-            access === 'granted' || access === 'not-required'
-              ? 'walk-recorder-access'
-              : 'walk-recorder-error'
-          }
-          role={access === 'denied' || access === 'unsupported' ? 'alert' : undefined}
-        >
-          {ACCESS_NOTE[access]}
-        </p>
-      )}
-
-      <div className="walk-recorder-controls">
-        {phase === 'recording' ? (
-          <button type="button" className="walk-recorder-stop" onClick={stop}>
-            <Square size={16} aria-hidden="true" /> Stop
-          </button>
-        ) : (
-          <button type="button" className="walk-recorder-start" onClick={() => void start()}>
-            <Circle size={16} aria-hidden="true" /> {phase === 'stopped' ? 'Record again' : 'Start'}
-          </button>
-        )}
-      </div>
-
-      {stats && phase === 'recording' && <LivenessBanner status={liveness(stats, windowedHz)} />}
-
-      {stats && (
-        <section className="walk-recorder-stats" aria-live="polite">
-          <Stat label="Elapsed" value={`${(stats.elapsedMs / 1000).toFixed(1)} s`} />
-          <Stat label="Samples recorded" value={String(stats.recordedSamples)} />
-          <Stat label="Tilt lag measured" value={String(stats.pairing.pairedCount)} />
-          <Stat label="Tilt lag, median" value={formatMs(stats.pairing.medianStalenessMs)} />
-          <Stat label="Tilt lag, p95" value={formatMs(stats.pairing.p95StalenessMs)} />
-          <Stat label="Tilt lag, worst" value={formatMs(stats.pairing.worstStalenessMs)} />
-          {/* Pairing first, then the samples that never reached the stream. */}
-          <Stat label="No tilt yet" value={String(stats.pairing.noOrientationCount)} />
-          <Stat label="Tilt unusable" value={String(stats.pairing.unusableOrientationCount)} />
-          <Stat label="Incomplete" value={String(stats.rejections.incomplete)} />
-          <Stat label="Clock went back" value={String(stats.rejections.regressed)} />
-        </section>
-      )}
-
-      {finished && (
-        <section className="walk-recorder-result">
-          {finished.issues.length === 0 ? (
-            <>
-              <p>
-                Capture is valid: {finished.session.events.length} events. Seal it with{' '}
-                <code>npm run evidence -- seal</code> once you have a checkpoint manifest for it.
-              </p>
-              <button type="button" className="walk-recorder-download" onClick={download}>
-                <Download size={16} aria-hidden="true" /> Download capture
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="walk-recorder-error" role="alert">
-                The capture did not validate, so it cannot be exported. Serialising an invalid
-                stream is refused by the library rather than worked around here.
-              </p>
-              <ul className="walk-recorder-issues">
-                {finished.issues.slice(0, 10).map((issue) => (
-                  <li key={`${issue.code}${issue.path}`}>
-                    <code>{issue.code}</code> at <code>{issue.path}</code> — {issue.message}
-                  </li>
-                ))}
-              </ul>
-            </>
+          {access && (
+            <p
+              className={
+                access === 'granted' || access === 'not-required'
+                  ? 'walk-recorder-access'
+                  : 'walk-recorder-error'
+              }
+              role={access === 'denied' || access === 'unsupported' ? 'alert' : undefined}
+            >
+              {ACCESS_NOTE[access]}
+            </p>
           )}
-        </section>
-      )}
+
+          <div className="walk-recorder-controls">
+            {phase === 'recording' ? (
+              <button type="button" className="walk-recorder-stop" onClick={stop}>
+                <Square size={16} aria-hidden="true" /> Stop
+              </button>
+            ) : (
+              <button type="button" className="walk-recorder-start" onClick={() => void start()}>
+                <Circle size={16} aria-hidden="true" />{' '}
+                {phase === 'stopped' ? 'Record again' : 'Start'}
+              </button>
+            )}
+          </div>
+
+          {stats && phase === 'recording' && (
+            <LivenessBanner status={liveness(stats, windowedHz)} />
+          )}
+        </div>
+
+        <div className="walk-recorder-readout">
+          {stats === null && (
+            <p className="walk-recorder-idle">
+              No capture yet. Recording reports elapsed time, how many inertial samples arrived, and
+              how far behind each one its orientation was — the tilt lag the evidence policy is
+              waiting on.
+            </p>
+          )}
+
+          {stats && (
+            <section className="walk-recorder-stats" aria-live="polite">
+              <Stat label="Elapsed" value={`${(stats.elapsedMs / 1000).toFixed(1)} s`} />
+              <Stat label="Samples recorded" value={String(stats.recordedSamples)} />
+              <Stat label="Tilt lag measured" value={String(stats.pairing.pairedCount)} />
+              <Stat label="Tilt lag, median" value={formatMs(stats.pairing.medianStalenessMs)} />
+              <Stat label="Tilt lag, p95" value={formatMs(stats.pairing.p95StalenessMs)} />
+              <Stat label="Tilt lag, worst" value={formatMs(stats.pairing.worstStalenessMs)} />
+              {/* Pairing first, then the samples that never reached the stream. */}
+              <Stat label="No tilt yet" value={String(stats.pairing.noOrientationCount)} />
+              <Stat label="Tilt unusable" value={String(stats.pairing.unusableOrientationCount)} />
+              <Stat label="Incomplete" value={String(stats.rejections.incomplete)} />
+              <Stat label="Clock went back" value={String(stats.rejections.regressed)} />
+            </section>
+          )}
+
+          {finished && (
+            <section className="walk-recorder-result">
+              {finished.issues.length === 0 ? (
+                <>
+                  <p>
+                    Capture is valid: {finished.session.events.length} events. Seal it with{' '}
+                    <code>npm run evidence -- seal</code> once you have a checkpoint manifest for
+                    it.
+                  </p>
+                  <button type="button" className="walk-recorder-download" onClick={download}>
+                    <Download size={16} aria-hidden="true" /> Download capture
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="walk-recorder-error" role="alert">
+                    The capture did not validate, so it cannot be exported. Serialising an invalid
+                    stream is refused by the library rather than worked around here.
+                  </p>
+                  <ul className="walk-recorder-issues">
+                    {finished.issues.slice(0, 10).map((issue) => (
+                      <li key={`${issue.code}${issue.path}`}>
+                        <code>{issue.code}</code> at <code>{issue.path}</code> — {issue.message}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </section>
+          )}
+        </div>
+      </div>
     </main>
   );
 }
