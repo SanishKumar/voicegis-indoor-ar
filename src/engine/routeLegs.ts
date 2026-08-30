@@ -5,9 +5,11 @@ import { STEP_TYPE, type RouteStep, type StepType } from './routingCore';
  *
  * A compiled route for a two-floor journey is eleven steps, and eleven is more
  * than anyone carries down a corridor. Almost all of them are turns inside one
- * continuous walk; what a visitor needs to know is that they walk, then take a
- * lift, then walk again. The turns are not discarded - they are counted, so the
- * leg can say how much is folded into it - but they stop being the unit.
+ * continuous walk; what a visitor needs to know at a glance is that they walk,
+ * then take a lift, then walk again. The original step indices stay attached to
+ * every leg so exact left/right instructions remain available for progress and
+ * for the expanded directions. A turn count is a summary, never a substitute
+ * for the instruction itself.
  *
  * Vertical moves always get their own leg. Changing floor is the part of an
  * indoor journey people get wrong, and burying it inside a walk is what makes

@@ -111,6 +111,27 @@ export interface VenueScene {
   dispose(): void;
 }
 
+/**
+ * Whether the WebGL drawing buffer still represents the canvas's CSS size.
+ *
+ * `WebGLRenderer.setSize()` stores physical pixels on the canvas, so comparing
+ * those attributes directly with `clientWidth/clientHeight` is only correct at
+ * DPR 1. On a DPR 2 handset that comparison forced a backbuffer allocation on
+ * every animation frame even when the layout had not changed.
+ */
+export function venueDrawingBufferNeedsResize(
+  bufferWidth: number,
+  bufferHeight: number,
+  cssWidth: number,
+  cssHeight: number,
+  pixelRatio: number,
+): boolean {
+  return (
+    bufferWidth !== Math.floor(cssWidth * pixelRatio) ||
+    bufferHeight !== Math.floor(cssHeight * pixelRatio)
+  );
+}
+
 /*
  * Furniture placement is seeded, not random: the same venue must draw the same
  * room every time it is opened, or the map appears to rearrange itself between
@@ -164,7 +185,8 @@ export function createVenueScene(
   const vec = ([x, y]: Coordinate, height = 0) => new Vector3(wx(x), height, wz(y));
 
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const pixelRatio = Math.min(window.devicePixelRatio, 2);
+  renderer.setPixelRatio(pixelRatio);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFShadowMap;
   renderer.toneMapping = ACESFilmicToneMapping;
@@ -869,7 +891,7 @@ export function createVenueScene(
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
       if (width === 0 || height === 0) return;
-      if (canvas.width !== width || canvas.height !== height) {
+      if (venueDrawingBufferNeedsResize(canvas.width, canvas.height, width, height, pixelRatio)) {
         renderer.setSize(width, height, false);
         camera.aspect = width / height;
         camera.updateProjectionMatrix();

@@ -36,6 +36,59 @@ test('a verified check-in drives fastest and step-free routes through different 
   await expect(fastestToggle).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('map guidance preserves every exact turn without opening the camera', async ({ page }) => {
+  await openPharmacyRoute(page);
+
+  const directions = page.getByRole('region', { name: 'Directions to Outpatient Pharmacy' });
+  const current = directions.locator('.nav-current-instruction');
+  await expect(current).toContainText(/^Instruction 1 of \d+/);
+  await expect(page.locator('.camera-preview')).toHaveCount(0);
+
+  const expand = directions.getByRole('button', { name: /Show all \d+ legs/ });
+  if (await expand.isVisible()) await expand.click();
+  const exactTurn = directions
+    .locator('.nav-leg-instructions li')
+    .filter({ hasText: /(?:Turn|Bear|Keep|Make a U-turn)/i })
+    .first();
+  await expect(exactTurn, 'the expanded route contains no exact turn instruction').toBeVisible();
+  const turnText = (await exactTurn.locator('span').innerText()).trim();
+  expect(turnText).not.toBe('');
+
+  const label = await current.locator('.nav-current-instruction-label').innerText();
+  const total = Number(label.match(/\d+\s+of\s+(\d+)/i)?.[1]);
+  expect(total).toBeGreaterThan(1);
+  for (
+    let index = 1;
+    index < total && !(await current.innerText()).includes(turnText);
+    index += 1
+  ) {
+    await directions.getByRole('button', { name: 'Next instruction' }).click();
+  }
+
+  await expect(current).toContainText(turnText);
+  await expect(page.locator('.camera-preview')).toHaveCount(0);
+});
+
+test('the current map instruction and its controls stay reachable on a small phone', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await openPharmacyRoute(page);
+
+  const directions = page.getByRole('region', { name: 'Directions to Outpatient Pharmacy' });
+  const current = directions.locator('.nav-current-instruction');
+  const next = directions.getByRole('button', { name: 'Next instruction' });
+  await expect(current).toBeVisible();
+  await expect(next).toBeVisible();
+
+  for (const control of [current, next]) {
+    const bounds = await control.boundingBox();
+    expect(bounds, 'guidance control has no box').not.toBeNull();
+    expect(bounds!.y).toBeGreaterThanOrEqual(-0.5);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(700.5);
+  }
+});
+
 test('a foreign-venue check-in is consumed with a visible refusal', async ({ page }) => {
   await precompleteOnboarding(page);
   const payload = encodeURIComponent('voicegis://harbor-exchange/g/ferry-entry');

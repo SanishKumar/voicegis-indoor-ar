@@ -1,4 +1,4 @@
-import { Box, Map, PenTool, Radio } from 'lucide-react';
+import { Box, Map, PenTool, Radio, Waypoints } from 'lucide-react';
 
 /**
  * Operator tooling, and the way back out of it.
@@ -8,9 +8,10 @@ import { Box, Map, PenTool, Radio } from 'lucide-react';
  * sensor recorder. None of those are for them, and three of the four entries
  * being operator tools made the one that was theirs harder to find.
  *
- * It renders only on the operator surfaces now. "Visitor view" is kept as the
- * first entry because an operator needs a way back, and without it the only
- * exit is editing the URL.
+ * It belongs to the operator build, not the public visitor bundle. The
+ * operator build keeps it while previewing the visitor experience so the
+ * operator can return without editing the URL; visually it is a workbench rail
+ * on a desk and a bottom dock under a thumb, never a banner over the product.
  */
 const SURFACES = [
   { id: 'visitor', label: 'Visitor view', icon: Map },
@@ -22,9 +23,20 @@ const SURFACES = [
 export default function SurfaceNav({ activeSurface }) {
   return (
     <nav className="surface-nav" aria-label="Operator tools">
-      {SURFACES.map((surface) => (
-        <SurfaceLink key={surface.id} surface={surface} activeSurface={activeSurface} />
-      ))}
+      <div className="surface-nav-brand" aria-hidden="true">
+        <span className="surface-nav-mark">
+          <Waypoints size={18} />
+        </span>
+        <span>
+          <strong>VoiceGIS</strong>
+          <small>Workbench</small>
+        </span>
+      </div>
+      <div className="surface-nav-links">
+        {SURFACES.map((surface) => (
+          <SurfaceLink key={surface.id} surface={surface} activeSurface={activeSurface} />
+        ))}
+      </div>
     </nav>
   );
 }
@@ -38,11 +50,9 @@ function SurfaceLink({ surface, activeSurface }) {
       className={active ? 'active' : ''}
       aria-current={active ? 'page' : undefined}
       /*
-        Named explicitly, because the visible label is the first thing to go.
-        Below 700px the span is display:none and the icon is aria-hidden, which
-        left all four links with no accessible name whatsoever - a screen reader
-        announced four unlabelled links to nowhere. The name matches the visible
-        text where there is one, so the two never disagree.
+        Named explicitly as a stable contract for assistive technology. The
+        label remains visible in both the rail and the dock, and the accessible
+        name matches it exactly.
       */
       aria-label={surface.label}
     >

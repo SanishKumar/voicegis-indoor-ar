@@ -87,10 +87,8 @@ function ActiveVenueApplication() {
     previousSurfaceRef.current = surface;
     if (previousSurface === 'visitor' || surface !== 'visitor') return;
 
-    // The operator navigation owns focus when its "Visitor view" link is
-    // activated. That whole navigation is then removed from the DOM. Hand
-    // focus to the visitor surface after either a link activation or browser
-    // history navigation so it never falls through to <body>.
+    // Entering the visitor preview from the workbench should start in the
+    // visitor task, not leave keyboard focus behind on the operator rail.
     const visitorTarget =
       document.getElementById('btn-search-open') ?? document.getElementById('welcome-step-heading');
     visitorTarget?.focus({ preventScroll: true });
@@ -118,16 +116,20 @@ function ActiveVenueApplication() {
         a build that reached it fails outright - and the public shell is tested
         for its absence separately, including when the route is guessed.
       */}
-      <SurfaceNav activeSurface={surface} />
-      {surface === 'inspector' ? (
-        <InspectorApp />
-      ) : surface === 'studio' ? (
-        <StudioApp />
-      ) : surface === 'recorder' ? (
-        <RecorderApp />
-      ) : (
-        <VisitorApp />
-      )}
+      <div className="operator-shell">
+        <SurfaceNav activeSurface={surface} />
+        <div className="operator-workspace">
+          {surface === 'inspector' ? (
+            <InspectorApp />
+          ) : surface === 'studio' ? (
+            <StudioApp />
+          ) : surface === 'recorder' ? (
+            <RecorderApp />
+          ) : (
+            <VisitorApp />
+          )}
+        </div>
+      </div>
     </NavigationProvider>
   );
 }

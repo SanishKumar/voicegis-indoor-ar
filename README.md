@@ -1,35 +1,32 @@
-# VoiceGIS Indoor Spatial Twin
+# VoiceGIS Indoor Navigation
 
 [![Quality](https://github.com/SanishKumar/voicegis-indoor-ar/actions/workflows/quality.yml/badge.svg)](https://github.com/SanishKumar/voicegis-indoor-ar/actions/workflows/quality.yml)
 
-An indoor-navigation platform built around versioned spatial data, deterministic routing, operational constraints, and shared 2D/3D presentation.
+Verified venue packages, QR known-point check-in, fail-closed accessible routing,
+and a cold-offline visitor application — all evaluated on the device.
 
-The repository includes a compiler, routing engine, browser application, offline package registry, localization replay core, and two unrelated runtime-switchable venue benchmarks.
+The repository includes the deterministic compiler and routing engine, the public
+visitor application, an offline package registry, operator inspection and
+authoring tools, a localization replay core, and two unrelated runtime-switchable
+venue benchmarks.
 
-## Product preview
+> **Delivered scope:** check-in is a discrete position fix, not continuous
+> tracking. The camera view is screen-aligned, not world-anchored AR, and there
+> is no voice interface yet. The bundled venues are synthetic and support
+> reproducible product tests, not real-building accuracy claims.
 
-<table>
-  <tr>
-    <td width="50%">
-      <img src="docs/assets/readme/01-overview.jpg" alt="Asterion benchmark overview" width="100%">
-      <br><sub>Navigation benchmark overview</sub>
-    </td>
-    <td width="50%">
-      <img src="docs/assets/readme/02-route-plan.jpg" alt="Architectural floor plan with an active route" width="100%">
-      <br><sub>Architectural plan and turn-by-turn route</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <img src="docs/assets/readme/03-spatial-route.jpg" alt="Exploded 3D spatial twin with a route between floors" width="100%">
-      <br><sub>Route projected through the 3D spatial twin</sub>
-    </td>
-    <td width="50%">
-      <img src="docs/assets/readme/04-accessible-fail-closed.jpg" alt="Accessible route rejected during a public lift outage" width="100%">
-      <br><sub>Fail-closed accessible routing during a lift outage</sub>
-    </td>
-  </tr>
-</table>
+## Delivered flagship
+
+- A `BuildingSource` compiles into an immutable, content-addressed
+  `VenuePackage`; malformed topology and undeclared accessibility are refused.
+- A published QR code resolves to a package-declared known point without a
+  beacon, RF fingerprint, lookup service, or camera footage leaving the device.
+- Standard and wheelchair profiles use the same deterministic routing core and
+  fail closed under restrictions, inaccessible edges, and operational closures.
+- The production visitor bundle can cold-reload and route after one verified
+  online installation while its browser cache remains intact.
+- Every route carries a receipt naming the package hash, profile, closures,
+  connector choice, and excluded edges.
 
 ## Try it in 60 seconds
 
@@ -74,7 +71,7 @@ measured; the bundled venues are synthetic.
 - Versioned TypeScript model and JSON Schema for floors, spaces, portals, POIs, connectors, and localization anchors
 - Semantic validation for geometry, connectivity, accessibility, restrictions, and reachability
 - Deterministic compilation with a content-addressed package manifest
-- One compiled package shared by routing, search, the 2D plan, and the 3D viewer
+- One compiled package shared by routing, search, the visitor venue map, and the 3D inspector
 
 ### Routing and operations
 
@@ -86,7 +83,7 @@ measured; the bundled venues are synthetic.
 
 ### Navigation clients
 
-- Architectural 2D plan with modeled openings, door swings, room codes, circulation cores, and route decision points
+- Interactive lit venue map with modeled spaces, openings, furniture, floor stacking, labels, and route decision points
 - React Three Fiber spatial twin with floor isolation, exploded view, semantic inspection, graph overlays, anchors, and active routes
 - Camera guidance view with route progress, optional device-heading alignment, and readiness diagnostics
 - Public POI search with aliases and floor-aware results
@@ -105,7 +102,7 @@ measured; the bundled venues are synthetic.
 flowchart LR
   Source["Building source"] --> Compiler["Schema validation + compiler"]
   Compiler --> Package["Content-addressed package"]
-  Package --> Plan["2D visitor plan"]
+  Package --> Map["Visitor venue map"]
   Package --> Twin["3D spatial twin"]
   Package --> Search["POI search"]
   Package --> Worker["Routing worker"]

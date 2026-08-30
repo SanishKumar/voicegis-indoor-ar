@@ -79,8 +79,8 @@ test('operator navigation is reachable and named for the keyboard', async ({ pag
   const nav = page.getByRole('navigation', { name: 'Operator tools' });
   await expect(nav).toBeVisible();
 
-  // Named without depending on the label being rendered: below 700px the text
-  // is display:none and the icon is aria-hidden.
+  // The mobile dock keeps its labels instead of becoming four mystery icons;
+  // the explicit names also remain stable for assistive technology.
   for (const name of ['Visitor view', '3D + venues', 'Studio', 'Record']) {
     await expect(nav.getByRole('link', { name, exact: true })).toBeVisible();
   }

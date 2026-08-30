@@ -1,10 +1,9 @@
 /**
  * NavigationPanel.jsx
  *
- * The journey, as the legs a person can hold in their head: walk, change
- * floor, walk. Turns are folded into the walk that contains them and counted
- * rather than listed, because eleven instructions behind a "View all
- * directions" link is not something anyone carries down a corridor.
+ * The journey has two scales: legs a person can scan (walk, change floor,
+ * walk), and the exact instruction they need now. Grouping never removes a
+ * left/right instruction; the map path remains usable without camera access.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -159,6 +158,7 @@ export default function NavigationPanel() {
   const steps = route.steps;
   const legs = groupRouteLegs(steps);
   const currentLegIndex = legIndexForStep(legs, currentStepIndex);
+  const currentStep = steps[currentStepIndex] ?? steps[0];
   const isArrived = navStatus === NAV_STATUS.ARRIVED;
 
   const remainingDistance = steps
@@ -176,18 +176,6 @@ export default function NavigationPanel() {
   const journeyLabel = connectorReceipt
     ? `${shortFloorLabel(venue, connectorReceipt.fromFloorId)} → ${connector?.name ?? connectorReceipt.sourceId} → ${shortFloorLabel(venue, connectorReceipt.toFloorId)}`
     : `${shortFloorLabel(venue, destNode?.floor)} · same floor`;
-
-  /** Moves guidance to the first step of an adjacent leg. */
-  const goToLeg = (index) => {
-    const leg = legs[index];
-    if (leg === undefined) return;
-    const target = leg.stepIndices[0];
-    const move = target > currentStepIndex ? actions.nextStep : actions.prevStep;
-    for (let cursor = currentStepIndex; cursor !== target;) {
-      move();
-      cursor += target > currentStepIndex ? 1 : -1;
-    }
-  };
 
   return (
     <div
@@ -240,6 +228,16 @@ export default function NavigationPanel() {
         </p>
       )}
 
+      {!isArrived && currentStep && (
+        <div className="nav-current-instruction" aria-live="polite">
+          <span className="nav-current-instruction-label">
+            Instruction {currentStepIndex + 1} of {steps.length}
+          </span>
+          <strong>{currentStep.instruction}</strong>
+          {currentStep.distance > 0 && <span>{formatDistance(currentStep.distance)}</span>}
+        </div>
+      )}
+
       <ol className="nav-legs" id="nav-steps-list">
         {legs.map((leg, index) => {
           const floor = leg.floorId ? venue.getFloorById(leg.floorId) : null;
@@ -254,14 +252,34 @@ export default function NavigationPanel() {
               <span className="nav-leg-mark" aria-hidden="true">
                 <LegIcon leg={leg} />
               </span>
-              <span className="nav-leg-body">
+              <div className="nav-leg-body">
                 <span className="nav-leg-headline">{leg.headline}</span>
                 <span className="nav-leg-meta">
                   {floor?.name}
                   {leg.distanceMeters > 0 && ` · ${formatDistance(leg.distanceMeters)}`}
                   {leg.turns > 0 && ` · ${leg.turns} ${leg.turns === 1 ? 'turn' : 'turns'}`}
                 </span>
-              </span>
+                {leg.stepIndices.length > 1 && (
+                  <ol
+                    className="nav-leg-instructions"
+                    aria-label={`Instructions for ${leg.headline}`}
+                  >
+                    {leg.stepIndices.slice(1).map((stepIndex) => {
+                      const step = steps[stepIndex];
+                      return (
+                        <li
+                          key={stepIndex}
+                          className={stepIndex === currentStepIndex ? 'is-current' : undefined}
+                          aria-current={stepIndex === currentStepIndex ? 'step' : undefined}
+                        >
+                          <span>{step.instruction}</span>
+                          {step.distance > 0 && <small>{formatDistance(step.distance)}</small>}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+              </div>
             </li>
           );
         })}
@@ -282,9 +300,9 @@ export default function NavigationPanel() {
         <div className="nav-leg-controls">
           <button
             className="nav-leg-step"
-            onClick={() => goToLeg(currentLegIndex - 1)}
-            disabled={currentLegIndex <= 0}
-            aria-label="Previous leg"
+            onClick={actions.prevStep}
+            disabled={currentStepIndex <= 0}
+            aria-label="Previous instruction"
             id="btn-prev-step"
           >
             <ChevronLeft size={16} strokeWidth={2} />
@@ -292,9 +310,9 @@ export default function NavigationPanel() {
           </button>
           <button
             className="nav-leg-step"
-            onClick={() => goToLeg(currentLegIndex + 1)}
-            disabled={currentLegIndex >= legs.length - 1}
-            aria-label="Next leg"
+            onClick={actions.nextStep}
+            disabled={currentStepIndex >= steps.length - 1}
+            aria-label="Next instruction"
             id="btn-next-step"
           >
             Next

@@ -92,6 +92,130 @@ test('surface navigation stays in the viewport, owns its row, and never scrolls 
   }
 });
 
+test('the operator workbench is a desktop rail and a labelled mobile dock', async ({ page }) => {
+  await openVisitor(page);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const nav = page.getByRole('navigation', { name: 'Operator tools' });
+  const workspace = page.locator('.operator-workspace');
+  const desktopNav = await nav.boundingBox();
+  const desktopWorkspace = await workspace.boundingBox();
+  expect(desktopNav).not.toBeNull();
+  expect(desktopWorkspace).not.toBeNull();
+  expect(desktopNav!.x).toBeCloseTo(0, 1);
+  expect(desktopNav!.width).toBeCloseTo(176, 1);
+  expect(desktopWorkspace!.x).toBeCloseTo(desktopNav!.x + desktopNav!.width, 1);
+  expect(desktopNav!.height).toBeCloseTo(800, 1);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  const mobileNav = await nav.boundingBox();
+  const mobileWorkspace = await workspace.boundingBox();
+  expect(mobileNav).not.toBeNull();
+  expect(mobileWorkspace).not.toBeNull();
+  expect(mobileNav!.x).toBeCloseTo(0, 1);
+  expect(mobileNav!.width).toBeCloseTo(375, 1);
+  expect(mobileNav!.y).toBeCloseTo(mobileWorkspace!.y + mobileWorkspace!.height, 1);
+  for (const label of ['Visitor view', '3D + venues', 'Studio', 'Record']) {
+    const link = nav.getByRole('link', { name: label, exact: true });
+    await expect(link).toBeVisible();
+    await expect(link.locator('span')).toHaveText(label);
+  }
+});
+
+test('Studio controls wrap without clipping or collisions on a 320px phone', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await openVisitor(page);
+  await page.goto('/#/studio');
+  await expect(page.locator('.studio-surface')).toBeVisible();
+
+  const controls = page.locator(
+    '.studio-editor-actions button, .studio-canvas-toolbar button, .studio-canvas-toolbar select',
+  );
+  await expect.poll(() => controls.count()).toBeGreaterThan(0);
+  const boxes = await controls.evaluateAll((elements) =>
+    elements.map((element) => {
+      const box = element.getBoundingClientRect();
+      return {
+        label: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '',
+        left: box.left,
+        right: box.right,
+        top: box.top,
+        bottom: box.bottom,
+        width: box.width,
+        height: box.height,
+      };
+    }),
+  );
+  expect(boxes.filter((box) => box.left < -0.5 || box.right > 320.5)).toEqual([]);
+
+  const collisions = boxes.flatMap((box, index) =>
+    boxes
+      .slice(index + 1)
+      .filter(
+        (other) =>
+          Math.min(box.right, other.right) - Math.max(box.left, other.left) > 1 &&
+          Math.min(box.bottom, other.bottom) - Math.max(box.top, other.top) > 1,
+      ),
+  );
+  expect(collisions, 'Studio controls overlap one another').toEqual([]);
+  await expect(page.getByRole('button', { name: 'Reset' }).first()).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
+});
+
+test('Inspector chrome keeps readable foreground and background contrast', async ({ page }) => {
+  await openVisitor(page);
+  await page.goto('/#/inspector');
+  await expect(page.locator('.spatial-twin')).toBeVisible();
+
+  const contrast = async (selector: string) =>
+    page
+      .locator(selector)
+      .first()
+      .evaluate((element) => {
+        const channels = (value: string) =>
+          (value.match(/[\d.]+/g) ?? []).slice(0, 3).map((channel) => Number(channel) / 255);
+        const luminance = (value: string) => {
+          const linear = channels(value).map((channel) =>
+            channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
+          );
+          return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+        };
+        let backgroundElement: Element | null = element;
+        let background = 'rgb(255, 255, 255)';
+        while (backgroundElement !== null) {
+          const candidate = getComputedStyle(backgroundElement).backgroundColor;
+          if (!candidate.endsWith(', 0)') && candidate !== 'rgba(0, 0, 0, 0)') {
+            background = candidate;
+            break;
+          }
+          backgroundElement = backgroundElement.parentElement;
+        }
+        const foregroundLuminance = luminance(getComputedStyle(element).color);
+        const backgroundLuminance = luminance(background);
+        return (
+          (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+          (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+        );
+      });
+
+  await expect(page.locator('.twin-poi-label').first()).toBeVisible();
+  expect(await contrast('.twin-poi-label')).toBeGreaterThanOrEqual(4.5);
+  expect(await contrast('.twin-empty-inspector h2')).toBeGreaterThanOrEqual(4.5);
+  expect(await contrast('.venue-package-manager-toggle')).toBeGreaterThanOrEqual(4.5);
+
+  const space = page.getByRole('combobox', { name: 'Inspect a space' });
+  const firstSpace = await space.evaluate(
+    (select) =>
+      [...(select as HTMLSelectElement).options].find((option) => option.value !== '')?.value,
+  );
+  expect(firstSpace).toBeTruthy();
+  await space.selectOption(firstSpace!);
+  await expect(page.locator('.twin-property-grid dd').first()).toBeVisible();
+  expect(await contrast('.twin-property-grid dd')).toBeGreaterThanOrEqual(4.5);
+});
+
 test('camera guidance controls fit at both supported narrow widths', async ({ page }) => {
   await openPharmacyRoute(page);
   await page.getByRole('button', { name: 'Dismiss' }).click();

@@ -8,14 +8,9 @@ import SurfaceNav from './SurfaceNav.jsx';
 /**
  * Every operator link must be announceable.
  *
- * This nav renders only on the operator surfaces now; the visitor shell shows
- * no control that leads to them. "Visitor view" stays so an operator can get
- * back without editing the URL.
- *
- * Below 700px the label span is `display: none` and the icon carries
- * `aria-hidden`, so the links had no accessible name at all: a screen reader
- * found four links to nowhere. The name cannot come from the visible text
- * because at that width there is none.
+ * The public bundle has no operator tooling. In the operator build the labels
+ * stay visible in the desktop rail and mobile dock, and the explicit names are
+ * pinned here so visual and assistive labels cannot drift apart.
  */
 
 afterEach(cleanup);
@@ -45,9 +40,12 @@ describe('surface navigation naming', () => {
   it('keeps the icons out of the accessible name', () => {
     // Decorative, and a duplicated name is worse than none.
     const { container } = render(<SurfaceNav activeSurface="visitor" />);
-    const icons = container.querySelectorAll('svg');
+    const icons = container.querySelectorAll('.surface-nav-links svg');
 
     expect(icons.length).toBe(SURFACES.length);
     for (const icon of icons) expect(icon.getAttribute('aria-hidden')).toBe('true');
+
+    // The workbench mark is decorative as one hidden unit, including its text.
+    expect(container.querySelector('.surface-nav-brand')?.getAttribute('aria-hidden')).toBe('true');
   });
 });

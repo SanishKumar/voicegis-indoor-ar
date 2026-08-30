@@ -20,3 +20,11 @@ Canvas size is updated through `ResizeObserver`; animation frames draw only. Dev
 - Reviewers can trust implemented-versus-planned labels.
 - The preview remains useful for testing camera permissions and instruction presentation.
 - World-anchored AR will be introduced only with pose alignment, localization quality, progress gates, and relocalization behavior.
+
+## 2026-08-31 implementation note
+
+Package-declared QR known-point check-in is now delivered. It provides a
+discrete position fix and floor; it does not provide continuous tracking,
+world-camera pose, or automatic route progress. The camera view therefore
+remains a screen-aligned preview, and the decision not to call it AR still
+applies.

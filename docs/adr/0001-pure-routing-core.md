@@ -31,3 +31,12 @@ Costs and limitations:
 - The current worker still bundles one hardcoded graph.
 - Dynamic building packages will require a versioned worker initialization message.
 - The binary heap and graph index are intentionally simple; hierarchical routing is deferred until multi-floor packages provide realistic scale.
+
+## 2026-08-31 implementation note
+
+The transport decision still holds, but the first two limitations above have
+since closed: the worker now receives the active verified venue package with
+each request rather than importing one hardcoded graph. Route receipts bind the
+result to that package's building ID and content hash. This note preserves the
+original decision record without presenting its old implementation state as the
+current one.

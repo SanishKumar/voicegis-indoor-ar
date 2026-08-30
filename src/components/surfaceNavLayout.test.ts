@@ -14,11 +14,13 @@ import { describe, expect, it } from 'vitest';
  * one another, because a fixed overlay sharing a band with a header collides
  * with something eventually.
  *
- * Moving it into the layout created the reverse problem on the narrow studio
+ * Moving a top bar into the layout created the reverse problem on narrow Studio
  * surface, which stacks into one column and outgrows the viewport: the
  * *document* became the scroll container and carried the nav away with it, so
  * 700px down the nav sat at y=-692 and no other surface was reachable. A
- * surface that outgrows the viewport has to scroll itself.
+ * surface that outgrows the viewport has to scroll itself. The current shell
+ * makes that ownership explicit: a side rail on a desk, a bottom dock on a
+ * phone, and a workspace that owns the remaining rectangle.
  *
  * Parsed with PostCSS rather than by hand. A brace scanner written for this
  * found 1,130 of the sheet's 1,142 rules, and the twelve it lost were enough to
@@ -94,6 +96,8 @@ describe('the stylesheet is parsed completely', () => {
     });
     expect(count).toBeGreaterThan(1_000);
     expect(rulesFor('surface-nav').length).toBeGreaterThan(0);
+    expect(rulesFor('operator-shell').length).toBeGreaterThan(0);
+    expect(rulesFor('operator-workspace').length).toBeGreaterThan(0);
     for (const surface of SURFACES) {
       expect(rulesFor(surface).length, surface).toBeGreaterThan(0);
     }
@@ -117,11 +121,24 @@ describe('the surface navigation is part of the page, not on top of it', () => {
     }
   });
 
-  it('still declares the flow layout the surfaces depend on', () => {
-    const base = rulesFor('surface-nav').find((rule) => declares(rule, 'flex') !== undefined);
-    expect(base, 'no .surface-nav rule declares a flex value').toBeDefined();
-    expect(declares(base!, 'flex')).toBe('0 0 auto');
-    expect(declares(base!, 'align-self')).toBe('center');
+  it('uses a side rail on a desk and a bottom dock on a phone', () => {
+    const shell = rulesFor('operator-shell').find(
+      (rule) => rule.media === null && declares(rule, 'display') === 'grid',
+    );
+    expect(shell, 'operator shell has no desktop grid').toBeDefined();
+    expect(declares(shell!, 'grid-template-columns')).toContain('176px');
+
+    const desktopNav = rulesFor('surface-nav').find(
+      (rule) => rule.media === null && declares(rule, 'flex-direction') === 'column',
+    );
+    expect(desktopNav, 'surface nav has no desktop rail').toBeDefined();
+
+    const mobileNav = rulesFor('surface-nav').find(
+      (rule) => rule.media !== null && /max-width:\s*720px/.test(rule.media),
+    );
+    expect(mobileNav, 'surface nav has no mobile dock').toBeDefined();
+    expect(declares(mobileNav!, 'grid-row')).toBe('2');
+    expect(declares(mobileNav!, 'flex-direction')).toBe('row');
   });
 });
 

@@ -39,7 +39,7 @@ The compiler owns derived data. Clients should not repair malformed topology at 
 
 ### Versioned building package
 
-A package will be immutable and content-addressed. At minimum it should contain:
+A package is immutable and content-addressed. It contains:
 
 - Building and floor metadata
 - Coordinate reference and transform metadata
@@ -70,7 +70,10 @@ Route guidance consumes this estimate. When quality is lost, the navigation runt
 
 ### Routing policy
 
-Routing is deterministic. Costs and prohibitions come from typed attributes, operational state, and an explicit user profile. Every route should return an explanation receipt containing selected connectors, avoided constraints, distance, duration estimate, and package version.
+Routing is deterministic. Costs and prohibitions come from typed attributes,
+operational state, and an explicit user profile. Every completed route returns an
+explanation receipt containing selected connectors, avoided constraints,
+distance, duration estimate, and package version.
 
 ### Navigation runtime
 
@@ -78,9 +81,8 @@ The runtime owns progress gates, instruction advancement, wrong-way hysteresis, 
 
 ### Presentation clients
 
-This section describes the intended client set, not what exists. Only the first
-item is built; the rest are why the package boundary is drawn where it is, and
-none of them should be described as delivered.
+This section separates the clients that exist from the clients that motivated
+the package boundary but have not been built.
 
 **Built today**
 

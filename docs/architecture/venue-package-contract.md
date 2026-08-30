@@ -96,7 +96,7 @@ by that identity, so a venue change recreates:
 - operational overlay and its evaluation time;
 - future venue-scoped localization estimate state.
 
-Search, routing, floor controls, the 2D plan, the 3D twin, POIs, connector names,
+Search, routing, floor controls, the visitor venue map, the 3D twin, POIs, connector names,
 and localization anchors all read from the same active runtime adapter.
 Operational overlays remain separate immutable artifacts, but are validated
 against the active building ID and package hash and are cleared on venue change.

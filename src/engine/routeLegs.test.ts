@@ -9,13 +9,14 @@ function step(type: StepType, instruction: string, distance = 0, floorId = 'g'):
 
 describe('route legs', () => {
   it('folds a run of turns into one walk', () => {
-    const legs = groupRouteLegs([
+    const steps = [
       step(STEP_TYPE.START, 'Start at the entrance'),
       step(STEP_TYPE.STRAIGHT, 'Continue on the concourse', 20),
       step(STEP_TYPE.TURN_LEFT, 'Turn left onto the link', 8),
       step(STEP_TYPE.STRAIGHT, 'Continue on the link', 12),
       step(STEP_TYPE.ARRIVE, 'Arrive at Pharmacy'),
-    ]);
+    ];
+    const legs = groupRouteLegs(steps);
 
     expect(legs.map((leg) => leg.kind)).toEqual(['start', 'walk', 'arrive']);
     expect(legs[1].distanceMeters).toBe(40);
@@ -23,6 +24,13 @@ describe('route legs', () => {
     expect(legs[1].stepIndices).toEqual([1, 2, 3]);
     // The walk is read as its first instruction, not as three.
     expect(legs[1].headline).toBe('Continue on the concourse');
+    // Grouping is an outline, not data loss: the UI can still render every
+    // exact turn from the original route in order.
+    expect(legs[1].stepIndices.map((index) => steps[index].instruction)).toEqual([
+      'Continue on the concourse',
+      'Turn left onto the link',
+      'Continue on the link',
+    ]);
   });
 
   it('gives a floor change a leg of its own', () => {
