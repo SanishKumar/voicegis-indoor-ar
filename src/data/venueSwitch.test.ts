@@ -13,7 +13,11 @@ describe('runtime venue switching', () => {
   it('recreates all venue-scoped state and exposes only the new package data', () => {
     const asterionState = createVenueScopedState(ASTERION_RUNTIME);
     asterionState.navigation.destinationNodeId = 'poi:poi-cardiology';
-    asterionState.navigation.route = { found: true, pathIds: ['poi:poi-cardiology'] };
+    asterionState.navigation.route = calculateCompiledRoute(
+      ASTERION_RUNTIME,
+      ASTERION_RUNTIME.config.defaultStartNode,
+      'poi:poi-cardiology',
+    );
     asterionState.navigation.selectedPOI = ASTERION_RUNTIME.getNodeById('poi:poi-cardiology');
     asterionState.operationalOverlay = { id: 'asterion-closure' };
     asterionState.localizationEstimate = {

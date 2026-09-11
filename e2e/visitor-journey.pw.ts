@@ -1,4 +1,88 @@
-import { expect, openPharmacyRoute, precompleteOnboarding, test } from './support';
+import {
+  expect,
+  expectCenterHitTarget,
+  openPharmacyRoute,
+  precompleteOnboarding,
+  test,
+} from './support';
+
+test('previewing the whole route preserves location and totals until arrival is confirmed', async ({
+  page,
+}) => {
+  test.setTimeout(45_000);
+  await openPharmacyRoute(page);
+  const directions = page.getByRole('region', { name: 'Directions to Outpatient Pharmacy' });
+  await expect(directions.getByText('Route preview', { exact: true })).toBeVisible();
+  await expect(directions.locator('.nav-legs')).toBeHidden();
+  const facts = await directions.locator('.nav-journey-facts').innerText();
+  const start = page.getByRole('button', { name: /Change start location/ });
+  const startLabel = await start.getAttribute('aria-label');
+  const map = page.locator('.compiled-map');
+  const locationFloor = await map.getAttribute('data-location-floor');
+  const label = await directions.locator('.nav-current-instruction-label').innerText();
+  const total = Number(label.match(/of\s+(\d+)/i)?.[1]);
+  expect(total).toBeGreaterThan(1);
+  for (let index = 1; index < total; index += 1) {
+    await directions.getByRole('button', { name: 'Next instruction' }).click();
+  }
+  await expect(directions.locator('.nav-journey-facts')).toHaveText(facts, { useInnerText: true });
+  await expect(start).toHaveAttribute('aria-label', startLabel!);
+  await expect(map).toHaveAttribute('data-location-floor', locationFloor!);
+  await expect(page.getByLabel('Map status')).toContainText('Route ready');
+  await expect(directions.locator('.nav-arrived')).toHaveCount(0);
+  await directions.getByRole('button', { name: 'I’m at my destination' }).click();
+  await expect(directions.locator('.nav-arrived')).toContainText('Arrival confirmed by you');
+  await directions.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(directions).toHaveCount(0);
+});
+
+test('dismissing a check-in and browsing floors preserves a recenterable checkpoint', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await openPharmacyRoute(page);
+  const map = page.locator('.compiled-map');
+  const floor = await map.getAttribute('data-location-floor');
+  await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
+  await expect(page.getByLabel('Planning location')).toContainText('Last check-in');
+  await expect(page.getByRole('button', { name: /Change start location/ })).toHaveAttribute(
+    'aria-label',
+    /Family Care Concourse/,
+  );
+  const floors = page.getByRole('group', { name: 'Floors', exact: true });
+  const checkpointFloor = await floors
+    .locator('button[aria-pressed="true"]')
+    .getAttribute('aria-label');
+  await floors.locator('button[aria-pressed="false"]').first().click();
+  await expect(map).toHaveAttribute('data-location-floor', floor!);
+  await page.getByRole('button', { name: 'Recenter on last check-in' }).click();
+  await expect(floors.getByRole('button', { name: checkpointFloor! })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});
+
+test('camera preview returns to the same shared instruction without moving the checkpoint', async ({
+  page,
+}) => {
+  // A blank test stream exercises view switching without enrolling a camera.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      value: async () => new MediaStream(),
+    });
+  });
+  await openPharmacyRoute(page);
+  await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
+  await page.getByRole('button', { name: 'Next instruction' }).click();
+  const instruction = await page.locator('.nav-current-instruction strong').innerText();
+  const floor = await page.locator('.compiled-map').getAttribute('data-location-floor');
+  await page.getByRole('button', { name: 'Which way?' }).click();
+  await expect(page.locator('.camera-preview-step-kicker')).toContainText('Preview instruction 2');
+  await expectCenterHitTarget(page.getByRole('button', { name: 'Exit to plan' }));
+  await page.getByRole('button', { name: 'Exit to plan' }).click();
+  await expect(page.locator('.nav-current-instruction strong')).toHaveText(instruction);
+  await expect(page.locator('.compiled-map')).toHaveAttribute('data-location-floor', floor!);
+});
 
 test('a first-time visitor names a destination, then a start, and gets a route', async ({
   page,
@@ -80,6 +164,7 @@ test('the current map instruction and its controls stay reachable on a small pho
   const next = directions.getByRole('button', { name: 'Next instruction' });
   await expect(current).toBeVisible();
   await expect(next).toBeVisible();
+  await expectCenterHitTarget(next);
 
   for (const control of [current, next]) {
     const bounds = await control.boundingBox();

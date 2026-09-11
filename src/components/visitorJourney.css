@@ -1,0 +1,189 @@
+/* Visitor-only refinements; operator layout remains untouched. */
+.visitor-shell .nav-panel.journey-panel {
+  gap: 12px;
+  padding: 18px;
+  max-height: min(72vh, 660px);
+}
+
+.journey-panel .nav-journey-facts {
+  display: flex;
+  gap: 28px;
+  padding: 9px 0;
+}
+
+.journey-panel .nav-journey-facts dd {
+  font-size: 21px;
+}
+.journey-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.visitor-shell .journey-overview .nav-journey-facts {
+  flex: 1;
+  border: 0;
+  margin: 0;
+  gap: 16px;
+}
+.visitor-shell .journey-overview .nav-legs-toggle {
+  display: inline-flex;
+  align-self: center;
+  padding: 8px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.journey-panel .nav-legs[hidden] {
+  display: none;
+}
+.journey-panel .nav-legs-toggle {
+  display: inline-flex;
+  align-self: flex-start;
+}
+.journey-panel .nav-current-instruction {
+  padding: 10px 12px;
+}
+.journey-panel .nav-current-instruction strong {
+  font-size: 17px;
+}
+.journey-panel .nav-panel-dest-name {
+  font-size: 24px;
+}
+.visitor-shell .journey-panel .nav-leg-step {
+  font-size: 13px;
+  padding: 10px;
+  white-space: nowrap;
+}
+.journey-panel .nav-leg-controls {
+  position: sticky;
+  bottom: 0;
+  flex-shrink: 0;
+  background: var(--ed-cream);
+}
+
+.journey-location-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.journey-location-note button {
+  background: transparent;
+  border: 0;
+  padding: 5px 0;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.journey-arrival-button {
+  border: 0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #0756bb;
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.compiled-map-location {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  max-width: min(280px, calc(100% - 88px));
+  padding: 8px 12px;
+  border: 1px solid #b9c9dc;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #17334f;
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.compiled-map-location span {
+  display: block;
+  font-size: 10px;
+}
+
+@media (max-width: 900px) {
+  .visitor-shell .compiled-map-floors {
+    flex-direction: row;
+    top: auto;
+    right: 12px;
+    bottom: calc(var(--visitor-sheet-height, 0px) + 64px);
+    transform: none;
+    max-width: calc(100% - 24px);
+    overflow-x: auto;
+  }
+  .visitor-shell .compiled-map-zoom {
+    flex-direction: row;
+    right: 12px;
+    bottom: calc(var(--visitor-sheet-height, 0px) + 12px);
+  }
+  .visitor-shell .compiled-map[data-route-floors='0'] .compiled-map-zoom {
+    flex-direction: column;
+    bottom: 12px;
+  }
+  .visitor-shell .compiled-map[data-route-floors='0'] .compiled-map-floors {
+    flex-direction: column;
+    bottom: 220px;
+  }
+  .compiled-map:not([data-route-floors='0']) .compiled-map-location {
+    display: none;
+  }
+  .visitor-shell .nav-panel.journey-panel {
+    padding: 14px 18px;
+    gap: 9px;
+  }
+  .visitor-shell .nav-panel.journey-panel.is-collapsed {
+    max-height: 51vh;
+  }
+  .visitor-shell .nav-panel.journey-panel .nav-journey-facts {
+    display: flex;
+    padding: 5px 0;
+  }
+  .journey-panel .nav-journey-facts dd {
+    font-size: 16px;
+  }
+  .journey-panel .nav-journey-facts dt {
+    font-size: 10px;
+  }
+  .journey-panel .nav-current-instruction strong {
+    font-size: 16px;
+  }
+  .compiled-map-location {
+    top: 10px;
+    left: 10px;
+  }
+}
+
+@media (max-width: 560px) {
+  .visitor-shell .visitor-header-actions {
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .visitor-shell .visitor-location-control {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+  }
+  .visitor-shell .visitor-heading-check,
+  .visitor-shell .visitor-access-profile,
+  .visitor-shell .visitor-utility-actions {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .visitor-shell .camera-preview-telemetry {
+    bottom: calc(var(--camera-preview-controls-height, 104px) + 26px);
+  }
+}

@@ -24,6 +24,13 @@ import { calculateCompiledRoute } from '../engine/compiledRoutePolicy';
 import { useVenue } from './VenueContext.jsx';
 import { createVenueScopedState } from '../data/venueSession';
 import { checkInFromScan } from '../capture/anchorCheckIn.ts';
+import {
+  JOURNEY_ACTION as ACTION,
+  NAV_STATUS,
+  visitorJourneyReducer,
+} from '../navigation/visitorJourney';
+
+export { NAV_STATUS };
 
 function routeOptionsFor(stepFree, operationalOverlay, evaluatedAt) {
   return {
@@ -31,30 +38,6 @@ function routeOptionsFor(stepFree, operationalOverlay, evaluatedAt) {
     ...(operationalOverlay ? { operationalOverlay, evaluatedAt } : {}),
   };
 }
-
-// ── Action Types ──
-const ACTION = {
-  SET_START: 'SET_START',
-  SET_DESTINATION: 'SET_DESTINATION',
-  SET_ROUTE_START: 'SET_ROUTE_START',
-  SET_ROUTE_RESULT: 'SET_ROUTE_RESULT',
-  CLEAR_ROUTE: 'CLEAR_ROUTE',
-  SET_VIEW: 'SET_VIEW',
-  SET_FLOOR: 'SET_FLOOR',
-  SET_SELECTED_POI: 'SET_SELECTED_POI',
-  CLEAR_SELECTED_POI: 'CLEAR_SELECTED_POI',
-  NEXT_STEP: 'NEXT_STEP',
-  PREV_STEP: 'PREV_STEP',
-  SET_NAV_STATUS: 'SET_NAV_STATUS',
-};
-
-// ── Navigation Status ──
-export const NAV_STATUS = {
-  IDLE: 'idle',
-  ROUTING: 'routing',
-  NAVIGATING: 'navigating',
-  ARRIVED: 'arrived',
-};
 
 // ── View Types ──
 export const VIEW_TYPE = {
@@ -73,116 +56,9 @@ function createInitialState({ venue, urlCheckIn }) {
     ...navigation,
     startNodeId: urlCheckIn.nodeId,
     activeFloorId: urlCheckIn.anchor.floorId,
+    locationFloorId: urlCheckIn.anchor.floorId,
+    locationBasis: 'qr',
   };
-}
-
-// ── Reducer ──
-function navigationReducer(state, action) {
-  switch (action.type) {
-    case ACTION.SET_START:
-      return {
-        ...state,
-        startNodeId: action.payload.nodeId,
-        activeFloorId: action.payload.floorId ?? state.activeFloorId,
-        route: null,
-        currentStepIndex: 0,
-        navStatus: NAV_STATUS.IDLE,
-      };
-
-    case ACTION.SET_DESTINATION:
-      return {
-        ...state,
-        destinationNodeId: action.payload,
-      };
-
-    case ACTION.SET_ROUTE_START: {
-      const { startId, endId, startFloorId } = action.payload;
-      return {
-        ...state,
-        startNodeId: startId,
-        destinationNodeId: endId,
-        activeFloorId: startFloorId ?? state.activeFloorId,
-        route: null,
-        navStatus: NAV_STATUS.ROUTING,
-        selectedPOI: null,
-      };
-    }
-
-    case ACTION.SET_ROUTE_RESULT: {
-      const route = action.payload;
-      return {
-        ...state,
-        route,
-        currentStepIndex: 0,
-        navStatus: route.found ? NAV_STATUS.NAVIGATING : NAV_STATUS.IDLE,
-      };
-    }
-
-    case ACTION.CLEAR_ROUTE:
-      return {
-        ...state,
-        destinationNodeId: null,
-        route: null,
-        currentStepIndex: 0,
-        navStatus: NAV_STATUS.IDLE,
-      };
-
-    case ACTION.SET_VIEW:
-      return {
-        ...state,
-        activeView: action.payload,
-      };
-
-    case ACTION.SET_FLOOR:
-      return {
-        ...state,
-        activeFloorId: action.payload,
-      };
-
-    case ACTION.SET_SELECTED_POI:
-      return {
-        ...state,
-        selectedPOI: action.payload,
-        activeFloorId: action.payload?.poi?.floorId ?? state.activeFloorId,
-      };
-
-    case ACTION.CLEAR_SELECTED_POI:
-      return {
-        ...state,
-        selectedPOI: null,
-      };
-
-    case ACTION.NEXT_STEP: {
-      if (!state.route) return state;
-      const nextIndex = Math.min(state.currentStepIndex + 1, state.route.steps.length - 1);
-      const isArrived = nextIndex === state.route.steps.length - 1;
-      return {
-        ...state,
-        currentStepIndex: nextIndex,
-        navStatus: isArrived ? NAV_STATUS.ARRIVED : NAV_STATUS.NAVIGATING,
-        activeFloorId: state.route.steps[nextIndex]?.floorId ?? state.activeFloorId,
-      };
-    }
-
-    case ACTION.PREV_STEP: {
-      const prevIndex = Math.max(state.currentStepIndex - 1, 0);
-      return {
-        ...state,
-        currentStepIndex: prevIndex,
-        navStatus: NAV_STATUS.NAVIGATING,
-        activeFloorId: state.route?.steps[prevIndex]?.floorId ?? state.activeFloorId,
-      };
-    }
-
-    case ACTION.SET_NAV_STATUS:
-      return {
-        ...state,
-        navStatus: action.payload,
-      };
-
-    default:
-      return state;
-  }
 }
 
 // ── Context ──
@@ -227,7 +103,7 @@ export function NavigationProvider({ children, venue }) {
   const [urlCheckIn] = useState(() => checkInFromUrl(venue));
   const resolvedUrlCheckIn = urlCheckIn?.ok ? urlCheckIn.result : null;
   const [state, dispatch] = useReducer(
-    navigationReducer,
+    visitorJourneyReducer,
     { venue, urlCheckIn: resolvedUrlCheckIn },
     createInitialState,
   );
@@ -235,6 +111,10 @@ export function NavigationProvider({ children, venue }) {
   // immediate user action. Results from an older generation must not resurrect
   // guidance after Cancel, a changed start, or a return to onboarding.
   const routeRequestGenerationRef = useRef(0);
+  // Synchronous intent survives scans delivered before React renders a route
+  // request, while clearing it makes cancellation final for subsequent scans.
+  const routeDestinationRef = useRef(null);
+  const routeStartRef = useRef(state.startNodeId);
   const { packageCacheStatus } = useVenue();
 
   const [theme, setTheme] = useState(() => {
@@ -266,6 +146,7 @@ export function NavigationProvider({ children, venue }) {
     }
     return false;
   });
+  const accessibleRoutingRef = useRef(accessibleRouting);
 
   // Consumed once. Left in place, a refresh would silently move the visitor
   // back to a code they walked away from. Stripped whenever the parameter is
@@ -279,6 +160,7 @@ export function NavigationProvider({ children, venue }) {
   }, []);
 
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [checkInToastVisible, setCheckInToastVisible] = useState(Boolean(resolvedUrlCheckIn));
   const [operationalOverlay, setOperationalOverlayState] = useState(null);
   // The last successful QR check-in. Held here rather than inside whichever
   // modal performed the scan, because each of those unmounts the moment the
@@ -318,6 +200,7 @@ export function NavigationProvider({ children, venue }) {
     // made every non-routing completion render CameraPreview with no search
     // target, defeating both the button's meaning and the focus handoff.
     routeRequestGenerationRef.current += 1;
+    routeDestinationRef.current = null;
     dispatch({ type: ACTION.CLEAR_ROUTE });
     dispatch({ type: ACTION.SET_VIEW, payload: VIEW_TYPE.MAP });
     setOnboardingComplete(false);
@@ -352,6 +235,8 @@ export function NavigationProvider({ children, venue }) {
     async (destNodeId, startId, stepFree, startFloorId) => {
       const requestGeneration = routeRequestGenerationRef.current + 1;
       routeRequestGenerationRef.current = requestGeneration;
+      routeDestinationRef.current = destNodeId;
+      routeStartRef.current = startId;
       dispatch({
         type: ACTION.SET_ROUTE_START,
         payload: {
@@ -368,9 +253,11 @@ export function NavigationProvider({ children, venue }) {
           routeOptionsFor(stepFree, operationalOverlay, operationalEvaluatedAt),
         );
         if (routeRequestGenerationRef.current !== requestGeneration) return;
+        if (!route.found) routeDestinationRef.current = null;
         dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: route });
       } catch (err) {
         if (routeRequestGenerationRef.current !== requestGeneration) return;
+        routeDestinationRef.current = null;
         console.error('Routing error:', err);
         dispatch({
           type: ACTION.SET_ROUTE_RESULT,
@@ -401,24 +288,32 @@ export function NavigationProvider({ children, venue }) {
   }, []);
 
   const toggleAccessibleRouting = useCallback(() => {
-    const next = !accessibleRouting;
+    const next = !accessibleRoutingRef.current;
+    accessibleRoutingRef.current = next;
     setAccessibleRouting(next);
     localStorage.setItem('accessible_routing', String(next));
-    if (state.route && state.startNodeId && state.destinationNodeId) {
-      void requestRoute(state.destinationNodeId, state.startNodeId, next, undefined);
+    if (routeDestinationRef.current && routeStartRef.current) {
+      const startNode = venue.getNodeById(routeStartRef.current);
+      void requestRoute(
+        routeDestinationRef.current,
+        routeStartRef.current,
+        next,
+        startNode ? String(startNode.floor) : undefined,
+      );
     }
-  }, [accessibleRouting, requestRoute, state.destinationNodeId, state.route, state.startNodeId]);
+  }, [requestRoute, venue]);
 
   const setOperationalOverlay = useCallback((overlay, evaluatedAt = new Date().toISOString()) => {
     routeRequestGenerationRef.current += 1;
+    routeDestinationRef.current = null;
     setOperationalOverlayState(overlay);
     setOperationalEvaluatedAt(overlay ? evaluatedAt : null);
     dispatch({ type: ACTION.CLEAR_ROUTE });
   }, []);
 
   /**
-   * Resolves a scanned payload and, when it names a check-in point, starts the
-   * next route from there.
+   * A scan changes the planning location and resumes an active journey to the
+   * same destination. It is a position checkpoint, never continuous tracking.
    *
    * Lives in the context so the onboarding flow and the location picker share
    * one implementation. They each held their own copy first, which is two
@@ -430,12 +325,19 @@ export function NavigationProvider({ children, venue }) {
       const result = checkInFromScan(payload, pkg.localizationAnchors, pkg.routing.nodes);
       if (!result.ok) return result;
 
-      const node = venue.getNodeById(result.nodeId);
+      const destinationNodeId = routeDestinationRef.current;
+      routeStartRef.current = result.nodeId;
       routeRequestGenerationRef.current += 1;
       dispatch({
         type: ACTION.SET_START,
-        payload: { nodeId: result.nodeId, floorId: node ? String(node.floor) : undefined },
+        payload: {
+          nodeId: result.nodeId,
+          floorId: result.anchor.floorId,
+          locationBasis: 'qr',
+        },
       });
+      setCheckInProblem(null);
+      setCheckInToastVisible(true);
       setCheckIn({
         anchorId: result.anchor.id,
         floorId: result.anchor.floorId,
@@ -444,9 +346,17 @@ export function NavigationProvider({ children, venue }) {
         distanceMeters: result.distanceMeters,
         scannedAt: Date.now(),
       });
+      if (destinationNodeId) {
+        void requestRoute(
+          destinationNodeId,
+          result.nodeId,
+          accessibleRoutingRef.current,
+          result.anchor.floorId,
+        );
+      }
       return result;
     },
-    [venue],
+    [requestRoute, venue],
   );
 
   const actions = {
@@ -454,6 +364,10 @@ export function NavigationProvider({ children, venue }) {
       (nodeId) => {
         const node = venue.getNodeById(nodeId);
         routeRequestGenerationRef.current += 1;
+        routeDestinationRef.current = null;
+        routeStartRef.current = nodeId;
+        setCheckIn(null);
+        setCheckInProblem(null);
         dispatch({
           type: ACTION.SET_START,
           payload: { nodeId, floorId: node ? String(node.floor) : undefined },
@@ -465,7 +379,8 @@ export function NavigationProvider({ children, venue }) {
     checkInWithPayload,
 
     dismissCheckIn: useCallback(() => {
-      setCheckIn(null);
+      // Dismissing feedback must not erase the last known location.
+      setCheckInToastVisible(false);
       setCheckInProblem(null);
     }, []),
 
@@ -474,18 +389,23 @@ export function NavigationProvider({ children, venue }) {
     }, []),
 
     navigateTo: async (destNodeId, startNodeId) => {
-      const startId = startNodeId || state.startNodeId;
+      const startId = startNodeId || routeStartRef.current;
+      if (startId !== routeStartRef.current) {
+        setCheckIn(null);
+        setCheckInProblem(null);
+      }
       const startNode = venue.getNodeById(startId);
       return requestRoute(
         destNodeId,
         startId,
-        accessibleRouting,
+        accessibleRoutingRef.current,
         startNode ? String(startNode.floor) : undefined,
       );
     },
 
     clearRoute: useCallback(() => {
       routeRequestGenerationRef.current += 1;
+      routeDestinationRef.current = null;
       dispatch({ type: ACTION.CLEAR_ROUTE });
     }, []),
 
@@ -512,6 +432,21 @@ export function NavigationProvider({ children, venue }) {
     prevStep: useCallback(() => {
       dispatch({ type: ACTION.PREV_STEP });
     }, []),
+
+    previewStep: useCallback((index) => {
+      dispatch({ type: ACTION.PREVIEW_STEP, payload: index });
+    }, []),
+
+    confirmArrival: useCallback(() => {
+      if (
+        state.route?.found &&
+        state.navStatus === NAV_STATUS.NAVIGATING &&
+        state.previewStepIndex === state.route.steps.length - 1
+      ) {
+        routeDestinationRef.current = null;
+      }
+      dispatch({ type: ACTION.CONFIRM_ARRIVAL });
+    }, [state.navStatus, state.previewStepIndex, state.route]),
   };
 
   return (
@@ -531,6 +466,7 @@ export function NavigationProvider({ children, venue }) {
         accessibleRouting,
         toggleAccessibleRouting,
         checkIn,
+        checkInToastVisible,
         checkInProblem,
         operationalOverlay,
         operationalEvaluatedAt,

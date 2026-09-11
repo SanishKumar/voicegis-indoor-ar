@@ -23,6 +23,7 @@ import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
 import { STEP_TYPE } from '../engine/routingEngine';
 import { groupRouteLegs, legIndexForStep } from '../engine/routeLegs';
+import './visitorJourney.css';
 
 function shortFloorLabel(venue, floorId) {
   const floor = venue.getFloorById(String(floorId));
@@ -38,14 +39,14 @@ function LegIcon({ leg, size = 18 }) {
 }
 
 export default function NavigationPanel() {
-  const { state, actions, venue } = useNavigation();
-  const { route, navStatus, currentStepIndex, destinationNodeId } = state;
+  const { state, actions, venue, setShowLocationPicker } = useNavigation();
+  const { route, navStatus, previewStepIndex: currentStepIndex, destinationNodeId } = state;
   const panelRef = useRef(null);
   /*
    * On a phone the whole strip covered four fifths of the map, which is the
    * one thing a visitor came to look at. Collapsed, the panel shows the leg in
    * hand and nothing else - which is what the journey is meant to be read as
-   * anyway. Wide screens have room for the lot and ignore this.
+   * anyway. Desktop uses the same compact, map-first presentation.
    */
   const [expanded, setExpanded] = useState(false);
   const destNode = venue.getNodeById(destinationNodeId);
@@ -161,9 +162,9 @@ export default function NavigationPanel() {
   const currentStep = steps[currentStepIndex] ?? steps[0];
   const isArrived = navStatus === NAV_STATUS.ARRIVED;
 
-  const remainingDistance = steps
-    .slice(currentStepIndex)
-    .reduce((total, step) => total + (step.distance || 0), 0);
+  // Browsing directions is not measured progress. Totals stay tied to the
+  // route's planning start until a new location produces a new route.
+  const totalDistance = steps.reduce((total, step) => total + (step.distance || 0), 0);
 
   const connectorReceipt = route.receipt?.selectedConnectors?.[0];
   const connector = connectorReceipt
@@ -180,7 +181,7 @@ export default function NavigationPanel() {
   return (
     <div
       ref={panelRef}
-      className={`nav-panel open ${expanded ? 'is-expanded' : 'is-collapsed'}`}
+      className={`nav-panel journey-panel open ${expanded ? 'is-expanded' : 'is-collapsed'}`}
       id="nav-panel"
       role="region"
       aria-label={`Directions to ${destNode?.poi?.name || 'destination'}`}
@@ -188,7 +189,7 @@ export default function NavigationPanel() {
     >
       <div className="nav-panel-header">
         <div className="nav-panel-destination">
-          <p className="nav-panel-dest-eyebrow">Going to</p>
+          <p className="nav-panel-dest-eyebrow">Route preview</p>
           <h2 className="nav-panel-dest-name">{destNode?.poi?.name || 'Destination'}</h2>
         </div>
         <button
@@ -200,31 +201,53 @@ export default function NavigationPanel() {
         </button>
       </div>
 
-      <dl className="nav-journey-facts">
-        <div>
-          <dt>Time</dt>
-          <dd>{estimateWalkTime(remainingDistance, venue.config.walkSpeedMps)}</dd>
-        </div>
-        <div>
-          <dt>Leg</dt>
-          <dd>
-            {Math.max(currentLegIndex + 1, 1)}/{legs.length}
-          </dd>
-        </div>
-        <div>
-          <dt>Remaining</dt>
-          <dd>{formatDistance(remainingDistance)}</dd>
-        </div>
-      </dl>
+      <div className="journey-overview">
+        <dl className="nav-journey-facts">
+          <div>
+            <dt>Estimated trip</dt>
+            <dd>{estimateWalkTime(totalDistance, venue.config.walkSpeedMps)}</dd>
+          </div>
+          <div>
+            <dt>Total route</dt>
+            <dd>{formatDistance(totalDistance)}</dd>
+          </div>
+        </dl>
+        {legs.length > 1 && (
+          <button
+            type="button"
+            className="nav-legs-toggle"
+            aria-expanded={expanded}
+            aria-controls="nav-steps-list"
+            aria-label={expanded ? 'Hide route details' : `Show all ${legs.length} legs`}
+            onClick={() => setExpanded((open) => !open)}
+          >
+            {expanded ? 'Hide details' : 'Route details'}
+          </button>
+        )}
+      </div>
 
       <p className="nav-route-summary" aria-label={routeProfile}>
         <span>{routeProfile}</span>
         <strong>{journeyLabel}</strong>
       </p>
 
+      <div className="journey-location-note">
+        <span>
+          {state.locationBasis === 'qr'
+            ? 'From last check-in'
+            : state.locationBasis === 'selected'
+              ? 'From selected start'
+              : 'From default start'}{' '}
+          · Not live tracking
+        </span>
+        <button type="button" onClick={() => setShowLocationPicker(true)}>
+          Update location
+        </button>
+      </div>
+
       {isArrived && (
         <p className="nav-arrived" aria-live="assertive">
-          You have arrived at {destNode?.poi?.name}.
+          Arrival confirmed by you at {destNode?.poi?.name}.
         </p>
       )}
 
@@ -238,11 +261,10 @@ export default function NavigationPanel() {
         </div>
       )}
 
-      <ol className="nav-legs" id="nav-steps-list">
+      <ol className="nav-legs" id="nav-steps-list" hidden={!expanded}>
         {legs.map((leg, index) => {
           const floor = leg.floorId ? venue.getFloorById(leg.floorId) : null;
-          const legState =
-            index < currentLegIndex ? 'done' : index === currentLegIndex ? 'current' : 'ahead';
+          const legState = index === currentLegIndex ? 'current' : 'ahead';
           return (
             <li
               key={`${leg.kind}-${leg.stepIndices[0]}`}
@@ -285,17 +307,6 @@ export default function NavigationPanel() {
         })}
       </ol>
 
-      {legs.length > 1 && (
-        <button
-          type="button"
-          className="nav-legs-toggle"
-          aria-expanded={expanded}
-          onClick={() => setExpanded((open) => !open)}
-        >
-          {expanded ? 'Show just this leg' : `Show all ${legs.length} legs`}
-        </button>
-      )}
-
       {!isArrived && (
         <div className="nav-leg-controls">
           <button
@@ -306,7 +317,7 @@ export default function NavigationPanel() {
             id="btn-prev-step"
           >
             <ChevronLeft size={16} strokeWidth={2} />
-            Back
+            Preview back
           </button>
           <button
             className="nav-leg-step"
@@ -315,10 +326,24 @@ export default function NavigationPanel() {
             aria-label="Next instruction"
             id="btn-next-step"
           >
-            Next
+            Preview next
             <ChevronRight size={16} strokeWidth={2} />
           </button>
         </div>
+      )}
+      {!isArrived && currentStepIndex === steps.length - 1 && (
+        <button type="button" className="journey-arrival-button" onClick={actions.confirmArrival}>
+          I’m at my destination
+        </button>
+      )}
+      {isArrived && (
+        <button
+          type="button"
+          className="journey-arrival-button"
+          onClick={clearRouteAndReturnToSearch}
+        >
+          Done
+        </button>
       )}
     </div>
   );

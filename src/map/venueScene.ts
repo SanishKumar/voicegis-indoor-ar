@@ -30,6 +30,7 @@ import {
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import { resolveCartographicLabels } from '../engine/floorplanCartography';
+import type { VisitorLocation } from '../navigation/visitorLocation';
 
 /**
  * The visitor map as a lit model rather than a drawing.
@@ -108,6 +109,8 @@ const WALL_HEIGHT = 1.4;
 const EXPLODE = 3.1;
 
 export interface VenueScene {
+  setLocation(location: Omit<VisitorLocation, 'label'> | null): void;
+  focusLocation(): void;
   setActiveFloor(floorId: string): void;
   setRoute(points: ReadonlyArray<{ x: number; y: number; floor: string }>): void;
   setSelectedSpace(spaceId: string | null): void;
@@ -542,6 +545,8 @@ export function createVenueScene(
   const MAX_DISTANCE = span * 2.4;
   const camera3 = { azimuth: -0.62, polar: 0.86, distance: HOME_DISTANCE };
   const target = new Vector3(0, 0, 0);
+  const locationGroup = new Group();
+  let location: Omit<VisitorLocation, 'label'> | null = null;
 
   function applyCamera() {
     camera.position.set(
@@ -851,6 +856,35 @@ export function createVenueScene(
   const pointer = new Vector2();
 
   const handle: VenueScene = {
+    setLocation(nextLocation) {
+      emptyGroup(locationGroup);
+      locationGroup.removeFromParent();
+      location = nextLocation;
+      if (!location) return;
+      const floor = floors.get(location.floorId);
+      if (!floor) return;
+      // Fixed-size checkpoint symbol: no heading cone or invented accuracy halo.
+      const rim = new Mesh(
+        new CylinderGeometry(0.85, 0.85, 0.12, 32),
+        new MeshStandardMaterial({ color: 0xffffff }),
+      );
+      const dot = new Mesh(
+        new CylinderGeometry(0.59, 0.59, 0.17, 32),
+        new MeshStandardMaterial({ color: location.basis === 'qr' ? 0x0967df : 0x536779 }),
+      );
+      dot.position.y = 0.1;
+      locationGroup.add(rim, dot);
+      locationGroup.position.copy(vec(location.position, 1.65));
+      floor.group.add(locationGroup);
+    },
+
+    focusLocation() {
+      if (!location) return;
+      handle.setActiveFloor(location.floorId);
+      target.copy(vec(location.position));
+      camera3.distance = HOME_DISTANCE * 0.7;
+    },
+
     setActiveFloor(floorId) {
       if (!floors.has(floorId)) return;
       activeFloorId = floorId;

@@ -1046,7 +1046,7 @@ interface ToggleButtonProps {
 interface SpatialNavigatorContextValue {
   state: {
     route: RouteResult | null;
-    currentStepIndex: number;
+    previewStepIndex: number;
   };
   venue: CompiledBuildingRuntime;
 }
@@ -1084,7 +1084,7 @@ export default function SpatialTwinViewer() {
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
   const activeRoute = state.route as RouteResult | null;
   const currentNodeId = activeRoute?.found
-    ? activeRoute.steps[state.currentStepIndex]?.nodeId
+    ? activeRoute.steps[state.previewStepIndex]?.nodeId
     : undefined;
   const activeRouteFloors = activeRoute?.found ? routeFloorIds(activeRoute.path) : [];
   const activeConnectorRuns = activeRoute?.found ? routeConnectorRuns(activeRoute.path) : [];
@@ -1351,11 +1351,12 @@ export default function SpatialTwinViewer() {
                 </p>
                 <div className="twin-route-current">
                   <span>
-                    Decision {Math.min(state.currentStepIndex + 1, activeRoute.steps.length)} of{' '}
+                    Preview instruction{' '}
+                    {Math.min(state.previewStepIndex + 1, activeRoute.steps.length)} of{' '}
                     {activeRoute.steps.length}
                   </span>
                   <strong>
-                    {activeRoute.steps[state.currentStepIndex]?.instruction ?? 'Route ready'}
+                    {activeRoute.steps[state.previewStepIndex]?.instruction ?? 'Route ready'}
                   </strong>
                 </div>
                 <dl className="twin-property-grid">

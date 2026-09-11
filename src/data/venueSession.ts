@@ -1,18 +1,8 @@
 import type { CompiledBuildingRuntime } from './compiledBuilding';
-import type { GraphNode } from '../engine/routingCore';
+import type { VisitorJourneyState } from '../navigation/visitorJourney';
 
 export interface VenueScopedState {
-  navigation: {
-    venueKey: string;
-    startNodeId: string;
-    destinationNodeId: string | null;
-    route: unknown | null;
-    activeView: string;
-    activeFloorId: string;
-    selectedPOI: GraphNode | null;
-    currentStepIndex: number;
-    navStatus: string;
-  };
+  navigation: VisitorJourneyState;
   operationalOverlay: unknown | null;
   localizationEstimate: unknown | null;
 }
@@ -26,9 +16,12 @@ export function createVenueScopedState(venue: CompiledBuildingRuntime): VenueSco
       route: null,
       activeView: 'map',
       activeFloorId: venue.config.defaultFloorId,
+      locationFloorId: venue.config.defaultFloorId,
+      locationBasis: 'default',
       selectedPOI: null,
-      currentStepIndex: 0,
+      previewStepIndex: 0,
       navStatus: 'idle',
+      arrivalSource: null,
     },
     operationalOverlay: null,
     localizationEstimate: null,

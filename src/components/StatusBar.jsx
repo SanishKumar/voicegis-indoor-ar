@@ -44,8 +44,8 @@ export default function StatusBar() {
     {
       [NAV_STATUS.IDLE]: 'Ready',
       [NAV_STATUS.ROUTING]: 'Computing route...',
-      [NAV_STATUS.NAVIGATING]: 'Navigating',
-      [NAV_STATUS.ARRIVED]: 'Arrived',
+      [NAV_STATUS.NAVIGATING]: 'Route ready',
+      [NAV_STATUS.ARRIVED]: 'Arrival confirmed',
     }[navStatus] || 'Ready';
 
   const statusDotClass =

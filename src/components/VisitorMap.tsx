@@ -1,14 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { Maximize, Minus, Plus } from 'lucide-react';
+import { LocateFixed, Maximize, Minus, Plus } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { createVenueScene, type VenueScene } from '../map/venueScene';
+import { resolveVisitorLocation } from '../navigation/visitorLocation';
+import type { LocationBasis } from '../navigation/visitorJourney';
+import type { CheckInRecord } from '../capture/anchorCheckIn';
+import './visitorJourney.css';
 
 interface NavigationValue {
   state: {
+    startNodeId: string;
+    locationFloorId: string;
+    locationBasis: LocationBasis;
     activeFloorId: string;
     selectedPOI?: { poi?: { spaceId?: string } } | null;
     route?: { found?: boolean; path?: Array<{ x: number; y: number; floor: string }> } | null;
   };
+  checkIn: CheckInRecord | null;
   actions: {
     setFloor(floorId: string): void;
     selectPOI(node: unknown): void;
@@ -28,7 +36,7 @@ interface NavigationValue {
  * thing this arrangement exists to avoid.
  */
 export default function VisitorMap() {
-  const { state, actions, venue } = useNavigation() as unknown as NavigationValue;
+  const { state, actions, venue, checkIn } = useNavigation() as unknown as NavigationValue;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const labelRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<VenueScene | null>(null);
@@ -36,6 +44,11 @@ export default function VisitorMap() {
 
   const buildingPackage = venue.buildingPackage;
   const floors = buildingPackage.floors;
+  const location = resolveVisitorLocation(state, checkIn, buildingPackage);
+  const locationX = location?.position[0];
+  const locationY = location?.position[1];
+  const locationFloor = location?.floorId;
+  const locationBasis = location?.basis;
 
   /*
    * How many storeys the active route touches. The scene opens the stack when
@@ -85,6 +98,15 @@ export default function VisitorMap() {
     sceneRef.current?.setSelectedSpace(state.selectedPOI?.poi?.spaceId ?? null);
   }, [ready, state.selectedPOI, state.activeFloorId]);
 
+  useEffect(() => {
+    if (!ready) return;
+    sceneRef.current?.setLocation(
+      locationX !== undefined && locationY !== undefined && locationFloor && locationBasis
+        ? { position: [locationX, locationY], floorId: locationFloor, basis: locationBasis }
+        : null,
+    );
+  }, [ready, locationX, locationY, locationFloor, locationBasis]);
+
   const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     // Letting go after dragging the map is not a tap on whatever happens to be
     // under the cursor.
@@ -96,13 +118,43 @@ export default function VisitorMap() {
   };
 
   return (
-    <div className="compiled-map" data-route-floors={routeFloorCount}>
+    <div
+      className="compiled-map"
+      data-route-floors={routeFloorCount}
+      data-location-floor={locationFloor}
+      data-location-basis={locationBasis}
+    >
       <canvas ref={canvasRef} className="compiled-map-canvas" onClick={handleClick} />
       <div ref={labelRef} className="compiled-map-labels" aria-hidden="true" />
+      {location && (
+        <div className="compiled-map-location" aria-label="Planning location">
+          <strong>
+            {location.basis === 'qr' ? `Last check-in · ${location.label}` : location.label}
+          </strong>
+          <span>
+            {floors.find((floor) => floor.id === location.floorId)?.name} ·{' '}
+            {location.basis === 'qr' ? 'Not tracked between check-ins' : 'Not a measured position'}
+          </span>
+        </div>
+      )}
 
       {/* Wheel and pinch are not available to a keyboard, so the same moves
           have buttons. */}
       <div className="compiled-map-zoom" role="group" aria-label="Map view">
+        {location && (
+          <button
+            type="button"
+            aria-label={
+              location.basis === 'qr' ? 'Recenter on last check-in' : 'Recenter on selected start'
+            }
+            onClick={() => {
+              actions.setFloor(location.floorId);
+              sceneRef.current?.focusLocation();
+            }}
+          >
+            <LocateFixed size={18} strokeWidth={2} aria-hidden="true" />
+          </button>
+        )}
         <button type="button" aria-label="Zoom in" onClick={() => sceneRef.current?.zoomBy(0.75)}>
           <Plus size={18} strokeWidth={2} aria-hidden="true" />
         </button>

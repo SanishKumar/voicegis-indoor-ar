@@ -22,6 +22,7 @@ import type { CheckInFailure } from '../capture/anchorCheckIn';
  */
 
 interface NavigationBinding {
+  checkInToastVisible: boolean;
   checkIn: (CheckInRecord & { scannedAt: number }) | null;
   checkInProblem: { reason: CheckInFailure; venueName: string } | null;
   actions: { dismissCheckIn: () => void };
@@ -32,7 +33,8 @@ interface NavigationBinding {
 }
 
 export default function CheckInToast() {
-  const { checkIn, checkInProblem, actions, venue } = useNavigation() as NavigationBinding;
+  const { checkIn, checkInToastVisible, checkInProblem, actions, venue } =
+    useNavigation() as NavigationBinding;
   const dismiss = actions.dismissCheckIn;
 
   // A check-in link this venue could not honour. Shown rather than swallowed:
@@ -51,14 +53,19 @@ export default function CheckInToast() {
             {scanProblemText(checkInProblem.reason)} Active venue: {checkInProblem.venueName}.
           </span>
         </span>
-        <button type="button" className="checkin-toast-close" onClick={dismiss} aria-label="Dismiss">
+        <button
+          type="button"
+          className="checkin-toast-close"
+          onClick={dismiss}
+          aria-label="Dismiss"
+        >
           <X size={15} />
         </button>
       </div>
     );
   }
 
-  if (!checkIn) return null;
+  if (!checkIn || !checkInToastVisible) return null;
 
   const label = describeCheckIn(checkIn, {
     space: (id) => venue.getSpaceById(id)?.name ?? null,

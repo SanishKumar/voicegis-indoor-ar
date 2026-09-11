@@ -54,7 +54,13 @@ export default function Header() {
             <MapPin size={16} strokeWidth={2} />
           </span>
           <span className="visitor-location-copy">
-            <small>Starting at</small>
+            <small>
+              {state.locationBasis === 'qr'
+                ? 'Last check-in'
+                : state.locationBasis === 'selected'
+                  ? 'Selected start'
+                  : 'Default start'}
+            </small>
             <strong>{locationLabel}</strong>
           </span>
         </button>

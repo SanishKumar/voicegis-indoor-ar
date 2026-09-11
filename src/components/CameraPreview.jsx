@@ -24,7 +24,7 @@ import { formatDistance } from '../data/buildingConfig.js';
 
 export default function CameraPreview() {
   const { state, actions } = useNavigation();
-  const { activeView, route, navStatus, currentStepIndex } = state;
+  const { activeView, route, navStatus, previewStepIndex: currentStepIndex } = state;
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -73,6 +73,27 @@ function CameraPreviewInner({
 }) {
   const [headingState, setHeadingState] = useState('idle');
   const [headingDegrees, setHeadingDegrees] = useState(null);
+  const controlsRef = useRef(null);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    const root = controls?.parentElement;
+    if (!controls || !root) return undefined;
+    // Controls wrap on phones. Telemetry must clear their measured height,
+    // otherwise it covers the map escape when a second row appears.
+    const publish = () =>
+      root.style.setProperty(
+        '--camera-preview-controls-height',
+        `${controls.getBoundingClientRect().height}px`,
+      );
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(controls);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--camera-preview-controls-height');
+    };
+  }, []);
 
   const routeBearing = Number.isFinite(currentStep?.bearing) ? currentStep.bearing : null;
   const headingDelta =
@@ -228,9 +249,7 @@ function CameraPreviewInner({
         <video ref={videoRef} className="camera-preview-video" playsInline muted autoPlay />
       )}
 
-      {isNavigating && !cameraError && (
-        <canvas ref={canvasRef} className="camera-preview-canvas" />
-      )}
+      {isNavigating && !cameraError && <canvas ref={canvasRef} className="camera-preview-canvas" />}
 
       {isNavigating && (
         <div className="camera-preview-status" role="status">
@@ -304,13 +323,13 @@ function CameraPreviewInner({
                     ? 'Unavailable'
                     : headingState === 'listening'
                       ? 'Waiting'
-                    : 'Not enabled'}
+                      : 'Not enabled'}
             </strong>
           </div>
           <div>
             <LocateFixed size={13} />
             <span>Position</span>
-            <strong>Manual start</strong>
+            <strong>Not tracked</strong>
           </div>
           <div className="not-ready">
             <Crosshair size={13} />
@@ -334,7 +353,7 @@ function CameraPreviewInner({
           </div>
           <div className="camera-preview-instruction-copy">
             <div className="camera-preview-step-kicker">
-              Decision {currentStepIndex + 1} / {stepCount}
+              Preview instruction {currentStepIndex + 1} / {stepCount}
               {headingDelta !== null && (
                 <span>
                   {Math.abs(headingDelta) < 12
@@ -356,7 +375,7 @@ function CameraPreviewInner({
         </div>
       )}
 
-      <div className="camera-preview-controls">
+      <div className="camera-preview-controls" ref={controlsRef}>
         <button
           className="camera-preview-control"
           onClick={() => actions.setView(VIEW_TYPE.MAP)}
@@ -378,14 +397,14 @@ function CameraPreviewInner({
               onClick={() => actions.prevStep()}
               disabled={currentStepIndex === 0}
             >
-              ← Prev
+              ← Preview back
             </button>
             <button
               className="camera-preview-control"
               onClick={() => actions.nextStep()}
               disabled={currentStepIndex >= (route?.steps?.length || 0) - 1}
             >
-              Next →
+              Preview next →
             </button>
           </>
         )}
