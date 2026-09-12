@@ -87,6 +87,88 @@ Why this first: the current experience must tell the truth before continuous tra
 
 Acceptance: no motion from instruction browsing; no continued travel after an interruption; no silent jump between adjacent corridors/floors in adversarial fixtures; every estimate exposes freshness and uncertainty. Field accuracy is still unproven at this gate.
 
+#### Phase 2, slice A: step-driven motion accounting
+
+Implemented 11 September 2026, without enabling live Visitor tracking:
+
+- The filter applies each detected stride's displacement exactly once. It does
+  not extrapolate the previous stride on heading/floor events or across a gap.
+- Position corrections can move the estimate, but do not establish ongoing
+  walking. Non-step frames publish zero velocity (no velocity observation, not
+  proven physical stillness).
+- The existing covariance-aging model and quality thresholds remain unchanged.
+  Heading events do not refresh position-correction age; sufficiently stale
+  observations still yield lost quality and frozen replay guidance.
+- Fifteen new synthetic regressions cover stopped/rotating traces, heading
+  cadence, turns, floor observations, same-time events, corrections, zero-length
+  strides, gaps and the IMU-to-replay path. All fifteen failed against the actual
+  pre-change filter before the fix: a 30-second gap invented 30 metres of travel,
+  and interleaved headings inflated two one-metre strides to 2.75 metres.
+- Evidence processor version is now 0.3.0, because identical capture inputs can
+  produce different estimates. Existing synthetic expected errors were updated
+  from explicit stride arithmetic, not treated as an accuracy improvement.
+  Policy, capture/recording schemas, venue packages and sensor eligibility are
+  unchanged; old processor artifacts must not be silently relabelled.
+
+This is a bounded first slice, **not completion of Phase 2**. Next: define the
+venue/device coordinate and heading-provenance boundary, decouple QR position
+from phone heading, and stop stale IMU integration across interruptions. Then
+add matching/floor-transition gates. Live-session watchdogs and real-device
+validation remain required before automatic maneuver progress. No Visitor
+adapter is connected by this slice.
+
+#### Phase 2, slice B: coordinate and heading-reference boundary
+
+Implemented locally after slice A, preserving its uncommitted changes:
+
+- Added explicit plan/filter coordinate transforms, directional-axis and
+  reference-frame types, provenance-aware true/magnetic/plan heading conversion,
+  uncertainty and timestamp gates. Tested all cardinal directions through the
+  actual router and reflected filter, plus rotated-map and wraparound cases.
+- Fixed the existing camera preview's false “Aligned” claims from relative alpha
+  and uncalibrated magnetic compass values. Unknown direction stays unknown;
+  the current browser preview remains screen-aligned. QR and route bearings are
+  not used to calibrate the phone.
+- Added explicit sensor-disable, stale-event expiry, background pause and
+  late-permission cleanup for heading diagnostics only. This is not a live
+  positioning adapter or an IMU continuity fix.
+- Kept existing venue north-offset metadata separate from measured alignment.
+  It must acquire explicit semantics and survey/calibration provenance before
+  it can support true-north guidance. No venue artifacts were rewritten.
+- Stacked mobile readiness values beneath their labels after a continuous-event
+  browser regression reproduced clipping of “Uncalibrated” at 320 px.
+
+See [the heading contract](localization/visitor-heading-contract.md) for formulas,
+source documentation, browser behavior and deliberately unresolved boundaries.
+Slice C below implements the position-only / separate-heading recording contract
+and corresponding replay refusals. Automatic Visitor movement remains disabled.
+Phase 2 is still incomplete.
+
+#### Phase 2, slice C: position-only checkpoints and versioned replay
+
+- QR/NFC scans now emit position and floor only; they do not initialize or
+  correct phone heading and do not reset integrated gyro direction.
+- Recording 0.2 requires null initial heading and a separate independent,
+  venue-bound travel-axis calibration. Inertial updates cannot establish
+  initial direction. Unknown heading is explicit, freezes guidance and prevents
+  stride displacement; later calibration does not replay missed strides.
+- The filter enforces the same contract when called directly, including its
+  explicit frame identity. Existing lost/relocalizing recovery cannot be bypassed
+  by clearing and recalibrating heading.
+- Raw capture 0.2 remains readable and unchanged. It lacks an independent
+  calibration event, so processor 0.4 / policy 0.3 withhold accuracy. Otherwise
+  eligible walks report `unverified-heading`; other refusal precedence remains.
+- Recording 0.1 and earlier evidence versions are not silently relabelled. The
+  synthetic reference is deliberately authored as 0.2 with separate calibration;
+  real calibration cannot be inferred from legacy numeric heading fields.
+
+See [the migration and compatibility notes](localization/position-only-recording.md).
+The user reprioritized the bounded 2D/3D presentation slice below ahead of
+interrupted IMU continuity/reset semantics; return to that continuity work after
+the presentation slice is reviewed. A future raw
+calibration/pose event, surveyed alignment and physical-device timing validation
+are still required before accuracy reporting or automatic Visitor progress.
+
 ### 3. Continuous standard navigation, behind a pilot gate
 
 1. Connect a consent-based handset observation adapter to the journey session. Start/stop listeners once, clean up reliably, and handle permission denial/revocation and resume.
@@ -110,6 +192,28 @@ Accessibility gate: validate wheelchair and other mobility patterns explicitly. 
 Acceptance: a first-time user can plan and finish a test journey without instruction; a seated/one-handed user can reach key actions; keyboard/screen reader and 320 px layouts work; camera and voice permissions are optional. Conduct task-based usability sessions, not just screenshot review.
 
 ### 5. Seamless 2D ↔ 3D
+
+**Priority update — implemented locally for review before returning to IMU
+continuity.** The Visitor now starts in a true orthographic 2D plan and tilts
+into an orbitable orthographic 3D model over the same scene. Mode changes keep
+centre, scale, map bearing, active floor, route and inspected instruction.
+Reduced-motion users switch immediately. Camera-preview round trips restore
+the presentation only for the same package hash; no localization state is
+derived from a camera pose.
+
+Cross-floor routes no longer automatically explode the building. The explicit
+3D **Route overview** reveals the other route floors; 2D stays on the inspected
+floor. **Expand map / Show directions** gives narrow phones room to inspect
+the scene while preserving the existing directions and keyboard focus.
+
+The route renderer now uses adjacent graph edges instead of spline smoothing
+or floor-filtered joins. Context loss pauses the map with readable directions
+still available; restoration or a display retry retains the journey. Missing
+WebGL has an honest textual fallback, not a fake 3D view.
+
+See [implementation and validation notes](visitor-map-views.md). Device-specific
+performance/quality tiers, surveyed geometry clearance and usability trials are
+still open; this does not complete those acceptance gates or enable tracking.
 
 1. Use the same authored geometry and journey snapshot. Make 2D and 3D camera presets over one Visitor scene; keep Inspector separate.
 2. Animate camera tilt/zoom while retaining the active route revision, location floor, inspected instruction and follow/browse intent.
@@ -152,13 +256,13 @@ Acceptance: timed/expired closures, closed lifts, stale offline closure data, tw
 - Preserve the authored venue package as source of truth. IMDF can become an import/export boundary when a concrete integration needs it; it is not a prerequisite for better visitor guidance.
 - Preserve Inspector and Studio as operator surfaces. Visitor 3D is not the operator twin UI.
 - Do not choose anchor quantities or claim positioning accuracy until a physical pilot provides evidence.
-- Do not implement phases 2–8 in this first review slice. Next implementation should address the coordinate/motion contract in phase 2 before enabling automatic progress.
+- Keep each implementation bounded for review. Phase 2 begins with motion accounting; complete its remaining coordinate/heading and continuity gates before enabling automatic progress.
 
 ## Verification record
 
-Phase 1 is implemented locally and ready for review; phases 2–8 remain planned. No push or deployment was performed. The pre-existing operator welcome-overlay edit in `src/index.css` was preserved unchanged; new visitor styles live in `src/components/visitorJourney.css`.
+Phase 1 was completed and is now committed at `94ccc91`. Phase 2 slices A, B and C are implemented locally for review; the rest of Phase 2 and phases 3–8 remain planned. No push or deployment was performed. In Phase 1, the pre-existing operator welcome-overlay edit in `src/index.css` was preserved unchanged; new visitor styles live in `src/components/visitorJourney.css`.
 
-Final checks on 11 September 2026:
+Phase 1 checks on 11 September 2026:
 
 | Gate                                                                                                                      | Result                                                                                                                                      |
 | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -173,3 +277,69 @@ The new provider regression tests were also exercised against an isolated copy o
 Concurrent runs of the code and browser suites exceeded timing limits in an existing exhaustive route-matrix test and an exact-turn browser journey. The final complete gates above ran sequentially; assertions and existing test timeouts were not relaxed to obtain those passes. The build still reports its existing large-chunk warning, which remains a performance item for the later map/rendering work.
 
 Automated Chromium checks and desktop visual inspection do not establish real-phone positioning accuracy, Safari behavior, accessibility certification or obstacle safety. No live sensor-guided progress, world-anchored AR or dynamic obstacle avoidance is claimed by this slice.
+
+### Phase 2 slice A verification — 11 September 2026
+
+- Before implementation: all 15 new `motionAccounting.test.ts` regressions
+  failed against the unchanged filter from `94ccc91`.
+- After implementation: all 342 localization-core tests passed, including the
+  unchanged invalid-state, capture-integrity and evidence-policy refusals.
+- `npm run check` passed: lint, type checking, **708 tests across 75 files**,
+  all three venue hashes, artifact sync, reference replay, QR sheets and the
+  public production build. The existing large-chunk warning remains.
+- `node scripts/runBrowserSmoke.js --workers=1` passed **68 desktop/mobile
+  Chromium tests**, including the Visitor journey and operator regressions.
+- Project and browser suites ran sequentially; no assertions or timeouts were
+  relaxed. The separate offline/install browser suites were not rerun in this
+  core-only slice; their Phase 1 results above are historical.
+- No UI/sensor enrollment changes, venue recompile, new surveyed evidence,
+  commit, push or deployment. Changes remain local for review.
+
+### Phase 2 slice B verification — 11–12 September 2026
+
+- Before the preview change, three new regressions failed against the actual
+  unchanged component: relative alpha and magnetic compass produced false
+  “Aligned” claims, and an invalid negative compass reading was accepted.
+- Added **65 unit tests**: 32 coordinate/reference tests, 20 browser-reading
+  tests and 13 component/lifecycle tests. All passed.
+- `npm run check` passed: lint, type checking, **773 tests across 78 files**,
+  all three venue hashes, artifact sync, reference replay, QR sheets and public
+  production build. The existing large-chunk warning remains.
+- The full `node scripts/runBrowserSmoke.js --workers=1` run passed **70
+  desktop/mobile Chromium tests** before the final narrow-width extension.
+- The initial narrow-width assertion could pass after telemetry expired to
+  “Stale”. It was corrected to require “Uncalibrated” with continuously emitted
+  synthetic compass events. This failed against the unchanged stylesheet and
+  passed in both browser projects after the mobile readiness layout correction.
+- Four related desktop/mobile browser checks also passed after that correction:
+  narrow-width camera controls and returning to the same shared instruction.
+- Desktop 1280×800 and mobile 375×812 / 320×700 screenshots were inspected.
+  Synthetic camera streams and orientation events test UI behavior only, not
+  hardware accuracy or Safari support.
+- Offline/install suites were not rerun; their Phase 1 results are historical.
+  No automatic positioning, capture-schema migration, venue recompile, new
+  surveyed evidence, commit, push or deployment. Changes remain local for review.
+
+### Phase 2 slice C verification — 12 September 2026
+
+- All five initial position-only QR/NFC, marker-rotation and evidence-refusal
+  regressions failed against the actual unchanged code before implementation.
+  A direct-filter legacy initialization bypass and 14 unqualified calibration
+  cases were also reproduced before enforcing the shared boundary there.
+- Added **34 tests**. The final `npm run check` passed: lint, type checking,
+  **807 tests across 80 files**, all three unchanged venue hashes, artifact sync,
+  regenerated synthetic reference replay, QR sheets and public production build.
+  The existing large-chunk warning remains.
+- **Four targeted desktop/mobile Chromium tests passed** for round-tripping
+  between surfaces and opening operator/recorder routes directly, against the
+  production operator build. Command:
+  `node scripts/runBrowserSmoke.js e2e/layout.pw.ts e2e/public-shell.pw.ts --grep "every surface round-trips|operator routes stay reachable" --workers=1`.
+- The full 70-test browser suite and separate offline/install suites were not
+  rerun in this core-only slice; their results above remain historical. No
+  device sensor enrollment or UI layout change was made by slice C.
+- Existing motion/bounds fixtures explicitly declare synthetic calibration now;
+  their displacement and numeric safety guards remain exercised. Evidence
+  expectations reflect the intentional refusal of uncalibrated capture accuracy,
+  not a measured accuracy improvement.
+- Previous local work was preserved. No field capture or venue artifact was
+  rewritten, no commit/push/deployment was made, and Visitor tracking remains off.

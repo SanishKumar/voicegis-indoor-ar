@@ -148,7 +148,7 @@ describe('sealing from the command line', () => {
 
     const sealed = await runEvidenceCli(sealOptions());
     expect(sealed.action).toBe('sealed');
-    expect(sealed.artifact.evidence.status).toBe('ok');
+    expect(sealed.artifact.evidence.status).toBe('unverified-heading');
 
     const verified = await runEvidenceCli(verifyOptions());
     expect(verified.action).toBe('verified');
@@ -302,13 +302,14 @@ describe('what the tool treats as failure', () => {
     expect(describeOutcome(outcome)).toContain('1 of 2 predeclared scored checkpoint(s)');
   });
 
-  it('says nothing extra when the walk produced a figure', async () => {
+  it('explains that missing heading prevents a figure without failing the tool', async () => {
     await writeInputs();
 
     const described = describeOutcome(await runEvidenceCli(sealOptions()));
 
-    expect(described.split('\n')).toHaveLength(1);
-    expect(described).toContain('status=ok');
+    expect(described.split('\n')).toHaveLength(2);
+    expect(described).toContain('status=unverified-heading');
+    expect(described).toContain('not a failure of this tool');
   });
 
   it('refuses a manifest written for another venue, naming the reason', async () => {

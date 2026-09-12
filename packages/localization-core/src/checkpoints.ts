@@ -27,7 +27,7 @@ export interface CheckpointAdapterConfig {
   qrAccuracyMeters: number;
   /** NFC only couples within a few centimetres, so the fix is tighter. */
   nfcAccuracyMeters: number;
-  /** Presenting a device to a marker constrains heading, but loosely. */
+  /** Retained for legacy configuration fingerprints; never used to measure phone heading. */
   headingAccuracyDegrees: number;
   floorConfidence: number;
   elevationByFloorId: Record<string, number>;
@@ -79,17 +79,15 @@ export interface CheckpointResolution {
   observations: LocalizationObservation[];
 }
 
-function normalizeHeading(degrees: number) {
-  const wrapped = degrees % 360;
-  return wrapped < 0 ? wrapped + 360 : wrapped;
-}
-
 /**
  * Turns a scanned QR or NFC checkpoint into observations the localization
  * filter already understands.
  *
+ * Position-only recording adapter. Authored marker orientation is not phone
+ * orientation and is deliberately never read here. This is not a pose adapter.
+ *
  * The first accepted scan produces the initial fix the filter requires; every
- * later scan produces a position, heading, and floor correction. A scan that
+ * later scan produces a position and floor correction. A scan that
  * cannot be resolved to exactly one anchor is rejected rather than guessed:
  * a payload that identifies two anchors would silently teleport a visitor, so
  * ambiguity fails closed the same way the mapping workspace refuses to publish
@@ -143,7 +141,6 @@ export class CheckpointAdapter {
     if (anchor.kind !== scan.kind) return this.reject('anchor-kind-mismatch', anchor.id);
 
     const accuracyMeters = this.accuracyFor(scan.kind);
-    const headingDegrees = normalizeHeading(anchor.headingDegrees);
     const elevationMeters = this.config.elevationByFloorId[anchor.floorId] ?? 0;
     const observations: LocalizationObservation[] = [];
 
@@ -156,9 +153,9 @@ export class CheckpointAdapter {
         position: [...anchor.position] as [number, number],
         floorId: anchor.floorId,
         elevationMeters,
-        headingDegrees,
+        headingDegrees: null,
         accuracyMeters,
-        headingAccuracyDegrees: this.config.headingAccuracyDegrees,
+        headingAccuracyDegrees: null,
       });
       this.initialized = true;
     } else {
@@ -169,14 +166,6 @@ export class CheckpointAdapter {
         source: 'manual-anchor',
         position: [...anchor.position] as [number, number],
         accuracyMeters,
-      });
-      observations.push({
-        kind: 'heading',
-        sequence: this.sequence++,
-        timeMs: scan.timeMs,
-        source: 'manual-anchor',
-        headingDegrees,
-        accuracyDegrees: this.config.headingAccuracyDegrees,
       });
       observations.push({
         kind: 'floor',

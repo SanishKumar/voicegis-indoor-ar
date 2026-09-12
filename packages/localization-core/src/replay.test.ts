@@ -13,14 +13,14 @@ describe('localization replay', () => {
     expect(second).toEqual(first);
     expect(first.report).toMatchObject({
       sessionId: 'synthetic-reference-corridor-001',
-      observationCount: 7,
+      observationCount: 8,
       checkpointCount: 3,
       mapMatching: {
-        acceptedCount: 7,
+        acceptedCount: 8,
         rejectedCount: 0,
       },
       runtime: {
-        guidanceFrozenFrames: 0,
+        guidanceFrozenFrames: 1,
       },
     });
   });

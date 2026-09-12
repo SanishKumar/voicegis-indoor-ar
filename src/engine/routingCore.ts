@@ -57,6 +57,7 @@ export interface RouteStep {
   instruction: string;
   distance: number;
   nodeId: string;
+  /** Clockwise from plan-up (-Y); not true or magnetic north. */
   bearing: number;
   floorId?: string | number;
 }

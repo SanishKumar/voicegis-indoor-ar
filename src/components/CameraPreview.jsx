@@ -21,6 +21,8 @@ import {
 import { useNavigation, VIEW_TYPE, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { STEP_TYPE } from '../engine/routingEngine';
 import { formatDistance } from '../data/buildingConfig.js';
+import { readPreviewHeading, PREVIEW_HEADING_MAX_AGE_MS } from '../capture/previewHeading';
+import { signedHeadingDifference } from '../navigation/coordinateFrames';
 
 export default function CameraPreview() {
   const { state, actions } = useNavigation();
@@ -52,6 +54,7 @@ export default function CameraPreview() {
       route={route}
       currentStepIndex={currentStepIndex}
       actions={actions}
+      venueKey={state.venueKey}
     />
   );
 }
@@ -70,9 +73,12 @@ function CameraPreviewInner({
   route,
   currentStepIndex,
   actions,
+  venueKey,
 }) {
   const [headingState, setHeadingState] = useState('idle');
-  const [headingDegrees, setHeadingDegrees] = useState(null);
+  const [headingEnabled, setHeadingEnabled] = useState(false);
+  const [headingPreview, setHeadingPreview] = useState(null);
+  const headingRequestRef = useRef(0);
   const controlsRef = useRef(null);
 
   useEffect(() => {
@@ -95,52 +101,104 @@ function CameraPreviewInner({
     };
   }, []);
 
-  const routeBearing = Number.isFinite(currentStep?.bearing) ? currentStep.bearing : null;
+  const directionalStep =
+    currentStep &&
+    [
+      STEP_TYPE.START,
+      STEP_TYPE.STRAIGHT,
+      STEP_TYPE.TURN_LEFT,
+      STEP_TYPE.TURN_RIGHT,
+      STEP_TYPE.SLIGHT_LEFT,
+      STEP_TYPE.SLIGHT_RIGHT,
+      STEP_TYPE.U_TURN,
+    ].includes(currentStep.type) &&
+    currentStep.distance > 0;
+  const routeBearing =
+    directionalStep && Number.isFinite(currentStep.bearing) ? currentStep.bearing : null;
+  const planHeading = headingPreview?.planHeading;
   const headingDelta =
-    headingDegrees !== null && routeBearing !== null
-      ? normalizeDegrees(routeBearing - headingDegrees)
+    planHeading?.status === 'known' && routeBearing !== null
+      ? signedHeadingDifference(routeBearing, planHeading.degrees)
       : null;
   const stepCount = route?.steps?.length ?? 0;
   const routeProgress = stepCount > 0 ? ((currentStepIndex + 1) / stepCount) * 100 : 0;
 
   const enableHeading = async () => {
+    const request = ++headingRequestRef.current;
+    setHeadingPreview(null);
+    if (document.visibilityState === 'hidden') {
+      setHeadingState('paused');
+      return;
+    }
     if (typeof window.DeviceOrientationEvent === 'undefined') {
       setHeadingState('unavailable');
       return;
     }
 
+    setHeadingState('requesting');
     try {
       const OrientationEvent = window.DeviceOrientationEvent;
       if (typeof OrientationEvent.requestPermission === 'function') {
-        const permission = await OrientationEvent.requestPermission();
+        const permission = await OrientationEvent.requestPermission(true);
+        if (request !== headingRequestRef.current) return;
         if (permission !== 'granted') {
           setHeadingState('denied');
           return;
         }
       }
+      if (request !== headingRequestRef.current || document.visibilityState === 'hidden') return;
+      setHeadingEnabled(true);
       setHeadingState('listening');
     } catch {
-      setHeadingState('denied');
+      if (request === headingRequestRef.current) setHeadingState('denied');
     }
   };
 
   useEffect(() => {
-    if (headingState !== 'listening' && headingState !== 'active') return undefined;
+    // Also cancels a pending permission request; resuming the page requires
+    // another explicit opt-in instead of reviving stale directional telemetry.
+    const pause = () => {
+      if (document.visibilityState !== 'hidden') return;
+      headingRequestRef.current += 1;
+      setHeadingEnabled(false);
+      setHeadingPreview(null);
+      setHeadingState('paused');
+    };
+    document.addEventListener('visibilitychange', pause);
+    return () => {
+      headingRequestRef.current += 1;
+      document.removeEventListener('visibilitychange', pause);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!headingEnabled || !isNavigating || cameraError) return undefined;
+    let lastEventTime = performance.now();
 
     const handleOrientation = (event) => {
-      const compassHeading = Number.isFinite(event.webkitCompassHeading)
-        ? event.webkitCompassHeading
-        : Number.isFinite(event.alpha)
-          ? (360 - event.alpha + 360) % 360
-          : null;
-      if (compassHeading === null) return;
-      setHeadingDegrees(compassHeading);
-      setHeadingState('active');
+      if (document.visibilityState === 'hidden') return;
+      const nowMs = performance.now();
+      lastEventTime = Math.min(nowMs, event.timeStamp);
+      setHeadingPreview(readPreviewHeading(event, nowMs, venueKey));
     };
 
     window.addEventListener('deviceorientation', handleOrientation, true);
-    return () => window.removeEventListener('deviceorientation', handleOrientation, true);
-  }, [headingState]);
+    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+    const watchdog = window.setInterval(() => {
+      if (
+        !Number.isFinite(lastEventTime) ||
+        performance.now() - lastEventTime > PREVIEW_HEADING_MAX_AGE_MS
+      ) {
+        setHeadingPreview(null);
+        setHeadingState('stale');
+      }
+    }, 250);
+    return () => {
+      window.clearInterval(watchdog);
+      window.removeEventListener('deviceorientation', handleOrientation, true);
+      window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
+    };
+  }, [cameraError, headingEnabled, isNavigating, venueKey]);
 
   useEffect(() => {
     if (!isNavigating) return undefined;
@@ -315,15 +373,21 @@ function CameraPreviewInner({
             <Compass size={13} />
             <span>Heading</span>
             <strong>
-              {headingDegrees !== null
-                ? `${Math.round(headingDegrees)}°`
+              {headingPreview !== null
+                ? headingPreview.label
                 : headingState === 'denied'
                   ? 'Denied'
                   : headingState === 'unavailable'
                     ? 'Unavailable'
-                    : headingState === 'listening'
-                      ? 'Waiting'
-                      : 'Not enabled'}
+                    : headingState === 'paused'
+                      ? 'Paused'
+                      : headingState === 'stale'
+                        ? 'Stale'
+                        : headingState === 'requesting'
+                          ? 'Requesting'
+                          : headingState === 'listening'
+                            ? 'Waiting'
+                            : 'Not enabled'}
             </strong>
           </div>
           <div>
@@ -384,10 +448,23 @@ function CameraPreviewInner({
           <Map size={16} />
           Exit to plan
         </button>
-        {isNavigating && !cameraError && headingDegrees === null && (
-          <button className="camera-preview-control heading" onClick={enableHeading}>
+        {isNavigating && !cameraError && (
+          <button
+            className="camera-preview-control heading"
+            disabled={headingState === 'requesting'}
+            onClick={
+              headingEnabled
+                ? () => {
+                    headingRequestRef.current += 1;
+                    setHeadingEnabled(false);
+                    setHeadingPreview(null);
+                    setHeadingState('idle');
+                  }
+                : enableHeading
+            }
+          >
             <Compass size={16} />
-            {headingState === 'listening' ? 'Move device' : 'Enable heading'}
+            {headingEnabled ? 'Disable heading' : 'Enable heading'}
           </button>
         )}
         {isNavigating && (
@@ -411,10 +488,6 @@ function CameraPreviewInner({
       </div>
     </div>
   );
-}
-
-function normalizeDegrees(value) {
-  return ((value + 540) % 360) - 180;
 }
 
 function drawPreviewOverlay(context, viewport, step, headingDelta) {

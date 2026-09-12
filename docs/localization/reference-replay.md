@@ -4,7 +4,7 @@
 
 This is a deterministic software regression fixture. It is **not** a measured indoor-localization result.
 
-The recording simulates a five-metre eastbound walk along the ground-floor corridor in the synthetic reference building. Observations include an explicit initial fix, step displacement, heading, and one synthetic visual-anchor correction. No camera frames are stored.
+The recording simulates a five-metre eastbound walk along the ground-floor corridor in the synthetic reference building. Recording 0.2 includes a position-only initial fix, separately declared synthetic travel-axis calibration, step displacement, inertial heading and one synthetic visual-anchor correction. No camera frames are stored.
 
 ## Reproduce
 
@@ -22,18 +22,25 @@ The report is regenerated from the observation stream and compared byte-for-byte
 
 ## Current result
 
-- Observations: 7
+- Observations: 8
 - Ground-truth checkpoints: 3
-- Quality frames: 4 high, 3 degraded, 0 lost
-- Median horizontal checkpoint error: 0.053 m
-- p95 horizontal checkpoint error: 0.056 m
-- Floor accuracy: 1.0
-- Route matches accepted: 7
+- Quality frames: 5 high, 3 degraded, 0 lost
+- Horizontal errors and floor accuracy: withheld (`null`)
+- Route matches accepted: 8
 - Route matches rejected: 0
-- Runtime frames: 4 tracking, 3 degraded, 0 lost/relocalizing
-- Guidance-frozen frames: 0
+- Runtime frames: 1 initializing, 4 tracking, 3 degraded, 0 lost/relocalizing
+- Guidance-frozen frames: 1
 
-These small errors are expected because both the simulated observations and checkpoints follow the same constructed straight path. They must not be quoted as device, venue, or real-world accuracy.
+The public replay reports `unofficial-recording` and withholds aggregate and
+per-checkpoint errors. A bare observation stream has no independently surveyed
+provenance. Earlier numeric results in this document were synthetic calculations,
+not device, venue, or real-world accuracy.
+
+Processor 0.4 / policy 0.3 additionally withhold accuracy from raw capture 0.2,
+which has no independent calibration event. See the
+[position-only recording migration](position-only-recording.md). Numeric heading
+and its uncertainty are null until calibration; the initial frozen frame is
+deliberate. Old recording 0.1 inputs cannot be fixed by changing the version tag.
 
 ## Filter contract
 
@@ -50,6 +57,26 @@ The matcher retains each raw estimate and projects it only to a same-floor route
 Runtime state is distinct from filter quality. Lost quality freezes guidance, and a later plausible estimate enters `relocalizing` rather than silently resuming. A recent trusted visual or manual anchor must explicitly confirm recovery; that transition records anchor identity and recovery duration.
 
 The filter rejects a stream that does not begin with an initial fix or moves backward in time. Quality becomes lost when uncertainty or correction age crosses configured limits.
+
+### Step-driven motion (processor 0.3.0)
+
+Each step applies its full displacement exactly once. Heading-only and floor
+observations do not translate the horizontal position; a position fix can correct
+it but cannot establish continued walking. No position is extrapolated across an
+observation gap. Velocity describes a step's interval only; other frames return
+zero, which means no velocity observation rather than proven physical stillness.
+
+The existing covariance-aging model and quality thresholds are retained. Holding
+the position mean does not hold uncertainty or renew the last position correction.
+The filter is observation-driven: it does not have a wall-clock watchdog while
+no events arrive. A future live adapter must freeze guidance on stale input or
+interruption immediately; this change alone is not that adapter.
+
+`motionAccounting.test.ts` includes deterministic stop/turn/gap, cadence,
+correction and IMU-to-replay regressions. All 15 cases failed on the prior filter.
+The IMU sample reducer, peak detector, heading provenance, map/compass transform
+and floor-transition policy remain separate unfinished work; these regressions
+do not validate phone carriage, wheelchair motion or sensor accuracy.
 
 ## Evidence still required
 

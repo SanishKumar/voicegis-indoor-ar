@@ -101,6 +101,93 @@ test('a first-time visitor names a destination, then a start, and gets a route',
   await expect(page.getByText('Outpatient Pharmacy', { exact: true }).first()).toBeVisible();
 });
 
+test('camera heading stays uncalibrated and its controls remain reachable', async ({
+  page,
+}, testInfo) => {
+  // Controlled browser events test UI semantics, not sensor accuracy.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      value: async () => new MediaStream(),
+    });
+    Object.defineProperty(window, 'DeviceOrientationEvent', {
+      value: class {
+        static requestPermission() {
+          return Promise.resolve('granted');
+        }
+      },
+    });
+    for (const name of ['deviceorientation', 'deviceorientationabsolute']) {
+      window.addEventListener(
+        name,
+        (event) => {
+          if (event.isTrusted) event.stopImmediatePropagation();
+        },
+        true,
+      );
+    }
+  });
+  await openPharmacyRoute(page);
+  await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
+  await page.getByRole('button', { name: 'Which way?' }).click();
+  const telemetry = page.getByRole('complementary', { name: 'Guidance readiness' });
+  await expect(telemetry).toContainText('Not enabled');
+  await page.getByRole('button', { name: 'Enable heading' }).click();
+  await expect(page.getByRole('button', { name: 'Disable heading' })).toBeVisible();
+  await page.evaluate(() => {
+    const event = new Event('deviceorientation');
+    Object.defineProperties(event, {
+      alpha: { value: 270 },
+      absolute: { value: false },
+      timeStamp: { value: performance.now() },
+    });
+    window.dispatchEvent(event);
+  });
+  await expect(telemetry).toContainText('Relative only');
+  await expect(page.locator('.camera-preview-step-kicker span')).toHaveCount(0);
+  const compassTimer = await page.evaluate(() => {
+    const emitCompass = () => {
+      const event = new Event('deviceorientation');
+      Object.defineProperties(event, {
+        webkitCompassHeading: { value: 90 },
+        webkitCompassAccuracy: { value: 5 },
+        timeStamp: { value: performance.now() },
+      });
+      window.dispatchEvent(event);
+    };
+    emitCompass();
+    return window.setInterval(emitCompass, 100);
+  });
+  await expect(telemetry).toContainText('Uncalibrated');
+  await expect(page.locator('.camera-preview-step-kicker span')).toHaveCount(0);
+  await expectCenterHitTarget(page.getByRole('button', { name: 'Disable heading' }));
+  await expectCenterHitTarget(page.getByRole('button', { name: 'Exit to plan' }));
+  await page.screenshot({ path: testInfo.outputPath('heading-uncalibrated.png') });
+  await page.setViewportSize({ width: 320, height: 700 });
+  await expect
+    .poll(() =>
+      telemetry.evaluate((panel) => {
+        const bounds = panel.getBoundingClientRect();
+        return (
+          panel.textContent?.includes('Uncalibrated') &&
+          [...panel.querySelectorAll('div, span, strong')].every((element) => {
+            const box = element.getBoundingClientRect();
+            return box.left >= bounds.left && box.right <= bounds.right;
+          })
+        );
+      }),
+    )
+    .toBe(true);
+  await expectCenterHitTarget(page.getByRole('button', { name: 'Disable heading' }));
+  await expectCenterHitTarget(page.getByRole('button', { name: 'Exit to plan' }));
+  await expect(telemetry).toContainText('Uncalibrated');
+  await page.screenshot({ path: testInfo.outputPath('heading-320px.png') });
+  await page.getByRole('button', { name: 'Disable heading' }).click();
+  await expect(telemetry).toContainText('Not enabled');
+  await page.evaluate((timer) => window.clearInterval(timer), compassTimer);
+  await page.getByRole('button', { name: 'Exit to plan' }).click();
+  await expect(page.locator('.compiled-map')).toBeVisible();
+});
+
 test('a verified check-in drives fastest and step-free routes through different connectors', async ({
   page,
 }) => {
@@ -220,7 +307,7 @@ test('Escape closes only the topmost dialog and restores focus', async ({ page }
   await expect(trigger).toBeFocused();
 });
 
-test('the stack opens only when the route actually crosses storeys', async ({ page }) => {
+test('the stack requires a cross-floor route and an explicit 3D overview', async ({ page }) => {
   await precompleteOnboarding(page);
   await page.goto('/#/visitor');
   const map = page.locator('.compiled-map');
@@ -244,12 +331,25 @@ test('the stack opens only when the route actually crosses storeys', async ({ pa
 
   await page.getByRole('button', { name: 'Cancel' }).click();
 
-  // Level 2: the route has to climb, and the stack is what shows that.
+  // A route that climbs still starts with just the floor being inspected.
   await routeTo('Maternity Clinic');
   const crossed = Number(await map.getAttribute('data-route-floors'));
   expect(crossed).toBeGreaterThan(1);
+  await expect(map).toHaveAttribute('data-floors-shown', '1');
+  await page.getByRole('button', { name: '3D model', exact: true }).click();
+  await expect(map).toHaveAttribute('data-floors-shown', '1');
+  await page.getByRole('button', { name: 'Route overview', exact: true }).click();
   // The scene's own count, not the route's: this is what proves it stacked.
   await expect
     .poll(async () => Number(await map.getAttribute('data-floors-shown')))
     .toBeGreaterThan(1);
+  await page.getByRole('button', { name: '2D plan', exact: true }).click();
+  await expect(map).toHaveAttribute('data-floors-shown', '1');
+  await page.getByRole('button', { name: '3D model', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Route overview', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Route overview', exact: true }).click();
+  await expect(map).toHaveAttribute('data-floors-shown', '1');
 });

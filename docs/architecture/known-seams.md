@@ -3,6 +3,66 @@
 Deliberately unfinished work, recorded so it is not rediscovered as a bug. Each
 entry says what is incomplete, why it was left, and what finishing it involves.
 
+## Visitor localization is not ready for automatic guidance
+
+The first motion-safety slice (processor 0.3.0, 11 September 2026) removes
+constant-velocity extrapolation from the filter's position mean. Each observed
+stride is counted once; heading/floor updates cannot keep a stopped visitor
+moving, and a long observation gap does not become accumulated travel. The
+existing uncertainty-aging model remains deliberately unchanged and uncalibrated.
+
+This does **not** finish the localization contract:
+
+- Slice B now defines a tested Visitor plan/filter reflection and heading
+  reference boundary (`src/navigation/coordinateFrames.ts`). It is not connected
+  to recorded or live positions. Existing venue north offsets are not promoted
+  to measured calibration; the venue's alignment provenance is still missing.
+- Slice C makes `CheckpointAdapter` position-only and removes scan-to-gyro heading
+  resets. Recording 0.2 requires a separate venue-bound travel calibration;
+  unknown heading freezes movement/guidance. Raw capture 0.2 has no such event,
+  so processor 0.4 / policy 0.3 withhold its accuracy (`unverified-heading` when
+  otherwise eligible). A versioned raw calibration/pose event remains required.
+- `DeadReckoningIntegrator` can integrate yaw across missing samples and retain
+  an incomplete acceleration peak across interruptions. Unresolved heading
+  samples are counted but stale heading can still be re-emitted, and steps can
+  still be produced against it. It needs a continuity/reset contract.
+- Replay quality ages only when an observation arrives. A live session needs
+  explicit permission/lifecycle handling and a staleness watchdog, not a timer
+  that extrapolates the last stride's velocity.
+- The route matcher lacks forward-jump and ambiguity gates; the current floor
+  observation threshold is not a verified stairs/lift transition policy.
+
+The camera preview now refuses relative/unqualified compass alignment, and its
+optional heading diagnostics expire or pause instead of retaining stale values.
+That preview lifecycle does not fix the separate IMU/recording continuity path.
+See [the Visitor heading contract](../localization/visitor-heading-contract.md).
+The [position-only recording migration](../localization/position-only-recording.md)
+explains legacy-file refusals, calibration declarations and null heading.
+
+Keep Visitor tracking checkpoint-only until these gates and device/venue tests
+are satisfied. The remaining sequence is in
+[the visitor plan](../visitor-experience-plan.md#2-establish-the-localization-contract-and-replay-safety).
+
+## Visitor 2D/3D switching is presentation, not tracking
+
+The Visitor uses one authored scene with flat and tilted orthographic camera
+presets. Camera focus, zoom and map bearing survive switching; the independent
+journey retains its instruction, route, selected floor and checkpoint. An
+explicit route overview shows exploded floors in 3D only. View memory is local
+to the Visitor shell and bound to the package hash; it is not persisted across
+reloads and does not restore a pose from another venue. Inspector stays separate.
+
+The renderer no longer smooths route corners or joins separate visits to the
+same floor. Centre lines follow adjacent graph edges; the width of a rendered
+line is not a certified clearance envelope. Context-loss recovery and a written
+directions fallback are covered in Chromium, not yet on physical iOS/Android
+devices. There is no adaptive GPU quality tier or handset performance budget
+yet. The compact route sheet still needs the broader cartographic/UX refinement
+in phase 4; an explicit Expand map action gives the model the available screen.
+
+Return to interrupted IMU continuity after independent review of this slice.
+See [map-view validation notes](../visitor-map-views.md).
+
 ## Nothing dates a checkpoint manifest before the walk it governs
 
 Eligibility used to be entirely self-declared: every rule deciding whether a

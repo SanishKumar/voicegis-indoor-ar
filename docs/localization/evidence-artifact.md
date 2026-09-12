@@ -3,9 +3,10 @@
 ## Scope
 
 This describes the tool, not a result. **No real walk has been captured yet.**
-Every artifact this repository can currently produce is sealed from a synthetic
-capture, and its error figures are properties of a constructed path rather than
-of any device, venue, or building. Nothing here may be quoted as accuracy.
+Every fixture is synthetic. Current processor 0.4 / policy 0.3 withhold accuracy
+from raw capture 0.2 because it records no independent travel-heading calibration.
+Earlier synthetic error figures were properties of a constructed path, not of
+any device, venue or building. Nothing here may be quoted as accuracy.
 
 The artifact exists so that when a real number does arrive, it arrives naming
 the inputs that produced it.
@@ -65,7 +66,7 @@ running build itself emits, so an artifact sealed under an earlier version is
 rejected before its seal is ever recomputed:
 
 ```text
-versions.processor: must be 0.2.0, which is what this build can interpret.
+versions.processor: must be 0.4.0, which is what this build can interpret.
 ```
 
 The bytes may be perfectly intact; this build simply declines to vouch for a
@@ -79,10 +80,22 @@ deliberately outside v0.1.
 
 ## Versions move when the numbers can
 
-`versions.processor` is `0.2.0` and `versions.policy` is `0.2.0` as of the
-orientation slice. Both were bumped because heading is now projected through the
-device's tilt and the declared angular-rate units are finally applied, either of
-which can move a figure derived from an unchanged capture.
+`versions.processor` is **0.4.0**, `versions.policy` is **0.3.0**, and the derived
+recording is **0.2.0** after the position-only checkpoint slice. Scans no longer
+supply handset direction. Uncalibrated strides are retained as observations but
+cannot move the position mean. The raw capture remains 0.2.0 and has no independent
+travel-heading calibration event, so even otherwise eligible walks report
+`unverified-heading` with null aggregate accuracy and no checkpoint errors.
+Sealing records the refusal; verification rejects a fabricated `ok` status.
+See [the migration contract](position-only-recording.md).
+
+No sensor model or accuracy evidence was newly admitted. Earlier processor/policy
+artifacts require their original build for verification; do not relabel or
+overwrite them as though nothing changed. The preceding processor 0.3 motion
+slice removed velocity extrapolation between strides, and that rule remains.
+
+In the preceding orientation slice, processor and policy moved to 0.2.0 because
+heading projection began using device tilt and declared angular-rate units.
 
 Neither says who sealed anything. Authorship needs a signature and is
 deliberately outside v0.1.

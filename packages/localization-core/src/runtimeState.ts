@@ -58,6 +58,12 @@ export class LocalizationRuntimeController {
       return this.snapshot(estimate.timeMs);
     }
 
+    if (estimate.headingDegrees === null) {
+      if (this.state !== 'lost' && this.state !== 'relocalizing') this.state = 'initializing';
+      this.reason = 'Position is available but travel direction is unverified; spatial guidance is frozen.';
+      return this.snapshot(estimate.timeMs);
+    }
+
     if (this.state === 'lost' || this.state === 'relocalizing') {
       this.state = 'relocalizing';
       this.reason =
@@ -86,6 +92,9 @@ export class LocalizationRuntimeController {
   }
 
   confirmRelocalization(estimate: LocalizationEstimate, anchorId: string): RuntimeSnapshot {
+    if (estimate.headingDegrees === null) {
+      throw new Error('Relocalization confirmation requires independently established heading.');
+    }
     if (this.state !== 'relocalizing') {
       throw new Error('Relocalization confirmation requires the relocalizing state.');
     }

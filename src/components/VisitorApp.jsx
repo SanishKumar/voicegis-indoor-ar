@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { VISITOR_VIEW, visitorViewFor } from '../context/visitorView.ts';
 import CameraPreview from './CameraPreview.jsx';
@@ -22,6 +22,10 @@ export default function VisitorApp() {
     setShowLocationPicker,
   } = useNavigation();
   const previousOnboardingCompleteRef = useRef(onboardingComplete);
+  // Camera presentation survives a camera-preview visit, never a venue change.
+  const mapViewMemory = useRef(null);
+  const [expandedRoute, setExpandedRoute] = useState(null);
+  const mapExpanded = state.route?.found === true && expandedRoute === state.route;
 
   useEffect(() => {
     const previous = previousOnboardingCompleteRef.current;
@@ -68,11 +72,33 @@ export default function VisitorApp() {
         {visitorViewFor(state.activeView) === VISITOR_VIEW.MAP && (
           <>
             <Suspense fallback={<div className="map-loading">Loading the venue model…</div>}>
-              <VisitorMap />
+              <VisitorMap key={state.venueKey} viewMemory={mapViewMemory} />
             </Suspense>
             <SearchPanel />
             <POICard />
-            <NavigationPanel />
+            <div className="visitor-directions-layer" hidden={mapExpanded}>
+              <NavigationPanel
+                onExpandMap={() => {
+                  setExpandedRoute(state.route);
+                  window.requestAnimationFrame(() =>
+                    document.getElementById('btn-show-directions')?.focus(),
+                  );
+                }}
+              />
+            </div>
+            {mapExpanded && (
+              <button
+                id="btn-show-directions"
+                className="visitor-map-return"
+                type="button"
+                onClick={() => {
+                  setExpandedRoute(null);
+                  window.requestAnimationFrame(() => document.getElementById('nav-panel')?.focus());
+                }}
+              >
+                Show directions
+              </button>
+            )}
           </>
         )}
         <CameraPreview />

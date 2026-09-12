@@ -9,15 +9,22 @@ const initial = {
   position: [1, 9] as [number, number],
   floorId: 'g',
   elevationMeters: 0,
-  headingDegrees: 90,
+  headingDegrees: null,
   accuracyMeters: 0.25,
-  headingAccuracyDegrees: 5,
+  headingAccuracyDegrees: null,
 };
+
+function initialize(filter: LocalizationFilter) {
+  filter.apply(initial);
+  filter.apply({ kind: 'heading-calibration', sequence: 1, timeMs: 0, source: 'replay',
+    headingDegrees: 90, accuracyDegrees: 5, reference: 'filter-local', axis: 'travel',
+    buildingId: 'synthetic', packageHash: 'synthetic-filter-test', provenanceId: 'constructed-eastbound-axis' });
+}
 
 describe('localization filter', () => {
   it('advances pedestrian motion in heading direction with explicit covariance', () => {
-    const filter = new LocalizationFilter();
-    filter.apply(initial);
+    const filter = new LocalizationFilter({}, { buildingId: 'synthetic', packageHash: 'synthetic-filter-test' });
+    initialize(filter);
     const estimate = filter.apply({
       kind: 'step',
       sequence: 1,
@@ -36,8 +43,8 @@ describe('localization filter', () => {
   });
 
   it('uses a position correction to reduce uncertainty', () => {
-    const filter = new LocalizationFilter();
-    filter.apply(initial);
+    const filter = new LocalizationFilter({}, { buildingId: 'synthetic', packageHash: 'synthetic-filter-test' });
+    initialize(filter);
     const predicted = filter.apply({
       kind: 'step',
       sequence: 1,
@@ -62,8 +69,8 @@ describe('localization filter', () => {
   });
 
   it('publishes lost quality when correction age and uncertainty exceed limits', () => {
-    const filter = new LocalizationFilter();
-    filter.apply(initial);
+    const filter = new LocalizationFilter({}, { buildingId: 'synthetic', packageHash: 'synthetic-filter-test' });
+    initialize(filter);
     const estimate = filter.apply({
       kind: 'heading',
       sequence: 1,
@@ -77,7 +84,7 @@ describe('localization filter', () => {
   });
 
   it('rejects observations before initialization and out-of-order time', () => {
-    const filter = new LocalizationFilter();
+    const filter = new LocalizationFilter({}, { buildingId: 'synthetic', packageHash: 'synthetic-filter-test' });
     expect(() =>
       filter.apply({
         kind: 'heading',
@@ -89,7 +96,7 @@ describe('localization filter', () => {
       }),
     ).toThrow('initial fix');
 
-    filter.apply(initial);
+    initialize(filter);
     expect(() =>
       filter.apply({
         kind: 'heading',

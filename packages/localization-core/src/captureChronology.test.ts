@@ -628,7 +628,7 @@ describe('evidence requires a capture that records its own end', () => {
 
     const closed = walkWithMark();
     closed.recordLifecycle('session-end', 3_100);
-    expect(buildEvidenceReport(closed.buildSession()).report.evidenceStatus).toBe('ok');
+    expect(buildEvidenceReport(closed.buildSession()).report.evidenceStatus).toBe('unverified-heading');
   });
 
   it('places incompleteness after sensor support and before localization', () => {
@@ -744,7 +744,7 @@ describe('a scan outcome is checked against the anchors it claims', () => {
 
   it('refuses a fabricated reset against an anchor that does not exist', () => {
     const session = closedWalkWith(2_500, 2_000);
-    expect(buildEvidenceReport(session).report.evidenceStatus).toBe('ok');
+    expect(buildEvidenceReport(session).report.evidenceStatus).toBe('unverified-heading');
 
     // An ordinary sample relabelled as a reset at the mark's instant wrongly
     // excluded a real mark as an ambiguous tie.

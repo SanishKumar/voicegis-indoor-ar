@@ -698,7 +698,7 @@ describe('fail-closed evaluation boundary', () => {
   it('publishes eligibility, survey and alignment provenance alongside the figure', () => {
     const evidence = buildEvidenceReport(recordWalk().buildSession());
 
-    expect(evidence.report.evidenceStatus).toBe('ok');
+    expect(evidence.report.evidenceStatus).toBe('unverified-heading');
     expect(evidence.eligibility.publishable).toBeGreaterThan(0);
     expect(evidence.survey.methods['tape-measure']).toBeGreaterThan(0);
     expect(evidence.survey.worstExpectedAccuracyMeters).toBeLessThanOrEqual(0.25);
@@ -769,8 +769,8 @@ describe('fail-closed evaluation boundary', () => {
     // an unrecorded transform or a relabel. Neither is evidence.
     expect(withSensors({ api: 'devicemotion' }).evidenceStatus).toBe('unsupported-sensor-model');
     expect(withSensors({ api: 'generic-sensor' }).evidenceStatus).toBe('unsupported-sensor-model');
-    // Only the explicitly supported native world-frame path publishes.
-    expect(withSensors({}).evidenceStatus).toBe('ok');
+    // A supported gyro frame still cannot supply an independent travel heading.
+    expect(withSensors({}).evidenceStatus).toBe('unverified-heading');
   });
 
   it('stays non-throwing for every combination of blocking conditions', () => {
@@ -844,7 +844,7 @@ describe('fail-closed evaluation boundary', () => {
     };
 
     // A 999 ms silence is tolerated; 1000 ms is not.
-    expect(build(1_099)).toBe('ok');
+    expect(build(1_099)).toBe('unverified-heading');
     expect(build(1_100)).toBe('interrupted-capture');
   });
 
@@ -1129,8 +1129,9 @@ describe('capture export and derivation', () => {
 
     expect(recording.observations[0].kind).toBe('initial-fix');
     expect(report.checkpointCount).toBe(1);
-    expect(Number.isFinite(report.medianHorizontalErrorMeters)).toBe(true);
-    expect(Number.isFinite(report.p95HorizontalErrorMeters)).toBe(true);
+    expect(report.evidenceStatus).toBe('unverified-heading');
+    expect(report.medianHorizontalErrorMeters).toBeNull();
+    expect(report.p95HorizontalErrorMeters).toBeNull();
   });
 
   it('re-derives a stored walk under different tuning without touching the capture', () => {

@@ -1,4 +1,4 @@
-import type { HeadingObservation, LocalizationObservation, StepObservation } from './types';
+import type { HeadingObservation, HeadingUnavailableObservation, LocalizationObservation, StepObservation } from './types';
 
 /**
  * One inertial sample, already reduced to the two scalars dead reckoning needs.
@@ -79,9 +79,8 @@ function normalizeHeading(degrees: number) {
  * already consumes.
  *
  * Dead reckoning drifts without bound on its own, so this deliberately produces
- * only relative motion. Absolute truth comes from checkpoints: `syncHeading` is
- * called when a scan resolves, which re-seeds the integrated heading and stops
- * gyro bias accumulating across the whole walk.
+ * only relative motion. A decoded checkpoint cannot seed direction. An explicit
+ * independent calibration is required; the legacy capture stream has none.
  *
  * Step detection is a peak detector over the gravity baseline. A footfall is
  * emitted on the falling edge, once the signal has both risen past the threshold
@@ -91,7 +90,7 @@ function normalizeHeading(degrees: number) {
 export class DeadReckoningIntegrator {
   private readonly config: DeadReckoningConfig;
   private sequence: number;
-  private headingDegrees: number;
+  private headingDegrees: number | null;
   private baseline: number | null = null;
   private lastSampleTimeMs: number | null = null;
   private lastStepTimeMs: number | null = null;
@@ -103,11 +102,11 @@ export class DeadReckoningIntegrator {
   constructor(
     config: Partial<DeadReckoningConfig> = {},
     startSequence = 0,
-    initialHeadingDegrees = 0,
+    initialHeadingDegrees: number | null = null,
   ) {
     this.config = resolveDeadReckoningConfig(config);
     this.sequence = startSequence;
-    this.headingDegrees = normalizeHeading(initialHeadingDegrees);
+    this.headingDegrees = initialHeadingDegrees === null ? null : normalizeHeading(initialHeadingDegrees);
   }
 
   get nextSequence() {
@@ -135,14 +134,17 @@ export class DeadReckoningIntegrator {
     return this.headingDegrees;
   }
 
-  /** Re-seeds integrated heading from an absolute source such as a checkpoint. */
+  /** Low-level explicit calibration, never call this from a decoded checkpoint. */
   syncHeading(headingDegrees: number) {
     this.headingDegrees = normalizeHeading(headingDegrees);
     this.lastHeadingEmitMs = null;
   }
 
-  private emitHeading(timeMs: number): HeadingObservation {
+  private emitHeading(timeMs: number): HeadingObservation | HeadingUnavailableObservation {
     this.lastHeadingEmitMs = timeMs;
+    if (this.headingDegrees === null) return {
+      kind: 'heading-unavailable', sequence: this.sequence++, timeMs, source: 'inertial',
+    };
     return {
       kind: 'heading',
       sequence: this.sequence++,
@@ -179,7 +181,7 @@ export class DeadReckoningIntegrator {
     // `unresolvedHeadingSamples` is what makes that staleness countable.
     if (sample.headingRateDegreesPerSecond === null) {
       this.unresolvedHeadingCount += 1;
-    } else if (previousTimeMs !== null && sample.timeMs > previousTimeMs) {
+    } else if (this.headingDegrees !== null && previousTimeMs !== null && sample.timeMs > previousTimeMs) {
       const elapsedSeconds = (sample.timeMs - previousTimeMs) / 1_000;
       this.headingDegrees = normalizeHeading(
         this.headingDegrees + sample.headingRateDegreesPerSecond * elapsedSeconds,

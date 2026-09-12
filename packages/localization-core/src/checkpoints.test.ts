@@ -34,18 +34,18 @@ describe('QR and NFC checkpoint adapter', () => {
         source: 'manual-anchor',
         position: [2, 2],
         floorId: 'g',
-        headingDegrees: 90,
+        headingDegrees: null,
       }),
     ]);
     expect(adapter.hasFix).toBe(true);
   });
 
-  it('corrects position, heading, and floor on every later scan', () => {
+  it('corrects only position and floor on every later scan', () => {
     const adapter = new CheckpointAdapter(anchors, { elevationByFloorId: { g: 0 } });
     adapter.resolve({ timeMs: 1_000, kind: 'qr', payload: 'vg:entry-anchor' });
     const second = adapter.resolve({ timeMs: 9_000, kind: 'nfc', payload: 'vg:gallery-anchor' });
 
-    expect(second.observations.map((o) => o.kind)).toEqual(['position-fix', 'heading', 'floor']);
+    expect(second.observations.map((o) => o.kind)).toEqual(['position-fix', 'floor']);
     // NFC couples within centimetres, so its fix must be tighter than QR.
     const fix = second.observations[0] as { accuracyMeters: number };
     expect(fix.accuracyMeters).toBeLessThan(0.35);
@@ -103,8 +103,8 @@ describe('QR and NFC checkpoint adapter', () => {
     const second = adapter.resolve({ timeMs: 2, kind: 'nfc', payload: 'vg:gallery-anchor' });
 
     expect([...first.observations, ...second.observations].map((o) => o.sequence)).toEqual([
-      40, 41, 42, 43,
+      40, 41, 42,
     ]);
-    expect(adapter.nextSequence).toBe(44);
+    expect(adapter.nextSequence).toBe(43);
   });
 });

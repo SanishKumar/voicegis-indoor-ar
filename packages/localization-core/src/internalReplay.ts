@@ -2,6 +2,7 @@ import { isBuildingFrameCoordinate } from './captureStream';
 import { LocalizationFilter, resolveLocalizationFilterConfig, type LocalizationFilterConfig } from './filter';
 import { matchEstimateToRoute } from './mapMatching';
 import { LocalizationRuntimeController, type RuntimeSnapshot } from './runtimeState';
+import { requireHeadingCalibration, requireHeadingMeasurement } from './headingObservations';
 import {
   LOCALIZATION_RECORDING_VERSION,
   type CheckpointError,
@@ -73,10 +74,11 @@ function isValidEstimate(estimate: LocalizationEstimate) {
     Number.isFinite(estimate.timeMs) &&
     estimate.position.every(isBuildingFrameCoordinate) &&
     estimate.velocity.every(Number.isFinite) &&
-    Number.isFinite(estimate.headingDegrees) &&
+    (estimate.headingDegrees === null || Number.isFinite(estimate.headingDegrees)) &&
+    (estimate.headingDegrees === null) === (estimate.headingSigmaDegrees === null) &&
     estimate.covariance.every((row) => row.every(Number.isFinite)) &&
     isFiniteNonNegative(estimate.positionSigmaMeters) &&
-    isFiniteNonNegative(estimate.headingSigmaDegrees) &&
+    (estimate.headingSigmaDegrees === null || isFiniteNonNegative(estimate.headingSigmaDegrees)) &&
     Number.isFinite(estimate.lastCorrectionTimeMs)
   );
 }
@@ -105,13 +107,40 @@ function isValidMapMatch(result: MapMatchResult) {
 
 export function validateRecording(recording: LocalizationRecording) {
   if (recording.schemaVersion !== LOCALIZATION_RECORDING_VERSION) {
-    throw new Error(`Unsupported localization recording version: ${recording.schemaVersion}.`);
+    throw new Error(`Unsupported localization recording version: ${recording.schemaVersion}. Version 0.2 requires position-only initial fixes and separate heading calibration; legacy headings cannot be relabelled.`);
   }
   if (recording.privacy.cameraFramesStored !== false) {
     throw new Error('Localization recordings must not contain camera frames by default.');
   }
   if (recording.observations.length === 0 || recording.observations[0].kind !== 'initial-fix') {
     throw new Error('A localization recording must start with an initial fix.');
+  }
+  let calibrated = false;
+  for (const observation of recording.observations) {
+    if (!Number.isSafeInteger(observation.sequence) || observation.sequence < 0 ||
+      !Number.isFinite(observation.timeMs) || observation.timeMs < 0) {
+      throw new Error('Observations require finite non-negative times and safe sequence numbers.');
+    }
+    if (!['initial-fix', 'position-fix', 'heading-calibration', 'heading-unavailable', 'heading', 'step', 'floor'].includes(observation.kind)) {
+      throw new Error('Unsupported localization observation kind.');
+    }
+    if (observation.kind === 'initial-fix') {
+      if (observation.headingDegrees !== null || observation.headingAccuracyDegrees !== null) {
+        throw new Error('An initial position fix must leave heading and heading accuracy null.');
+      }
+    } else if (observation.kind === 'heading-calibration') {
+      requireHeadingCalibration(observation, recording);
+      calibrated = true;
+    } else if (observation.kind === 'heading-unavailable') {
+      calibrated = false;
+    } else if (observation.kind === 'heading') {
+      if (!calibrated || observation.source !== 'inertial') {
+        throw new Error('An inertial heading requires prior independent calibration; an anchor payload cannot supply heading.');
+      }
+    }
+    if (observation.kind === 'heading-calibration' || observation.kind === 'heading') {
+      requireHeadingMeasurement(observation);
+    }
   }
   for (let index = 1; index < recording.observations.length; index += 1) {
     const previous = recording.observations[index - 1];
@@ -137,7 +166,7 @@ export function validateRecording(recording: LocalizationRecording) {
 export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
   validateRecording(recording);
   const filterConfig = resolveLocalizationFilterConfig();
-  const filter = new LocalizationFilter(filterConfig);
+  const filter = new LocalizationFilter(filterConfig, { buildingId: recording.buildingId, packageHash: recording.packageHash });
   const estimates = recording.observations.map((observation) => filter.apply(observation));
   const runtime = new LocalizationRuntimeController();
   const runtimeSnapshots = estimates.map((estimate) => runtime.update(estimate));

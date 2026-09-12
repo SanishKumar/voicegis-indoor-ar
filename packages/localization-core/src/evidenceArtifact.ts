@@ -50,7 +50,7 @@ export const EVIDENCE_ARTIFACT_VERSION = '0.1.0' as const;
  * The derivation and replay pipeline that turned a capture into a figure.
  * Bumped whenever a change could move a number from the same inputs.
  */
-export const EVIDENCE_PROCESSOR_VERSION = '0.2.0' as const;
+export const EVIDENCE_PROCESSOR_VERSION = '0.4.0' as const;
 
 /** The manifest shape, versioned separately: it is authored before a walk. */
 export const CHECKPOINT_MANIFEST_VERSION = '0.2.0' as const;
@@ -433,6 +433,7 @@ const EVIDENCE_STATUSES: readonly EvidenceStatus[] = [
   'unsupported-sensor-model',
   'incomplete-capture',
   'invalid-localization-state',
+  'unverified-heading',
 ];
 
 /**
@@ -471,6 +472,7 @@ const STATUS_REQUIRES_LOCALIZATION: readonly EvidenceStatus[] = [
   'invalid-localization-state',
   'manifest-not-satisfied',
   'insufficient-ground-truth',
+  'unverified-heading',
 ];
 
 const EXCLUSION_REASONS: readonly string[] = [
@@ -1169,6 +1171,7 @@ export function decodeEvidenceArtifact(value: unknown): ArtifactDecoding {
   const declaredScoredCount = decoded.manifest.scoredCount;
   const publishedCount = decoded.evidence.checkpointCount;
   if (publishableStatus) {
+    decoder.fail('evidence.status', 'cannot be ok: Capture Stream 0.2 carries no independent travel-heading calibration.');
     if (declaredScoredCount === 0 || publishable === 0 || publishedCount === 0) {
       decoder.fail('evidence.status', 'cannot be ok when nothing was scored.');
     }
@@ -1178,6 +1181,10 @@ export function decodeEvidenceArtifact(value: unknown): ArtifactDecoding {
         'cannot be ok unless every predeclared scored mark backed the figure.',
       );
     }
+  }
+  if (decoded.evidence.status === 'unverified-heading' &&
+    (declaredScoredCount === 0 || publishable === 0 || declaredScoredCount !== publishable)) {
+    decoder.fail('evidence.status', 'unverified-heading requires otherwise eligible marks satisfying the full manifest.');
   }
   if (decoded.evidence.status === 'manifest-not-satisfied' && publishable >= declaredScoredCount) {
     decoder.fail(

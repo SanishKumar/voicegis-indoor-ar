@@ -48,6 +48,26 @@ const device: CaptureDeviceProfile = {
   sensors: { api: 'native', gyroscopeUnits: 'deg/s', frame: 'world' },
 };
 
+/** Constructed local-frame direction for numeric-boundary tests, not a capture migration. */
+function withSyntheticCalibration(recording: LocalizationRecording): LocalizationRecording {
+  const fixed = structuredClone(recording);
+  fixed.observations = fixed.observations.map((event) => event.kind === 'heading-unavailable'
+    ? { ...event, kind: 'heading', headingDegrees: 90, accuracyDegrees: 12 }
+    : event);
+  fixed.observations.splice(1, 0, {
+    kind: 'heading-calibration', sequence: 1, timeMs: fixed.observations[0].timeMs,
+    source: 'replay', headingDegrees: 90, accuracyDegrees: 5,
+    reference: 'filter-local', axis: 'travel', buildingId: fixed.buildingId,
+    packageHash: fixed.packageHash, provenanceId: 'synthetic-boundary-test-axis',
+  });
+  fixed.observations = fixed.observations.map((event, sequence) => ({ ...event, sequence }));
+  fixed.checkpoints = fixed.checkpoints.map((mark) => ({ ...mark,
+    ...(mark.observationIndex !== undefined && mark.observationIndex > 0
+      ? { observationIndex: mark.observationIndex + 1 } : {}),
+  }));
+  return fixed;
+}
+
 /** A walk that localizes, keeps continuous inertial coverage, and ends on a mark. */
 function walkEndingOn(
   markPosition: [number, number],
@@ -318,9 +338,15 @@ describe('invalid derived localization state is not evidence', () => {
   });
 
   it('reports an ordinary outward step from a valid boundary anchor without overrides', () => {
-    const evidence = buildEvidenceReport(oneStepFromBoundary());
+    const session = oneStepFromBoundary();
+    const evidence = buildEvidenceReport(session);
+    // The uncalibrated capture now refuses heading before movement. Keep the
+    // original bounds guard exercised with a deliberately calibrated fixture.
+    const core = replayCore(withSyntheticCalibration(deriveRecording(session)));
 
-    expect(evidence.report.evidenceStatus).toBe('invalid-localization-state');
+    expect(core.invalidEstimateIndices.length).toBeGreaterThan(0);
+    expect(core.medianHorizontalErrorMeters).toBeNull();
+    expect(evidence.report.evidenceStatus).toBe('unverified-heading');
     expect(evidence.report.medianHorizontalErrorMeters).toBeNull();
     expect(evidence.report.checkpointErrors).toEqual([]);
   });
@@ -328,7 +354,7 @@ describe('invalid derived localization state is not evidence', () => {
   it('does not let later QR corrections hide an earlier out-of-frame estimate', () => {
     const session = transientRecoveryWalk();
     const overrides = { deadReckoningConfig: { strideLengthMeters: BOUND + 1 } };
-    const derived = deriveRecording(session, overrides);
+    const derived = withSyntheticCalibration(deriveRecording(session, overrides));
     const diagnostic = replayRecording(derived);
     const selected = diagnostic.estimates[derived.checkpoints[0].observationIndex!];
 
@@ -336,9 +362,10 @@ describe('invalid derived localization state is not evidence', () => {
       BOUND + 1,
     );
     expect(Math.abs(selected.position[0])).toBeLessThanOrEqual(BOUND);
-    expect(buildEvidenceReport(session, overrides).report.evidenceStatus).toBe(
-      'invalid-localization-state',
-    );
+    const core = replayCore(derived);
+    expect(core.invalidEstimateIndices.length).toBeGreaterThan(0);
+    expect(core.medianHorizontalErrorMeters).toBeNull();
+    expect(buildEvidenceReport(session, overrides).report.evidenceStatus).toBe('unverified-heading');
   });
 
   it.each([Infinity, NaN])('refuses a non-finite derived elevation (%s)', (elevation) => {
@@ -427,11 +454,12 @@ describe('invalid derived localization state is not evidence', () => {
     expect(report.medianHorizontalErrorMeters).toBeNull();
   });
 
-  it('leaves an honest walk untouched', () => {
+  it('keeps an intact but uncalibrated capture diagnostic', () => {
     const honest = buildEvidenceReport(walkEndingOn([3.5, 9]));
 
-    expect(honest.report.evidenceStatus).toBe('ok');
-    expect(honest.report.medianHorizontalErrorMeters).toBeCloseTo(3.688, 3);
-    expect(honest.report.checkpointErrors).toHaveLength(1);
+    expect(honest.report.evidenceStatus).toBe('unverified-heading');
+    // The marker's authored heading no longer makes five strides measurable.
+    expect(honest.report.medianHorizontalErrorMeters).toBeNull();
+    expect(honest.report.checkpointErrors).toEqual([]);
   });
 });

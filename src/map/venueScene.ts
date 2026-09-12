@@ -2,7 +2,6 @@ import {
   ACESFilmicToneMapping,
   AmbientLight,
   BoxGeometry,
-  CatmullRomCurve3,
   ConeGeometry,
   CylinderGeometry,
   DirectionalLight,
@@ -15,14 +14,12 @@ import {
   Mesh,
   MeshStandardMaterial,
   PCFShadowMap,
-  PerspectiveCamera,
   Raycaster,
   Scene,
   DoubleSide,
   Shape,
   ShapeGeometry,
   SphereGeometry,
-  TubeGeometry,
   Vector2,
   Vector3,
   WebGLRenderer,
@@ -31,15 +28,17 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import { resolveCartographicLabels } from '../engine/floorplanCartography';
 import type { VisitorLocation } from '../navigation/visitorLocation';
+import {
+  createVisitorCamera,
+  planToWorld,
+  routeSegments,
+  type MapMode,
+  type VisitorMapView,
+} from './visitorCamera';
 
 /**
- * The visitor map as a lit model rather than a drawing.
- *
- * The floor being read is built once per venue and shown flat; the previous
- * renderer offered a "Tilted" mode that rotated the plan seven degrees and
- * squashed it to 72% height, which is an oblique squash rather than a
- * projection - no camera, no vanishing point, no depth ordering - and it is
- * gone. Perspective here comes from an actual camera.
+ * One authored scene, seen from a top-down plan or an orbitable 3D camera.
+ * Neither presentation owns or advances the journey.
  *
  * Colour lives in the model. The interface around it stays cream, ink and one
  * blue, so the two never compete.
@@ -109,6 +108,9 @@ const WALL_HEIGHT = 1.4;
 const EXPLODE = 3.1;
 
 export interface VenueScene {
+  setMode(mode: MapMode): void;
+  setOverview(enabled: boolean): void;
+  getView(): VisitorMapView;
   setLocation(location: Omit<VisitorLocation, 'label'> | null): void;
   focusLocation(): void;
   setActiveFloor(floorId: string): void;
@@ -182,6 +184,7 @@ export function createVenueScene(
   canvas: HTMLCanvasElement,
   labelLayer: HTMLElement,
   buildingPackage: CompiledBuildingPackage,
+  initialView?: VisitorMapView,
 ): VenueScene {
   const outline = buildingPackage.floors.flatMap((floor) => floor.outline as Coordinate[]);
   const xs = outline.map((point) => point[0]);
@@ -192,12 +195,15 @@ export function createVenueScene(
   ];
   const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
 
-  /** Plan metres to world space: plan +Y (north) becomes -Z, centred on origin. */
+  /** Plan +X right, +Y down; world +Y is elevation. */
   const wx = (x: number) => x - centre[0];
-  const wz = (y: number) => -(y - centre[1]);
+  const wz = (y: number) => planToWorld(centre[0], y, centre)[1];
   const vec = ([x, y]: Coordinate, height = 0) => new Vector3(wx(x), height, wz(y));
 
-  const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
+  // Fail before constructing Three's listeners/resources on unsupported devices.
+  const context = canvas.getContext('webgl2', { antialias: true, alpha: true });
+  if (!context || context.isContextLost()) throw new Error('Map graphics are unavailable');
+  const renderer = new WebGLRenderer({ canvas, context, antialias: true, alpha: true });
   const pixelRatio = Math.min(window.devicePixelRatio, 2);
   renderer.setPixelRatio(pixelRatio);
   renderer.shadowMap.enabled = true;
@@ -205,7 +211,9 @@ export function createVenueScene(
   renderer.toneMapping = ACESFilmicToneMapping;
 
   const scene = new Scene();
-  const camera = new PerspectiveCamera(34, 1, 0.5, span * 12);
+  const cameraRig = createVisitorCamera(span, initialView);
+  const { camera, view: cameraView } = cameraRig;
+  const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   scene.add(new HemisphereLight(0xd6e7f5, 0xbfae92, 1.5));
   const key = new DirectionalLight(0xfff2df, 2.4);
@@ -540,22 +548,8 @@ export function createVenueScene(
   let routeFloors: string[] = [];
   let selectedSpaceId: string | null = null;
 
-  const HOME_DISTANCE = span * 1.55;
-  const MIN_DISTANCE = span * 0.32;
-  const MAX_DISTANCE = span * 2.4;
-  const camera3 = { azimuth: -0.62, polar: 0.86, distance: HOME_DISTANCE };
-  const target = new Vector3(0, 0, 0);
   const locationGroup = new Group();
   let location: Omit<VisitorLocation, 'label'> | null = null;
-
-  function applyCamera() {
-    camera.position.set(
-      target.x + camera3.distance * Math.sin(camera3.polar) * Math.sin(camera3.azimuth),
-      target.y + camera3.distance * Math.cos(camera3.polar),
-      target.z + camera3.distance * Math.sin(camera3.polar) * Math.cos(camera3.azimuth),
-    );
-    camera.lookAt(target);
-  }
 
   function emptyGroup(group: Group) {
     for (const child of [...group.children]) {
@@ -590,35 +584,30 @@ export function createVenueScene(
     return (view.elevation - active.elevation) * EXPLODE;
   }
 
-  /*
-   * The stack is not a mode with a switch. It appears when the route crosses
-   * storeys, because that is the only time the other floors are answering a
-   * question the visitor has, and it collapses again the moment they are not.
-   */
-  const stacked = () => routeFloors.length > 1;
+  // A route crossing floors does not itself change the visitor's camera.
+  const stacked = () => cameraView.mode === '3d' && cameraView.overview && routeFloors.length > 1;
+
+  function routeTube(from: Vector3, to: Vector3) {
+    const direction = to.clone().sub(from);
+    if (direction.length() < 0.001) return null;
+    const tube = new Mesh(new CylinderGeometry(0.24, 0.24, direction.length(), 8), routeMaterial());
+    tube.position.copy(from).add(to).multiplyScalar(0.5);
+    tube.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), direction.normalize());
+    return tube;
+  }
 
   function rebuildRoute() {
     clearRoute();
     if (routePoints.length < 2) return;
 
     const showing = stacked() ? routeFloors : [activeFloorId];
-    for (const floorId of showing) {
-      const view = floors.get(floorId);
-      if (view === undefined) continue;
-      const leg = routePoints.filter((point) => String(point.floor) === floorId);
-      if (leg.length < 2) continue;
-      const curve = new CatmullRomCurve3(
-        leg.map((point) => vec([point.x, point.y], 0.2)),
-        false,
-        'catmullrom',
-        0.12,
-      );
-      const tube = new Mesh(
-        new TubeGeometry(curve, leg.length * 12, 0.28, 8, false),
-        routeMaterial(),
-      );
-      tube.castShadow = true;
-      view.routeGroup.add(tube);
+    for (const [from, to] of routeSegments(routePoints)) {
+      if (from.floor !== to.floor || !showing.includes(from.floor)) continue;
+      const view = floors.get(from.floor);
+      if (!view) continue;
+      // Actual graph edges, never a spline that cuts across a corner.
+      const tube = routeTube(vec([from.x, from.y], 0.52), vec([to.x, to.y], 0.52));
+      if (tube) view.routeGroup.add(tube);
     }
 
     if (!stacked()) return;
@@ -652,19 +641,16 @@ export function createVenueScene(
       shaftsGroup.add(shaft);
     }
 
-    for (let index = 0; index < routeFloors.length - 1; index += 1) {
-      const from = floors.get(routeFloors[index]);
-      const to = floors.get(routeFloors[index + 1]);
+    for (const [exit, entry] of routeSegments(routePoints)) {
+      if (exit.floor === entry.floor) continue;
+      const from = floors.get(exit.floor);
+      const to = floors.get(entry.floor);
       if (from === undefined || to === undefined) continue;
-      // The point the path leaves this floor from is where the climb starts.
-      const exit = [...routePoints].reverse().find((point) => String(point.floor) === from.id);
-      if (exit === undefined) continue;
-      const bottom = Math.min(stackY(from), stackY(to));
-      const height = Math.abs(stackY(to) - stackY(from));
-      if (height <= 0) continue;
-      const hop = new Mesh(new CylinderGeometry(0.3, 0.3, height, 8), routeMaterial());
-      hop.position.copy(vec([exit.x, exit.y], bottom + height / 2 + 0.2));
-      hopsGroup.add(hop);
+      const hop = routeTube(
+        vec([exit.x, exit.y], stackY(from) + 0.52),
+        vec([entry.x, entry.y], stackY(to) + 0.52),
+      );
+      if (hop) hopsGroup.add(hop);
     }
   }
 
@@ -756,7 +742,7 @@ export function createVenueScene(
     const placed = new Set<string>();
     // Scale is how far in the camera has come from its opening distance, which
     // is what decides which tier of labels is allowed to compete.
-    const scale = HOME_DISTANCE / camera3.distance;
+    const scale = 1 / cameraView.scale;
     for (const label of resolveCartographicLabels(candidates, [], 6, scale).placed) {
       const element = labelElements.get(label.id);
       if (element === undefined) continue;
@@ -786,38 +772,46 @@ export function createVenueScene(
    * dragging the map would open something the visitor never aimed at.
    */
   const DRAG_SLOP = 6;
-  const pointers = new Map<number, { x: number; y: number }>();
+  const pointers = new Map<number, { x: number; y: number; startX: number; startY: number }>();
   let dragged = false;
   let panning = false;
   let pinchDistance = 0;
-
-  const clampDistance = (value: number) => Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, value));
 
   const spread = () => {
     const [a, b] = [...pointers.values()];
     return Math.hypot(a.x - b.x, a.y - b.y);
   };
 
-  canvas.addEventListener('pointerdown', (event) => {
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    dragged = false;
-    panning = event.shiftKey || event.button === 1;
-    if (pointers.size === 2) pinchDistance = spread();
+  const pointerDown = (event: PointerEvent) => {
+    if (pointers.size === 0) dragged = false;
+    pointers.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+      startX: event.clientX,
+      startY: event.clientY,
+    });
+    panning = cameraView.mode === '2d' || event.shiftKey || event.button === 1;
+    if (pointers.size === 2) {
+      pinchDistance = spread();
+      dragged = true;
+    }
     canvas.setPointerCapture(event.pointerId);
-  });
+  };
 
-  canvas.addEventListener('pointermove', (event) => {
+  const pointerMove = (event: PointerEvent) => {
     const previous = pointers.get(event.pointerId);
     if (previous === undefined) return;
     const dx = event.clientX - previous.x;
     const dy = event.clientY - previous.y;
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (Math.abs(dx) > DRAG_SLOP || Math.abs(dy) > DRAG_SLOP) dragged = true;
+    pointers.set(event.pointerId, { ...previous, x: event.clientX, y: event.clientY });
+    if (Math.hypot(event.clientX - previous.startX, event.clientY - previous.startY) > DRAG_SLOP)
+      dragged = true;
 
     if (pointers.size === 2) {
+      cameraRig.pan(dx / 2, dy / 2, canvas.clientWidth, canvas.clientHeight);
       const next = spread();
       if (pinchDistance > 0 && next > 0) {
-        camera3.distance = clampDistance(camera3.distance * (pinchDistance / next));
+        cameraRig.zoomBy(pinchDistance / next);
         dragged = true;
       }
       pinchDistance = next;
@@ -825,37 +819,60 @@ export function createVenueScene(
     }
 
     if (panning) {
-      const scale = camera3.distance * 0.0016;
-      target.x -= (dx * Math.cos(camera3.azimuth) - dy * Math.sin(camera3.azimuth)) * scale;
-      target.z += (dx * Math.sin(camera3.azimuth) + dy * Math.cos(camera3.azimuth)) * scale;
+      cameraRig.pan(dx, dy, canvas.clientWidth, canvas.clientHeight);
       return;
     }
 
-    camera3.azimuth -= dx * 0.005;
-    camera3.polar = Math.min(1.45, Math.max(0.2, camera3.polar - dy * 0.005));
-  });
+    cameraView.azimuth -= dx * 0.005;
+    cameraView.tilt3d = Math.min(1.3, Math.max(0.2, cameraView.tilt3d - dy * 0.005));
+  };
 
   const releasePointer = (event: PointerEvent) => {
     pointers.delete(event.pointerId);
     if (pointers.size < 2) pinchDistance = 0;
     if (pointers.size === 0) panning = false;
   };
+  canvas.addEventListener('pointerdown', pointerDown);
+  canvas.addEventListener('pointermove', pointerMove);
   canvas.addEventListener('pointerup', releasePointer);
   canvas.addEventListener('pointercancel', releasePointer);
+  canvas.addEventListener('lostpointercapture', releasePointer);
 
-  canvas.addEventListener(
-    'wheel',
-    (event) => {
-      event.preventDefault();
-      camera3.distance = clampDistance(camera3.distance * (1 + Math.sign(event.deltaY) * 0.12));
-    },
-    { passive: false },
-  );
+  const wheel = (event: WheelEvent) => {
+    event.preventDefault();
+    cameraRig.zoomBy(1 + Math.sign(event.deltaY) * 0.12);
+  };
+  canvas.addEventListener('wheel', wheel, { passive: false });
+  const keyDown = (event: KeyboardEvent) => {
+    const moves: Record<string, [number, number]> = {
+      ArrowLeft: [40, 0],
+      ArrowRight: [-40, 0],
+      ArrowUp: [0, 40],
+      ArrowDown: [0, -40],
+    };
+    const move = moves[event.key];
+    if (!move) return;
+    event.preventDefault();
+    cameraRig.pan(move[0], move[1], canvas.clientWidth, canvas.clientHeight);
+  };
+  canvas.addEventListener('keydown', keyDown);
 
   const raycaster = new Raycaster();
   const pointer = new Vector2();
 
   const handle: VenueScene = {
+    setMode(mode) {
+      cameraView.mode = mode;
+      pointers.clear();
+      layout();
+      rebuildRoute();
+    },
+    setOverview(enabled) {
+      cameraView.overview = enabled;
+      layout();
+      rebuildRoute();
+    },
+    getView: cameraRig.snapshot,
     setLocation(nextLocation) {
       emptyGroup(locationGroup);
       locationGroup.removeFromParent();
@@ -881,8 +898,8 @@ export function createVenueScene(
     focusLocation() {
       if (!location) return;
       handle.setActiveFloor(location.floorId);
-      target.copy(vec(location.position));
-      camera3.distance = HOME_DISTANCE * 0.7;
+      cameraView.target = planToWorld(location.position[0], location.position[1], centre);
+      cameraView.scale = 0.7;
     },
 
     setActiveFloor(floorId) {
@@ -930,14 +947,13 @@ export function createVenueScene(
     },
 
     zoomBy(factor) {
-      camera3.distance = clampDistance(camera3.distance * factor);
+      cameraRig.zoomBy(factor);
     },
 
     resetView() {
-      camera3.azimuth = -0.62;
-      camera3.polar = 0.86;
-      camera3.distance = HOME_DISTANCE;
-      target.set(0, 0, 0);
+      cameraRig.reset();
+      layout();
+      rebuildRoute();
     },
 
     pickPoi(clientX, clientY) {
@@ -963,14 +979,14 @@ export function createVenueScene(
       if (width === 0 || height === 0) return;
       if (venueDrawingBufferNeedsResize(canvas.width, canvas.height, width, height, pixelRatio)) {
         renderer.setSize(width, height, false);
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
       }
       for (const view of floors.values()) {
-        view.group.position.y += (view.targetY - view.group.position.y) * 0.16;
+        // Connector segments and floors must share exact endpoints while the
+        // camera animates. Moving only floors would detach routes from stops.
+        view.group.position.y = view.targetY;
         const ghosted = view.targetOpacity < 0.995;
         for (const material of view.materials) {
-          material.opacity += (view.targetOpacity - material.opacity) * 0.16;
+          material.opacity = view.targetOpacity;
           material.transparent = material.opacity < 0.995;
           material.depthWrite = material.opacity > 0.6;
         }
@@ -980,12 +996,31 @@ export function createVenueScene(
           if (mesh.isMesh === true) mesh.castShadow = !ghosted;
         });
       }
-      applyCamera();
+      const now = performance.now();
+      const pose = cameraRig.update(width, height, now - lastFrame, motionPreference.matches);
+      lastFrame = now;
+      const diagnostics = {
+        cameraMode: cameraView.mode,
+        cameraTilt: pose.tilt.toFixed(4),
+        cameraTransition: pose.settled ? 'settled' : 'moving',
+        cameraScale: cameraView.scale.toFixed(4),
+        cameraTarget: cameraView.target.map((value) => value.toFixed(4)).join(','),
+        cameraBearing: cameraView.azimuth.toFixed(4),
+      };
+      for (const [key, value] of Object.entries(diagnostics))
+        if (canvas.dataset[key] !== value) canvas.dataset[key] = value;
       renderer.render(scene, camera);
       drawLabels(width, height);
     },
 
     dispose() {
+      canvas.removeEventListener('pointerdown', pointerDown);
+      canvas.removeEventListener('pointermove', pointerMove);
+      canvas.removeEventListener('pointerup', releasePointer);
+      canvas.removeEventListener('pointercancel', releasePointer);
+      canvas.removeEventListener('lostpointercapture', releasePointer);
+      canvas.removeEventListener('wheel', wheel);
+      canvas.removeEventListener('keydown', keyDown);
       clearRoute();
       for (const element of labelElements.values()) element.remove();
       labelElements.clear();
@@ -996,12 +1031,14 @@ export function createVenueScene(
         if (Array.isArray(material)) material.forEach((entry) => entry.dispose());
         else material?.dispose();
       });
+      key.shadow.dispose();
       renderer.dispose();
     },
   };
 
   handle.setActiveFloor(activeFloorId);
   layout();
-  applyCamera();
+  let lastFrame = performance.now();
+  cameraRig.update(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight), 0, true);
   return handle;
 }

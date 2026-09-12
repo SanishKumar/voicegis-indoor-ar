@@ -16,6 +16,7 @@ import {
   CircleDot,
   Footprints,
   MapPin,
+  Maximize2,
   Navigation,
   X,
 } from 'lucide-react';
@@ -38,7 +39,7 @@ function LegIcon({ leg, size = 18 }) {
   return <ArrowUp size={size} strokeWidth={2} />;
 }
 
-export default function NavigationPanel() {
+export default function NavigationPanel({ onExpandMap }) {
   const { state, actions, venue, setShowLocationPicker } = useNavigation();
   const { route, navStatus, previewStepIndex: currentStepIndex, destinationNodeId } = state;
   const panelRef = useRef(null);
@@ -192,6 +193,17 @@ export default function NavigationPanel() {
           <p className="nav-panel-dest-eyebrow">Route preview</p>
           <h2 className="nav-panel-dest-name">{destNode?.poi?.name || 'Destination'}</h2>
         </div>
+        {onExpandMap && (
+          <button
+            className="nav-expand-map"
+            type="button"
+            aria-label="Expand map"
+            title="Expand map"
+            onClick={onExpandMap}
+          >
+            <Maximize2 size={18} aria-hidden="true" />
+          </button>
+        )}
         <button
           className="nav-panel-close-btn"
           onClick={clearRouteAndReturnToSearch}

@@ -1,4 +1,4 @@
-export const LOCALIZATION_RECORDING_VERSION = '0.1.0' as const;
+export const LOCALIZATION_RECORDING_VERSION = '0.2.0' as const;
 
 export type ObservationSource =
   'manual-anchor' | 'visual-anchor' | 'inertial' | 'pedometer' | 'barometer' | 'replay';
@@ -14,9 +14,10 @@ export interface InitialFixObservation extends ObservationBase {
   position: [number, number];
   floorId: string;
   elevationMeters: number;
-  headingDegrees: number;
+  /** 0.2 recordings require null: position acquisition does not measure heading. */
+  headingDegrees: null;
   accuracyMeters: number;
-  headingAccuracyDegrees: number;
+  headingAccuracyDegrees: null;
 }
 
 export interface PositionFixObservation extends ObservationBase {
@@ -31,8 +32,25 @@ export interface HeadingObservation extends ObservationBase {
   accuracyDegrees: number;
 }
 
+/** Independent, explicitly declared travel-axis alignment in the filter's local frame. */
+export interface HeadingCalibrationObservation extends ObservationBase {
+  kind: 'heading-calibration';
+  headingDegrees: number;
+  accuracyDegrees: number;
+  reference: 'filter-local';
+  axis: 'travel';
+  buildingId: string;
+  packageHash: string;
+  provenanceId: string;
+}
+
+export interface HeadingUnavailableObservation extends ObservationBase {
+  kind: 'heading-unavailable';
+}
+
 export interface StepObservation extends ObservationBase {
   kind: 'step';
+  /** Complete observed stride displacement, applied once; never extrapolated. */
   distanceMeters: number;
   durationMs: number;
   varianceMeters2: number;
@@ -49,6 +67,8 @@ export type LocalizationObservation =
   | InitialFixObservation
   | PositionFixObservation
   | HeadingObservation
+  | HeadingCalibrationObservation
+  | HeadingUnavailableObservation
   | StepObservation
   | FloorObservation;
 
@@ -57,12 +77,17 @@ export type LocalizationQuality = 'high' | 'degraded' | 'lost';
 export interface LocalizationEstimate {
   timeMs: number;
   position: [number, number, number];
+  /**
+   * Interval-average velocity on a step frame; zero on other frames.
+   * Zero means no velocity observation, not proven physical stillness.
+   * Never use this field to extrapolate position or advance guidance.
+   */
   velocity: [number, number, number];
-  headingDegrees: number;
+  headingDegrees: number | null;
   floorId: string;
   covariance: number[][];
   positionSigmaMeters: number;
-  headingSigmaDegrees: number;
+  headingSigmaDegrees: number | null;
   lastCorrectionTimeMs: number;
   observationSources: ObservationSource[];
   quality: LocalizationQuality;
@@ -79,7 +104,7 @@ export interface GroundTruthCheckpoint {
    * Estimates are produced one per observation, so the index identifies one
    * estimate unambiguously. Looking an estimate up by time cannot: several
    * observations routinely share a millisecond — a single scan alone emits a
-   * position fix, a heading, and a floor — and the last one written would win,
+   * position fix and a floor — and the last one written would win,
    * which is how a mark could be scored against a reset that happened after it.
    */
   observationIndex?: number;
@@ -146,6 +171,8 @@ export type EvidenceStatus =
   | 'unofficial-recording'
   /** The walk never obtained a first fix, so nothing was ever localized. */
   | 'insufficient-localization'
+  /** Position fixes exist, but no independent travel-axis heading was established. */
+  | 'unverified-heading'
   /** Backgrounding or sensor loss makes the estimate untrustworthy afterwards. */
   | 'interrupted-capture'
   /** No surveyed mark survived eligibility. */

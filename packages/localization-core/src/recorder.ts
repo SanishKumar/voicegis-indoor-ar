@@ -899,10 +899,12 @@ export function buildEvidenceReport(
               ? 'manifest-not-satisfied'
               : derived.checkpoints.length === 0
                 ? 'insufficient-ground-truth'
-                : null;
+                // Capture Stream 0.2 has no independent travel-axis calibration
+                // event. Raw orientation and authored marker headings do not
+                // supply one, even when the gyro frame is world-relative.
+                : 'unverified-heading';
 
-  const status: EvidenceStatus = blockingStatus ?? 'ok';
-  const isPublishable = status === 'ok';
+  const status: EvidenceStatus = blockingStatus;
   // Counts computed from a numerically invalid trajectory are not diagnostic
   // evidence either: a NaN route projection previously counted as an accepted
   // match, and a NaN position could still be labelled a high-quality frame.
@@ -917,9 +919,11 @@ export function buildEvidenceReport(
     observationCount: derived.observations.length,
     checkpointCount: derived.checkpoints.length,
     qualityFrameCounts: reportCore?.qualityFrameCounts ?? { high: 0, degraded: 0, lost: 0 },
-    medianHorizontalErrorMeters: isPublishable ? reportCore!.medianHorizontalErrorMeters : null,
-    p95HorizontalErrorMeters: isPublishable ? reportCore!.p95HorizontalErrorMeters : null,
-    floorAccuracy: isPublishable ? reportCore!.floorAccuracy : null,
+    // No Capture Stream 0.2 event records independent heading calibration.
+    // Retain diagnostics and prior refusals, but never publish accuracy.
+    medianHorizontalErrorMeters: null,
+    p95HorizontalErrorMeters: null,
+    floorAccuracy: null,
     mapMatching: reportCore?.mapMatching ?? {
       acceptedCount: 0,
       rejectedCount: 0,
@@ -936,7 +940,7 @@ export function buildEvidenceReport(
       stateCounts: { initializing: 0, tracking: 0, degraded: 0, lost: 0, relocalizing: 0 },
       guidanceFrozenFrames: 0,
     },
-    checkpointErrors: isPublishable ? reportCore!.checkpointErrors : [],
+    checkpointErrors: [],
   };
 
   const exclusionCounts = {
@@ -1112,14 +1116,13 @@ function deriveValidatedRecording(
   );
   const checkpoints = new CheckpointAdapter(session.anchors, checkpointConfig);
   const deadReckoning = new DeadReckoningIntegrator(deadReckoningConfig);
-  const anchorsById = new Map(session.anchors.map((anchor) => [anchor.id, anchor]));
 
   // Each observation remembers the capture event that produced it, so
   // evaluation can order against the stream rather than against wall time
   // alone.
   // Every derived observation keeps the identity of the capture event that
   // produced it, plus which of that event's observations it was. One scan emits
-  // a position fix, a heading, and a floor at the same millisecond, so time and
+  // a position fix and a floor at the same millisecond, so time and
   // source sequence alone still do not name one of them.
   const collected: Array<{
     key: ObservationKey;
@@ -1161,8 +1164,6 @@ function deriveValidatedRecording(
         // second time through a parallel helper meant two places had to agree
         // about what resolves, and only one of them was the authority.
         anchorResets.push({ timeMs: event.timeMs, sequence: event.sequence });
-        const anchor = anchorsById.get(resolution.anchorId ?? '');
-        if (anchor) deadReckoning.syncHeading(anchor.headingDegrees);
       }
       collect(resolution.observations, event.sequence);
       continue;

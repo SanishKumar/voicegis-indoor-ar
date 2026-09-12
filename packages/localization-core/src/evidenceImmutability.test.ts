@@ -130,8 +130,8 @@ describe('evidence dependencies resist mutation from the package root', () => {
     // A caller's map must not leak into a later derivation that did not pass one.
     const second = buildEvidenceReport(session);
 
-    expect(first.report.evidenceStatus).toBe('ok');
-    expect(second.report.evidenceStatus).toBe('ok');
+    expect(first.report.evidenceStatus).toBe('unverified-heading');
+    expect(second.report.evidenceStatus).toBe('unverified-heading');
     expect(DEFAULT_CHECKPOINT_CONFIG.elevationByFloorId).toEqual({});
   });
 });

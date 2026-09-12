@@ -91,14 +91,14 @@ describe('IMU dead reckoning', () => {
     );
     const drifted = integrator.heading;
 
-    // Dead reckoning drifts without bound; a scan is what stops it.
+    // This test explicitly recalibrates; a decoded scan cannot do so.
     expect(drifted).toBeGreaterThan(15);
     integrator.syncHeading(180);
     expect(integrator.heading).toBe(180);
   });
 
   it('emits heading no more often than the configured interval', () => {
-    const integrator = new DeadReckoningIntegrator({ headingEmitIntervalMs: 1_000 });
+    const integrator = new DeadReckoningIntegrator({ headingEmitIntervalMs: 1_000 }, 0, 0);
     const observations = runAll(
       integrator,
       walkingSamples({ durationMs: 5_000, amplitude: 0.1 }),
@@ -118,7 +118,7 @@ describe('IMU dead reckoning', () => {
   });
 
   it('walks the filter forward along the heading it was seeded with', () => {
-    const filter = new LocalizationFilter();
+    const filter = new LocalizationFilter({}, { buildingId: 'synthetic', packageHash: 'synthetic-integrator-test' });
     filter.apply({
       kind: 'initial-fix',
       sequence: 0,
@@ -127,10 +127,13 @@ describe('IMU dead reckoning', () => {
       position: [0, 0],
       floorId: 'g',
       elevationMeters: 0,
-      headingDegrees: 90,
+      headingDegrees: null,
       accuracyMeters: 0.2,
-      headingAccuracyDegrees: 10,
+      headingAccuracyDegrees: null,
     });
+    filter.apply({ kind: 'heading-calibration', sequence: 1, timeMs: 0, source: 'replay',
+      headingDegrees: 90, accuracyDegrees: 10, reference: 'filter-local', axis: 'travel',
+      buildingId: 'synthetic', packageHash: 'synthetic-integrator-test', provenanceId: 'constructed-eastbound-axis' });
 
     // Heading 90 degrees is east, so only X should grow.
     const integrator = new DeadReckoningIntegrator({}, 1, 90);

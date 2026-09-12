@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "0.1.0",
+  "schemaVersion": "0.2.0",
   "sessionId": "synthetic-reference-corridor-001",
   "buildingId": "reference-medical-centre",
   "packageHash": "5be7c952924d796b39ca065311d662cd24da0a18ae20bee0fd6ee962636cd00b",
@@ -29,13 +29,26 @@
       "position": [1, 9],
       "floorId": "g",
       "elevationMeters": 0,
-      "headingDegrees": 90,
+      "headingDegrees": null,
       "accuracyMeters": 0.25,
-      "headingAccuracyDegrees": 5
+      "headingAccuracyDegrees": null
+    },
+    {
+      "kind": "heading-calibration",
+      "sequence": 1,
+      "timeMs": 0,
+      "source": "replay",
+      "headingDegrees": 90,
+      "accuracyDegrees": 5,
+      "reference": "filter-local",
+      "axis": "travel",
+      "buildingId": "reference-medical-centre",
+      "packageHash": "5be7c952924d796b39ca065311d662cd24da0a18ae20bee0fd6ee962636cd00b",
+      "provenanceId": "synthetic-eastbound-travel-axis-fixture-not-surveyed"
     },
     {
       "kind": "step",
-      "sequence": 1,
+      "sequence": 2,
       "timeMs": 1000,
       "source": "pedometer",
       "distanceMeters": 1,
@@ -44,7 +57,7 @@
     },
     {
       "kind": "step",
-      "sequence": 2,
+      "sequence": 3,
       "timeMs": 2000,
       "source": "pedometer",
       "distanceMeters": 1,
@@ -53,7 +66,7 @@
     },
     {
       "kind": "position-fix",
-      "sequence": 3,
+      "sequence": 4,
       "timeMs": 3000,
       "source": "visual-anchor",
       "position": [4.05, 9.02],
@@ -61,7 +74,7 @@
     },
     {
       "kind": "heading",
-      "sequence": 4,
+      "sequence": 5,
       "timeMs": 3000,
       "source": "inertial",
       "headingDegrees": 90,
@@ -69,7 +82,7 @@
     },
     {
       "kind": "step",
-      "sequence": 5,
+      "sequence": 6,
       "timeMs": 4000,
       "source": "pedometer",
       "distanceMeters": 1,
@@ -78,7 +91,7 @@
     },
     {
       "kind": "step",
-      "sequence": 6,
+      "sequence": 7,
       "timeMs": 5000,
       "source": "pedometer",
       "distanceMeters": 1,

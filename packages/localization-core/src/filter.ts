@@ -16,6 +16,7 @@ import type {
   LocalizationQuality,
   ObservationSource,
 } from './types';
+import { requireHeadingCalibration, requireHeadingMeasurement, type LocalizationFrame } from './headingObservations';
 
 const STATE_SIZE = 5;
 const X = 0;
@@ -101,22 +102,33 @@ export class LocalizationFilter {
   private elevationMeters = 0;
   private lastCorrectionTimeMs = 0;
   private readonly sources = new Set<ObservationSource>();
+  private headingKnown = false;
 
   private readonly config: LocalizationFilterConfig;
+  private readonly frame: LocalizationFrame | null;
 
-  constructor(overrides: Partial<LocalizationFilterConfig> = {}) {
+  constructor(overrides: Partial<LocalizationFilterConfig> = {}, frame: LocalizationFrame | null = null) {
     this.config = resolveLocalizationFilterConfig(overrides);
+    // Without an explicit frame this instance is position-only. Snapshot the
+    // identity so later caller edits cannot rebind an active calibration.
+    this.frame = frame ? { ...frame } : null;
   }
 
   private initialize(observation: InitialFixObservation) {
+    if (observation.headingDegrees !== null || observation.headingAccuracyDegrees !== null) {
+      throw new Error('Initial fixes are position-only; heading requires independent calibration.');
+    }
     const positionVariance = observation.accuracyMeters ** 2;
-    const headingVariance = degreesToRadians(observation.headingAccuracyDegrees) ** 2;
+    this.headingKnown = false;
+    // Finite matrix placeholder only. Unknown heading and its uncertainty are
+    // exposed as null and cannot drive movement or be fused as a prior.
+    const headingVariance = degreesToRadians(180) ** 2;
     this.state = [
       observation.position[0],
       observation.position[1],
       0,
       0,
-      degreesToRadians(observation.headingDegrees),
+      0,
     ];
     this.covariance = diagonal([positionVariance, positionVariance, 1, 1, headingVariance]);
     this.timeMs = observation.timeMs;
@@ -126,7 +138,7 @@ export class LocalizationFilter {
     this.sources.add(observation.source);
   }
 
-  private predict(targetTimeMs: number) {
+  private ageUncertainty(targetTimeMs: number) {
     if (!this.state || !this.covariance) throw new Error('Localization filter is not initialized.');
     if (targetTimeMs < this.timeMs)
       throw new Error('Localization observations must be time ordered.');
@@ -136,7 +148,11 @@ export class LocalizationFilter {
     const transition = identity(STATE_SIZE);
     transition[X][VX] = deltaSeconds;
     transition[Y][VY] = deltaSeconds;
-    this.state = multiplyVector(transition, this.state);
+
+    // Retain the existing uncertainty envelope for unobserved motion, but do
+    // not propagate the position mean from the previous stride's velocity.
+    // A step already contains its complete displacement. Heading/floor events
+    // and gaps in delivery are not observations of continued walking.
 
     const accelerationVariance = this.config.accelerationNoiseMetersPerSecond2 ** 2;
     const positionNoise = 0.25 * deltaSeconds ** 4 * accelerationVariance;
@@ -222,11 +238,11 @@ export class LocalizationFilter {
       timeMs: this.timeMs,
       position: [this.state[X], this.state[Y], this.elevationMeters],
       velocity: [this.state[VX], this.state[VY], 0],
-      headingDegrees: normalizeDegrees(radiansToDegrees(this.state[HEADING])),
+      headingDegrees: this.headingKnown ? normalizeDegrees(radiansToDegrees(this.state[HEADING])) : null,
       floorId: this.floorId,
       covariance: this.covariance.map((row) => [...row]),
       positionSigmaMeters: Math.sqrt(Math.max(this.covariance[X][X], this.covariance[Y][Y])),
-      headingSigmaDegrees: radiansToDegrees(Math.sqrt(this.covariance[HEADING][HEADING])),
+      headingSigmaDegrees: this.headingKnown ? radiansToDegrees(Math.sqrt(this.covariance[HEADING][HEADING])) : null,
       lastCorrectionTimeMs: this.lastCorrectionTimeMs,
       observationSources: [...this.sources].sort(),
       quality: this.quality(),
@@ -234,6 +250,8 @@ export class LocalizationFilter {
   }
 
   apply(observation: LocalizationObservation): LocalizationEstimate {
+    if (observation.kind === 'heading-calibration') requireHeadingCalibration(observation, this.frame);
+    if (observation.kind === 'heading') requireHeadingMeasurement(observation);
     if (observation.kind === 'initial-fix') {
       if (this.state) throw new Error('Localization filter has already been initialized.');
       this.initialize(observation);
@@ -243,25 +261,42 @@ export class LocalizationFilter {
       throw new Error('The first localization observation must be an initial fix.');
     }
 
-    const previousTimeMs = this.timeMs;
-    this.predict(observation.timeMs);
+    this.ageUncertainty(observation.timeMs);
     this.sources.add(observation.source);
 
     if (observation.kind === 'position-fix') {
       this.updatePosition(observation.position, observation.accuracyMeters ** 2);
       this.lastCorrectionTimeMs = observation.timeMs;
-    } else if (observation.kind === 'heading') {
+    } else if (observation.kind === 'heading-calibration') {
+      this.state[HEADING] = degreesToRadians(observation.headingDegrees);
+      for (let index = 0; index < STATE_SIZE; index += 1) {
+        this.covariance[index][HEADING] = 0;
+        this.covariance[HEADING][index] = 0;
+      }
+      this.covariance[HEADING][HEADING] = degreesToRadians(observation.accuracyDegrees) ** 2;
+      this.headingKnown = true;
+    } else if (observation.kind === 'heading-unavailable') {
+      this.headingKnown = false;
+    } else if (observation.kind === 'heading' && this.headingKnown) {
       this.updateHeading(observation.headingDegrees, observation.accuracyDegrees ** 2);
     } else if (observation.kind === 'step') {
+      if (!this.headingKnown) {
+        // An observed stride has no known displacement direction. Do not turn
+        // the internal numeric placeholder into northward movement or replay
+        // this stride later when calibration arrives.
+        this.state[VX] = 0;
+        this.state[VY] = 0;
+        this.covariance[X][X] += observation.distanceMeters ** 2 + observation.varianceMeters2;
+        this.covariance[Y][Y] += observation.distanceMeters ** 2 + observation.varianceMeters2;
+        return this.estimate();
+      }
       const heading = this.state[HEADING];
       const directionX = Math.sin(heading);
       const directionY = Math.cos(heading);
-      const elapsedSeconds = Math.max(0.001, (observation.timeMs - previousTimeMs) / 1_000);
-      const expectedDistance =
-        (this.state[VX] * directionX + this.state[VY] * directionY) * elapsedSeconds;
-      const correction = observation.distanceMeters - expectedDistance;
-      this.state[X] += directionX * correction;
-      this.state[Y] += directionY * correction;
+      // Apply each observed stride once, independent of how many unrelated
+      // observations arrived since the previous stride.
+      this.state[X] += directionX * observation.distanceMeters;
+      this.state[Y] += directionY * observation.distanceMeters;
       const speed = observation.distanceMeters / Math.max(0.001, observation.durationMs / 1_000);
       this.state[VX] = directionX * speed;
       this.state[VY] = directionY * speed;
@@ -277,6 +312,13 @@ export class LocalizationFilter {
       }
     }
 
+    if (observation.kind !== 'step') {
+      // Velocity describes only the interval of an observed stride, not a
+      // continuous-motion prediction. A position correction may also update
+      // these components through covariance; that is not measured velocity.
+      this.state[VX] = 0;
+      this.state[VY] = 0;
+    }
     return this.estimate();
   }
 }

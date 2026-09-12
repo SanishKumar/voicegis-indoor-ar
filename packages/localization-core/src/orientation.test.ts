@@ -178,7 +178,8 @@ function imuEvent(
 
 /** Feeds one second of samples at 100 ms and returns the integrated heading. */
 function headingAfterOneSecond(gyroscope: Vector3, tilt: DeviceOrientationSample | null) {
-  const integrator = new DeadReckoningIntegrator();
+  // Explicit synthetic initial direction; a QR cannot supply this calibration.
+  const integrator = new DeadReckoningIntegrator({}, 0, 0);
   for (let timeMs = 0; timeMs <= 1_000; timeMs += 100) {
     integrator.push(reduceImuEvent(imuEvent(timeMs, gyroscope, tilt), deviceSensors));
   }

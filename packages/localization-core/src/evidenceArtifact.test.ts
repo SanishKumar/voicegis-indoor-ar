@@ -7,6 +7,7 @@ import {
   EVIDENCE_ARTIFACT_VERSION,
   SessionRecorder,
   buildEvidenceReport,
+  deriveRecording,
   exportEvidenceArtifact,
   importEvidenceArtifact,
   sealEvidenceArtifact,
@@ -222,10 +223,10 @@ describe('the artifact names its inputs without republishing them', () => {
     // version change through silently, and these numbers are how a reader tells
     // a figure produced by one processor from a figure produced by another.
     expect(sealed.versions).toMatchObject({
-      processor: '0.2.0',
-      policy: '0.2.0',
+      processor: '0.4.0',
+      policy: '0.3.0',
       captureStream: '0.2.0',
-      recording: '0.1.0',
+      recording: '0.2.0',
     });
   });
 
@@ -242,8 +243,14 @@ describe('the artifact names its inputs without republishing them', () => {
   it('records the figure alongside the status that qualifies it', async () => {
     const sealed = await seal();
 
-    expect(sealed.evidence.status).toBe('ok');
-    expect(sealed.evidence.medianHorizontalErrorMeters).toBeCloseTo(3.688, 3);
+    // Five detected strides are still recorded, but their travel direction was
+    // never calibrated. Processor 0.4 cannot turn them into an accuracy figure.
+    const strides = deriveRecording(walk()).observations.filter((entry) => entry.kind === 'step');
+    expect(strides).toHaveLength(5);
+    expect(strides.every((entry) => entry.distanceMeters === 0.72)).toBe(true);
+
+    expect(sealed.evidence.status).toBe('unverified-heading');
+    expect(sealed.evidence.medianHorizontalErrorMeters).toBeNull();
     expect(sealed.evidence.eligibility).toMatchObject({ surveyed: 1, publishable: 1, excluded: 0 });
   });
 
@@ -412,21 +419,19 @@ describe('the official path takes no tuning', () => {
     const session = walk();
     const sealed = await seal(session);
 
-    // The same capture through the diagnostic path with a stride override
-    // reports a different figure while still claiming ok. That is precisely why
-    // nothing sealed may go through it.
+    // Tuning changes diagnostic uncertainty, but cannot repair missing heading
+    // provenance or change the authoritative configuration used by sealing.
     const bent = buildEvidenceReport(session, {
       deadReckoningConfig: { strideLengthMeters: 1.4 },
     });
 
-    expect(bent.report.evidenceStatus).toBe('ok');
-    expect(bent.report.medianHorizontalErrorMeters).not.toBe(
-      sealed.evidence.medianHorizontalErrorMeters,
-    );
+    expect(bent.report.evidenceStatus).toBe('unverified-heading');
+    expect(bent.report.medianHorizontalErrorMeters).toBeNull();
+    expect(bent.report.qualityFrameCounts).not.toEqual(buildEvidenceReport(session).report.qualityFrameCounts);
     expect(bent.configuration.deadReckoning.strideLengthMeters).toBe(1.4);
     // The sealed artifact is unmoved by any of it.
     expect(sealed.configuration.deadReckoning.strideLengthMeters).toBe(0.72);
-    expect(sealed.evidence.medianHorizontalErrorMeters).toBeCloseTo(3.688, 3);
+    expect(sealed.evidence.medianHorizontalErrorMeters).toBeNull();
   });
 
   it('exposes no way to pass tuning into sealing', () => {
@@ -454,7 +459,7 @@ describe('verification detects a tampered artifact', () => {
     });
 
     expect(verification.valid).toBe(false);
-    expect(verification.valid === false && verification.issues[0]).toMatch(/content hash/);
+    expect(verification.valid === false && verification.issues.join(' ')).toMatch(/null/);
   });
 
   it('rejects a rewritten status, configuration, policy, or manifest hash', async () => {
@@ -581,7 +586,7 @@ describe('a capture and its manifest must describe the same walk', () => {
     );
 
     expect(result.sealed).not.toBeNull();
-    expect(result.sealed!.evidence.status).toBe('ok');
+    expect(result.sealed!.evidence.status).toBe('unverified-heading');
     expect(result.sealed!.manifest.missingScoredCount).toBe(0);
   });
 
@@ -826,11 +831,12 @@ describe('validation runs before any hash is trusted', () => {
     const sealed = await seal();
 
     const withheld = structuredClone(sealed) as EvidenceArtifact;
-    withheld.evidence.medianHorizontalErrorMeters = null;
+    withheld.evidence.status = 'ok';
     expect(decodeEvidenceArtifact(withheld).artifact).toBeNull();
 
     const claimed = structuredClone(sealed) as EvidenceArtifact;
     claimed.evidence.status = 'interrupted-capture';
+    claimed.evidence.medianHorizontalErrorMeters = 1.1;
     expect(decodeEvidenceArtifact(claimed).artifact).toBeNull();
   });
 
@@ -895,7 +901,7 @@ describe('inputs are read once, before anything is awaited', () => {
     const result = await pending;
     expect(result.sealed).not.toBeNull();
     expect(result.sealed!.manifest.scoredCount).toBe(1);
-    expect(result.sealed!.evidence.status).toBe('ok');
+    expect(result.sealed!.evidence.status).toBe('unverified-heading');
   });
 });
 
@@ -1046,7 +1052,7 @@ describe('decoding is deep, descriptor-safe, and produces the value returned', (
     expect(verification.valid).toBe(true);
     expect(verification.valid && verification.artifact).not.toBe(live);
     expect(verification.valid && verification.artifact.evidence.medianHorizontalErrorMeters)
-      .toBeCloseTo(3.688, 3);
+      .toBeNull();
   });
 
   it('refuses to export anything import would reject', async () => {
@@ -1530,7 +1536,7 @@ describe('a status is a claim about the counts beside it', () => {
 
   it('still accepts each status on the walk that genuinely produced it', async () => {
     const cases: Array<[string, CheckpointManifest]> = [
-      ['ok', manifest()],
+      ['unverified-heading', manifest()],
       ['insufficient-ground-truth', diagnosticOnly()],
       ['manifest-not-satisfied', missingScored()],
     ];
@@ -1578,7 +1584,7 @@ describe('no status can be worn by a walk that did not earn it', () => {
     // constrained the one under review and left the rest free to carry any
     // counts at all.
     const sealed = await seal();
-    expect(sealed.evidence.status).toBe('ok');
+    expect(sealed.evidence.status).toBe('unverified-heading');
 
     const cannotCarryScoredMarks = [
       'insufficient-localization',
@@ -1661,7 +1667,7 @@ describe('a status is also a claim about whether the walk localized', () => {
   it('seals each shape with the status it earned', async () => {
     const { scored, diagnosticOnly, noFix } = await shapes();
 
-    expect(scored.evidence.status).toBe('ok');
+    expect(scored.evidence.status).toBe('unverified-heading');
     expect(diagnosticOnly.evidence.status).toBe('insufficient-ground-truth');
     expect(noFix.evidence.status).toBe('insufficient-localization');
 
