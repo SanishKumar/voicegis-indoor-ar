@@ -90,9 +90,9 @@ bypasses were also reproduced before closing them. Existing motion and bounds
 fixtures now declare their synthetic calibration separately, retaining the
 original displacement, numeric-bound and tampering assertions.
 
-Next is the interrupted-IMU continuity/reset slice: missing orientation, sample
-gaps, incomplete footfall peaks and lifecycle boundaries must invalidate stale
-integration consistently. A versioned raw calibration/pose capture event, with
+The subsequent [interrupted-IMU continuity slice](imu-continuity.md) invalidates
+stale integration across missing rates, material sample gaps and lifecycle
+boundaries (processor 0.5 / policy 0.4). A versioned raw calibration/pose capture event, with
 real-device timing and surveyed alignment provenance, is also required before
 accuracy reporting can resume. That capture-schema design, live watchdogs,
 matching/floor-transition gates and physical pilot validation remain separate

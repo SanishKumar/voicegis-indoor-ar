@@ -74,9 +74,11 @@ interruption immediately; this change alone is not that adapter.
 
 `motionAccounting.test.ts` includes deterministic stop/turn/gap, cadence,
 correction and IMU-to-replay regressions. All 15 cases failed on the prior filter.
-The IMU sample reducer, peak detector, heading provenance, map/compass transform
-and floor-transition policy remain separate unfinished work; these regressions
-do not validate phone carriage, wheelchair motion or sensor accuracy.
+Subsequent slices define the coordinate/heading boundary, position-only recording
+and [interruption resets](imu-continuity.md), now under processor 0.5 / policy 0.4.
+Live silence handling, raw calibration provenance and floor-transition policy
+remain open. These regressions do not validate phone carriage, wheelchair motion
+or sensor accuracy.
 
 ## Evidence still required
 

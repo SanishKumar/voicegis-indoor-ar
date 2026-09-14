@@ -147,4 +147,4 @@ export function publishableSurveyMethods(): SurveyMethod[] {
  * records both this and the resolved values, so a reader can tell a policy
  * change from a configuration change without diffing every field.
  */
-export const EVIDENCE_POLICY_VERSION = '0.3.0' as const;
+export const EVIDENCE_POLICY_VERSION = '0.4.0' as const;

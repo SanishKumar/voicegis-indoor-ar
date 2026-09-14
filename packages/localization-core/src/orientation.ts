@@ -102,8 +102,8 @@ export function worldUpComponent(vector: Vector3, betaDegrees: number, gammaDegr
  * carries no information about which way is up, so its turn cannot be resolved
  * into a heading change. Returning zero would assert that the walker did not
  * turn, which is a claim the data does not support and the kind of invention
- * that makes a drifted heading look confident. The caller is expected to skip
- * the sample rather than integrate it.
+ * that makes a drifted heading look confident. The caller must invalidate its
+ * previous heading rather than hold it through the missing rate.
  */
 export function headingRateDegreesPerSecond(
   gyroscope: Vector3,

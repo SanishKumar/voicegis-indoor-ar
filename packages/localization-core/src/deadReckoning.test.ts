@@ -83,7 +83,7 @@ describe('IMU dead reckoning', () => {
     expect(integrator.heading).toBeCloseTo(20, 0);
   });
 
-  it('re-seeds integrated heading when a checkpoint reports the truth', () => {
+  it('re-seeds integrated heading only through explicit calibration', () => {
     const integrator = new DeadReckoningIntegrator({}, 0, 0);
     runAll(
       integrator,

@@ -164,10 +164,28 @@ Phase 2 is still incomplete.
 
 See [the migration and compatibility notes](localization/position-only-recording.md).
 The user reprioritized the bounded 2D/3D presentation slice below ahead of
-interrupted IMU continuity/reset semantics; return to that continuity work after
-the presentation slice is reviewed. A future raw
+interrupted IMU continuity/reset semantics; slice D now follows that presentation
+work. A future raw
 calibration/pose event, surveyed alignment and physical-device timing validation
 are still required before accuracy reporting or automatic Visitor progress.
+
+#### Phase 2, slice D: interrupted IMU continuity
+
+- Missing/non-finite heading rates invalidate direction before any same-sample
+  step. Full interruptions discard incomplete peaks and pre-interruption timing.
+- An explicit sample-gap limit (default 1,000 ms, inclusive) is separate from
+  stride-duration tuning. Duplicate timestamps cannot complete a footfall.
+- Replay consumes independent visibility, sensor and permission gates in causal
+  order; resuming one does not reopen the others. QR/NFC cannot resume or calibrate.
+- The handset recorder writes visibility boundaries, requires fresh tilt after
+  return, and cleans up listeners and pending permission starts on exit.
+- Processor 0.5 / policy 0.4 preserve raw capture/recording 0.2 compatibility;
+  older artifacts require their original build. No accuracy evidence is admitted.
+
+See [the contract and remaining boundaries](localization/imu-continuity.md).
+Next: route-matching forward-jump, ambiguity and floor-transition gates. Live
+silence detection, raw partial-sample/calibration semantics and physical-device
+validation remain required before enabling automatic Visitor progress.
 
 ### 3. Continuous standard navigation, behind a pilot gate
 
@@ -193,8 +211,8 @@ Acceptance: a first-time user can plan and finish a test journey without instruc
 
 ### 5. Seamless 2D ↔ 3D
 
-**Priority update — implemented locally for review before returning to IMU
-continuity.** The Visitor now starts in a true orthographic 2D plan and tilts
+**Priority update — implemented before IMU continuity (slice D).** The Visitor
+now starts in a true orthographic 2D plan and tilts
 into an orbitable orthographic 3D model over the same scene. Mode changes keep
 centre, scale, map bearing, active floor, route and inspected instruction.
 Reduced-motion users switch immediately. Camera-preview round trips restore
@@ -260,7 +278,13 @@ Acceptance: timed/expired closures, closed lifts, stale offline closure data, tw
 
 ## Verification record
 
-Phase 1 was completed and is now committed at `94ccc91`. Phase 2 slices A, B and C are implemented locally for review; the rest of Phase 2 and phases 3–8 remain planned. No push or deployment was performed. In Phase 1, the pre-existing operator welcome-overlay edit in `src/index.css` was preserved unchanged; new visitor styles live in `src/components/visitorJourney.css`.
+Phase 1 was completed at `94ccc91`. At the start of the continuity slice, Phase 2
+slices A–C and the bounded 2D/3D presentation work were present in clean HEAD
+`3bb408c`. Slice D is now implemented locally for review. Remaining localization,
+live guidance, physical validation and later product work are still planned;
+presentation switching does not complete all Phase 5 acceptance gates. No commit,
+push or deployment was performed in slice D. The verification records below are
+historical per-slice results, not claims that every gate was rerun every time.
 
 Phase 1 checks on 11 September 2026:
 
@@ -343,3 +367,32 @@ Automated Chromium checks and desktop visual inspection do not establish real-ph
   not a measured accuracy improvement.
 - Previous local work was preserved. No field capture or venue artifact was
   rewritten, no commit/push/deployment was made, and Visitor tracking remains off.
+
+### Phase 2 slice D verification — 12–14 September 2026
+
+- All 19 initial core regressions failed against the actual `3bb408c` code.
+  Three initial handset/component regressions also failed before their fixes.
+  Both production-browser recorder tests failed against the prior handset/UI
+  implementation because exported visibility boundaries were missing.
+- Added **44 unit tests**. The final `npm run check`, repeated on 14 September,
+  passed: lint, type checking, **864 tests across 84 files**, all three unchanged
+  venue hashes, artifact sync, unchanged reference replay, QR sheets and the
+  public production build. The existing large-chunk warning remains.
+- The full `node scripts/runBrowserSmoke.js --workers=1` run passed **86
+  desktop/mobile Chromium tests** on 12 September, including Visitor 2D/3D
+  journeys, recorder export and existing operator regressions.
+- Final review then reproduced a queued pre-resume orientation event bypassing
+  the initial visibility reset. The timestamp-boundary correction passed its
+  unit regression. On 14 September, **six targeted production-browser checks**
+  passed against the final code, including the extended recorder export test,
+  surface round trips and direct operator routes. Command:
+  `node scripts/runBrowserSmoke.js e2e/recorder-continuity.pw.ts e2e/layout.pw.ts e2e/public-shell.pw.ts --grep "recorder exports|every surface round-trips|operator routes stay reachable" --workers=1`.
+- The full 86-test browser suite was not rerun after that final narrow correction;
+  separate offline/install suites were not rerun in this slice. Main project and
+  full browser suites ran sequentially, without relaxed assertions or timeouts.
+- Processor 0.5 / policy 0.4 deliberately change replay/eligibility semantics;
+  raw capture and recording versions stay 0.2. No hardware timing, surveyed
+  calibration, accuracy or obstacle-safety claim is implied by these tests.
+- Work remains local for review. No commit, push, deployment, venue recompile or
+  historical capture rewrite. Next bounded slice: matching forward-jump,
+  ambiguity and floor-transition gates, still before live Visitor tracking.

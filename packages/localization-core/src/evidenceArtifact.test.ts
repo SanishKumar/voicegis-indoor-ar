@@ -223,8 +223,8 @@ describe('the artifact names its inputs without republishing them', () => {
     // version change through silently, and these numbers are how a reader tells
     // a figure produced by one processor from a figure produced by another.
     expect(sealed.versions).toMatchObject({
-      processor: '0.4.0',
-      policy: '0.3.0',
+      processor: '0.5.0',
+      policy: '0.4.0',
       captureStream: '0.2.0',
       recording: '0.2.0',
     });
@@ -384,6 +384,7 @@ describe('every input is bound into the seal', () => {
     const sealed = await seal();
 
     expect(sealed.configuration.deadReckoning.strideLengthMeters).toBe(0.72);
+    expect(sealed.configuration.deadReckoning.maximumSampleGapMs).toBe(1_000);
     expect(sealed.configuration.checkpoint.qrAccuracyMeters).toBe(0.35);
     expect(sealed.configuration.routeSegmentCount).toBe(0);
     expect(sealed.configuration.thresholds).toMatchObject({
@@ -957,6 +958,12 @@ describe('decoding is deep, descriptor-safe, and produces the value returned', (
     const decoding = decodeEvidenceArtifact(forged);
     return { valid: decoding.artifact !== null, issues: decoding.issues };
   };
+
+  it.each([0, -1])('refuses an impossible continuity limit %s before checking a seal', async (gap) => {
+    const decoding = await rewritten((artifact) => { artifact.configuration.deadReckoning.maximumSampleGapMs = gap; });
+    expect(decoding.valid).toBe(false);
+    expect(decoding.issues.join(' ')).toContain('maximumSampleGapMs');
+  });
 
   it('refuses junk below a section header', async () => {
     // Validation stopped at section headers, so each of these verified once the

@@ -87,7 +87,7 @@ export interface PairingSummary {
    * says how often that happened.
    */
   pairedCount: number;
-  /** No orientation had arrived yet when the sample was recorded. */
+  /** No tilt was cached, including after invalidation or a continuity reset. */
   noOrientationCount: number;
   /**
    * An orientation existed but could not be used for this sample: stamped after
@@ -171,6 +171,7 @@ export class HandsetCaptureAdapter {
 
   private latestOrientation: DeviceOrientationSample | null = null;
   private latestOrientationAtMs: number | null = null;
+  private orientationNotBeforeMs: number | null = null;
 
   private lastMotionTimeStampMs: number | null = null;
   private readonly stalenessMs: number[] = [];
@@ -208,6 +209,21 @@ export class HandsetCaptureAdapter {
     return this.maxStalenessMs;
   }
 
+  /** A resumed stream must receive fresh tilt; keep its clock and counters.
+   * Supply the lifecycle timestamp to reject delayed pre-resume callbacks. */
+  resetOrientation(notBeforeTimeStampMs?: number) {
+    if (notBeforeTimeStampMs !== undefined) {
+      if (!finite(notBeforeTimeStampMs))
+        throw new RangeError('Orientation boundary must be finite.');
+      this.orientationNotBeforeMs = Math.max(
+        this.orientationNotBeforeMs ?? notBeforeTimeStampMs,
+        notBeforeTimeStampMs,
+      );
+    }
+    this.latestOrientation = null;
+    this.latestOrientationAtMs = null;
+  }
+
   /**
    * Stores the latest tilt. Nothing is recorded here.
    *
@@ -226,6 +242,10 @@ export class HandsetCaptureAdapter {
       !finite(event.beta) ||
       !finite(event.gamma)
     ) {
+      this.resetOrientation();
+      return;
+    }
+    if (this.orientationNotBeforeMs !== null && event.timeStamp < this.orientationNotBeforeMs) {
       return;
     }
     // Deliberately does not adopt the session origin. Orientation is context

@@ -97,9 +97,10 @@ or backgrounded preview. Permission denial has no effect on map navigation.
   unknown-heading observations. See [the migration](position-only-recording.md).
   The raw capture schema still needs a measured calibration/pose event; neither
   adapter is connected to Visitor movement, and current captures cannot publish
-  accuracy under processor 0.4 / policy 0.3.
-- Implement interrupted IMU continuity/reset semantics and a real live-session
-  watchdog; the preview watchdog is not a positioning session.
+  accuracy under current processor 0.5 / policy 0.4.
+- [Slice D](imu-continuity.md) implements deterministic IMU continuity and recorder
+  visibility boundaries. A real live-session watchdog remains required; the
+  preview watchdog is not a positioning session.
 - Add matching ambiguity, forward-progress and verified floor-transition gates.
 - Survey a venue and validate calibration, carriage, accessibility and accuracy
   on actual phones. Synthetic event dispatch and Chromium layouts do not verify

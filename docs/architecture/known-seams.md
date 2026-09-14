@@ -20,12 +20,11 @@ This does **not** finish the localization contract:
 - Slice C makes `CheckpointAdapter` position-only and removes scan-to-gyro heading
   resets. Recording 0.2 requires a separate venue-bound travel calibration;
   unknown heading freezes movement/guidance. Raw capture 0.2 has no such event,
-  so processor 0.4 / policy 0.3 withhold its accuracy (`unverified-heading` when
+  so current processor 0.5 / policy 0.4 withhold its accuracy (`unverified-heading` when
   otherwise eligible). A versioned raw calibration/pose event remains required.
-- `DeadReckoningIntegrator` can integrate yaw across missing samples and retain
-  an incomplete acceleration peak across interruptions. Unresolved heading
-  samples are counted but stale heading can still be re-emitted, and steps can
-  still be produced against it. It needs a continuity/reset contract.
+- Slice D invalidates heading on missing rates and discards partial motion across
+  material sample gaps or lifecycle boundaries. This closes deterministic IMU
+  continuity, not the live silence/watchdog or raw partial-sample capture contract.
 - Replay quality ages only when an observation arrives. A live session needs
   explicit permission/lifecycle handling and a staleness watchdog, not a timer
   that extrapolates the last stride's velocity.
@@ -34,7 +33,8 @@ This does **not** finish the localization contract:
 
 The camera preview now refuses relative/unqualified compass alignment, and its
 optional heading diagnostics expire or pause instead of retaining stale values.
-That preview lifecycle does not fix the separate IMU/recording continuity path.
+The separate IMU/recording path is covered by
+[the continuity contract](../localization/imu-continuity.md).
 See [the Visitor heading contract](../localization/visitor-heading-contract.md).
 The [position-only recording migration](../localization/position-only-recording.md)
 explains legacy-file refusals, calibration declarations and null heading.
@@ -60,7 +60,8 @@ devices. There is no adaptive GPU quality tier or handset performance budget
 yet. The compact route sheet still needs the broader cartographic/UX refinement
 in phase 4; an explicit Expand map action gives the model the available screen.
 
-Return to interrupted IMU continuity after independent review of this slice.
+The subsequent continuity slice is now implemented locally; matching ambiguity,
+forward-jump and floor-transition gates are the next bounded software work.
 See [map-view validation notes](../visitor-map-views.md).
 
 ## Nothing dates a checkpoint manifest before the walk it governs
@@ -402,17 +403,22 @@ scored against. Excluding ineligible checkpoints bounds *which* marks are
 scored; it does not bound the correctness of the estimate they are scored
 against.
 
-## Inertial integration ignores interruptions
+## Live silence and partial raw samples remain outside replay continuity
 
-`DeadReckoningIntegrator.push` integrates yaw rate over the gap since the last
-sample. When a session is backgrounded and resumed, the first resumed sample is
-integrated across the entire missing interval and invents a heading change that
-never happened. Lifecycle events are recorded but not consumed.
+Processor 0.5 consumes capture lifecycle boundaries and resets heading and the
+step detector across interruptions; missing heading rates invalidate stale
+direction immediately. The handset recorder now writes visibility boundaries,
+clears cached orientation and cleans up pending permission starts. See
+[the continuity slice](../localization/imu-continuity.md).
 
-Deferred to the interruption-recovery slice. Until then, any walk containing a
-`backgrounded` lifecycle event should be treated as heading-unreliable after
-that point, and **its accuracy figures must not be published** — this is the
-defect that was shown to move a checkpoint error from 2.828 m to 0.776 m.
+Replay still requires an incoming sample or boundary to notice an interruption.
+A live session needs a watchdog for total silence. The browser adapter also
+rejects/counts incomplete raw motion samples without serializing their loss;
+short rejected runs cannot be reconstructed from capture 0.2. Tilt staleness is
+measured, not default-gated. Raw capture evolution and real-device timing must
+resolve these before device-frame evidence admission or Visitor tracking.
+Interrupted captures remain ineligible for accuracy, including permission denial
+under policy 0.4. No synthetic interrupted walk has become publishable.
 
 ## Orientation is projected, but a device-frame walk is still not evidence
 
@@ -473,8 +479,9 @@ that it was plausible; it turns out to be the ordinary behaviour of a browser
 with nothing to report.
 
 A sample that cannot be resolved — device frame with no orientation — yields
-null rather than zero, and `DeadReckoningIntegrator` steps over it rather than
-integrating it, counting it in `unresolvedHeadingSamples`. Zero would assert the
+null rather than zero. `DeadReckoningIntegrator` immediately invalidates heading,
+counting it in `unresolvedHeadingSamples`; valid acceleration may still produce
+an unlocated stride, never directional displacement. Zero would assert the
 walker held their course, which is a measurement nobody took. Nothing reads that
 counter yet: the only way to reach a nonzero value is a device-frame capture,
 and the policy refuses those wholesale. It exists so the count predates the

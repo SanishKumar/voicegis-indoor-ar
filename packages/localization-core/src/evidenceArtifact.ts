@@ -50,7 +50,7 @@ export const EVIDENCE_ARTIFACT_VERSION = '0.1.0' as const;
  * The derivation and replay pipeline that turned a capture into a figure.
  * Bumped whenever a change could move a number from the same inputs.
  */
-export const EVIDENCE_PROCESSOR_VERSION = '0.4.0' as const;
+export const EVIDENCE_PROCESSOR_VERSION = '0.5.0' as const;
 
 /** The manifest shape, versioned separately: it is authored before a walk. */
 export const CHECKPOINT_MANIFEST_VERSION = '0.2.0' as const;
@@ -504,6 +504,7 @@ const DEAD_RECKONING_CONFIG_KEYS = [
   'stepThresholdMetersPerSecond2',
   'minimumStepIntervalMs',
   'maximumStepIntervalMs',
+  'maximumSampleGapMs',
   'strideLengthMeters',
   'strideVarianceMeters2',
   'headingAccuracyDegrees',
@@ -786,6 +787,22 @@ function decodeCheckpointConfig(
   };
 }
 
+function decodeDeadReckoningConfig(
+  decoder: ArtifactDecoder,
+  configuration: Record<string, unknown> | null,
+): DeadReckoningConfig {
+  const values = decoder.numberGroup(
+    configuration,
+    'deadReckoning',
+    'configuration.deadReckoning',
+    DEAD_RECKONING_CONFIG_KEYS,
+  );
+  if (values.maximumSampleGapMs <= 0) {
+    decoder.fail('configuration.deadReckoning.maximumSampleGapMs', 'must be positive.');
+  }
+  return values as unknown as DeadReckoningConfig;
+}
+
 /**
  * A decoded artifact whose seal has *not* been checked.
  *
@@ -1027,12 +1044,7 @@ export function decodeEvidenceArtifact(value: unknown): ArtifactDecoding {
     },
     configuration: {
       checkpoint: decodeCheckpointConfig(decoder, configuration),
-      deadReckoning: decoder.numberGroup(
-        configuration,
-        'deadReckoning',
-        'configuration.deadReckoning',
-        DEAD_RECKONING_CONFIG_KEYS,
-      ) as unknown as DeadReckoningConfig,
+      deadReckoning: decodeDeadReckoningConfig(decoder, configuration),
       filter: filterIsNull
         ? null
         : (decoder.numberGroup(

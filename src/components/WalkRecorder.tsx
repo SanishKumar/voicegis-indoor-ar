@@ -93,11 +93,22 @@ export default function WalkRecorder() {
   const originRef = useRef<number>(0);
   const sessionIdRef = useRef<string>('');
   const detachRef = useRef<(() => void) | null>(null);
+  const mountedRef = useRef(false);
+  const startPendingRef = useRef(false);
+  const startGenerationRef = useRef(0);
 
   // Detaching on unmount matters more than usual here: a listener left behind
   // keeps feeding a recorder nobody is watching, and on a phone that is a
   // sensor subscription that never stops draining the battery.
-  useEffect(() => () => detachRef.current?.(), []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      startGenerationRef.current += 1;
+      startPendingRef.current = false;
+      detachRef.current?.();
+    };
+  }, []);
 
   const readStats = useCallback(() => {
     const adapter = adapterRef.current;
@@ -127,9 +138,16 @@ export default function WalkRecorder() {
   }, [phase, readStats]);
 
   const start = useCallback(async () => {
+    if (startPendingRef.current || detachRef.current) return;
+    startPendingRef.current = true;
+    const generation = ++startGenerationRef.current;
     // Must stay inside the click: iOS only honours the request during a real
     // user gesture, and an await before it would already be too late.
     const granted = await requestMotionPermission(motionEventConstructor());
+    // A permission dialog can outlive this page. A late grant must not attach
+    // orphan listeners, nor may repeated taps start overlapping captures.
+    if (!mountedRef.current || generation !== startGenerationRef.current) return;
+    startPendingRef.current = false;
     setAccess(granted);
     if (granted === 'denied' || granted === 'unsupported') return;
 
@@ -154,15 +172,32 @@ export default function WalkRecorder() {
     });
     const adapter = new HandsetCaptureAdapter(recorder, { originTimeStampMs: origin });
 
-    const onMotion = (event: Event) => adapter.handleMotion(event as unknown as MotionEventLike);
-    const onOrientation = (event: Event) =>
-      adapter.handleOrientation(event as unknown as OrientationEventLike);
+    let backgrounded = document.hidden;
+    if (backgrounded) recorder.recordLifecycle('backgrounded', 0);
+    const onMotion = (event: Event) => {
+      if (!backgrounded) adapter.handleMotion(event as unknown as MotionEventLike);
+    };
+    const onOrientation = (event: Event) => {
+      if (!backgrounded) adapter.handleOrientation(event as unknown as OrientationEventLike);
+    };
+    const onVisibilityChange = () => {
+      if (backgrounded === document.hidden) return;
+      backgrounded = document.hidden;
+      const boundaryTimeStampMs = performance.now();
+      adapter.resetOrientation(boundaryTimeStampMs);
+      recorder.recordLifecycle(
+        backgrounded ? 'backgrounded' : 'foregrounded',
+        boundaryTimeStampMs - origin,
+      );
+    };
     window.addEventListener('devicemotion', onMotion);
     window.addEventListener('deviceorientation', onOrientation);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     detachRef.current = () => {
       window.removeEventListener('devicemotion', onMotion);
       window.removeEventListener('deviceorientation', onOrientation);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       detachRef.current = null;
     };
 
@@ -287,7 +322,7 @@ export default function WalkRecorder() {
               <Stat label="Tilt lag, p95" value={formatMs(stats.pairing.p95StalenessMs)} />
               <Stat label="Tilt lag, worst" value={formatMs(stats.pairing.worstStalenessMs)} />
               {/* Pairing first, then the samples that never reached the stream. */}
-              <Stat label="No tilt yet" value={String(stats.pairing.noOrientationCount)} />
+              <Stat label="No cached tilt" value={String(stats.pairing.noOrientationCount)} />
               <Stat label="Tilt unusable" value={String(stats.pairing.unusableOrientationCount)} />
               <Stat label="Incomplete" value={String(stats.rejections.incomplete)} />
               <Stat label="Clock went back" value={String(stats.rejections.regressed)} />

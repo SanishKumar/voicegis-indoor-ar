@@ -1,4 +1,9 @@
-import type { HeadingObservation, HeadingUnavailableObservation, LocalizationObservation, StepObservation } from './types';
+import type {
+  HeadingObservation,
+  HeadingUnavailableObservation,
+  LocalizationObservation,
+  StepObservation,
+} from './types';
 
 /**
  * One inertial sample, already reduced to the two scalars dead reckoning needs.
@@ -29,8 +34,10 @@ export interface DeadReckoningConfig {
   stepThresholdMetersPerSecond2: number;
   /** Refractory period that stops one footfall being counted twice. */
   minimumStepIntervalMs: number;
-  /** Longest gap still treated as continuous walking. */
+  /** Cap on reported stride duration, not a sensor-continuity test. */
   maximumStepIntervalMs: number;
+  /** A sample gap at or above this limit breaks both heading and step continuity. */
+  maximumSampleGapMs: number;
   strideLengthMeters: number;
   strideVarianceMeters2: number;
   headingAccuracyDegrees: number;
@@ -50,6 +57,7 @@ const AUTHORITATIVE_DEAD_RECKONING_CONFIG: DeadReckoningConfig = Object.freeze({
   stepThresholdMetersPerSecond2: 1.6,
   minimumStepIntervalMs: 260,
   maximumStepIntervalMs: 2_000,
+  maximumSampleGapMs: 1_000,
   strideLengthMeters: 0.72,
   strideVarianceMeters2: 0.09,
   headingAccuracyDegrees: 12,
@@ -66,10 +74,15 @@ export const DEFAULT_DEAD_RECKONING_CONFIG: Readonly<DeadReckoningConfig> = Obje
 export function resolveDeadReckoningConfig(
   overrides: Partial<DeadReckoningConfig> = {},
 ): DeadReckoningConfig {
-  return { ...AUTHORITATIVE_DEAD_RECKONING_CONFIG, ...overrides };
+  const config = { ...AUTHORITATIVE_DEAD_RECKONING_CONFIG, ...overrides };
+  if (!Number.isFinite(config.maximumSampleGapMs) || config.maximumSampleGapMs <= 0) {
+    throw new RangeError('maximumSampleGapMs must be finite and positive.');
+  }
+  return config;
 }
 
 function normalizeHeading(degrees: number) {
+  if (!Number.isFinite(degrees)) throw new RangeError('Heading must be finite.');
   const wrapped = degrees % 360;
   return wrapped < 0 ? wrapped + 360 : wrapped;
 }
@@ -93,6 +106,7 @@ export class DeadReckoningIntegrator {
   private headingDegrees: number | null;
   private baseline: number | null = null;
   private lastSampleTimeMs: number | null = null;
+  private lastInputTimeMs: number | null = null;
   private lastStepTimeMs: number | null = null;
   private lastHeadingEmitMs: number | null = null;
   private aboveThreshold = false;
@@ -106,7 +120,8 @@ export class DeadReckoningIntegrator {
   ) {
     this.config = resolveDeadReckoningConfig(config);
     this.sequence = startSequence;
-    this.headingDegrees = initialHeadingDegrees === null ? null : normalizeHeading(initialHeadingDegrees);
+    this.headingDegrees =
+      initialHeadingDegrees === null ? null : normalizeHeading(initialHeadingDegrees);
   }
 
   get nextSequence() {
@@ -118,13 +133,8 @@ export class DeadReckoningIntegrator {
   }
 
   /**
-   * Samples that produced no heading rate and were stepped over.
-   *
-   * Nonzero means the integrated heading covers less than the walk does. No
-   * evidence path reads this yet, because the policy still refuses every
-   * capture whose frame is `device` outright, and a device-frame capture is the
-   * only way to reach it. It is here so that the count exists before the policy
-   * that needs it, rather than being invented alongside it.
+   * Samples with no finite heading rate. They invalidate, rather than hold,
+   * any previous heading. Valid acceleration may still produce unlocated steps.
    */
   get unresolvedHeadingSamples() {
     return this.unresolvedHeadingCount;
@@ -134,17 +144,52 @@ export class DeadReckoningIntegrator {
     return this.headingDegrees;
   }
 
-  /** Low-level explicit calibration, never call this from a decoded checkpoint. */
+  /** Low-level explicit calibration for the next sample onward. The caller
+   * must separately supply the filter's calibration observation. Never call
+   * this from a decoded checkpoint. No pre-calibration interval or peak survives. */
   syncHeading(headingDegrees: number) {
-    this.headingDegrees = normalizeHeading(headingDegrees);
+    const heading = normalizeHeading(headingDegrees);
+    this.clearMotionHistory();
+    this.headingDegrees = heading;
     this.lastHeadingEmitMs = null;
+  }
+
+  private clearMotionHistory() {
+    this.baseline = null;
+    this.lastSampleTimeMs = null;
+    this.lastStepTimeMs = null;
+    this.aboveThreshold = false;
+  }
+
+  private requireTime(timeMs: number) {
+    if (
+      !Number.isFinite(timeMs) ||
+      timeMs < 0 ||
+      (this.lastInputTimeMs !== null && timeMs < this.lastInputTimeMs)
+    ) {
+      throw new RangeError('IMU time must be finite, non-negative and non-regressing.');
+    }
+  }
+
+  /** A causal reset: preserve diagnostic totals and sequence, discard direction
+   * and unfinished motion. Emit loss now, even inside the normal heading cadence. */
+  interrupt(timeMs: number): LocalizationObservation[] {
+    this.requireTime(timeMs);
+    this.lastInputTimeMs = timeMs;
+    this.clearMotionHistory();
+    this.headingDegrees = null;
+    return [this.emitHeading(timeMs)];
   }
 
   private emitHeading(timeMs: number): HeadingObservation | HeadingUnavailableObservation {
     this.lastHeadingEmitMs = timeMs;
-    if (this.headingDegrees === null) return {
-      kind: 'heading-unavailable', sequence: this.sequence++, timeMs, source: 'inertial',
-    };
+    if (this.headingDegrees === null)
+      return {
+        kind: 'heading-unavailable',
+        sequence: this.sequence++,
+        timeMs,
+        source: 'inertial',
+      };
     return {
       kind: 'heading',
       sequence: this.sequence++,
@@ -170,22 +215,41 @@ export class DeadReckoningIntegrator {
 
   /** Feeds one sample and returns any observations it produced, in order. */
   push(sample: ImuSample): LocalizationObservation[] {
+    this.requireTime(sample.timeMs);
     const observations: LocalizationObservation[] = [];
     const previousTimeMs = this.lastSampleTimeMs;
+    const gapMs = previousTimeMs === null ? null : sample.timeMs - previousTimeMs;
+    this.lastInputTimeMs = sample.timeMs;
+    if (
+      !Number.isFinite(sample.accelerationMagnitude) ||
+      sample.accelerationMagnitude < 0 ||
+      gapMs === 0
+    ) {
+      return this.interrupt(sample.timeMs);
+    }
+    if (gapMs !== null && gapMs >= this.config.maximumSampleGapMs) {
+      observations.push(...this.interrupt(sample.timeMs));
+    }
     this.lastSampleTimeMs = sample.timeMs;
 
-    // A sample whose heading rate could not be resolved is stepped over rather
-    // than integrated as zero. Zero would assert that the walker held their
-    // course across the interval, which is a measurement nobody took; the
-    // heading simply stops advancing and goes stale until a scan re-seeds it.
-    // `unresolvedHeadingSamples` is what makes that staleness countable.
-    if (sample.headingRateDegreesPerSecond === null) {
+    // Loss must reach the filter before any step emitted by this same sample.
+    // A later usable rate measures change, not a new absolute direction.
+    if (
+      sample.headingRateDegreesPerSecond === null ||
+      !Number.isFinite(sample.headingRateDegreesPerSecond)
+    ) {
       this.unresolvedHeadingCount += 1;
-    } else if (this.headingDegrees !== null && previousTimeMs !== null && sample.timeMs > previousTimeMs) {
-      const elapsedSeconds = (sample.timeMs - previousTimeMs) / 1_000;
-      this.headingDegrees = normalizeHeading(
-        this.headingDegrees + sample.headingRateDegreesPerSecond * elapsedSeconds,
-      );
+      if (this.headingDegrees !== null) {
+        this.headingDegrees = null;
+        observations.push(this.emitHeading(sample.timeMs));
+      }
+    } else if (this.headingDegrees !== null && gapMs !== null && gapMs > 0) {
+      const heading = this.headingDegrees + sample.headingRateDegreesPerSecond * (gapMs / 1_000);
+      if (Number.isFinite(heading)) this.headingDegrees = normalizeHeading(heading);
+      else {
+        this.headingDegrees = null;
+        observations.push(this.emitHeading(sample.timeMs));
+      }
     }
 
     if (this.baseline === null) {
@@ -201,7 +265,9 @@ export class DeadReckoningIntegrator {
     } else if (this.aboveThreshold && excess <= 0) {
       this.aboveThreshold = false;
       const sinceLastStep =
-        this.lastStepTimeMs === null ? Number.POSITIVE_INFINITY : sample.timeMs - this.lastStepTimeMs;
+        this.lastStepTimeMs === null
+          ? Number.POSITIVE_INFINITY
+          : sample.timeMs - this.lastStepTimeMs;
       if (sinceLastStep >= this.config.minimumStepIntervalMs) {
         const durationMs = Number.isFinite(sinceLastStep)
           ? Math.min(sinceLastStep, this.config.maximumStepIntervalMs)

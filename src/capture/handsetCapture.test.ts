@@ -306,6 +306,28 @@ describe('what the adapter produces is a valid capture', () => {
   });
 });
 
+describe('orientation continuity reset', () => {
+  it('preserves the session clock, counts and a non-regressing resume boundary', () => {
+    const session = recorder();
+    const adapter = new HandsetCaptureAdapter(session, { originTimeStampMs: 1_000 });
+    adapter.handleOrientation(orientation(1_000, 0, 0));
+    adapter.handleMotion(motion(1_000));
+    adapter.resetOrientation(2_000);
+    adapter.resetOrientation(1_500);
+    adapter.handleOrientation(orientation(1_999, 0, 0));
+    adapter.handleMotion(motion(2_020));
+    adapter.handleOrientation(orientation(2_020, 0, 0));
+    adapter.handleMotion(motion(2_040));
+    expect(() => adapter.resetOrientation(NaN)).toThrow(/boundary/);
+    adapter.handleMotion(motion(2_060));
+    const imu = session.buildSession().events.filter((event) => event.type === 'imu');
+    expect(imu.map((event) => event.timeMs)).toEqual([0, 1_020, 1_040, 1_060]);
+    expect(imu.map((event) => event.orientation === null)).toEqual([false, true, false, false]);
+    expect(adapter.recordedSamples).toBe(4);
+    expect(adapter.pairing).toMatchObject({ pairedCount: 3, noOrientationCount: 1 });
+  });
+});
+
 describe('asking for motion access', () => {
   it('separates a platform that never asks from one that granted', async () => {
     await expect(requestMotionPermission(undefined)).resolves.toBe('unsupported');

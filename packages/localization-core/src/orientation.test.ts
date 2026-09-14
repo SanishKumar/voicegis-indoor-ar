@@ -206,12 +206,12 @@ describe('through the reduction the integrator consumes', () => {
     expect(integrator.heading).toBeCloseTo(30, 6);
   });
 
-  it('holds heading and counts the samples it could not resolve', () => {
+  it('invalidates heading and counts the samples it could not resolve', () => {
     // Device frame with no orientation: nothing says which way is up, so the
     // heading stops advancing rather than advancing by an invented zero.
     const integrator = headingAfterOneSecond([0, 30, 0], null);
 
-    expect(integrator.heading).toBe(0);
+    expect(integrator.heading).toBeNull();
     expect(integrator.unresolvedHeadingSamples).toBe(11);
   });
 

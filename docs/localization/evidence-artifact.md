@@ -3,7 +3,7 @@
 ## Scope
 
 This describes the tool, not a result. **No real walk has been captured yet.**
-Every fixture is synthetic. Current processor 0.4 / policy 0.3 withhold accuracy
+Every fixture is synthetic. Current processor 0.5 / policy 0.4 withhold accuracy
 from raw capture 0.2 because it records no independent travel-heading calibration.
 Earlier synthetic error figures were properties of a constructed path, not of
 any device, venue or building. Nothing here may be quoted as accuracy.
@@ -66,7 +66,7 @@ running build itself emits, so an artifact sealed under an earlier version is
 rejected before its seal is ever recomputed:
 
 ```text
-versions.processor: must be 0.4.0, which is what this build can interpret.
+versions.processor: must be 0.5.0, which is what this build can interpret.
 ```
 
 The bytes may be perfectly intact; this build simply declines to vouch for a
@@ -80,8 +80,13 @@ deliberately outside v0.1.
 
 ## Versions move when the numbers can
 
-`versions.processor` is **0.4.0**, `versions.policy` is **0.3.0**, and the derived
-recording is **0.2.0** after the position-only checkpoint slice. Scans no longer
+`versions.processor` is **0.5.0** and `versions.policy` is **0.4.0** after the
+[continuity slice](imu-continuity.md): lifecycle events and material sample gaps
+reset inertial history, missing rates invalidate heading immediately, and recorded
+permission denial withholds interrupted-walk evidence. The resolved configuration
+now includes a positive `maximumSampleGapMs` (default 1,000 ms).
+
+The derived recording remains **0.2.0** after the position-only checkpoint slice. Scans no longer
 supply handset direction. Uncalibrated strides are retained as observations but
 cannot move the position mean. The raw capture remains 0.2.0 and has no independent
 travel-heading calibration event, so even otherwise eligible walks report

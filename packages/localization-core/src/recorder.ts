@@ -820,7 +820,8 @@ export function buildEvidenceReport(
       (event.event === 'backgrounded' ||
         event.event === 'foregrounded' ||
         event.event === 'sensor-interrupted' ||
-        event.event === 'sensor-resumed'),
+        event.event === 'sensor-resumed' ||
+        event.event === 'permission-denied'),
   );
 
   // A silent gap is an interruption the device never announced. Only gaps after
@@ -1134,6 +1135,9 @@ function deriveValidatedRecording(
   const anchorResets: Array<{ timeMs: number; sequence: number }> = [];
   let order = 0;
   let firstFixKey: ObservationKey | null = null;
+  let backgrounded = false;
+  let sensorInterrupted = false;
+  let permissionDenied = false;
 
   const collect = (observations: LocalizationObservation[], sourceSequence: number) => {
     observations.forEach((observation, ordinal) => {
@@ -1144,7 +1148,38 @@ function deriveValidatedRecording(
   };
 
   for (const event of sortCaptureEvents(session.events)) {
+    if (event.type === 'lifecycle') {
+      // Independent causes: foregrounding must not clear a sensor or permission
+      // outage. A resume without its matching start still resets continuity.
+      switch (event.event) {
+        case 'backgrounded':
+          backgrounded = true;
+          break;
+        case 'foregrounded':
+          backgrounded = false;
+          break;
+        case 'sensor-interrupted':
+          sensorInterrupted = true;
+          break;
+        case 'sensor-resumed':
+          sensorInterrupted = false;
+          break;
+        case 'permission-denied':
+          permissionDenied = true;
+          break;
+        case 'permission-granted':
+          permissionDenied = false;
+          break;
+        default:
+          continue; // Structural start/end; validation bounds the session.
+      }
+      collect(deadReckoning.interrupt(event.timeMs), event.sequence);
+      continue;
+    }
     if (event.type === 'imu') {
+      // Keep raw samples in the capture, but do not derive movement while the
+      // capture itself says the stream is suspended.
+      if (backgrounded || sensorInterrupted || permissionDenied) continue;
       collect(deadReckoning.push(reduceImuEvent(event, session.device.sensors)), event.sequence);
       continue;
     }
