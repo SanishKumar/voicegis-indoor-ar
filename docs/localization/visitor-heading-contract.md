@@ -97,11 +97,13 @@ or backgrounded preview. Permission denial has no effect on map navigation.
   unknown-heading observations. See [the migration](position-only-recording.md).
   The raw capture schema still needs a measured calibration/pose event; neither
   adapter is connected to Visitor movement, and current captures cannot publish
-  accuracy under current processor 0.5 / policy 0.4.
+  accuracy under current processor 0.6 / policy 0.4.
 - [Slice D](imu-continuity.md) implements deterministic IMU continuity and recorder
   visibility boundaries. A real live-session watchdog remains required; the
   preview watchdog is not a positioning session.
-- Add matching ambiguity, forward-progress and verified floor-transition gates.
+- [Slice E](route-matching-safety.md) adds ambiguity, progress and floor-refusal
+  gates. Whole-venue off-route detection and verified connector traversal remain
+  open; a confidence value cannot establish a stair/lift transition.
 - Survey a venue and validate calibration, carriage, accessibility and accuracy
   on actual phones. Synthetic event dispatch and Chromium layouts do not verify
   Safari sensors, camera pose or real-world direction accuracy.

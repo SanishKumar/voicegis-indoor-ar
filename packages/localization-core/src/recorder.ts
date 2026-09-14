@@ -935,6 +935,11 @@ export function buildEvidenceReport(
         'wrong-floor': 0,
         'outside-gate': 0,
         'backward-progress': 0,
+        'forward-progress': 0,
+        'ambiguous-route': 0,
+        'floor-transition-unverified': 0,
+        'invalid-input': 0,
+        'route-discontinuity': 0,
       },
     },
     runtime: reportCore?.runtime ?? {

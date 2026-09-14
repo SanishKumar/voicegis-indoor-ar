@@ -1,4 +1,4 @@
-import type { LocalizationEstimate } from './types';
+import type { LocalizationEstimate, MapMatchResult } from './types';
 
 export type LocalizationRuntimeState =
   'initializing' | 'tracking' | 'degraded' | 'lost' | 'relocalizing';
@@ -29,12 +29,24 @@ function guidanceFor(state: LocalizationRuntimeState): GuidanceState {
   return 'frozen';
 }
 
+function currentRouteAccepted(estimate: LocalizationEstimate, match?: MapMatchResult) {
+  return (
+    match !== undefined &&
+    match.accepted &&
+    match.timeMs === estimate.timeMs &&
+    match.floorId === estimate.floorId &&
+    match.rawPosition[0] === estimate.position[0] &&
+    match.rawPosition[1] === estimate.position[1]
+  );
+}
+
 export class LocalizationRuntimeController {
   private state: LocalizationRuntimeState = 'initializing';
   private lostAtMs: number | null = null;
   private recoveryDurationMs: number | null = null;
   private recoveryAnchorId: string | null = null;
   private reason = 'Waiting for an initial localization estimate.';
+  private routeRequired = false;
 
   constructor(private readonly config: RecoveryConfig = DEFAULT_RECOVERY_CONFIG) {}
 
@@ -50,7 +62,8 @@ export class LocalizationRuntimeController {
     };
   }
 
-  update(estimate: LocalizationEstimate): RuntimeSnapshot {
+  update(estimate: LocalizationEstimate, routeMatch?: MapMatchResult): RuntimeSnapshot {
+    if (routeMatch !== undefined) this.routeRequired = true;
     if (estimate.quality === 'lost') {
       if (this.lostAtMs === null) this.lostAtMs = estimate.timeMs;
       this.state = 'lost';
@@ -60,7 +73,19 @@ export class LocalizationRuntimeController {
 
     if (estimate.headingDegrees === null) {
       if (this.state !== 'lost' && this.state !== 'relocalizing') this.state = 'initializing';
-      this.reason = 'Position is available but travel direction is unverified; spatial guidance is frozen.';
+      this.reason =
+        'Position is available but travel direction is unverified; spatial guidance is frozen.';
+      return this.snapshot(estimate.timeMs);
+    }
+
+    if (
+      estimate.floorTransitionPending ||
+      (this.routeRequired && !currentRouteAccepted(estimate, routeMatch))
+    ) {
+      if (this.state !== 'lost' && this.state !== 'relocalizing') this.state = 'initializing';
+      this.reason = estimate.floorTransitionPending
+        ? 'Floor change is unverified; spatial guidance is frozen until an anchor confirms location.'
+        : `No accepted route match for this estimate (${routeMatch?.reason ?? 'missing'}); spatial guidance is frozen.`;
       return this.snapshot(estimate.timeMs);
     }
 
@@ -91,7 +116,20 @@ export class LocalizationRuntimeController {
     return this.snapshot(timeMs);
   }
 
-  confirmRelocalization(estimate: LocalizationEstimate, anchorId: string): RuntimeSnapshot {
+  confirmRelocalization(
+    estimate: LocalizationEstimate,
+    anchorId: string,
+    routeMatch?: MapMatchResult,
+  ): RuntimeSnapshot {
+    const routeRequired = this.routeRequired || routeMatch !== undefined;
+    if (routeRequired && !currentRouteAccepted(estimate, routeMatch)) {
+      throw new Error(
+        'Relocalization confirmation requires an accepted route match for this estimate.',
+      );
+    }
+    if (estimate.floorTransitionPending) {
+      throw new Error('Relocalization confirmation requires a confirmed floor.');
+    }
     if (estimate.headingDegrees === null) {
       throw new Error('Relocalization confirmation requires independently established heading.');
     }
@@ -112,6 +150,7 @@ export class LocalizationRuntimeController {
     }
 
     this.state = 'tracking';
+    this.routeRequired = routeRequired;
     this.recoveryAnchorId = anchorId;
     this.recoveryDurationMs =
       this.lostAtMs === null ? null : Math.max(0, estimate.timeMs - this.lostAtMs);

@@ -183,9 +183,58 @@ are still required before accuracy reporting or automatic Visitor progress.
   older artifacts require their original build. No accuracy evidence is admitted.
 
 See [the contract and remaining boundaries](localization/imu-continuity.md).
-Next: route-matching forward-jump, ambiguity and floor-transition gates. Live
+Slice E below adds bounded route/floor safeguards. Live
 silence detection, raw partial-sample/calibration semantics and physical-device
 validation remain required before enabling automatic Visitor progress.
+
+#### Phase 2, slice E: bounded route matching and floor safety
+
+- Route-scoped matching retains a progress high-water mark and refuses large
+  forward increments, same-time advances, disconnected segment changes and
+  ambiguous crossing/parallel/retraced route legs. Straight subdivisions and
+  shared endpoints remain usable. These are conservative software gates, not
+  validated speed, clearance or positioning models.
+- Rejections cannot advance the cursor. Once route-bound, runtime updates and
+  explicit relocalization require an accepted match for the current estimate;
+  stale matches and omitted gates cannot resume guidance.
+- Unqualified floor/elevation claims retain the confirmed floor, freeze movement
+  and expose a pending transition. An adjacent, same-time anchor position/floor
+  pair can confirm/reacquire floor, but never proves a stair/lift traversal or
+  silently moves the route cursor to another floor.
+- Processor 0.6 / policy 0.4 keep capture/recording 0.2 formats; historical
+  artifacts require their original build. Only the synthetic reference report's
+  rejection-counter vocabulary changed. No Visitor movement is enabled.
+
+See [the route/floor contract](localization/route-matching-safety.md).
+Slice F below implements the shared session/freshness and reacquisition substrate.
+Whole-venue off-route alternatives, typed connector
+evidence, independently surveyed calibration and physical/mobility validation
+remain prerequisites for automatic guidance; Phase 2 is not yet complete.
+
+#### Phase 2, slice F: live-session freshness and explicit reacquisition
+
+- Added an in-memory controller owning filter, matcher and runtime for one exact
+  venue/package/route revision. It is not yet connected to Visitor or browser sensors.
+- Every read/input checks motion occurrence age; a late sample cannot conceal a
+  prior timeout. Hidden/permission/sensor/floor interruptions, quality loss and
+  route rejection retire the acquisition lease and freeze progress.
+- Recovery requires a new explicit acquisition and an internally resolved fresh
+  checkpoint, then independent travel heading and a qualified complete motion
+  sample. Old callbacks, copied leases and another route's lease cannot resume it.
+- Position/floor/matcher acquisition commits together; it can reacquire a floor
+  but never proves a connector traversal. Old heading is not carried across scans.
+- Duplicate or overlapping strides and intervals predating acquisition/calibration
+  cannot move the visitor. Detached snapshots retain last-known diagnostics but
+  expose no usable progress while frozen. An optional diagnostic watchdog has
+  explicit disposal and stopped/error cleanup.
+- Replay/evidence behavior and versions are unchanged by this slice. The new
+  1,500 ms timeout and 500 ms delivery limit are software policy, not device claims.
+
+See [the live-session contract](localization/live-session.md). Next bounded slice:
+an operator-only integration harness around verified venue/route geometry and
+consent-based observation/lifecycle ownership, with unavailable calibration shown
+honestly. Keep public Visitor progress manual until the remaining validation gates
+are met; neither a synthetic harness nor this controller establishes field accuracy.
 
 ### 3. Continuous standard navigation, behind a pilot gate
 
@@ -280,7 +329,7 @@ Acceptance: timed/expired closures, closed lifts, stale offline closure data, tw
 
 Phase 1 was completed at `94ccc91`. At the start of the continuity slice, Phase 2
 slices A–C and the bounded 2D/3D presentation work were present in clean HEAD
-`3bb408c`. Slice D is now implemented locally for review. Remaining localization,
+`3bb408c`. Slices D–F are now implemented in the workspace. Remaining localization,
 live guidance, physical validation and later product work are still planned;
 presentation switching does not complete all Phase 5 acceptance gates. No commit,
 push or deployment was performed in slice D. The verification records below are
@@ -396,3 +445,58 @@ Automated Chromium checks and desktop visual inspection do not establish real-ph
 - Work remains local for review. No commit, push, deployment, venue recompile or
   historical capture rewrite. Next bounded slice: matching forward-jump,
   ambiguity and floor-transition gates, still before live Visitor tracking.
+
+### Phase 2 slice E verification — 14 September 2026
+
+- All 11 initial route/floor regressions failed against the actual pre-change
+  implementation with the prior continuity slice preserved. Follow-up regressions
+  reproduced defects in the first implementation before correction: unrelated
+  crossings sharing progress labels, same-time advances, stale/omitted runtime
+  matches, disconnected corridor hops and over-rejection of straight subdivisions.
+- Added **42 unit tests**. `npm run check` passed: lint, types, **906 tests across
+  85 files**, all three unchanged venue hashes, artifact sync, synthetic reference
+  replay, QR sheets and public production build. The existing large-chunk warning
+  remains. No assertion or timeout was relaxed.
+- **Eight targeted desktop/mobile Chromium checks passed** against the production
+  operator build: recorder export, camera-preview return, verified check-in with
+  standard/step-free routing, and shared-scene 2D/3D switching. Command:
+  `node scripts/runBrowserSmoke.js e2e/visitor-map-views.pw.ts e2e/visitor-journey.pw.ts e2e/recorder-continuity.pw.ts --grep "2D and 3D use one scene|camera preview returns|a verified check-in drives|recorder exports" --workers=1`.
+- The full browser and offline/install suites were not rerun in this core-only
+  slice; their earlier results remain historical. Main project and browser suites
+  ran sequentially. No Visitor presentation or device enrollment changed.
+- The synthetic reference report gained five zero-valued rejection counters;
+  its observation stream, accepted matches and runtime counts are unchanged.
+  Processor 0.6 records changed semantics; policy/capture/recording stay 0.4/0.2/0.2.
+- Previous local work is preserved. No commit, push, deployment, venue recompile,
+  historical field artifact rewrite or automatic Visitor tracking was performed.
+  The default progress cap and uncertainty band are software policy, not measured
+  speed, clearance or localization accuracy. Explicit live reacquisition, freshness,
+  whole-venue off-route evidence, verified connectors and physical pilots remain open.
+
+### Phase 2 slice F verification — 15 September 2026
+
+- Added **62 live-session tests**. The initial 13 failed because the session API
+  was absent; they are feature-absence tests, not old replay bug reproductions.
+  Six follow-up tests reproduced implementation defects before correction:
+  pre-acquisition/overlapping strides, malformed stride input, stopped-session
+  timer cleanup, calibration reporting success after route rejection, and timer
+  cleanup after a consumer exception.
+- `npm run check` passed: lint, types, **968 tests across 86 files**, unchanged
+  venue hashes (386a43f4b609 / 9a9c9d37907c / 639ca9c4a7ae), artifact sync,
+  reference replay, QR sheets and public production build. The existing
+  large-chunk warning remains. No assertion or timeout was relaxed.
+- **Eight targeted desktop/mobile Chromium tests passed** against the production
+  operator build: recorder continuity export, camera-preview return, verified
+  standard/step-free routing and shared-scene 2D/3D switching. Command:
+  `node scripts/runBrowserSmoke.js e2e/visitor-map-views.pw.ts e2e/visitor-journey.pw.ts e2e/recorder-continuity.pw.ts --grep "2D and 3D use one scene|camera preview returns|a verified check-in drives|recorder exports" --workers=1`.
+- Project and browser checks ran sequentially. Full browser and separate
+  offline/install suites were not rerun; earlier results remain historical.
+  The browser checks guard existing journeys, not a live session UI integration.
+- The controller/watchdog are library-only. No sensor listener, camera access,
+  Visitor progress or automatic recovery was enabled. Browser lifecycle ownership,
+  validated calibration and real-device/mobility trials remain open. Synthetic
+  motion/calibration inputs are not surveyed accuracy or physical-safety evidence.
+- Prior local changes are preserved. No commit, push, deployment, venue compile,
+  capture/report regeneration or evidence-version change was performed in slice F.
+  Work is local for review; the next bounded slice is the operator-only integration
+  harness described above and in [the session contract](localization/live-session.md).

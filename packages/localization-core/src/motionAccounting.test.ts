@@ -135,8 +135,9 @@ describe('step-driven motion accounting', () => {
 
       expect(floor.position.slice(0, 2)).toEqual(walked.position.slice(0, 2));
       expect(floor.velocity).toEqual([0, 0, 0]);
-      // The existing floor acceptance policy is deliberately not redesigned here.
-      expect(floor.floorId).toBe(confidence >= 0.75 ? 'l1' : 'g');
+      // Neither confidence alone nor the floor hint proves a connector transition.
+      expect(floor.floorId).toBe('g');
+      expect(floor.floorTransitionPending).toBe(true);
     },
   );
 

@@ -52,7 +52,11 @@ The current core publishes:
 - contributing observation sources and last correction time;
 - explicit `high`, `degraded`, or `lost` quality.
 
-The matcher retains each raw estimate and projects it only to a same-floor route segment inside an uncertainty-aware gate. Lost quality, wrong floors, excessive distance, and implausible backward progress produce explicit rejection reasons; a nearby route never upgrades localization quality.
+The matcher retains raw estimates and projects only inside a same-floor uncertainty
+gate. Slice E adds ambiguity, bounded forward progress, connectivity and pending-floor
+refusals; a route-scoped high-water mark prevents backward jitter ratcheting.
+Rejected projections freeze route-bound runtime guidance without upgrading or
+rewriting the raw estimate. See [the limits and contract](route-matching-safety.md).
 
 Runtime state is distinct from filter quality. Lost quality freezes guidance, and a later plausible estimate enters `relocalizing` rather than silently resuming. A recent trusted visual or manual anchor must explicitly confirm recovery; that transition records anchor identity and recovery duration.
 
@@ -75,10 +79,10 @@ interruption immediately; this change alone is not that adapter.
 `motionAccounting.test.ts` includes deterministic stop/turn/gap, cadence,
 correction and IMU-to-replay regressions. All 15 cases failed on the prior filter.
 Subsequent slices define the coordinate/heading boundary, position-only recording
-and [interruption resets](imu-continuity.md), now under processor 0.5 / policy 0.4.
-Live silence handling, raw calibration provenance and floor-transition policy
-remain open. These regressions do not validate phone carriage, wheelchair motion
-or sensor accuracy.
+and [interruption resets](imu-continuity.md), followed by bounded route/floor safety
+under processor 0.6 / policy 0.4. Live silence handling, raw calibration provenance
+and verified connector traversal remain open. These regressions do not validate
+phone carriage, wheelchair motion or sensor accuracy.
 
 ## Evidence still required
 

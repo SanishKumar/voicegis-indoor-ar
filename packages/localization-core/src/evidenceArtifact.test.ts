@@ -223,7 +223,7 @@ describe('the artifact names its inputs without republishing them', () => {
     // version change through silently, and these numbers are how a reader tells
     // a figure produced by one processor from a figure produced by another.
     expect(sealed.versions).toMatchObject({
-      processor: '0.5.0',
+      processor: '0.6.0',
       policy: '0.4.0',
       captureStream: '0.2.0',
       recording: '0.2.0',

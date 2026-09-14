@@ -20,16 +20,20 @@ This does **not** finish the localization contract:
 - Slice C makes `CheckpointAdapter` position-only and removes scan-to-gyro heading
   resets. Recording 0.2 requires a separate venue-bound travel calibration;
   unknown heading freezes movement/guidance. Raw capture 0.2 has no such event,
-  so current processor 0.5 / policy 0.4 withhold its accuracy (`unverified-heading` when
+  so current processor 0.6 / policy 0.4 withhold its accuracy (`unverified-heading` when
   otherwise eligible). A versioned raw calibration/pose event remains required.
 - Slice D invalidates heading on missing rates and discards partial motion across
   material sample gaps or lifecycle boundaries. This closes deterministic IMU
   continuity, not the live silence/watchdog or raw partial-sample capture contract.
-- Replay quality ages only when an observation arrives. A live session needs
-  explicit permission/lifecycle handling and a staleness watchdog, not a timer
-  that extrapolates the last stride's velocity.
-- The route matcher lacks forward-jump and ambiguity gates; the current floor
-  observation threshold is not a verified stairs/lift transition policy.
+- Replay quality still ages only when an observation arrives. Slice F adds a
+  separate live session with clock-checked freshness and an optional diagnostic
+  watchdog, without extrapolating position. It is not connected to Visitor;
+  permission/listener ownership and a qualified handset adapter remain open.
+- Slice E adds bounded forward progress, ambiguity, connectivity and retained-floor
+  gates, and couples runtime guidance to accepted current-frame matching. The
+  per-update cap is not a field-calibrated movement budget. Whole-venue off-route
+  alternatives and verified connector transitions remain open. Slice F adds
+  explicit checkpoint reacquisition without claiming connector traversal.
 
 The camera preview now refuses relative/unqualified compass alignment, and its
 optional heading diagnostics expire or pause instead of retaining stale values.
@@ -38,6 +42,9 @@ The separate IMU/recording path is covered by
 See [the Visitor heading contract](../localization/visitor-heading-contract.md).
 The [position-only recording migration](../localization/position-only-recording.md)
 explains legacy-file refusals, calibration declarations and null heading.
+See [route-matching safety](../localization/route-matching-safety.md) for the
+pending-floor state, single-use anchor pair and deliberate refusal to infer a
+stairs/lift traversal from confidence or route geometry alone.
 
 Keep Visitor tracking checkpoint-only until these gates and device/venue tests
 are satisfied. The remaining sequence is in
@@ -60,8 +67,12 @@ devices. There is no adaptive GPU quality tier or handset performance budget
 yet. The compact route sheet still needs the broader cartographic/UX refinement
 in phase 4; an explicit Expand map action gives the model the available screen.
 
-The subsequent continuity slice is now implemented locally; matching ambiguity,
-forward-jump and floor-transition gates are the next bounded software work.
+Continuity, bounded matching/floor safety and the shared live-session substrate
+are implemented. The [live-session contract](../localization/live-session.md)
+specifies lease ownership, freshness and explicit checkpoint/heading reacquisition.
+Next is an operator-only integration harness with verified geometry and proper
+observation/lifecycle ownership, not public automatic progress. Independent
+calibration capture and device/venue validation are still missing.
 See [map-view validation notes](../visitor-map-views.md).
 
 ## Nothing dates a checkpoint manifest before the walk it governs

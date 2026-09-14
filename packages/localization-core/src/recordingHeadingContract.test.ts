@@ -101,7 +101,11 @@ describe('position-only recording 0.2', () => {
   });
 
   it('uses a later independent calibration only for later strides', () => {
-    const result = replayRecording(recording([initial(), step(100), calibration(200), step(300)]));
+    const input = recording([initial(), step(100), calibration(200), step(300)]);
+    // Direction can resume guidance only when a route also has an accepted match.
+    input.routeSegments = [{ id: 'east', floorId: 'g', from: [2, 3], to: [12, 3],
+      startProgressMeters: 0, lengthMeters: 10 }];
+    const result = replayRecording(input);
     expect(result.estimates.map((estimate) => estimate.position)).toEqual([
       [2, 3, 0],
       [2, 3, 0],

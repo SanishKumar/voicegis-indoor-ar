@@ -103,6 +103,8 @@ export class LocalizationFilter {
   private lastCorrectionTimeMs = 0;
   private readonly sources = new Set<ObservationSource>();
   private headingKnown = false;
+  private floorTransitionPending = false;
+  private pendingFloorFix: { timeMs: number; sequence: number; source: ObservationSource } | null = null;
 
   private readonly config: LocalizationFilterConfig;
   private readonly frame: LocalizationFrame | null;
@@ -240,6 +242,7 @@ export class LocalizationFilter {
       velocity: [this.state[VX], this.state[VY], 0],
       headingDegrees: this.headingKnown ? normalizeDegrees(radiansToDegrees(this.state[HEADING])) : null,
       floorId: this.floorId,
+      floorTransitionPending: this.floorTransitionPending,
       covariance: this.covariance.map((row) => [...row]),
       positionSigmaMeters: Math.sqrt(Math.max(this.covariance[X][X], this.covariance[Y][Y])),
       headingSigmaDegrees: this.headingKnown ? radiansToDegrees(Math.sqrt(this.covariance[HEADING][HEADING])) : null,
@@ -261,12 +264,24 @@ export class LocalizationFilter {
       throw new Error('The first localization observation must be an initial fix.');
     }
 
+    if (observation.kind === 'floor' && (!Number.isFinite(observation.confidence) ||
+      observation.confidence < 0 || observation.confidence > 1)) {
+      throw new Error('Floor confidence must be finite and between 0 and 1.');
+    }
+
     this.ageUncertainty(observation.timeMs);
+    const floorFix = this.pendingFloorFix;
+    this.pendingFloorFix = null;
     this.sources.add(observation.source);
 
     if (observation.kind === 'position-fix') {
       this.updatePosition(observation.position, observation.accuracyMeters ** 2);
       this.lastCorrectionTimeMs = observation.timeMs;
+      if ((observation.source === 'manual-anchor' || observation.source === 'visual-anchor') &&
+        Number.isFinite(observation.accuracyMeters) && observation.accuracyMeters > 0 &&
+        observation.position.every(Number.isFinite)) {
+        this.pendingFloorFix = { timeMs: observation.timeMs, sequence: observation.sequence, source: observation.source };
+      }
     } else if (observation.kind === 'heading-calibration') {
       this.state[HEADING] = degreesToRadians(observation.headingDegrees);
       for (let index = 0; index < STATE_SIZE; index += 1) {
@@ -280,10 +295,10 @@ export class LocalizationFilter {
     } else if (observation.kind === 'heading' && this.headingKnown) {
       this.updateHeading(observation.headingDegrees, observation.accuracyDegrees ** 2);
     } else if (observation.kind === 'step') {
-      if (!this.headingKnown) {
-        // An observed stride has no known displacement direction. Do not turn
-        // the internal numeric placeholder into northward movement or replay
-        // this stride later when calibration arrives.
+      if (!this.headingKnown || this.floorTransitionPending) {
+        // Without a known direction and floor, a stride cannot locate movement.
+        // Keep its uncertainty, not a northward or old-floor displacement; never
+        // replay it later when calibration or floor confirmation arrives.
         this.state[VX] = 0;
         this.state[VY] = 0;
         this.covariance[X][X] += observation.distanceMeters ** 2 + observation.varianceMeters2;
@@ -303,12 +318,17 @@ export class LocalizationFilter {
       this.covariance[X][X] += observation.varianceMeters2;
       this.covariance[Y][Y] += observation.varianceMeters2;
     } else if (observation.kind === 'floor') {
-      if (observation.confidence < 0 || observation.confidence > 1) {
-        throw new Error('Floor confidence must be between 0 and 1.');
-      }
-      if (observation.confidence >= 0.75) {
+      const pairedAnchor = floorFix !== null && floorFix.source === observation.source &&
+        floorFix.timeMs === observation.timeMs && floorFix.sequence + 1 === observation.sequence;
+      if (pairedAnchor && observation.confidence >= 0.75 && Number.isFinite(observation.elevationMeters) &&
+        typeof observation.floorId === 'string' && observation.floorId.length > 0) {
         this.floorId = observation.floorId;
         this.elevationMeters = observation.elevationMeters;
+        this.floorTransitionPending = false;
+      } else if (observation.floorId !== this.floorId || observation.elevationMeters !== this.elevationMeters) {
+        // Confidence is not connector evidence. Retain the last confirmed floor
+        // and freeze displacement until an adjacent anchor position/floor pair.
+        this.floorTransitionPending = true;
       }
     }
 

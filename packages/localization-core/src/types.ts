@@ -86,6 +86,8 @@ export interface LocalizationEstimate {
   headingDegrees: number | null;
   floorId: string;
   covariance: number[][];
+  /** Derived safety state; older hand-authored estimates may omit it. */
+  floorTransitionPending?: boolean;
   positionSigmaMeters: number;
   headingSigmaDegrees: number | null;
   lastCorrectionTimeMs: number;
@@ -120,10 +122,12 @@ export interface RouteMatchSegment {
 }
 
 export type MapMatchReason =
-  'matched' | 'no-route' | 'quality-lost' | 'wrong-floor' | 'outside-gate' | 'backward-progress';
+  'matched' | 'no-route' | 'quality-lost' | 'wrong-floor' | 'outside-gate' | 'backward-progress'
+  | 'forward-progress' | 'ambiguous-route' | 'floor-transition-unverified' | 'invalid-input' | 'route-discontinuity';
 
 export interface MapMatchResult {
   timeMs: number;
+  floorId: string;
   accepted: boolean;
   reason: MapMatchReason;
   rawPosition: [number, number];

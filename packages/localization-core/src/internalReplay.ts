@@ -1,6 +1,6 @@
 import { isBuildingFrameCoordinate } from './captureStream';
 import { LocalizationFilter, resolveLocalizationFilterConfig, type LocalizationFilterConfig } from './filter';
-import { matchEstimateToRoute } from './mapMatching';
+import { RouteMatchTracker } from './mapMatching';
 import { LocalizationRuntimeController, type RuntimeSnapshot } from './runtimeState';
 import { requireHeadingCalibration, requireHeadingMeasurement } from './headingObservations';
 import {
@@ -95,6 +95,8 @@ function isValidMapMatch(result: MapMatchResult) {
       result.progressMeters !== null);
 
   return (
+    result.reason !== 'invalid-input' &&
+    typeof result.floorId === 'string' && result.floorId.length > 0 &&
     Number.isFinite(result.timeMs) &&
     result.rawPosition.every(isBuildingFrameCoordinate) &&
     matchedPositionValid &&
@@ -169,15 +171,9 @@ export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
   const filter = new LocalizationFilter(filterConfig, { buildingId: recording.buildingId, packageHash: recording.packageHash });
   const estimates = recording.observations.map((observation) => filter.apply(observation));
   const runtime = new LocalizationRuntimeController();
-  const runtimeSnapshots = estimates.map((estimate) => runtime.update(estimate));
-  let previousProgressMeters: number | null = null;
-  const mapMatches = estimates.map((estimate) => {
-    const result = matchEstimateToRoute(estimate, recording.routeSegments ?? [], {
-      previousProgressMeters,
-    });
-    if (result.accepted) previousProgressMeters = result.progressMeters;
-    return result;
-  });
+  const matcher = new RouteMatchTracker(recording.routeSegments ?? []);
+  const mapMatches = estimates.map((estimate) => matcher.match(estimate));
+  const runtimeSnapshots = estimates.map((estimate, index) => runtime.update(estimate, mapMatches[index]));
   const invalidEstimateIndices = estimates.flatMap((estimate, index) =>
     isValidEstimate(estimate) ? [] : [index],
   );
@@ -262,6 +258,11 @@ export function replayCore(recording: LocalizationRecording): ReplayCoreResult {
     'wrong-floor': 0,
     'outside-gate': 0,
     'backward-progress': 0,
+    'forward-progress': 0,
+    'ambiguous-route': 0,
+    'floor-transition-unverified': 0,
+    'invalid-input': 0,
+    'route-discontinuity': 0,
   };
   mapMatches.forEach((match) => {
     reasonCounts[match.reason] += 1;

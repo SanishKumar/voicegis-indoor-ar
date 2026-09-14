@@ -61,4 +61,5 @@ export * from './recorder';
 export * from './mapMatching';
 export * from './replay';
 export * from './runtimeState';
+export * from './liveSession';
 export * from './types';

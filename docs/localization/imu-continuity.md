@@ -77,8 +77,9 @@ device-frame admission/capture contract must address this, permission revocation
 signals, independent orientation-channel silence and real device timing. The
 current device-frame refusal remains essential.
 
-Next software slice: route-matching forward-jump, ambiguity and floor-transition
-gates. Independently surveyed calibration/pose provenance, raw capture evolution,
+The subsequent [route/floor safety slice](route-matching-safety.md) adds bounded
+forward-jump, ambiguity and floor-refusal gates under processor 0.6 / policy 0.4.
+Independently surveyed calibration/pose provenance, raw capture evolution,
 live observation-age policy and real iOS/Android/mobility testing remain required
 before automatic Visitor progress. These synthetic tests do not certify any
 stride model, sensor accuracy, safe deadline or real-building route.
