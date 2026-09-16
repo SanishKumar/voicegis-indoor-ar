@@ -28,7 +28,9 @@ This does **not** finish the localization contract:
 - Replay quality still ages only when an observation arrives. Slice F adds a
   separate live session with clock-checked freshness and an optional diagnostic
   watchdog, without extrapolating position. It is not connected to Visitor;
-  permission/listener ownership and a qualified handset adapter remain open.
+  slice G2 adds operator-only permission/listener ownership and an input adapter.
+  Physical timing qualification and independent travel calibration remain open;
+  the panel never forwards uncalibrated input as a motion heartbeat.
 - Slice E adds bounded forward progress, ambiguity, connectivity and retained-floor
   gates, and couples runtime guidance to accepted current-frame matching. The
   per-update cap is not a field-calibrated movement budget. Whole-venue off-route
@@ -70,9 +72,17 @@ in phase 4; an explicit Expand map action gives the model the available screen.
 Continuity, bounded matching/floor safety and the shared live-session substrate
 are implemented. The [live-session contract](../localization/live-session.md)
 specifies lease ownership, freshness and explicit checkpoint/heading reacquisition.
-Next is an operator-only integration harness with verified geometry and proper
-observation/lifecycle ownership, not public automatic progress. Independent
-calibration capture and device/venue validation are still missing.
+Slices G1/G2 provide the [operator harness](../localization/operator-session-harness.md):
+verified canonical route geometry, manual checkpoint tests, watchdog expiry and
+explicit stop/background recovery, plus separately opt-in motion/tilt diagnostics.
+The handset adapter rejects partial/stale input and resets across acquisition,
+calibration and lifecycle boundaries. Pending permissions cannot revive a stopped
+owner. Raw readiness may remain observable after a guidance fault, but cannot
+restore tracking. No camera or independent calibration source is supplied;
+Visitor progress remains unchanged. Its calibrated forwarding path is tested
+with synthetic declarations only. Measured calibration capture and physical
+device/venue/mobility validation are still missing, as described in
+[the handset contract](../localization/live-handset-input.md).
 See [map-view validation notes](../visitor-map-views.md).
 
 ## Nothing dates a checkpoint manifest before the walk it governs

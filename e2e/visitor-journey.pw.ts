@@ -101,6 +101,33 @@ test('a first-time visitor names a destination, then a start, and gets a route',
   await expect(page.getByText('Outpatient Pharmacy', { exact: true }).first()).toBeVisible();
 });
 
+test('a missing camera explains the failure and preserves the route on return', async ({
+  page,
+  allowBrowserError,
+}) => {
+  allowBrowserError(/console: Camera preview failed: NotFoundError: Requested device not found/);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      value: async () => {
+        throw new DOMException('Requested device not found', 'NotFoundError');
+      },
+    });
+  });
+  await openPharmacyRoute(page);
+  await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
+  const instruction = await page.locator('.nav-current-instruction').innerText();
+  await page.getByRole('button', { name: 'Which way?' }).click();
+  await expect(page.locator('.camera-preview-fallback')).toContainText(
+    'Requested device not found',
+  );
+  const exit = page.getByRole('button', { name: 'Exit to plan', exact: true });
+  await expectCenterHitTarget(exit);
+  await exit.click();
+  await expect(page.locator('.nav-current-instruction')).toHaveText(instruction, {
+    useInnerText: true,
+  });
+});
+
 test('camera heading stays uncalibrated and its controls remain reachable', async ({
   page,
 }, testInfo) => {

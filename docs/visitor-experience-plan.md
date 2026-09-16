@@ -230,11 +230,54 @@ remain prerequisites for automatic guidance; Phase 2 is not yet complete.
 - Replay/evidence behavior and versions are unchanged by this slice. The new
   1,500 ms timeout and 500 ms delivery limit are software policy, not device claims.
 
-See [the live-session contract](localization/live-session.md). Next bounded slice:
-an operator-only integration harness around verified venue/route geometry and
-consent-based observation/lifecycle ownership, with unavailable calibration shown
-honestly. Keep public Visitor progress manual until the remaining validation gates
-are met; neither a synthetic harness nor this controller establishes field accuracy.
+See [the live-session contract](localization/live-session.md). Slice G1 below
+starts its operator-only integration. Keep public Visitor progress manual until
+the remaining validation gates are met; neither a synthetic harness nor this
+controller establishes field accuracy.
+
+#### Phase 2, slice G1: checkpoint-only operator integration
+
+- Added a **Checkpoint session** diagnostic under **Record** in the operator
+  build. It reads the selected Visitor route without receiving navigation actions.
+  The public build excludes the panel and its preparation module.
+- Starting verifies package bytes, recalculates the current route policy and
+  constructs filter-local segments/anchors from canonical geometry. Changed
+  package/route/profile/closure bindings retire the old owner. Pending integrity
+  results cannot enroll after stop, backgrounding or unmount.
+- Manual authored-payload tests exercise checkpoint refusal, resolution, silent
+  expiry and explicit reacquisition. The last checkpoint is diagnostic only;
+  no heading is inferred and guidance always stays frozen. The panel never
+  requests cameras or sensors and never starts the separate walk recorder.
+- Stop/unmount dispose the watchdog. Hidden/pagehide interrupts the session;
+  foregrounding alone cannot resume it. This is an in-memory diagnostic, not
+  measured capture or field accuracy evidence. Evidence versions are unchanged.
+
+See [the harness guide](localization/operator-session-harness.md). Slice G2 below
+adds consent-owned handset input without enabling Visitor progress.
+
+#### Phase 2, slice G2: opt-in handset input diagnostics
+
+- Added separate explicit motion/tilt opt-in under the operator checkpoint panel.
+  Starting the session alone requests nothing. Both permission requests occur
+  within the user action; denial, cancellation, late grants, hidden/pagehide,
+  replacement and unmount cannot silently enroll or resume input.
+- A lease-bound adapter pairs complete motion with fresh tilt, preserves event
+  occurrence clocks, projects gyro rates through the existing device profile and
+  resets cached tilt, heading and unfinished strides at recovery boundaries.
+  Partial, stale, future, duplicate and regressing input is refused. Timers and
+  orientation-only input never manufacture qualified motion heartbeats.
+- The panel shows paired/rejected counts and sample age. Guidance stays frozen:
+  it has no measured travel-heading source. Continued raw readiness after a
+  guidance fault cannot restore the session. Neither compass alpha, route shape
+  nor QR orientation is used as calibration.
+- The calibrated forwarding API is synthetic-tested but unused by the UI.
+  Samples remain in memory, the recorder is separate, the public build excludes
+  the new modules, and capture/replay/evidence contracts are unchanged.
+
+See [the input contract](localization/live-handset-input.md). Next is measured
+independent travel-heading capture and real-device timing/mobility qualification,
+not automatic Visitor progress. Whole-venue off-route evidence, verified
+connectors and predeclared pilot gates remain open.
 
 ### 3. Continuous standard navigation, behind a pilot gate
 
@@ -500,3 +543,69 @@ Automated Chromium checks and desktop visual inspection do not establish real-ph
   capture/report regeneration or evidence-version change was performed in slice F.
   Work is local for review; the next bounded slice is the operator-only integration
   harness described above and in [the session contract](localization/live-session.md).
+
+### Browser-smoke repair and slice G1 verification — 15 September 2026
+
+- Reproduced the two reported smoke failure families before changing production
+  behavior: deterministic missing-camera rejection and an expanded directions
+  panel intercepting the retry action. The four desktop/mobile regression cases
+  failed against the existing code. A separate 320 px Cancel-button viewport
+  assertion then reproduced horizontal clipping before its CSS correction.
+- Camera geometry tests now use an explicit empty test stream. A separate
+  missing-camera journey expects exactly its one known console error and verifies
+  that returning preserves the instruction. Global console-error checks remain
+  strict. Map recovery is in the visible directions scroll flow, with real hit
+  testing and clicks at compact, expanded and 320 px sizes. No forced clicks,
+  retries or longer timeouts were added.
+- Added **26 unit tests**: 11 canonical package/route preparation tests and 15
+  harness ownership/lifecycle tests. The initial missing factory was feature
+  absence, not an old behavioral bug. A follow-up check caught a misleading
+  "Not started" label after cancelling pending verification; it now says "Stopped".
+- `npm run check` passed: lint, types, **994 tests across 88 files**, unchanged
+  venue hashes (386a43f4b609 / 9a9c9d37907c / 639ca9c4a7ae), artifact sync,
+  reference replay, QR sheets and public production build. The existing chunk-size
+  warning remains. No venue, capture, report or evidence version was regenerated.
+- Targeted production-browser checks passed for the six camera/recovery cases
+  and the two operator diagnostic journeys. The latter use the real Asterion
+  package and check expiry/reacquisition, no hardware permission requests,
+  unchanged Visitor state, lifecycle cleanup and reachable 320 px controls.
+  Narrow-screen recovery and diagnostic screenshots were visually inspected.
+- The complete `npm run test:browser` passed with `CI=true` on this Windows host:
+  **90 operator tests** (6.9 minutes), **12 public offline tests** (45.5 seconds),
+  and **2 install/update-failure tests** (19.2 seconds), **104 total**, one worker,
+  no skips or retries. Unit and browser gates ran sequentially. This is not a
+  claim that the remote Linux GitHub job has been rerun; that remains to be done.
+- `git diff --check` passed. Work remains local for review, with no commit, push
+  or deployment. Qualified handset input and measured independent calibration
+  remain open; no automatic Visitor movement or physical accuracy claim was added.
+
+### Phase 2 slice G2 verification — 16 September 2026
+
+- Added **46 unit tests**: 22 reducer tests, 12 permission-subscription tests and
+  12 additional harness tests. Missing new modules initially produced feature-
+  absence failures, not proof of defects in the existing replay pipeline.
+  Follow-up tests reproduced five implementation defects before correction:
+  raw readiness disappearing after startup disorder, accepting calibration behind
+  consumed input, no first-sample deadline after calibration, copied acquisition
+  tokens being accepted, and diagnostic heading surviving acquisition replacement.
+- `npm run check` passed: lint, types, **1,040 tests across 90 files**, unchanged
+  venue hashes (386a43f4b609 / 9a9c9d37907c / 639ca9c4a7ae), artifact sync,
+  reference replay, QR sheets and public production build. The existing chunk-size
+  warning remains. No venue, capture, recording, report or evidence version changed.
+- The panel has no independent pose producer and never invokes calibrated motion
+  forwarding. Software tests of that path use explicit synthetic declarations;
+  neither those tests nor the browser permission fixtures establish physical
+  device behavior, localization accuracy or safe automatic navigation.
+- The complete `npm run test:browser` passed with `CI=true` on this Windows host:
+  **94 operator tests** (6.1 minutes), **12 public offline tests** (37.4 seconds)
+  and **2 install/update-failure tests** (19.1 seconds), **108 total**, one worker,
+  no skips or retries. The operator suite includes six desktop/mobile harness
+  journeys; the new opt-in cases cover paired/partial input, denial, cancelled
+  late grants, Visitor isolation and real hit targets at 320 px. The fresh mobile
+  screenshot was visually inspected. Project and browser gates ran sequentially.
+- The public build-graph guard excludes both handset modules, and offline tests
+  confirm a guessed operator hash exposes no diagnostic. `git diff --check`
+  passed. No assertion, retry count or timeout was relaxed.
+- Existing local work is preserved. Nothing was committed, pushed or deployed;
+  the remote Linux GitHub job has not been rerun. The next boundary remains
+  measured independent calibration and physical handset/venue validation.

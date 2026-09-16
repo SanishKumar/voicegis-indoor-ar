@@ -187,8 +187,18 @@ describe('public offline build', () => {
     expect(
       operatorModulesIn([
         'D:\\repo\\src\\components\\SpatialTwinViewer.tsx',
+        'D:\\repo\\src\\components\\SessionHarness.tsx',
+        'D:\\repo\\src\\navigation\\prepareDiagnosticSession.ts',
+        'D:\\repo\\src\\capture\\liveHandsetInput.ts',
+        'D:\\repo\\src\\capture\\handsetSubscription.ts',
         'D:\\repo\\src\\components\\VisitorApp.jsx',
       ]),
-    ).toEqual(['D:/repo/src/components/SpatialTwinViewer.tsx']);
+    ).toEqual([
+      'D:/repo/src/components/SpatialTwinViewer.tsx',
+      'D:/repo/src/components/SessionHarness.tsx',
+      'D:/repo/src/navigation/prepareDiagnosticSession.ts',
+      'D:/repo/src/capture/liveHandsetInput.ts',
+      'D:/repo/src/capture/handsetSubscription.ts',
+    ]);
   });
 });

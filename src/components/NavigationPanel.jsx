@@ -39,7 +39,7 @@ function LegIcon({ leg, size = 18 }) {
   return <ArrowUp size={size} strokeWidth={2} />;
 }
 
-export default function NavigationPanel({ onExpandMap }) {
+export default function NavigationPanel({ onExpandMap, mapRecoveryRef }) {
   const { state, actions, venue, setShowLocationPicker } = useNavigation();
   const { route, navStatus, previewStepIndex: currentStepIndex, destinationNodeId } = state;
   const panelRef = useRef(null);
@@ -108,6 +108,7 @@ export default function NavigationPanel({ onExpandMap }) {
         aria-live="polite"
         tabIndex={-1}
       >
+        <div className="map-recovery-slot" ref={mapRecoveryRef} />
         <div className="route-failure-message">
           <div className="nav-panel-dest-icon" aria-hidden="true">
             <Navigation size={18} strokeWidth={2} />
@@ -141,6 +142,7 @@ export default function NavigationPanel({ onExpandMap }) {
         role="alert"
         tabIndex={-1}
       >
+        <div className="map-recovery-slot" ref={mapRecoveryRef} />
         <div className="route-failure-message">
           <div className="route-failure-icon" aria-hidden="true">
             <AlertTriangle size={20} strokeWidth={2} />
@@ -188,6 +190,7 @@ export default function NavigationPanel({ onExpandMap }) {
       aria-label={`Directions to ${destNode?.poi?.name || 'destination'}`}
       tabIndex={-1}
     >
+      <div className="map-recovery-slot" ref={mapRecoveryRef} />
       <div className="nav-panel-header">
         <div className="nav-panel-destination">
           <p className="nav-panel-dest-eyebrow">Route preview</p>

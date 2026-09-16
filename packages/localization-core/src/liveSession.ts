@@ -221,6 +221,12 @@ export class LiveLocalizationSession {
     return this.snapshot();
   }
 
+  /** Object-identity ownership only; this does not renew a lease or assess time.
+   * Adapters must still read/check occurrence freshness on delivery. */
+  ownsAcquisition(lease: LiveObservationLease): boolean {
+    return this.lease !== null && this.lease === lease;
+  }
+
   /** Explicit user-authorized start/recovery, after the owner checks visibility and permissions.
    * Always retires old callbacks and heading, even if the route has not changed. */
   beginAcquisition(nowMs: number): LiveObservationLease {

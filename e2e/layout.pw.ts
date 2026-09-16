@@ -217,6 +217,12 @@ test('Inspector chrome keeps readable foreground and background contrast', async
 });
 
 test('camera guidance controls fit at both supported narrow widths', async ({ page }) => {
+  // Geometry must not depend on the runner having a physical camera.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      value: async () => new MediaStream(),
+    });
+  });
   await openPharmacyRoute(page);
   await page.getByRole('button', { name: 'Dismiss' }).click();
   await page.getByRole('button', { name: 'Which way?' }).click();

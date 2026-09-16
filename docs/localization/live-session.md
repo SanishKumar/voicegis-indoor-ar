@@ -2,8 +2,15 @@
 
 Phase 2 slice F, 15 September 2026. `LiveLocalizationSession` is an in-memory
 controller around the existing filter, route matcher and runtime. It is exported
-from localization-core, but **is not connected to Visitor or a handset adapter**.
+from localization-core, but **is not connected to Visitor**.
 Automatic instructions, arrival and rerouting remain disabled.
+
+Slices G1/G2 exercise this controller in an operator-only
+[diagnostic panel](operator-session-harness.md). It verifies the package/route
+boundary and owns visibility/watchdog cleanup plus optional handset listeners.
+The [input adapter](live-handset-input.md) has a synthetic-tested calibrated
+forwarding path, but the panel supplies no travel calibration or qualified motion
+and never changes Visitor progress.
 
 ## Session ownership
 
@@ -24,6 +31,10 @@ before requesting permission, starting a scan, or starting sensor work. Do not
 replace a captured lease with the latest one when an asynchronous result arrives.
 Copied lease fields, another instance's lease, and retired leases cannot submit
 observations. Identity fields are diagnostic context, not cryptographic credentials.
+
+`ownsAcquisition(lease)` checks this exact object identity without consuming time
+or renewing freshness. An adapter can reject a copied token at construction;
+it must still read/check the session and occurrence timestamps on delivery.
 
 ## Recovery sequence
 
@@ -126,8 +137,9 @@ capture/recording remain **0.2.0/0.2.0**. No report, recorded walk or venue arti
 was regenerated in slice F. The existing replay runtime is still observation-driven;
 it is not made wall-clock-driven by adding this live controller.
 
-Next: an operator-only integration harness using the verified venue and route
-boundary, consent/lifecycle ownership and a qualified observation adapter. Show
-unavailable calibration honestly; test recovery without granting public progress.
+The operator harness now owns opt-in motion/tilt delivery and lifecycle cleanup.
+Next: establish independently measured calibration and physical handset timing
+before enabling qualified input in that panel. Keep unavailable calibration
+explicit and test recovery without granting public progress.
 Whole-venue off-route evidence, surveyed calibration, connector verification,
 real-device/mobility trials and pilot release thresholds remain required.

@@ -19,6 +19,10 @@ const OPERATOR_MODULE_SUFFIXES = [
   '/src/components/SurfaceNav.jsx',
   '/src/components/VenuePackageManager.jsx',
   '/src/components/WalkRecorder.tsx',
+  '/src/components/SessionHarness.tsx',
+  '/src/navigation/prepareDiagnosticSession.ts',
+  '/src/capture/liveHandsetInput.ts',
+  '/src/capture/handsetSubscription.ts',
 ];
 
 async function filesBelow(directory, prefix = '') {

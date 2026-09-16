@@ -91,6 +91,11 @@ test('the deployable shell contains no operator route, even when its hash is gue
   await expect(page.locator('.compiled-map')).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Operator tools' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'BuildingSource workspace' })).toHaveCount(0);
+  await page.evaluate(() => {
+    window.location.hash = '#/recorder';
+  });
+  await expect(page.getByRole('region', { name: 'Checkpoint session diagnostic' })).toHaveCount(0);
+  await expect(page.locator('.compiled-map')).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Circle, Download, Square } from 'lucide-react';
 import {
   SessionRecorder,
@@ -79,7 +79,7 @@ function motionEventConstructor() {
     .DeviceMotionEvent;
 }
 
-export default function WalkRecorder() {
+export default function WalkRecorder({ children }: { children?: ReactNode } = {}) {
   const { venue } = useVenue() as { venue: RecordingVenue | null };
   const [phase, setPhase] = useState<Phase>('idle');
   const [access, setAccess] = useState<MotionPermission | null>(null);
@@ -361,6 +361,7 @@ export default function WalkRecorder() {
           )}
         </div>
       </div>
+      {children}
     </main>
   );
 }

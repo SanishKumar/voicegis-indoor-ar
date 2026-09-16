@@ -214,6 +214,16 @@
   min-height: 44px;
   cursor: pointer;
 }
+.map-recovery-slot:empty {
+  display: none;
+}
+.map-recovery-slot {
+  flex-shrink: 0;
+}
+.map-recovery-slot .compiled-map-fallback {
+  position: static;
+  max-width: none;
+}
 .compiled-map[data-render-status='lost'] .compiled-map-labels,
 .compiled-map[data-render-status='unavailable'] .compiled-map-labels {
   visibility: hidden;
@@ -298,6 +308,20 @@
 }
 
 @media (max-width: 560px) {
+  .journey-panel .nav-panel-header {
+    gap: 8px;
+  }
+  .journey-panel .nav-panel-destination {
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: anywhere;
+  }
+  .journey-panel .nav-panel-dest-name {
+    font-size: 20px;
+  }
+  .journey-panel .nav-panel-close-btn {
+    padding-inline: 12px;
+  }
   .visitor-shell .visitor-header-actions {
     width: 100%;
     flex-wrap: nowrap;

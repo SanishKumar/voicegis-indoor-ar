@@ -9,6 +9,7 @@ import VisitorApp from './components/VisitorApp.jsx';
 const SpatialTwinViewer = lazy(() => import('./components/SpatialTwinViewer.tsx'));
 const BuildingSourceWorkspace = lazy(() => import('./components/BuildingSourceWorkspace.tsx'));
 const WalkRecorder = lazy(() => import('./components/WalkRecorder.tsx'));
+const SessionHarness = lazy(() => import('./components/SessionHarness.tsx'));
 
 function currentSurface() {
   const value = window.location.hash.replace(/^#\/?/, '').split('/')[0];
@@ -72,7 +73,9 @@ function RecorderApp() {
         </main>
       }
     >
-      <WalkRecorder />
+      <WalkRecorder>
+        <SessionHarness />
+      </WalkRecorder>
     </Suspense>
   );
 }

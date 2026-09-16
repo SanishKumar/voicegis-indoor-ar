@@ -1,0 +1,117 @@
+.session-harness {
+  margin-top: 24px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 14px;
+  padding: clamp(16px, 3vw, 28px);
+  color: var(--ed-ink);
+  background: var(--ed-cream);
+  font-family: var(--ed-body);
+}
+.session-harness-heading,
+.session-harness-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+.session-harness h2 {
+  font-size: 24px;
+  margin: 4px 0 12px;
+}
+.session-harness-heading span {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.session-harness-gate {
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #e6edf3;
+}
+.session-harness p {
+  line-height: 1.6;
+  font-size: 14px;
+}
+.session-harness-note {
+  padding: 12px;
+  border-left: 3px solid #0756bb;
+  background: #0756bb08;
+}
+.session-harness-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.session-harness dt {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.session-harness dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+.session-harness-actions {
+  justify-content: flex-start;
+}
+.session-harness button,
+.session-harness input {
+  min-height: 44px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font: inherit;
+  color: inherit;
+  background: var(--ed-cream);
+}
+.session-harness button {
+  cursor: pointer;
+  max-width: 100%;
+}
+.session-harness button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.session-harness button:focus-visible,
+.session-harness input:focus-visible {
+  outline: 2px solid #0756bb;
+  outline-offset: 3px;
+}
+.session-harness form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 20px;
+}
+.session-harness label {
+  grid-column: 1 / -1;
+  font-size: 13px;
+}
+.session-harness input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.session-harness-notice:empty {
+  display: none;
+}
+.session-harness-input {
+  border-top: 1px solid var(--ed-ink);
+  margin-top: 24px;
+  padding-top: 20px;
+}
+.session-harness-input h3 {
+  font-size: 20px;
+  margin: 0 0 12px;
+}
+.session-harness-input-state {
+  margin: 16px 0;
+  font-weight: 600;
+}
+@media (max-width: 560px) {
+  .session-harness form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

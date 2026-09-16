@@ -252,9 +252,25 @@ test('a device without WebGL can still search and read the full route', async ({
   await expect(page.locator('.nav-current-instruction-label')).toContainText('2 of');
   await expect(page.getByRole('button', { name: '3D model', exact: true })).toBeDisabled();
   const instruction = await page.locator('.nav-current-instruction').innerText();
+  const retry = page.getByRole('button', { name: 'Retry map display', exact: true });
+  await retry.scrollIntoViewIfNeeded();
+  await expectCenterHitTarget(retry);
+  await page.getByRole('button', { name: /^Show all .* legs$/ }).click();
+  await retry.scrollIntoViewIfNeeded();
+  await expectInsideViewport(retry);
+  await expectCenterHitTarget(retry);
+  const originalViewport = page.viewportSize()!;
+  await page.setViewportSize({ width: 320, height: 700 });
+  await retry.scrollIntoViewIfNeeded();
+  await expectInsideViewport(retry);
+  await expectCenterHitTarget(retry);
+  await expectInsideViewport(page.getByRole('button', { name: 'Cancel', exact: true }));
+  await page.screenshot({ path: testInfo.outputPath('map-recovery-in-directions.png') });
   await page.evaluate(() => document.dispatchEvent(new Event('test-enable-webgl')));
   await page.getByRole('button', { name: 'Retry map display', exact: true }).click();
   await expect(page.locator('.compiled-map')).toHaveAttribute('data-render-status', 'ready');
+  await page.setViewportSize(originalViewport);
+  await page.getByRole('button', { name: 'Hide route details' }).click();
   await page.getByRole('button', { name: '3D model', exact: true }).click();
   await expect(page.locator('.compiled-map-canvas')).toHaveAttribute('data-camera-mode', '3d');
   await expect(page.locator('.nav-current-instruction')).toHaveText(instruction, {

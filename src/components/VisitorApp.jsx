@@ -25,6 +25,7 @@ export default function VisitorApp() {
   // Camera presentation survives a camera-preview visit, never a venue change.
   const mapViewMemory = useRef(null);
   const [expandedRoute, setExpandedRoute] = useState(null);
+  const [mapRecoveryTarget, setMapRecoveryTarget] = useState(null);
   const mapExpanded = state.route?.found === true && expandedRoute === state.route;
 
   useEffect(() => {
@@ -72,12 +73,17 @@ export default function VisitorApp() {
         {visitorViewFor(state.activeView) === VISITOR_VIEW.MAP && (
           <>
             <Suspense fallback={<div className="map-loading">Loading the venue model…</div>}>
-              <VisitorMap key={state.venueKey} viewMemory={mapViewMemory} />
+              <VisitorMap
+                key={state.venueKey}
+                viewMemory={mapViewMemory}
+                recoveryTarget={mapExpanded ? null : mapRecoveryTarget}
+              />
             </Suspense>
             <SearchPanel />
             <POICard />
             <div className="visitor-directions-layer" hidden={mapExpanded}>
               <NavigationPanel
+                mapRecoveryRef={setMapRecoveryTarget}
                 onExpandMap={() => {
                   setExpandedRoute(state.route);
                   window.requestAnimationFrame(() =>

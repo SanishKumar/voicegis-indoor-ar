@@ -42,6 +42,13 @@ Scene teardown removes pointer, wheel and keyboard listeners and disposes mesh
 resources and light-shadow render targets; failed capability checks do not
 allocate a renderer.
 
+The September 15 smoke repair places the recovery status/action in the visible
+directions panel's scroll flow when that panel is open, including expanded route
+details. Expanding the map places it back over the unobstructed map. Retry is no
+longer underneath a higher-stacking directions card. A 320 px header refinement
+keeps Cancel inside the viewport. Recovery still belongs to the same scene owner;
+it does not reset the journey or enable tracking.
+
 ## Verification
 
 - Camera math tests cover top-down axes, orthographic scale, centre/bearing/zoom

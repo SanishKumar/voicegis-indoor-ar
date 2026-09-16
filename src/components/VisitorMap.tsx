@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { LocateFixed, Maximize, Minus, Plus } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { createVenueScene, type VenueScene } from '../map/venueScene';
@@ -38,8 +39,10 @@ interface NavigationValue {
  */
 export default function VisitorMap({
   viewMemory,
+  recoveryTarget = null,
 }: {
   viewMemory: MutableRefObject<{ venueHash: string; view: VisitorMapView } | null>;
+  recoveryTarget?: HTMLElement | null;
 }) {
   const { state, actions, venue, checkIn } = useNavigation() as unknown as NavigationValue;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -165,6 +168,23 @@ export default function VisitorMap({
     if (sceneRef.current) setPresentation(sceneRef.current.getView());
   };
 
+  const recovery = (renderStatus === 'lost' || renderStatus === 'unavailable') && (
+    <div className="compiled-map-fallback" role="status">
+      <strong>{renderStatus === 'lost' ? 'Map display paused' : 'Map display unavailable'}</strong>
+      <span>Your route is unchanged. Search and written directions still work.</span>
+      <button
+        type="button"
+        onClick={() => {
+          setReady(false);
+          setRenderStatus('loading');
+          setAttempt((value) => value + 1);
+        }}
+      >
+        Retry map display
+      </button>
+    </div>
+  );
+
   return (
     <div
       className="compiled-map"
@@ -222,24 +242,9 @@ export default function VisitorMap({
           </button>
         )}
       </div>
-      {(renderStatus === 'lost' || renderStatus === 'unavailable') && (
-        <div className="compiled-map-fallback" role="status">
-          <strong>
-            {renderStatus === 'lost' ? 'Map display paused' : 'Map display unavailable'}
-          </strong>
-          <span>Your route is unchanged. Search and written directions still work.</span>
-          <button
-            type="button"
-            onClick={() => {
-              setReady(false);
-              setRenderStatus('loading');
-              setAttempt((value) => value + 1);
-            }}
-          >
-            Retry map display
-          </button>
-        </div>
-      )}
+      {/* Recovery belongs inside visible directions, never underneath their panel.
+          Expanding the map moves this same action back onto the unobstructed map. */}
+      {recoveryTarget ? createPortal(recovery, recoveryTarget) : recovery}
       {location && (
         <div className="compiled-map-location" aria-label="Planning location">
           <strong>
