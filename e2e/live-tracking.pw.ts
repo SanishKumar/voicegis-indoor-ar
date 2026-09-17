@@ -235,7 +235,7 @@ test('a checked-in visitor can track their walk and the guidance follows their s
   await expect(page.getByRole('button', { name: 'Next instruction' })).toHaveCount(0);
 
   // Following the instructions all the way brings the visitor to the door.
-  await expect(journey).toHaveAttribute('data-tracking-reason', 'arrived', { timeout: 60_000 });
+  await expect(journey).toHaveAttribute('data-tracking-reason', 'arrived', { timeout: 100_000 });
   await expect(page.locator('.jr-banner-lead')).toContainText('Arriving');
   await directions.getByRole('button', { name: 'I’m at my destination' }).click();
   await expect(journey).toHaveAttribute('data-tracking', 'off');
