@@ -24,9 +24,12 @@ import {
   Map,
   Navigation,
   Square,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { useNavigation, VIEW_TYPE, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { bannerCopy } from './journey/guidanceCopy';
+import { speechAvailable } from './journey/useSpokenGuidance.js';
 import ManeuverIcon from './journey/ManeuverIcon.jsx';
 import { ANCHOR_SIGMA } from '../navigation/liveTracker';
 import { bearingAt, guidanceAt, positionAt, trackForRoute } from '../navigation/routeProgress';
@@ -41,11 +44,26 @@ const REPORT_MS = 200;
 /** The phone held a little below level when nothing says otherwise. */
 const RESTING_PITCH_DEGREES = -18;
 
-/** @param {{ tracking?: import('./journey/useLiveTracking.js').LiveTracking | null }} props */
-export default function CameraPreview({ tracking = null }) {
+/**
+ * @param {{
+ *   tracking?: import('./journey/useLiveTracking.js').LiveTracking | null,
+ *   voice?: boolean,
+ *   onVoice?: ((on: boolean) => void) | null,
+ * }} props
+ */
+export default function CameraPreview({ tracking = null, voice = false, onVoice = null }) {
   const { state, actions, venue } = useNavigation();
   if (state.activeView !== VIEW_TYPE.CAMERA_PREVIEW) return null;
-  return <CameraGuidance state={state} actions={actions} venue={venue} tracking={tracking} />;
+  return (
+    <CameraGuidance
+      state={state}
+      actions={actions}
+      venue={venue}
+      tracking={tracking}
+      voice={voice}
+      onVoice={onVoice}
+    />
+  );
 }
 
 /** Pitch and roll of the rear camera from the gravity the phone reports, in portrait. */
@@ -99,7 +117,7 @@ function headingLabel(source) {
   }
 }
 
-function CameraGuidance({ state, actions, venue, tracking }) {
+function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   const { route, navStatus, progressMeters, locationBasis } = state;
   const navigating = navStatus === NAV_STATUS.NAVIGATING || navStatus === NAV_STATUS.ARRIVED;
   const found = navigating && Boolean(route?.found) && route.steps.length > 0;
@@ -526,6 +544,17 @@ function CameraGuidance({ state, actions, venue, tracking }) {
           <Map size={16} />
           Exit to plan
         </button>
+        {found && !cameraError && speechAvailable() && onVoice && (
+          <button
+            className="camera-preview-control"
+            aria-pressed={voice}
+            aria-label={voice ? 'Mute spoken directions' : 'Speak directions aloud'}
+            onClick={() => onVoice(!voice)}
+          >
+            {voice ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            {voice ? 'Mute' : 'Speak'}
+          </button>
+        )}
         {found && !cameraError && canTrack && (
           <button className="camera-preview-control is-primary" onClick={() => tracking.start()}>
             <LocateFixed size={16} />

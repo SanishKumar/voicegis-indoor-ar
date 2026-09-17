@@ -1,12 +1,14 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { VISITOR_VIEW, visitorViewFor } from '../context/visitorView.ts';
-import { trackForRoute } from '../navigation/routeProgress';
+import { guidanceAt, positionAt, trackForRoute } from '../navigation/routeProgress';
 import CameraPreview from './CameraPreview.jsx';
 import CheckInToast from './CheckInToast.tsx';
 import Header from './Header.jsx';
+import { bannerCopy } from './journey/guidanceCopy';
 import JourneyChrome from './journey/JourneyChrome.jsx';
 import { useLiveTracking } from './journey/useLiveTracking.js';
+import { useSpokenGuidance } from './journey/useSpokenGuidance.js';
 import { useWalkthrough } from './journey/useWalkthrough.js';
 import LocationPicker from './LocationPicker.jsx';
 import POICard from './POICard.jsx';
@@ -31,6 +33,7 @@ export default function VisitorApp() {
   // Camera presentation survives a camera-preview visit, never a venue change.
   const mapViewMemory = useRef(null);
   const [mapRecoveryTarget, setMapRecoveryTarget] = useState(null);
+  const [voice, setVoice] = useState(false);
 
   /*
    * A journey is on screen from the moment a route is asked for until it is
@@ -60,6 +63,24 @@ export default function VisitorApp() {
   });
   const live = tracking.status === 'on';
   const following = track !== null && (live || walkthrough.playing || state.progressMeters > 0);
+
+  /*
+   * Spoken turns belong to the journey, not to a view: the same instruction
+   * is read aloud whether the map or the camera is on screen, and the mute
+   * choice survives switching between them.
+   */
+  const spokenCopy =
+    track !== null && state.route?.found === true
+      ? bannerCopy(
+          state.route.steps,
+          track,
+          guidanceAt(track, state.progressMeters),
+          state.progressMeters,
+          (floorId) => venue.getFloorById(floorId)?.name,
+          positionAt(track, state.progressMeters).vertical,
+        )
+      : null;
+  useSpokenGuidance(spokenCopy, voice && state.navStatus === NAV_STATUS.NAVIGATING);
 
   useEffect(() => {
     const previous = previousOnboardingCompleteRef.current;
@@ -118,11 +139,13 @@ export default function VisitorApp() {
             <JourneyChrome
               walkthrough={walkthrough}
               tracking={tracking}
+              voice={voice}
+              onVoice={setVoice}
               onRecoverySlot={setMapRecoveryTarget}
             />
           </>
         )}
-        <CameraPreview tracking={tracking} />
+        <CameraPreview tracking={tracking} voice={voice} onVoice={setVoice} />
       </main>
       <StatusBar />
       <LocationPicker isOpen={showLocationPicker} onClose={() => setShowLocationPicker(false)} />

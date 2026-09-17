@@ -664,8 +664,9 @@ Implemented in the Visitor surface, after review of the current product:
   browser journeys stub the capability and prove the offer, the refusal and
   the flat overlay. The gravity-to-attitude signs in `attitudeFromGravity`
   follow the W3C device frame and want a check on a physical phone. Spoken
-  guidance still lives in the journey chrome, so it pauses while the camera
-  view is open.
+  guidance belongs to the journey rather than to a view: the same instruction
+  is read aloud on the map and in the camera, and the mute choice survives
+  switching between them.
 - **Gate.** lint, tsc, 1,140 unit tests including the new floor projection,
   plan-world, pose-displacement and camera guidance suites; the visitor
   browser journeys on both projects, including a tracked walk seen through the

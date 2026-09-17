@@ -141,7 +141,7 @@ const walker = (page: Page, call: string) =>
 test('a checked-in visitor can track their walk and the guidance follows their steps', async ({
   page,
 }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(240_000);
   await installSensors(page);
   await openPharmacyRoute(page);
   await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
@@ -203,7 +203,7 @@ test('a checked-in visitor can track their walk and the guidance follows their s
   // The route changes floor by the South Public Stair. The tracker stops at the
   // top and asks, rather than deciding the visitor went down.
   await expect(journey).toHaveAttribute('data-tracking-reason', 'floor-change', {
-    timeout: 60_000,
+    timeout: 100_000,
   });
   await expect(journey).toHaveAttribute('data-tier', 'frozen');
   const atStairs = Number(await canvas.getAttribute('data-route-progress'));

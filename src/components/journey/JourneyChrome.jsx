@@ -22,7 +22,7 @@ import { startPointLabel } from '../../capture/startLabel.ts';
 import { guidanceAt, positionAt, trackForRoute } from '../../navigation/routeProgress';
 import { bannerCopy, formatMeters, formatMinutes, stepSummary } from './guidanceCopy';
 import ManeuverIcon from './ManeuverIcon.jsx';
-import { speechAvailable, useSpokenGuidance } from './useSpokenGuidance.js';
+import { speechAvailable } from './useSpokenGuidance.js';
 import './journey.css';
 
 /**
@@ -36,7 +36,13 @@ import './journey.css';
  * panels mark themselves as map insets so the camera keeps the route in the
  * space between them.
  */
-export default function JourneyChrome({ walkthrough, tracking = null, onRecoverySlot }) {
+export default function JourneyChrome({
+  walkthrough,
+  tracking = null,
+  voice = false,
+  onVoice = null,
+  onRecoverySlot,
+}) {
   const {
     state,
     actions,
@@ -48,7 +54,6 @@ export default function JourneyChrome({ walkthrough, tracking = null, onRecovery
   } = useNavigation();
   const { route, navStatus, destinationNodeId, progressMeters } = state;
   const [stepsOpen, setStepsOpen] = useState(false);
-  const [voice, setVoice] = useState(false);
   const regionRef = useRef(null);
   const activeStepRef = useRef(null);
 
@@ -63,7 +68,6 @@ export default function JourneyChrome({ walkthrough, tracking = null, onRecovery
     ? bannerCopy(route.steps, track, guidance, progressMeters, floorName, riding)
     : null;
   const arrived = navStatus === NAV_STATUS.ARRIVED;
-  useSpokenGuidance(copy, voice && navStatus === NAV_STATUS.NAVIGATING);
 
   // Route creation replaces the control that launched it. Focus the new
   // calculation or guidance region once, rather than dropping the visitor on
@@ -297,7 +301,7 @@ export default function JourneyChrome({ walkthrough, tracking = null, onRecovery
             className="jr-banner-voice"
             aria-pressed={voice}
             aria-label={voice ? 'Mute spoken directions' : 'Speak directions aloud'}
-            onClick={() => setVoice((on) => !on)}
+            onClick={() => onVoice?.(!voice)}
           >
             {voice ? <Volume2 size={20} /> : <VolumeX size={20} />}
           </button>
