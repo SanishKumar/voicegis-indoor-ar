@@ -122,6 +122,30 @@
   color: var(--ed-ink);
 }
 
+/* A narrow phone gives the instruction the width: the icon and the voice
+   control shrink and the display size steps down a notch. */
+@media (max-width: 360px) {
+  .jr-banner {
+    gap: 10px;
+    min-height: 76px;
+    padding: 12px 12px 12px 14px;
+  }
+
+  .jr-banner-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .jr-banner-text {
+    font-size: 18px;
+  }
+
+  .jr-banner-voice {
+    width: 40px;
+    height: 40px;
+  }
+}
+
 /* ----------------------------------------------------------------- sheet */
 .jr-sheet {
   position: absolute;
@@ -533,4 +557,61 @@
 /* Icons keep their size; a nowrap label must not squeeze them to a sliver. */
 .jr svg {
   flex: none;
+}
+
+/* ------------------------------------------------------------ tracking */
+/* Confidence is carried by the pill's weight, not a hue: solid while
+   tracking, a heavier rule for caution, a broken rule when frozen. */
+.jr-banner-status.is-tracking {
+  border-color: var(--ed-cream);
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+}
+
+.jr-banner-status.is-caution {
+  border-width: 2px;
+  border-color: var(--ed-cream);
+  color: var(--ed-cream);
+}
+
+.jr-banner-status.is-frozen {
+  border-style: dashed;
+  border-color: var(--ed-cream);
+  color: var(--ed-cream);
+}
+
+.jr-tracking {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ed-ink-soft);
+}
+
+.jr-tracking p {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.jr-tracking strong {
+  color: var(--ed-ink);
+}
+
+.jr-secondary {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ed-ink);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.jr-secondary:focus-visible {
+  outline: 2px solid var(--ed-blue);
+  outline-offset: 2px;
 }

@@ -1,4 +1,5 @@
 import type { CompiledBuildingRuntime } from '../data/compiledBuilding';
+import { describeWithLandmarks, landmarksFrom } from './routeLandmarks';
 import {
   calculateRoute,
   type RouteFailure,
@@ -132,11 +133,19 @@ export function calculateCompiledRoute(
     };
   }
 
-  const route = calculateRoute(startId, destinationId, routingNodes, routingEdges, {
+  const computed = calculateRoute(startId, destinationId, routingNodes, routingEdges, {
     accessibleOnly: profile === 'wheelchair',
     allowRestricted: options.allowRestricted,
     closedEdgeIds: overlayResolution?.closedEdgeIds,
   });
+  // The graph gives distances and corridor names; the package's own places
+  // turn those into directions a person can follow indoors.
+  const route = computed.found
+    ? {
+        ...computed,
+        steps: describeWithLandmarks(computed.steps, computed.path, landmarksFrom(buildingPackage)),
+      }
+    : computed;
   return {
     ...route,
     receipt: {

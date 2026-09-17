@@ -17,6 +17,15 @@ export default function LocationPicker({ isOpen, onClose }) {
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
   const [scanning, setScanning] = useState(false);
+  // Opened as 'scan' when the journey asks for a code, so re-anchoring is one
+  // tap rather than a picker, then a button, then the camera. Closing puts
+  // the scanner away for next time.
+  const [openedAs, setOpenedAs] = useState(isOpen);
+  if (openedAs !== isOpen) {
+    setOpenedAs(isOpen);
+    if (isOpen === 'scan') setScanning(true);
+    else if (!isOpen) setScanning(false);
+  }
   const [scanProblem, setScanProblem] = useState(null);
   const allPOIs = useMemo(() => venue.getPOIs(), [venue]);
   const availableCategories = useMemo(
@@ -95,7 +104,14 @@ export default function LocationPicker({ isOpen, onClose }) {
           </button>
         </div>
 
-        <button type="button" className="lp-scan-cta" onClick={() => { setScanProblem(null); setScanning(true); }}>
+        <button
+          type="button"
+          className="lp-scan-cta"
+          onClick={() => {
+            setScanProblem(null);
+            setScanning(true);
+          }}
+        >
           <QrCode size={18} aria-hidden="true" />
           <span>Scan a check-in code</span>
         </button>

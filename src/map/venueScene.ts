@@ -19,6 +19,7 @@ import {
   MeshStandardMaterial,
   PCFShadowMap,
   Raycaster,
+  RingGeometry,
   Scene,
   DoubleSide,
   Shape,
@@ -124,6 +125,11 @@ export interface ScenePuck {
   floorId: string;
   /** Unit direction of travel in plan coordinates. */
   heading: readonly [number, number];
+  /**
+   * One-sigma position uncertainty in metres, drawn as a ring on the floor.
+   * Null when there is no measurement to describe - a walk-through has none.
+   */
+  sigmaMeters?: number | null;
 }
 
 export interface SceneFollow {
@@ -868,6 +874,20 @@ export function createVenueScene(
   const arrow = new Mesh(arrowGeometry, overlay(0xfff9f0));
   arrowPivot.add(arrow);
   puck.add(puckDiscs, arrowPivot);
+
+  /*
+   * The uncertainty ring is a measurement, so it is in metres on the floor
+   * rather than pixels on the screen: zoom in and it grows with the room.
+   * Only a live position has one; the walk-through marker draws none.
+   */
+  const halo = new Group();
+  halo.rotation.x = -Math.PI / 2;
+  const haloFill = new Mesh(new CircleGeometry(1, 48), overlay(ROUTE_COLOR, 0.12));
+  const haloRim = new Mesh(new RingGeometry(0.97, 1, 48), overlay(ROUTE_COLOR, 0.45));
+  haloRim.position.z = 0.001;
+  halo.add(haloFill, haloRim);
+  haloFill.renderOrder = 998;
+  haloRim.renderOrder = 999;
   // Painted in this order, last on top, regardless of depth.
   [puckShadow, puckRim, puckCore, arrow].forEach((mesh, index) => {
     mesh.renderOrder = 1000 + index;
@@ -886,6 +906,7 @@ export function createVenueScene(
     // floor is worse than none.
     if (puckTarget === null || floor === undefined || !floor.group.visible) {
       puck.removeFromParent();
+      halo.removeFromParent();
       return;
     }
     const wanted = azimuthForHeading(puckTarget.heading);
@@ -907,6 +928,14 @@ export function createVenueScene(
     if (puck.parent !== floor.group) floor.group.add(puck);
     puck.position.copy(vec([puckShown.x, puckShown.y], 0.72));
     arrowPivot.rotation.y = puckShown.angle;
+    const sigma = puckTarget.sigmaMeters;
+    if (sigma !== null && sigma !== undefined && Number.isFinite(sigma) && sigma > 0) {
+      if (halo.parent !== floor.group) floor.group.add(halo);
+      halo.position.copy(vec([puckShown.x, puckShown.y], 0.6));
+      halo.scale.setScalar(sigma);
+    } else {
+      halo.removeFromParent();
+    }
   }
 
   /** Target height and opacity for every floor, given route and active floor. */
@@ -1467,6 +1496,12 @@ export function createVenueScene(
       canvas.removeEventListener('webglcontextrestored', onContextRestored);
       clearRoute();
       puck.removeFromParent();
+      halo.removeFromParent();
+      halo.traverse((object) => {
+        const mesh = object as Mesh;
+        mesh.geometry?.dispose();
+        (mesh.material as MeshBasicMaterial | undefined)?.dispose();
+      });
       userMoveListeners.clear();
       tubeGeometry.dispose();
       aheadMaterial.dispose();

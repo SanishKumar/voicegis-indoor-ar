@@ -17,8 +17,16 @@ import type { GraphNode, RouteStep } from '../engine/routingCore';
  * claim about the connector's real travel distance.
  */
 export const VERTICAL_TRAVEL_METERS = 6;
+/**
+ * How close to the end of the route counts as being there. Live tracking
+ * reports arrival from this far out, and a visitor who says they are at their
+ * destination from within it is believed.
+ */
+export const ARRIVAL_METERS = 2.5;
+/** Two distances along the route closer than this are the same place. */
+export const PROGRESS_EPSILON = 0.05;
 
-const EPSILON = 0.05;
+const EPSILON = PROGRESS_EPSILON;
 
 export interface TrackPoint {
   id: string;
@@ -252,4 +260,76 @@ export function trackForRoute(route: { path: readonly PathNode[]; steps: readonl
     tracks.set(route, track);
   }
   return track;
+}
+
+/** Plan bearing of travel at a point: clockwise degrees from plan-up (-Y). */
+export function bearingAt(track: RouteTrack, meters: number): number {
+  const [dx, dy] = positionAt(track, meters).heading;
+  const degrees = (Math.atan2(dx, -dy) * 180) / Math.PI;
+  return degrees < 0 ? degrees + 360 : degrees;
+}
+
+function bearingOfSegment(track: RouteTrack, index: number): number | null {
+  const from = track.points[index];
+  const to = track.points[index + 1];
+  if (from === undefined || to === undefined || from.floor !== to.floor) return null;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.hypot(dx, dy) < 1e-6) return null;
+  const degrees = (Math.atan2(dx, -dy) * 180) / Math.PI;
+  return degrees < 0 ? degrees + 360 : degrees;
+}
+
+/**
+ * Every direction of travel the route takes within a window of a point. A
+ * person turns somewhere near a corner, not on it, so anything they could
+ * legitimately be facing between the corner's approach and its exit counts.
+ */
+export function bearingsNear(track: RouteTrack, meters: number, windowMeters: number): number[] {
+  const bearings: number[] = [];
+  const low = meters - windowMeters;
+  const high = meters + windowMeters;
+  for (let index = 0; index < track.points.length - 1; index += 1) {
+    const start = track.at[index];
+    const end = track.at[index + 1];
+    if (end < low || start > high) continue;
+    const bearing = bearingOfSegment(track, index);
+    if (bearing !== null && !bearings.some((known) => Math.abs(known - bearing) < 1e-6)) {
+      bearings.push(bearing);
+    }
+  }
+  return bearings;
+}
+
+export interface VerticalRun {
+  /** Progress at which the connector is boarded. */
+  boardingMeters: number;
+  /** Progress at which the connector is left. */
+  alightingMeters: number;
+  fromFloorId: string;
+  toFloorId: string;
+}
+
+/**
+ * The next storey change at or after a point, if any. A lift that passes
+ * storeys is one run from boarding to alighting.
+ */
+export function nextVerticalRun(track: RouteTrack, meters: number): VerticalRun | null {
+  for (let index = 0; index < track.points.length - 1; index += 1) {
+    const from = track.points[index];
+    const to = track.points[index + 1];
+    if (from.floor === to.floor) continue;
+    let end = index + 1;
+    while (end < track.points.length - 1 && track.points[end].floor !== track.points[end + 1].floor)
+      end += 1;
+    // A run already alighted from is behind, even when standing exactly at its exit.
+    if (track.at[end] <= meters + EPSILON) continue;
+    return {
+      boardingMeters: track.at[index],
+      alightingMeters: track.at[end],
+      fromFloorId: from.floor,
+      toFloorId: track.points[end].floor,
+    };
+  }
+  return null;
 }

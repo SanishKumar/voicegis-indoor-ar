@@ -25,6 +25,7 @@ import { useVenue } from './VenueContext.jsx';
 import { createVenueScopedState } from '../data/venueSession';
 import { checkInFromScan } from '../capture/anchorCheckIn.ts';
 import {
+  canConfirmArrival,
   JOURNEY_ACTION as ACTION,
   NAV_STATUS,
   visitorJourneyReducer,
@@ -454,15 +455,9 @@ export function NavigationProvider({ children, venue }) {
     }, []),
 
     confirmArrival: useCallback(() => {
-      if (
-        state.route?.found &&
-        state.navStatus === NAV_STATUS.NAVIGATING &&
-        state.previewStepIndex === state.route.steps.length - 1
-      ) {
-        routeDestinationRef.current = null;
-      }
+      if (canConfirmArrival(state)) routeDestinationRef.current = null;
       dispatch({ type: ACTION.CONFIRM_ARRIVAL });
-    }, [state.navStatus, state.previewStepIndex, state.route]),
+    }, [state]),
   };
 
   return (

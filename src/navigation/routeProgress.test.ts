@@ -9,6 +9,9 @@ import {
   guidanceAt,
   positionAt,
   progressForStep,
+  bearingAt,
+  bearingsNear,
+  nextVerticalRun,
   trackForRoute,
   walkedFloors,
 } from './routeProgress';
@@ -144,6 +147,56 @@ describe('route track', () => {
       step('arrive', 'c'),
     ]);
     expect(looped.stepAt).toEqual([0, 4, 8, 14]);
+  });
+});
+
+describe('bearings and storey changes along a track', () => {
+  const track = buildRouteTrack(path, steps);
+
+  it('reports the plan bearing of travel, clockwise from plan-up', () => {
+    expect(bearingAt(track, 4)).toBeCloseTo(90, 6); // east
+    expect(bearingAt(track, 12)).toBeCloseTo(180, 6); // south
+  });
+
+  it('offers every direction near a corner and one direction away from it', () => {
+    expect(bearingsNear(track, 4, 3)).toEqual([90]);
+    expect(bearingsNear(track, 10, 3).sort()).toEqual([180, 90]);
+    // A storey change has no direction of its own.
+    expect(bearingsNear(track, 15 + VERTICAL_TRAVEL_METERS / 2, 1)).toEqual([]);
+  });
+
+  it('finds the next storey change ahead, and not one already completed', () => {
+    const run = {
+      boardingMeters: 15,
+      alightingMeters: 15 + VERTICAL_TRAVEL_METERS,
+      fromFloorId: 'g',
+      toFloorId: 'l1',
+    };
+    expect(nextVerticalRun(track, 0)).toEqual(run);
+    expect(nextVerticalRun(track, 15)).toEqual(run);
+    expect(nextVerticalRun(track, 15 + VERTICAL_TRAVEL_METERS / 2)).toEqual(run);
+    // Standing exactly where the lift was left, the ride is behind.
+    expect(nextVerticalRun(track, 15 + VERTICAL_TRAVEL_METERS)).toBeNull();
+    expect(nextVerticalRun(track, 17 + VERTICAL_TRAVEL_METERS)).toBeNull();
+  });
+
+  it('treats a lift passing a storey as one run from boarding to alighting', () => {
+    const ride = buildRouteTrack(
+      [
+        node('a', 0, 0),
+        node('lift-g', 4, 0),
+        node('lift-1', 4, 0, 'l1'),
+        node('lift-2', 4, 0, 'l2'),
+        node('b', 4, 9, 'l2'),
+      ],
+      [step('start', 'a'), step('elevator', 'lift-g'), step('arrive', 'b')],
+    );
+    expect(nextVerticalRun(ride, 1)).toEqual({
+      boardingMeters: 4,
+      alightingMeters: 4 + 2 * VERTICAL_TRAVEL_METERS,
+      fromFloorId: 'g',
+      toFloorId: 'l2',
+    });
   });
 });
 

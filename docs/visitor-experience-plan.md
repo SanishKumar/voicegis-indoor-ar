@@ -609,3 +609,31 @@ Automated Chromium checks and desktop visual inspection do not establish real-ph
 - Existing local work is preserved. Nothing was committed, pushed or deployed;
   the remote Linux GitHub job has not been rerun. The next boundary remains
   measured independent calibration and physical handset/venue validation.
+
+### Live tracking and landmark directions — 17 September 2026
+
+Implemented in the Visitor surface, after review of the current product:
+
+- **Live tracking.** `src/navigation/liveTracker.ts` moves guidance from the
+  phone's motion sensors as a route-constrained tracker: strides from the
+  existing dead-reckoning integrator advance progress only while the
+  gyro-relative direction of travel agrees with the corridor; uncertainty grows
+  8% per metre and resets at every scan; storey changes are confirmed by a scan
+  or by the visitor, never inferred; a walk off the route holds the marker and
+  offers a scan. Four tiers (anchored, tracking, caution, frozen) are shown in
+  the instruction banner by weight, with a reason-specific line and the actions
+  that would help. `useLiveTracking` owns the consent-owned handset
+  subscription, tilt pairing, stop/resume and re-anchoring on a new route.
+  Documented in [visitor live tracking](localization/visitor-live-tracking.md).
+  It is separate from the recorder, replay and evidence pipeline and is not an
+  accuracy claim; no physical-handset validation has been done.
+- **Landmark directions.** `src/engine/routeLandmarks.ts` rewrites the graph's
+  instructions in the venue's own public destinations: turns at the room
+  nearest the corner, stretches past the last room whose wall lies beside them,
+  arrival on the side the door is on, judged from the corridor rather than the
+  doorway hop. Applied in `calculateCompiledRoute`, so the worker and the
+  fallback path agree. Nothing is invented; a place not beside the route is
+  not named.
+- **Gate.** 1,118 unit tests; 100 operator browser journeys including two new
+  tracking journeys driven by a synthesised, wall-clock-driven walker that
+  obeys the banner; 12 cold-offline and 2 install/update journeys unchanged.

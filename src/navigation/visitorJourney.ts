@@ -1,5 +1,7 @@
 import type { GraphNode, RouteResult } from '../engine/routingCore';
 import {
+  ARRIVAL_METERS,
+  PROGRESS_EPSILON,
   clampProgress,
   guidanceAt,
   positionAt,
@@ -182,16 +184,34 @@ export function visitorJourneyReducer(
         activeFloorId: floor || state.activeFloorId,
       };
     }
-    case 'CONFIRM_ARRIVAL':
-      if (
-        !state.route?.found ||
-        state.navStatus !== NAV_STATUS.NAVIGATING ||
-        state.route.steps.length === 0 ||
-        state.previewStepIndex !== state.route.steps.length - 1
-      )
-        return state;
-      return { ...state, navStatus: NAV_STATUS.ARRIVED, arrivalSource: 'user-confirmed' };
+    case 'CONFIRM_ARRIVAL': {
+      const route = state.route;
+      if (!route?.found || !canConfirmArrival(state)) return state;
+      // Confirming from within the arrival radius lands the visitor at the
+      // door, so the map and the step list agree with what they just said.
+      return {
+        ...state,
+        navStatus: NAV_STATUS.ARRIVED,
+        arrivalSource: 'user-confirmed',
+        progressMeters: trackForRoute(route).length,
+        previewStepIndex: route.steps.length - 1,
+      };
+    }
     default:
       return state;
   }
+}
+/**
+ * Whether the visitor may confirm they have arrived: at the final step, or
+ * within the arrival radius of the end of the route, which is where live
+ * tracking reports arrival from. Published progress can trail the tracker by
+ * a fraction, so the radius is read with that much slack.
+ */
+export function canConfirmArrival(state: VisitorJourneyState): boolean {
+  const route = state.route;
+  if (!route?.found || route.steps.length === 0 || state.navStatus !== NAV_STATUS.NAVIGATING) {
+    return false;
+  }
+  if (state.previewStepIndex === route.steps.length - 1) return true;
+  return trackForRoute(route).length - state.progressMeters <= ARRIVAL_METERS + PROGRESS_EPSILON;
 }

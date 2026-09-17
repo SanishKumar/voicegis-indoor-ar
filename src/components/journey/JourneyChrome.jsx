@@ -8,8 +8,11 @@ import {
   ChevronRight,
   ChevronUp,
   Loader2,
+  LocateFixed,
   Pause,
   Play,
+  ScanLine,
+  Square,
   Volume2,
   VolumeX,
   X,
@@ -33,7 +36,7 @@ import './journey.css';
  * panels mark themselves as map insets so the camera keeps the route in the
  * space between them.
  */
-export default function JourneyChrome({ walkthrough, onRecoverySlot }) {
+export default function JourneyChrome({ walkthrough, tracking = null, onRecoverySlot }) {
   const {
     state,
     actions,
@@ -77,6 +80,7 @@ export default function JourneyChrome({ walkthrough, onRecoverySlot }) {
 
   const endRoute = () => {
     walkthrough.pause();
+    tracking?.stop();
     actions.clearRoute();
     // Clearing guidance renders the map's search trigger again; restore focus
     // there only for this explicit dismissal.
@@ -202,23 +206,65 @@ export default function JourneyChrome({ walkthrough, onRecoverySlot }) {
     : `${shortFloor(destination?.floor)} · same floor`;
   const destinationFloor = destination ? floorName(String(destination.floor)) : undefined;
   const atEnd = guidance.atEnd;
+  const live = tracking?.status === 'on';
+  const snap = live ? tracking.snapshot : null;
+  const liveState = live ? describeTracking(snap, floorName) : null;
   const status = arrived
     ? 'Arrived'
-    : walkthrough.playing
-      ? 'Walk-through'
-      : progressMeters > 0
-        ? 'Preview'
-        : 'Overview';
+    : live
+      ? liveState.label
+      : walkthrough.playing
+        ? 'Walk-through'
+        : progressMeters > 0
+          ? 'Preview'
+          : 'Overview';
+  const statusTitle = live ? liveState.detail : statusExplanation(status);
+  const statusClass = live ? ` is-${snap?.tier ?? 'frozen'}` : '';
+
+  /*
+   * What the primary action should be depends on what the phone can do and
+   * what it knows. A phone with sensors and a known start tracks the walk;
+   * one with sensors and no known start asks for a scan first; anything else
+   * gets the walk-through, which is also always available as a preview.
+   */
+  const locationBasis = state.locationBasis;
+  const sensorsOut =
+    tracking?.status === 'unsupported' ||
+    tracking?.status === 'insecure' ||
+    tracking?.status === 'requesting';
+  const canTrack =
+    Boolean(tracking?.plausible) && !live && !sensorsOut && locationBasis !== 'default';
+  const needsScanToTrack =
+    Boolean(tracking?.plausible) && !live && !sensorsOut && locationBasis === 'default';
+  const trackLabel =
+    tracking?.status === 'hidden'
+      ? 'Resume tracking'
+      : tracking?.status === 'denied' || tracking?.status === 'error'
+        ? 'Try tracking again'
+        : 'Track my walk';
+  const scanFixes =
+    live &&
+    ['no-anchor', 'uncertain', 'off-route', 'wrong-way', 'floor-change'].includes(snap?.reason);
+  const liveArrived = live && snap?.reason === 'arrived';
+  const liveFloorChange = live && snap?.reason === 'floor-change' && snap.pendingFloor;
 
   const stepTo = (move) => {
     walkthrough.pause();
     move();
   };
+  const startTracking = () => {
+    walkthrough.pause();
+    tracking.start();
+  };
+  const openScanner = () => setShowLocationPicker('scan');
 
   return (
     <div
       className={`jr${stepsOpen ? ' has-steps' : ''}`}
       data-journey={arrived ? 'arrived' : 'guiding'}
+      data-tracking={tracking?.status ?? 'off'}
+      data-tier={snap?.tier ?? ''}
+      data-tracking-reason={snap?.reason ?? ''}
       data-map-inset=""
     >
       <section
@@ -232,7 +278,7 @@ export default function JourneyChrome({ walkthrough, onRecoverySlot }) {
         <div className="jr-banner-copy" aria-live="polite">
           <p className="jr-banner-lead">
             {arrived ? 'You’re here' : copy.lead}
-            <span className="jr-banner-status" title={statusExplanation(status)}>
+            <span className={`jr-banner-status${statusClass}`} title={statusTitle}>
               {status}
             </span>
           </p>
@@ -334,14 +380,64 @@ export default function JourneyChrome({ walkthrough, onRecoverySlot }) {
           </button>
         </div>
 
+        {tracking && tracking.status !== 'off' && (
+          <div
+            className="jr-tracking"
+            role="status"
+            data-tracking-state={live ? (snap?.tier ?? 'starting') : tracking.status}
+          >
+            <p>
+              <strong>{live ? liveState.label : haltLabel(tracking.status)}</strong>
+              {' · '}
+              {live ? liveState.detail : haltDetail(tracking.status)}
+            </p>
+            {scanFixes && (
+              <button type="button" className="jr-pill" onClick={openScanner}>
+                <ScanLine size={16} aria-hidden="true" /> Scan a code
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="jr-actions">
           {arrived ? (
             <button type="button" className="jr-primary" onClick={endRoute}>
               Done
             </button>
-          ) : atEnd ? (
+          ) : liveFloorChange ? (
+            <button type="button" className="jr-primary" onClick={tracking.confirmFloor}>
+              <Check size={18} aria-hidden="true" /> I’m on{' '}
+              {floorName(snap.pendingFloor.toFloorId) ?? 'the next floor'}
+            </button>
+          ) : atEnd || liveArrived ? (
             <button type="button" className="jr-primary" onClick={actions.confirmArrival}>
               <Check size={18} aria-hidden="true" /> I’m at my destination
+            </button>
+          ) : walkthrough.playing ? (
+            <button
+              type="button"
+              className="jr-primary"
+              aria-pressed="true"
+              onClick={walkthrough.toggle}
+            >
+              <Pause size={18} aria-hidden="true" /> Pause
+            </button>
+          ) : live ? (
+            <button
+              type="button"
+              className="jr-primary"
+              aria-pressed="true"
+              onClick={tracking.stop}
+            >
+              <Square size={16} aria-hidden="true" /> Stop tracking
+            </button>
+          ) : canTrack ? (
+            <button type="button" className="jr-primary" onClick={startTracking}>
+              <LocateFixed size={18} aria-hidden="true" /> {trackLabel}
+            </button>
+          ) : needsScanToTrack ? (
+            <button type="button" className="jr-primary" onClick={openScanner}>
+              <ScanLine size={18} aria-hidden="true" /> Scan a code to track
             </button>
           ) : (
             <button
@@ -350,19 +446,11 @@ export default function JourneyChrome({ walkthrough, onRecoverySlot }) {
               aria-pressed={walkthrough.playing}
               onClick={walkthrough.toggle}
             >
-              {walkthrough.playing ? (
-                <Pause size={18} aria-hidden="true" />
-              ) : (
-                <Play size={18} aria-hidden="true" />
-              )}
-              {walkthrough.playing
-                ? 'Pause'
-                : progressMeters > 0
-                  ? 'Continue walk-through'
-                  : 'Walk through route'}
+              <Play size={18} aria-hidden="true" />
+              {progressMeters > 0 ? 'Continue walk-through' : 'Walk through route'}
             </button>
           )}
-          {!arrived && (
+          {!arrived && !live && (
             <>
               <button
                 type="button"
@@ -397,12 +485,25 @@ export default function JourneyChrome({ walkthrough, onRecoverySlot }) {
             {stepsOpen ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
           </button>
         </div>
-
         <div className="jr-steps" id="nav-steps-list" hidden={!stepsOpen}>
-          <p className="jr-note">
-            Your position isn’t tracked yet. Guidance moves when you step through it or play the
-            walk-through; scan a check-in code to update where you are.
-          </p>
+          {!live && (
+            <p className="jr-note">
+              Your position isn’t tracked yet.{' '}
+              {!arrived && !walkthrough.playing && (canTrack || needsScanToTrack) ? (
+                <>
+                  Step through the route, or{' '}
+                  <button type="button" className="jr-secondary" onClick={walkthrough.toggle}>
+                    {progressMeters > 0
+                      ? 'continue the walk-through preview'
+                      : 'preview it as a walk-through'}
+                  </button>
+                  . Scan a check-in code to update where you are.
+                </>
+              ) : (
+                'Guidance moves when you step through it or play the walk-through; scan a check-in code to update where you are.'
+              )}
+            </p>
+          )}
           <ol className="jr-step-list">
             {steps.map((step, index) => {
               const done = guidance.stepIndex >= index && index !== steps.length - 1;
@@ -434,6 +535,94 @@ export default function JourneyChrome({ walkthrough, onRecoverySlot }) {
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * The tracker's state in the visitor's terms: a short label for the pill and
+ * one sentence saying what is happening and what, if anything, would help.
+ */
+function describeTracking(snap, floorName) {
+  if (!snap) return { label: 'Starting', detail: 'Waiting for the phone’s motion sensors.' };
+  const caution = snap.tier === 'caution';
+  switch (snap.reason) {
+    case 'no-anchor':
+      return {
+        label: 'Scan needed',
+        detail: 'Scan a check-in code so tracking has a known starting point.',
+      };
+    case 'awaiting-departure':
+      return {
+        label: 'Anchored',
+        detail: 'At the check-in point. Set off along the route and the marker will follow.',
+      };
+    case 'following':
+      return { label: 'Tracking', detail: 'Following your steps along the route.' };
+    case 'uncertain':
+      return caution
+        ? { label: 'Uncertain', detail: 'Your position has drifted. Scan the next code to fix it.' }
+        : {
+            label: 'Scan needed',
+            detail: 'Too far since the last code to trust. Scan a code to continue.',
+          };
+    case 'wrong-way':
+      return {
+        label: 'Wrong way?',
+        detail: 'Your steps head away from the route. Turn around, or scan the nearest code.',
+      };
+    case 'off-route':
+      return caution
+        ? {
+            label: 'Off route?',
+            detail: 'Your steps don’t match the route. Head back to it, or scan the nearest code.',
+          }
+        : { label: 'Off route', detail: 'Tracking paused. Return to the route and scan a code.' };
+    case 'no-heading':
+      return {
+        label: 'Counting steps',
+        detail:
+          'No gyroscope reading, so steps are counted along the route without a direction check.',
+      };
+    case 'floor-change':
+      return {
+        label: 'Changing floor',
+        detail: `Take the lift or stairs to ${floorName(snap.pendingFloor?.toFloorId) ?? 'the next floor'}. Scan the code there, or tap when you arrive.`,
+      };
+    case 'arrived':
+      return { label: 'Arriving', detail: 'You’re at your destination.' };
+    case 'sensors-silent':
+      return { label: 'Paused', detail: 'Motion sensors stopped. Check the phone isn’t locked.' };
+    default:
+      return {
+        label: 'Unavailable',
+        detail: 'This phone can’t track your walk. The walk-through and the steps still work.',
+      };
+  }
+}
+
+function haltLabel(status) {
+  return (
+    {
+      requesting: 'Asking for motion access',
+      denied: 'Motion access refused',
+      unsupported: 'No motion sensors',
+      insecure: 'Secure connection needed',
+      hidden: 'Tracking paused',
+      error: 'Tracking stopped',
+    }[status] ?? 'Tracking'
+  );
+}
+
+function haltDetail(status) {
+  return (
+    {
+      requesting: 'Allow motion and orientation access to track your walk.',
+      denied: 'Tracking needs motion access. The walk-through and the steps still work.',
+      unsupported: 'This browser offers no motion sensors.',
+      insecure: 'Motion sensors are only available over a secure (https) connection.',
+      hidden: 'Tracking stops while the app is in the background. Resume when you’re back.',
+      error: 'Something went wrong reading the sensors. You can try again.',
+    }[status] ?? ''
   );
 }
 

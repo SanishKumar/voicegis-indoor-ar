@@ -3,7 +3,7 @@ import { ASTERION_RUNTIME } from '../test/venueFixtures';
 import { createVenueScopedState } from '../data/venueSession';
 import { calculateCompiledRoute } from '../engine/compiledRoutePolicy';
 import { visitorJourneyReducer as reduce } from './visitorJourney';
-import { guidanceAt, positionAt, trackForRoute } from './routeProgress';
+import { ARRIVAL_METERS, guidanceAt, positionAt, trackForRoute } from './routeProgress';
 
 function journey() {
   const initial = createVenueScopedState(ASTERION_RUNTIME).navigation;
@@ -115,6 +115,27 @@ describe('visitor journey presentation versus location', () => {
     // Reaching the end of a walk-through is not arriving.
     expect(end.navStatus).toBe('navigating');
     expect(reduce(end, { type: 'CONFIRM_ARRIVAL' }).navStatus).toBe('arrived');
+  });
+
+  it('believes a confirmation from within the arrival radius and lands the visitor at the door', () => {
+    const { state, route } = journey();
+    const track = trackForRoute(route);
+    const last = route.steps.length - 1;
+    // Live tracking says "arrived" this far out; from any further the button is not offered.
+    const outside = reduce(state, {
+      type: 'SET_PROGRESS',
+      payload: track.length - ARRIVAL_METERS - 1,
+    });
+    expect(outside.previewStepIndex).toBeLessThan(last);
+    expect(reduce(outside, { type: 'CONFIRM_ARRIVAL' })).toBe(outside);
+    const atDoor = reduce(state, { type: 'SET_PROGRESS', payload: track.length - ARRIVAL_METERS });
+    expect(atDoor.previewStepIndex).toBeLessThan(last);
+    expect(reduce(atDoor, { type: 'CONFIRM_ARRIVAL' })).toMatchObject({
+      navStatus: 'arrived',
+      arrivalSource: 'user-confirmed',
+      progressMeters: track.length,
+      previewStepIndex: last,
+    });
   });
 
   it('manual steps and progress describe the same place', () => {

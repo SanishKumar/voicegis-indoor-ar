@@ -180,6 +180,7 @@ export default function VisitorMap({
   recoveryTarget = null,
   journey = false,
   following = false,
+  sigmaMeters = null,
 }: {
   viewMemory: MutableRefObject<MapMemory | null>;
   recoveryTarget?: HTMLElement | null;
@@ -187,6 +188,8 @@ export default function VisitorMap({
   journey?: boolean;
   /** Keep the guidance marker centred and the way ahead up. */
   following?: boolean;
+  /** Live position uncertainty to draw around the marker; null for a walk-through. */
+  sigmaMeters?: number | null;
 }) {
   const { state, actions, venue, checkIn } = useNavigation() as unknown as NavigationValue;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -352,10 +355,20 @@ export default function VisitorMap({
         puckFloor &&
         headingX !== undefined &&
         headingY !== undefined
-        ? { x: puckX, y: puckY, floorId: puckFloor, heading: [headingX, headingY] }
+        ? { x: puckX, y: puckY, floorId: puckFloor, heading: [headingX, headingY], sigmaMeters }
         : null,
     );
-  }, [ready, puckX, puckY, puckFloor, headingX, headingY, state.activeFloorId, attempt]);
+  }, [
+    ready,
+    puckX,
+    puckY,
+    puckFloor,
+    headingX,
+    headingY,
+    sigmaMeters,
+    state.activeFloorId,
+    attempt,
+  ]);
 
   useEffect(() => {
     if (!ready) return;

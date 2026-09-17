@@ -6,6 +6,7 @@ import CameraPreview from './CameraPreview.jsx';
 import CheckInToast from './CheckInToast.tsx';
 import Header from './Header.jsx';
 import JourneyChrome from './journey/JourneyChrome.jsx';
+import { useLiveTracking } from './journey/useLiveTracking.js';
 import { useWalkthrough } from './journey/useWalkthrough.js';
 import LocationPicker from './LocationPicker.jsx';
 import POICard from './POICard.jsx';
@@ -20,6 +21,7 @@ export default function VisitorApp() {
     state,
     actions,
     venue,
+    checkIn,
     onboardingComplete,
     completeOnboarding,
     showLocationPicker,
@@ -43,7 +45,21 @@ export default function VisitorApp() {
     setProgress: actions.setProgress,
     walkSpeedMps: venue.config.walkSpeedMps,
   });
-  const following = track !== null && (walkthrough.playing || state.progressMeters > 0);
+  /*
+   * Live tracking and the walk-through supply the same thing - a distance
+   * along the route - from different sources. Only one runs at a time, and
+   * the map follows the marker whenever either is moving it.
+   */
+  const tracking = useLiveTracking({
+    track,
+    locationBasis: state.locationBasis,
+    checkInDistanceMeters: checkIn?.distanceMeters ?? 0,
+    northOffsetDegrees: venue.buildingPackage.building?.coordinateSystem?.northOffsetDegrees ?? 0,
+    setProgress: actions.setProgress,
+    active: track !== null && state.navStatus === NAV_STATUS.NAVIGATING,
+  });
+  const live = tracking.status === 'on';
+  const following = track !== null && (live || walkthrough.playing || state.progressMeters > 0);
 
   useEffect(() => {
     const previous = previousOnboardingCompleteRef.current;
@@ -94,11 +110,16 @@ export default function VisitorApp() {
                 recoveryTarget={journey ? mapRecoveryTarget : null}
                 journey={journey}
                 following={following}
+                sigmaMeters={live ? (tracking.snapshot?.sigmaMeters ?? null) : null}
               />
             </Suspense>
             <SearchPanel />
             <POICard />
-            <JourneyChrome walkthrough={walkthrough} onRecoverySlot={setMapRecoveryTarget} />
+            <JourneyChrome
+              walkthrough={walkthrough}
+              tracking={tracking}
+              onRecoverySlot={setMapRecoveryTarget}
+            />
           </>
         )}
         <CameraPreview />
