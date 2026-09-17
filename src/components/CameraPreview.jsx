@@ -1,92 +1,160 @@
 /**
- * Camera overlay preview for exercising route instructions.
+ * The camera as a window onto the same guidance as the map.
  *
- * This view intentionally does not claim spatial AR. It has no device pose,
- * world anchor, or user localization, so its graphics remain screen-aligned.
+ * The route ahead is drawn on the floor of the camera image from where the
+ * visitor is along the route and which way the phone faces. Progress is the
+ * same progress the map's marker uses - from live tracking or from the
+ * walk-through - and the facing comes from the phone's gyroscope once
+ * tracking has established the direction of travel, or from the visitor
+ * saying they are looking along the corridor. None of that anchors anything
+ * to the building, and the view says so in as many words.
+ *
+ * On a phone that can run an immersive session, the route is anchored to the
+ * world instead and the phone's own tracked movement moves the marker.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ArrowUp,
+  Box,
   Camera,
   CameraOff,
   Compass,
-  CornerUpLeft,
-  CornerUpRight,
   Crosshair,
   LocateFixed,
   Map,
   Navigation,
+  Square,
 } from 'lucide-react';
 import { useNavigation, VIEW_TYPE, NAV_STATUS } from '../context/NavigationContext.jsx';
-import { STEP_TYPE } from '../engine/routingEngine';
-import { formatDistance } from '../data/buildingConfig.js';
-import { readPreviewHeading, PREVIEW_HEADING_MAX_AGE_MS } from '../capture/previewHeading';
-import { signedHeadingDifference } from '../navigation/coordinateFrames';
+import { bannerCopy } from './journey/guidanceCopy';
+import ManeuverIcon from './journey/ManeuverIcon.jsx';
+import { ANCHOR_SIGMA } from '../navigation/liveTracker';
+import { bearingAt, guidanceAt, positionAt, trackForRoute } from '../navigation/routeProgress';
+import { facingFrom } from '../ar/facingFrom';
+import { DEFAULT_CAMERA_MODEL, projectRouteAhead } from '../ar/floorProjection';
+import { ArStartError, immersiveArSupported, startArGuidance } from '../ar/arSession';
 
-export default function CameraPreview() {
-  const { state, actions } = useNavigation();
-  const { activeView, route, navStatus, previewStepIndex: currentStepIndex } = state;
+const INK = '#000609';
+const CREAM = '#fff9f0';
+/** How often the drawn state is written out for the readiness panel and tests. */
+const REPORT_MS = 200;
+/** The phone held a little below level when nothing says otherwise. */
+const RESTING_PITCH_DEGREES = -18;
+
+/** @param {{ tracking?: import('./journey/useLiveTracking.js').LiveTracking | null }} props */
+export default function CameraPreview({ tracking = null }) {
+  const { state, actions, venue } = useNavigation();
+  if (state.activeView !== VIEW_TYPE.CAMERA_PREVIEW) return null;
+  return <CameraGuidance state={state} actions={actions} venue={venue} tracking={tracking} />;
+}
+
+/** Pitch and roll of the rear camera from the gravity the phone reports, in portrait. */
+function attitudeFromGravity(gravity) {
+  if (!gravity) return { pitch: RESTING_PITCH_DEGREES, roll: 0, known: false };
+  const size = Math.hypot(gravity.x, gravity.y, gravity.z);
+  if (!(size > 1)) return { pitch: RESTING_PITCH_DEGREES, roll: 0, known: false };
+  // The rear camera looks along the phone's minus-z; its height above the
+  // horizon is the angle between that and the up the reported gravity gives.
+  const pitch = (Math.asin(Math.max(-1, Math.min(1, -gravity.z / size))) * 180) / Math.PI;
+  // Roll is the screen's top leaning away from up, clockwise positive.
+  const roll = (Math.atan2(-gravity.x, gravity.y) * 180) / Math.PI;
+  return {
+    pitch: Math.max(-89, Math.min(89, pitch)),
+    roll: Math.max(-60, Math.min(60, roll)),
+    known: true,
+  };
+}
+
+function tierLabel(snapshot) {
+  if (!snapshot) return 'Starting';
+  const sigma = `±${Math.max(1, Math.round(snapshot.sigmaMeters))} m`;
+  switch (snapshot.tier) {
+    case 'anchored':
+      return `At the check-in point · ${sigma}`;
+    case 'tracking':
+      return `Tracking · ${sigma}`;
+    case 'caution':
+      return `Caution · ${sigma}`;
+    default:
+      return snapshot.reason === 'floor-change'
+        ? 'Waiting at the floor change'
+        : snapshot.reason === 'arrived'
+          ? 'At the destination'
+          : 'Holding';
+  }
+}
+
+function headingLabel(source) {
+  switch (source) {
+    case 'ar':
+      return 'World-tracked';
+    case 'tracker':
+      return 'Gyroscope, aligned by your walk';
+    case 'aligned':
+      return 'Gyroscope, aligned by you';
+    case 'assumed':
+      return 'Assumed along route';
+    default:
+      return 'Off';
+  }
+}
+
+function CameraGuidance({ state, actions, venue, tracking }) {
+  const { route, navStatus, progressMeters, locationBasis } = state;
+  const navigating = navStatus === NAV_STATUS.NAVIGATING || navStatus === NAV_STATUS.ARRIVED;
+  const found = navigating && Boolean(route?.found) && route.steps.length > 0;
+  const track = found ? trackForRoute(route) : null;
+  const guidance = track ? guidanceAt(track, progressMeters) : null;
+  const floorName = (floorId) => venue.getFloorById(floorId)?.name;
+  const riding = track ? positionAt(track, progressMeters).vertical : false;
+  const copy =
+    track && guidance
+      ? bannerCopy(route.steps, track, guidance, progressMeters, floorName, riding)
+      : null;
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
-  const animationFrameRef = useRef(null);
-  const [cameraError, setCameraError] = useState(null);
-  const [isVideoReady, setIsVideoReady] = useState(false);
-
-  if (activeView !== VIEW_TYPE.CAMERA_PREVIEW) return null;
-
-  const currentStep = route?.steps?.[currentStepIndex];
-  const isNavigating = navStatus === NAV_STATUS.NAVIGATING || navStatus === NAV_STATUS.ARRIVED;
-
-  return (
-    <CameraPreviewInner
-      videoRef={videoRef}
-      canvasRef={canvasRef}
-      streamRef={streamRef}
-      animationFrameRef={animationFrameRef}
-      cameraError={cameraError}
-      setCameraError={setCameraError}
-      isVideoReady={isVideoReady}
-      setIsVideoReady={setIsVideoReady}
-      currentStep={currentStep}
-      isNavigating={isNavigating}
-      route={route}
-      currentStepIndex={currentStepIndex}
-      actions={actions}
-      venueKey={state.venueKey}
-    />
-  );
-}
-
-function CameraPreviewInner({
-  videoRef,
-  canvasRef,
-  streamRef,
-  animationFrameRef,
-  cameraError,
-  setCameraError,
-  isVideoReady,
-  setIsVideoReady,
-  currentStep,
-  isNavigating,
-  route,
-  currentStepIndex,
-  actions,
-  venueKey,
-}) {
-  const [headingState, setHeadingState] = useState('idle');
-  const [headingEnabled, setHeadingEnabled] = useState(false);
-  const [headingPreview, setHeadingPreview] = useState(null);
-  const headingRequestRef = useRef(0);
+  const overlayRef = useRef(null);
   const controlsRef = useRef(null);
+  const telemetryRef = useRef(null);
+  const [cameraError, setCameraError] = useState(null);
+  const [videoReady, setVideoReady] = useState(false);
+  const [arSupport, setArSupport] = useState('checking');
+  const [arSession, setArSession] = useState(null);
+  const [arStarting, setArStarting] = useState(false);
+  const [arProblem, setArProblem] = useState(null);
+  const [arReport, setArReport] = useState(null);
+  /** The visitor said they were looking along the corridor: the gyroscope reading at that moment. */
+  const [alignment, setAlignment] = useState(null);
+  const [drawn, setDrawn] = useState({ facing: null, points: 0, gravity: false });
+  // The loop below draws every frame; it reads progress here rather than restarting for it.
+  const progressRef = useRef(progressMeters);
+  useEffect(() => {
+    progressRef.current = progressMeters;
+  });
 
+  const live = tracking?.status === 'on';
+  const plausible = Boolean(tracking?.plausible);
+  const sensorsOut =
+    tracking?.status === 'unsupported' ||
+    tracking?.status === 'insecure' ||
+    tracking?.status === 'requesting';
+  const knownStart = locationBasis !== 'default';
+  const canTrack = plausible && !live && !sensorsOut && knownStart && found;
+  const trackLabel =
+    tracking?.status === 'hidden'
+      ? 'Resume tracking'
+      : tracking?.status === 'denied' || tracking?.status === 'error'
+        ? 'Try tracking again'
+        : 'Track my walk';
+  const arAvailable = arSupport === 'yes' && found && plausible && !sensorsOut;
+
+  // Controls wrap on phones. The readiness panel keeps clear of their measured height.
   useEffect(() => {
     const controls = controlsRef.current;
     const root = controls?.parentElement;
     if (!controls || !root) return undefined;
-    // Controls wrap on phones. Telemetry must clear their measured height,
-    // otherwise it covers the map escape when a second row appears.
     const publish = () =>
       root.style.setProperty(
         '--camera-preview-controls-height',
@@ -101,132 +169,38 @@ function CameraPreviewInner({
     };
   }, []);
 
-  const directionalStep =
-    currentStep &&
-    [
-      STEP_TYPE.START,
-      STEP_TYPE.STRAIGHT,
-      STEP_TYPE.TURN_LEFT,
-      STEP_TYPE.TURN_RIGHT,
-      STEP_TYPE.SLIGHT_LEFT,
-      STEP_TYPE.SLIGHT_RIGHT,
-      STEP_TYPE.U_TURN,
-    ].includes(currentStep.type) &&
-    currentStep.distance > 0;
-  const routeBearing =
-    directionalStep && Number.isFinite(currentStep.bearing) ? currentStep.bearing : null;
-  const planHeading = headingPreview?.planHeading;
-  const headingDelta =
-    planHeading?.status === 'known' && routeBearing !== null
-      ? signedHeadingDifference(routeBearing, planHeading.degrees)
-      : null;
-  const stepCount = route?.steps?.length ?? 0;
-  const routeProgress = stepCount > 0 ? ((currentStepIndex + 1) / stepCount) * 100 : 0;
-
-  const enableHeading = async () => {
-    const request = ++headingRequestRef.current;
-    setHeadingPreview(null);
-    if (document.visibilityState === 'hidden') {
-      setHeadingState('paused');
-      return;
-    }
-    if (typeof window.DeviceOrientationEvent === 'undefined') {
-      setHeadingState('unavailable');
-      return;
-    }
-
-    setHeadingState('requesting');
-    try {
-      const OrientationEvent = window.DeviceOrientationEvent;
-      if (typeof OrientationEvent.requestPermission === 'function') {
-        const permission = await OrientationEvent.requestPermission(true);
-        if (request !== headingRequestRef.current) return;
-        if (permission !== 'granted') {
-          setHeadingState('denied');
-          return;
-        }
-      }
-      if (request !== headingRequestRef.current || document.visibilityState === 'hidden') return;
-      setHeadingEnabled(true);
-      setHeadingState('listening');
-    } catch {
-      if (request === headingRequestRef.current) setHeadingState('denied');
-    }
-  };
-
   useEffect(() => {
-    // Also cancels a pending permission request; resuming the page requires
-    // another explicit opt-in instead of reviving stale directional telemetry.
-    const pause = () => {
-      if (document.visibilityState !== 'hidden') return;
-      headingRequestRef.current += 1;
-      setHeadingEnabled(false);
-      setHeadingPreview(null);
-      setHeadingState('paused');
-    };
-    document.addEventListener('visibilitychange', pause);
+    let cancelled = false;
+    immersiveArSupported().then((supported) => {
+      if (!cancelled) setArSupport(supported ? 'yes' : 'no');
+    });
     return () => {
-      headingRequestRef.current += 1;
-      document.removeEventListener('visibilitychange', pause);
+      cancelled = true;
     };
   }, []);
 
   useEffect(() => {
-    if (!headingEnabled || !isNavigating || cameraError) return undefined;
-    let lastEventTime = performance.now();
-
-    const handleOrientation = (event) => {
-      if (document.visibilityState === 'hidden') return;
-      const nowMs = performance.now();
-      lastEventTime = Math.min(nowMs, event.timeStamp);
-      setHeadingPreview(readPreviewHeading(event, nowMs, venueKey));
-    };
-
-    window.addEventListener('deviceorientation', handleOrientation, true);
-    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-    const watchdog = window.setInterval(() => {
-      if (
-        !Number.isFinite(lastEventTime) ||
-        performance.now() - lastEventTime > PREVIEW_HEADING_MAX_AGE_MS
-      ) {
-        setHeadingPreview(null);
-        setHeadingState('stale');
-      }
-    }, 250);
-    return () => {
-      window.clearInterval(watchdog);
-      window.removeEventListener('deviceorientation', handleOrientation, true);
-      window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
-    };
-  }, [cameraError, headingEnabled, isNavigating, venueKey]);
-
-  useEffect(() => {
-    if (!isNavigating) return undefined;
+    if (!found) return undefined;
     let cancelled = false;
 
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         });
-
         if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
+          stream.getTracks().forEach((mediaTrack) => mediaTrack.stop());
           return;
         }
-
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => {
-            videoRef.current
-              ?.play()
-              .then(() => setIsVideoReady(true))
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          video.onloadedmetadata = () => {
+            video
+              .play()
+              .then(() => setVideoReady(true))
               .catch((error) => setCameraError(error.message || 'Camera playback failed'));
           };
         }
@@ -239,85 +213,206 @@ function CameraPreviewInner({
     }
 
     startCamera();
-
     return () => {
       cancelled = true;
-      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current?.getTracks().forEach((mediaTrack) => mediaTrack.stop());
       streamRef.current = null;
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-      setIsVideoReady(false);
+      setVideoReady(false);
     };
-  }, [animationFrameRef, isNavigating, setCameraError, setIsVideoReady, streamRef, videoRef]);
+  }, [found]);
 
+  // The drawing loop: the route on the floor, from the freshest reading every frame.
   useEffect(() => {
     const canvas = canvasRef.current;
-    const container = canvas?.parentElement;
-    if (!canvas || !container) return undefined;
-
-    const resizeCanvas = () => {
-      const { width, height } = container.getBoundingClientRect();
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-      const nextWidth = Math.max(1, Math.round(width * pixelRatio));
-      const nextHeight = Math.max(1, Math.round(height * pixelRatio));
-
-      if (canvas.width !== nextWidth) canvas.width = nextWidth;
-      if (canvas.height !== nextHeight) canvas.height = nextHeight;
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-    };
-
-    const resizeObserver = new ResizeObserver(resizeCanvas);
-    resizeObserver.observe(container);
-    resizeCanvas();
-
-    return () => resizeObserver.disconnect();
-  }, [canvasRef]);
-
-  useEffect(() => {
-    if (!canvasRef.current) return undefined;
-
-    const canvas = canvasRef.current;
+    if (!canvas || !track || cameraError) return undefined;
     const context = canvas.getContext('2d');
     if (!context) return undefined;
+    const container = canvas.parentElement;
+    let frame = 0;
+    let lastReport = 0;
+    let lastDrawn = null;
+    let fadeFrom = null;
 
-    function draw() {
+    const fit = () => {
+      const bounds = container?.getBoundingClientRect() ?? { width: 0, height: 0 };
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      const width = Math.max(1, Math.round(bounds.width * ratio));
+      const height = Math.max(1, Math.round(bounds.height * ratio));
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
+      canvas.style.width = `${bounds.width}px`;
+      canvas.style.height = `${bounds.height}px`;
+    };
+    const observer = container ? new ResizeObserver(fit) : null;
+    if (container) observer.observe(container);
+    fit();
+
+    const draw = () => {
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
-      const pixelRatio = width > 0 ? canvas.width / width : 1;
-
-      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      const ratio = width > 0 ? canvas.width / width : 1;
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.clearRect(0, 0, width, height);
 
-      if (isNavigating && currentStep) {
-        drawPreviewOverlay(context, { width, height }, currentStep, headingDelta);
+      const reading = tracking?.peek ? tracking.peek() : { gravity: null, snapshot: null };
+      const { facing, progress } = facingFrom(
+        track,
+        live,
+        reading.snapshot,
+        alignment,
+        progressRef.current,
+      );
+      const attitude = attitudeFromGravity(live ? reading.gravity : null);
+      const here = positionAt(track, progress);
+      const projection = projectRouteAhead(
+        track,
+        progress,
+        {
+          x: here.x,
+          y: here.y,
+          facingDegrees: facing,
+          pitchDegrees: attitude.pitch,
+          rollDegrees: attitude.roll,
+        },
+        { width, height, ...DEFAULT_CAMERA_MODEL },
+      );
+
+      // An immersive session draws its own floor; the flat overlay stays out of its way.
+      if (!arSession) paintProjection(context, { width, height }, projection, fadeFrom);
+
+      const now = performance.now();
+      const points = projection.ribbon.reduce((sum, line) => sum + line.length, 0);
+      if (now - lastReport >= REPORT_MS) {
+        lastReport = now;
+        // The ribbon's near end would run under the readiness panel; it fades out above it.
+        const panel = telemetryRef.current;
+        fadeFrom = panel
+          ? panel.getBoundingClientRect().top - canvas.getBoundingClientRect().top - 16
+          : height * 0.72;
+        const next = {
+          facing: Math.round(facing),
+          points,
+          gravity: attitude.known,
+        };
+        if (
+          lastDrawn === null ||
+          next.facing !== lastDrawn.facing ||
+          next.points !== lastDrawn.points ||
+          next.gravity !== lastDrawn.gravity
+        ) {
+          lastDrawn = next;
+          setDrawn(next);
+        }
       }
-
-      animationFrameRef.current = requestAnimationFrame(draw);
-    }
-
-    draw();
-    return () => {
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      frame = requestAnimationFrame(draw);
     };
-  }, [animationFrameRef, canvasRef, currentStep, headingDelta, isNavigating, isVideoReady]);
+    frame = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
+  }, [alignment, arSession, cameraError, live, track, tracking]);
+
+  useEffect(() => () => void arSession?.end(), [arSession]);
+
+  const alignNow = useCallback(() => {
+    if (!track || !tracking?.peek) return;
+    const { snapshot } = tracking.peek();
+    if (!snapshot || snapshot.relativeHeadingDegrees === null) return;
+    setAlignment({
+      epoch: snapshot.headingEpoch,
+      relative: snapshot.relativeHeadingDegrees,
+      facing: bearingAt(track, snapshot.progressMeters),
+    });
+  }, [track, tracking]);
+
+  const startAr = useCallback(async () => {
+    if (!track || !tracking || !overlayRef.current || arStarting) return;
+    setArProblem(null);
+    setArStarting(true);
+    try {
+      // Sensors and the tracker come from the same tap the session needs.
+      if (tracking.status !== 'on') tracking.start();
+      const tracker = tracking.tracker();
+      if (!tracker) throw new ArStartError('failed');
+      const now = performance.now();
+      const current = tracker.isAnchored ? tracker.read(now).progressMeters : null;
+      // The session assumes the visitor stands where the guidance is. A
+      // tracker that has not been anchored, or that disagrees with a
+      // walk-through the visitor advanced by hand, is anchored there with the
+      // uncertainty of a chosen point rather than a scanned one.
+      if (current === null || Math.abs(current - progressMeters) > 0.5) {
+        tracker.anchor({
+          progressMeters,
+          sigmaMeters: ANCHOR_SIGMA.selected,
+          timeMs: now,
+        });
+      }
+      const handle = await startArGuidance({
+        track,
+        tracker,
+        overlay: overlayRef.current,
+        facingDegrees: () => {
+          const snapshot = tracker.read(performance.now());
+          return snapshot.displacementAttached ? null : snapshot.headingDegrees;
+        },
+        onFrame: setArReport,
+        onEnd: () => {
+          setArSession(null);
+          setArReport(null);
+        },
+      });
+      setArSession(handle);
+    } catch (error) {
+      const reason = error instanceof ArStartError ? error.reason : 'failed';
+      setArProblem(
+        reason === 'refused'
+          ? 'The immersive session was not allowed.'
+          : reason === 'unsupported'
+            ? 'This phone cannot run an immersive session.'
+            : 'The immersive session could not start.',
+      );
+    } finally {
+      setArStarting(false);
+    }
+  }, [arStarting, progressMeters, track, tracking]);
+
+  const exit = () => {
+    void arSession?.end();
+    actions.setView(VIEW_TYPE.MAP);
+  };
+
+  const snapshot = live ? tracking.snapshot : null;
+  const source = track
+    ? facingFrom(track, live, snapshot, alignment, progressMeters).source
+    : 'off';
+  const showAlign = live && !arSession && source === 'assumed';
+  const arActive = arSession !== null;
 
   return (
-    <div className="camera-preview animate-fade-in" id="camera-preview">
-      {isNavigating && !cameraError && (
+    <div
+      className="camera-preview animate-fade-in"
+      id="camera-preview"
+      data-heading-source={source}
+      data-facing={drawn.facing ?? ''}
+      data-ribbon={drawn.points}
+      data-ar={arActive ? 'active' : arSupport === 'yes' ? 'available' : arSupport}
+      data-tracking={tracking?.status ?? 'none'}
+    >
+      {found && !cameraError && (
         <video ref={videoRef} className="camera-preview-video" playsInline muted autoPlay />
       )}
+      {found && !cameraError && <canvas ref={canvasRef} className="camera-preview-canvas" />}
 
-      {isNavigating && !cameraError && <canvas ref={canvasRef} className="camera-preview-canvas" />}
-
-      {isNavigating && (
+      {found && (
         <div className="camera-preview-status" role="status">
           <Camera size={14} />
-          <strong>Guidance preview</strong>
-          <span>Not world-anchored</span>
+          <strong>{arActive ? 'Immersive guidance' : 'Camera guidance'}</strong>
+          <span>{arActive ? 'Anchored to your start point' : 'Not world-anchored'}</span>
         </div>
       )}
 
-      {!isNavigating && (
+      {!found && (
         <div className="camera-preview-fallback">
           <div className="camera-preview-fallback-icon">
             <Navigation size={48} />
@@ -326,7 +421,7 @@ function CameraPreviewInner({
             Plan a route first
           </h3>
           <p style={{ maxWidth: '340px', color: 'var(--color-text-muted)' }}>
-            Camera permission is requested only when there is an active route to preview.
+            Camera permission is requested only when there is a route to show.
           </p>
           <button
             className="btn btn-primary"
@@ -338,7 +433,7 @@ function CameraPreviewInner({
         </div>
       )}
 
-      {isNavigating && cameraError && (
+      {found && cameraError && (
         <div className="camera-preview-fallback">
           <div className="camera-preview-fallback-icon">
             <CameraOff size={48} />
@@ -347,7 +442,7 @@ function CameraPreviewInner({
             Camera Access Required
           </h3>
           <p style={{ maxWidth: '320px', color: 'var(--color-text-muted)' }}>
-            The camera preview needs permission to place route instructions over the live feed.
+            The camera view needs permission to draw the route over the live image.
           </p>
           <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
             Error: {cameraError}
@@ -362,275 +457,226 @@ function CameraPreviewInner({
         </div>
       )}
 
-      {isNavigating && !cameraError && (
-        <aside className="camera-preview-telemetry" aria-label="Guidance readiness">
+      {found && !cameraError && (
+        <aside
+          className="camera-preview-telemetry"
+          aria-label="Guidance readiness"
+          ref={telemetryRef}
+        >
+          {(showAlign || arProblem || (!live && !canTrack)) && (
+            <p className="camera-preview-note" role="status">
+              {arProblem
+                ? arProblem
+                : showAlign
+                  ? 'Hold the phone up, looking along the corridor the route follows, then say so. The gyroscope keeps the route turning with you from there.'
+                  : !plausible
+                    ? 'This device has no motion sensors, so the route is drawn as if you were looking along it. Step through the route or play the walk-through to move.'
+                    : !knownStart
+                      ? 'Scan a check-in code on the map so tracking knows where you are.'
+                      : 'Tracking is paused; the route is drawn as if you were looking along it.'}
+            </p>
+          )}
           <div>
             <Camera size={13} />
             <span>Video</span>
-            <strong>{isVideoReady ? 'Live' : 'Starting'}</strong>
+            <strong>{videoReady ? 'Live' : 'Starting'}</strong>
           </div>
-          <div>
-            <Compass size={13} />
-            <span>Heading</span>
-            <strong>
-              {headingPreview !== null
-                ? headingPreview.label
-                : headingState === 'denied'
-                  ? 'Denied'
-                  : headingState === 'unavailable'
-                    ? 'Unavailable'
-                    : headingState === 'paused'
-                      ? 'Paused'
-                      : headingState === 'stale'
-                        ? 'Stale'
-                        : headingState === 'requesting'
-                          ? 'Requesting'
-                          : headingState === 'listening'
-                            ? 'Waiting'
-                            : 'Not enabled'}
-            </strong>
-          </div>
-          <div>
+          <div className={live ? undefined : 'not-ready'}>
             <LocateFixed size={13} />
             <span>Position</span>
-            <strong>Not tracked</strong>
+            <strong>{live ? tierLabel(snapshot) : 'Not tracked'}</strong>
           </div>
-          <div className="not-ready">
+          <div className={source === 'assumed' || source === 'off' ? 'not-ready' : undefined}>
+            <Compass size={13} />
+            <span>Heading</span>
+            <strong>{headingLabel(source)}</strong>
+          </div>
+          <div className={arActive ? undefined : 'not-ready'}>
             <Crosshair size={13} />
             <span>World anchor</span>
-            <strong>Required</strong>
+            <strong>
+              {arActive
+                ? arReport?.floorHits
+                  ? 'Floor found'
+                  : 'Your start point'
+                : 'Not anchored'}
+            </strong>
           </div>
         </aside>
       )}
 
-      {!cameraError && isNavigating && currentStep && (
+      {found && !cameraError && copy && (
         <div className="camera-preview-instruction animate-slide-down">
           <div className="camera-preview-instruction-icon">
-            {currentStep.type === STEP_TYPE.TURN_LEFT && <CornerUpLeft size={22} />}
-            {currentStep.type === STEP_TYPE.TURN_RIGHT && <CornerUpRight size={22} />}
-            {(currentStep.type === STEP_TYPE.STRAIGHT || currentStep.type === STEP_TYPE.START) && (
-              <ArrowUp size={22} />
-            )}
-            {currentStep.type === STEP_TYPE.ARRIVE && <Navigation size={22} />}
-            {currentStep.type === STEP_TYPE.SLIGHT_LEFT && <CornerUpLeft size={22} />}
-            {currentStep.type === STEP_TYPE.SLIGHT_RIGHT && <CornerUpRight size={22} />}
+            <ManeuverIcon type={copy.step.type} size={22} />
           </div>
           <div className="camera-preview-instruction-copy">
             <div className="camera-preview-step-kicker">
-              Preview instruction {currentStepIndex + 1} / {stepCount}
-              {headingDelta !== null && (
-                <span>
-                  {Math.abs(headingDelta) < 12
-                    ? 'Aligned'
-                    : `${Math.round(Math.abs(headingDelta))}° ${headingDelta < 0 ? 'left' : 'right'}`}
-                </span>
-              )}
+              <span className="camera-preview-lead">{copy.lead}</span>
+              {live && snapshot && <span>{snapshot.tier}</span>}
             </div>
-            <div className="camera-preview-instruction-text">{currentStep.instruction}</div>
-            {currentStep.distance > 0 && (
-              <div className="camera-preview-instruction-distance">
-                {formatDistance(currentStep.distance)}
-              </div>
-            )}
-            <div className="camera-preview-progress" aria-hidden="true">
-              <span style={{ width: `${routeProgress}%` }} />
-            </div>
+            <div className="camera-preview-instruction-text">{copy.text}</div>
+            {copy.then && <div className="camera-preview-instruction-distance">{copy.then}</div>}
           </div>
         </div>
       )}
 
       <div className="camera-preview-controls" ref={controlsRef}>
-        <button
-          className="camera-preview-control"
-          onClick={() => actions.setView(VIEW_TYPE.MAP)}
-          id="btn-exit-camera-preview"
-        >
+        <button className="camera-preview-control" onClick={exit} id="btn-exit-camera-preview">
           <Map size={16} />
           Exit to plan
         </button>
-        {isNavigating && !cameraError && (
-          <button
-            className="camera-preview-control heading"
-            disabled={headingState === 'requesting'}
-            onClick={
-              headingEnabled
-                ? () => {
-                    headingRequestRef.current += 1;
-                    setHeadingEnabled(false);
-                    setHeadingPreview(null);
-                    setHeadingState('idle');
-                  }
-                : enableHeading
-            }
-          >
-            <Compass size={16} />
-            {headingEnabled ? 'Disable heading' : 'Enable heading'}
+        {found && !cameraError && canTrack && (
+          <button className="camera-preview-control is-primary" onClick={() => tracking.start()}>
+            <LocateFixed size={16} />
+            {trackLabel}
           </button>
         )}
-        {isNavigating && (
-          <>
-            <button
-              className="camera-preview-control"
-              onClick={() => actions.prevStep()}
-              disabled={currentStepIndex === 0}
-            >
-              ← Preview back
-            </button>
-            <button
-              className="camera-preview-control"
-              onClick={() => actions.nextStep()}
-              disabled={currentStepIndex >= (route?.steps?.length || 0) - 1}
-            >
-              Preview next →
-            </button>
-          </>
+        {found && !cameraError && showAlign && (
+          <button className="camera-preview-control is-primary" onClick={alignNow}>
+            <Compass size={16} />
+            I’m facing the corridor
+          </button>
         )}
+        {found && !cameraError && live && !arSession && source === 'aligned' && (
+          <button className="camera-preview-control" onClick={() => setAlignment(null)}>
+            <Compass size={16} />
+            Re-align
+          </button>
+        )}
+        {found && !cameraError && arAvailable && !arSession && (
+          <button className="camera-preview-control" onClick={startAr} disabled={arStarting}>
+            <Box size={16} />
+            {arStarting ? 'Starting AR…' : 'Start AR'}
+          </button>
+        )}
+      </div>
+
+      {/* Shown over the camera by the immersive session, for as long as it runs. */}
+      <div
+        ref={overlayRef}
+        className={`camera-ar-overlay${arActive ? ' is-active' : ''}`}
+        aria-hidden={!arActive}
+      >
+        {arActive && copy && (
+          <div className="camera-preview-instruction">
+            <div className="camera-preview-instruction-icon">
+              <ManeuverIcon type={copy.step.type} size={22} />
+            </div>
+            <div className="camera-preview-instruction-copy">
+              <div className="camera-preview-step-kicker">
+                <span className="camera-preview-lead">{copy.lead}</span>
+                {snapshot && <span>{snapshot.tier}</span>}
+              </div>
+              <div className="camera-preview-instruction-text">{copy.text}</div>
+              {copy.then && <div className="camera-preview-instruction-distance">{copy.then}</div>}
+            </div>
+          </div>
+        )}
+        <p className="camera-ar-overlay-note">
+          {arReport?.aligned
+            ? 'The route is placed from where the guidance says you are, looking the way it goes. If the chevrons point into a wall, face along the corridor and re-align.'
+            : 'Placing the route…'}
+        </p>
+        <div className="camera-preview-controls">
+          <button
+            className="camera-preview-control"
+            onClick={() => arSession?.realign()}
+            disabled={!arSession}
+          >
+            <Compass size={16} />
+            Re-align
+          </button>
+          <button
+            className="camera-preview-control is-primary"
+            onClick={() => void arSession?.end()}
+            disabled={!arSession}
+          >
+            <Square size={16} />
+            Leave AR
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function drawPreviewOverlay(context, viewport, step, headingDelta) {
-  const centerX = viewport.width / 2;
-  const directionOffset =
-    step.type === STEP_TYPE.TURN_LEFT || step.type === STEP_TYPE.SLIGHT_LEFT
-      ? -viewport.width * 0.16
-      : step.type === STEP_TYPE.TURN_RIGHT || step.type === STEP_TYPE.SLIGHT_RIGHT
-        ? viewport.width * 0.16
-        : 0;
-  const headingOffset =
-    headingDelta === null
-      ? 0
-      : Math.max(-1, Math.min(1, headingDelta / 90)) * viewport.width * 0.24;
-  const targetX = centerX + headingOffset + directionOffset;
-  const start = [centerX, viewport.height * 0.82];
-  const decision = [centerX, viewport.height * 0.61];
-  const target = [targetX, viewport.height * 0.43];
-
-  context.fillStyle = 'rgba(9, 10, 12, 0.12)';
-  context.fillRect(0, 0, viewport.width, viewport.height);
-  drawHeadingRuler(context, viewport, headingDelta);
-
-  if (step.type === STEP_TYPE.ARRIVE) {
-    drawArrivalMarker(context, target);
-  } else {
-    drawRouteRibbon(context, [start, decision, target]);
-    drawArrowHead(context, decision, target);
-  }
-
-  drawReticle(context, viewport);
-  if (step.distance > 0) drawDistanceIndicator(context, viewport, step.distance);
-}
-
-function drawHeadingRuler(context, viewport, headingDelta) {
-  const y = viewport.height * 0.34;
-  const centerX = viewport.width / 2;
+/**
+ * The projected route as a ribbon on the floor: blue edged in ink, sixty
+ * centimetres wide at every depth, chevrons along it and a ring at the end.
+ */
+function paintProjection(context, viewport, projection, fadeFrom) {
+  const focal =
+    viewport.height / 2 / Math.tan((DEFAULT_CAMERA_MODEL.verticalFovDegrees / 2) * (Math.PI / 180));
   context.save();
-  context.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-  context.lineWidth = 1;
-  context.beginPath();
-  context.moveTo(centerX - 100, y);
-  context.lineTo(centerX + 100, y);
-  context.stroke();
-
-  for (let index = -4; index <= 4; index += 1) {
-    const x = centerX + index * 25;
+  context.lineJoin = 'round';
+  for (const line of projection.ribbon) {
+    if (line.length < 2) continue;
+    const left = [];
+    const right = [];
+    for (let index = 0; index < line.length; index += 1) {
+      const point = line[index];
+      const previous = line[Math.max(0, index - 1)];
+      const next = line[Math.min(line.length - 1, index + 1)];
+      const dx = next.x - previous.x;
+      const dy = next.y - previous.y;
+      const length = Math.hypot(dx, dy) || 1;
+      const half = Math.max(2, Math.min(48, (focal / Math.max(0.3, point.depthMeters)) * 0.3));
+      const nx = (-dy / length) * half;
+      const ny = (dx / length) * half;
+      left.push([point.x + nx, point.y + ny]);
+      right.push([point.x - nx, point.y - ny]);
+    }
     context.beginPath();
-    context.moveTo(x, y - (index === 0 ? 8 : 4));
-    context.lineTo(x, y + (index === 0 ? 8 : 4));
+    context.moveTo(left[0][0], left[0][1]);
+    for (let index = 1; index < left.length; index += 1) {
+      context.lineTo(left[index][0], left[index][1]);
+    }
+    for (let index = right.length - 1; index >= 0; index -= 1) {
+      context.lineTo(right[index][0], right[index][1]);
+    }
+    context.closePath();
+    context.fillStyle = 'rgba(10, 101, 219, 0.82)';
+    context.fill();
+    context.strokeStyle = 'rgba(0, 6, 9, 0.7)';
+    context.lineWidth = 2;
     context.stroke();
   }
-
-  context.fillStyle = 'rgba(255, 255, 255, 0.82)';
-  context.font = '600 10px ui-monospace, Consolas, monospace';
-  context.textAlign = 'center';
-  const label =
-    headingDelta === null
-      ? 'SCREEN-ALIGNED'
-      : Math.abs(headingDelta) < 12
-        ? 'ROUTE ALIGNED'
-        : `ROUTE ${Math.round(Math.abs(headingDelta))}° ${headingDelta < 0 ? 'LEFT' : 'RIGHT'}`;
-  context.fillText(label, centerX, y - 15);
+  for (const chevron of projection.chevrons) {
+    const size = Math.max(4, Math.min(18, chevron.pixelsPerMeter * 0.2));
+    context.save();
+    context.translate(chevron.x, chevron.y);
+    context.rotate(chevron.angleRadians);
+    context.beginPath();
+    context.moveTo(-size * 0.55, -size * 0.8);
+    context.lineTo(size * 0.45, 0);
+    context.lineTo(-size * 0.55, size * 0.8);
+    context.strokeStyle = CREAM;
+    context.lineCap = 'round';
+    context.lineWidth = Math.max(2, size * 0.22);
+    context.stroke();
+    context.restore();
+  }
+  if (projection.destination) {
+    const radius = Math.max(8, Math.min(40, 400 / Math.max(1, projection.destination.depthMeters)));
+    context.beginPath();
+    context.arc(projection.destination.x, projection.destination.y, radius, 0, Math.PI * 2);
+    context.strokeStyle = INK;
+    context.lineWidth = 6;
+    context.stroke();
+    context.strokeStyle = CREAM;
+    context.lineWidth = 3;
+    context.stroke();
+  }
+  // The near end of the ribbon would run under the panels: let it go before it gets there.
+  if (fadeFrom !== null && fadeFrom < viewport.height) {
+    const start = Math.max(0, fadeFrom - 90);
+    const gradient = context.createLinearGradient(0, start, 0, Math.max(start + 1, fadeFrom));
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
+    context.globalCompositeOperation = 'destination-out';
+    context.fillStyle = gradient;
+    context.fillRect(0, start, viewport.width, viewport.height - start);
+  }
   context.restore();
-}
-
-function drawRouteRibbon(context, points) {
-  context.save();
-  context.lineCap = 'round';
-  context.lineJoin = 'round';
-  context.beginPath();
-  context.moveTo(...points[0]);
-  points.slice(1).forEach((point) => context.lineTo(...point));
-  context.strokeStyle = 'rgba(18, 19, 22, 0.9)';
-  context.lineWidth = 30;
-  context.stroke();
-  context.strokeStyle = '#ff5c39';
-  context.lineWidth = 13;
-  context.stroke();
-  context.restore();
-}
-
-function drawArrowHead(context, from, to) {
-  const angle = Math.atan2(to[1] - from[1], to[0] - from[0]);
-  const size = 24;
-  context.save();
-  context.translate(to[0], to[1]);
-  context.rotate(angle);
-  context.beginPath();
-  context.moveTo(size, 0);
-  context.lineTo(-size * 0.7, -size * 0.65);
-  context.lineTo(-size * 0.7, size * 0.65);
-  context.closePath();
-  context.fillStyle = '#ff5c39';
-  context.fill();
-  context.strokeStyle = '#151619';
-  context.lineWidth = 6;
-  context.stroke();
-  context.restore();
-}
-
-function drawReticle(context, viewport) {
-  const centerX = viewport.width / 2;
-  const centerY = viewport.height * 0.51;
-  context.save();
-  context.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-  context.lineWidth = 1;
-  context.beginPath();
-  context.moveTo(centerX - 18, centerY);
-  context.lineTo(centerX + 18, centerY);
-  context.moveTo(centerX, centerY - 18);
-  context.lineTo(centerX, centerY + 18);
-  context.stroke();
-  context.restore();
-}
-
-function drawArrivalMarker(context, target) {
-  const pulse = 1 + Math.sin((Date.now() / 1000) * 3) * 0.08;
-  context.save();
-  context.translate(target[0], target[1]);
-  context.beginPath();
-  context.arc(0, 0, 34 * pulse, 0, Math.PI * 2);
-  context.strokeStyle = '#f7f3eb';
-  context.lineWidth = 4;
-  context.stroke();
-  context.beginPath();
-  context.arc(0, 0, 16, 0, Math.PI * 2);
-  context.fillStyle = '#16825d';
-  context.fill();
-  context.restore();
-}
-
-function drawDistanceIndicator(context, viewport, distance) {
-  const y = viewport.height - 116;
-  const width = 104;
-  context.fillStyle = 'rgba(24, 25, 28, 0.9)';
-  context.fillRect(viewport.width / 2 - width / 2, y - 17, width, 34);
-  context.strokeStyle = 'rgba(255, 255, 255, 0.38)';
-  context.lineWidth = 1;
-  context.strokeRect(viewport.width / 2 - width / 2, y - 17, width, 34);
-  context.fillStyle = '#fff3ed';
-  context.font = '700 13px Inter, sans-serif';
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText(formatDistance(distance), viewport.width / 2, y);
 }

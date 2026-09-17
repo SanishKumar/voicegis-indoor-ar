@@ -41,6 +41,24 @@ strides, that the visitor is setting off away from the route. The venue's
 declared `northOffsetDegrees` is applied as stated for that 180° test and for
 nothing finer, because it is not surveyed.
 
+## A pose instead of strides
+
+Inside an immersive WebXR session (`src/ar/arSession.ts`) the phone measures
+its own movement through the room, in metres, with its camera and inertial
+sensors. The tracker takes that movement through `attachDisplacement` and
+`displace` and stops moving progress for strides while it does, so the same
+walk is never counted twice; strides still count towards the stride
+calibration. Each movement is judged against the corridor exactly as a stride
+is, with its length in stride-equivalents added to the off-route and
+wrong-way tallies, and uncertainty grows at 3% of the distance moved instead
+of 8%. The session's world is lined up with the plan once, from the same
+assumption the tracker makes at a scan - the visitor is at their progress,
+looking the way the route goes - and `src/ar/planWorld.ts` holds nothing but
+that one rotation and offset. A storey change starts the alignment again on
+the new floor. Frozen holds: once twelve stride-equivalents have disagreed, or
+uncertainty has passed twelve metres, nothing moves the marker until a scan
+gives it a new anchor.
+
 ## The four tiers
 
 | Tier     | Meaning                                                                                             | What the interface does                                                             |

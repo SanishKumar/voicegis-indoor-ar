@@ -27,6 +27,18 @@ export function sensorsPlausible() {
 }
 
 /**
+ * @typedef {object} LiveTracking
+ * @property {string} status
+ * @property {import('../../navigation/liveTracker').TrackerSnapshot | null} snapshot
+ * @property {() => void} start
+ * @property {() => void} stop
+ * @property {() => void} confirmFloor
+ * @property {boolean} plausible
+ * @property {() => { gravity: { x: number, y: number, z: number } | null, snapshot: import('../../navigation/liveTracker').TrackerSnapshot | null }} peek
+ * @property {() => import('../../navigation/liveTracker').RouteTracker | null} tracker
+ */
+
+/**
  * Live progress along the route from the phone's motion sensors.
  *
  * Owns the sensor subscription, pairs each motion sample with the freshest
@@ -44,12 +56,13 @@ export function useLiveTracking({
   northOffsetDegrees = 0,
   setProgress,
   active,
-}) {
+}) /** @type {LiveTracking} */ {
   const [status, setStatus] = useState('off');
   const [snapshot, setSnapshot] = useState(null);
   const trackerRef = useRef(null);
   const disposeRef = useRef(null);
   const tiltRef = useRef(null);
+  const gravityRef = useRef(null);
   const incompleteRef = useRef(0);
   const lastPublishedRef = useRef(null);
   const anchorRef = useRef({ locationBasis, checkInDistanceMeters });
@@ -110,8 +123,25 @@ export function useLiveTracking({
     disposeRef.current?.();
     disposeRef.current = null;
     tiltRef.current = null;
+    gravityRef.current = null;
     setStatus('off');
   }, []);
+
+  /**
+   * The freshest reading, for a view that draws every frame: the last gravity
+   * vector the phone reported and the tracker's state now. Nothing here is
+   * published through React, so nothing re-renders for it.
+   */
+  const peek = useCallback(() => {
+    const tracker = trackerRef.current;
+    return {
+      gravity: gravityRef.current,
+      snapshot: tracker === null ? null : tracker.read(performance.now()),
+    };
+  }, []);
+
+  /** The tracker itself, for a pose source that feeds it directly; null until tracking has been started once. */
+  const tracker = useCallback(() => trackerRef.current, []);
 
   const start = useCallback(() => {
     if (!track) return;
@@ -166,6 +196,7 @@ export function useLiveTracking({
           return;
         }
         incompleteRef.current = 0;
+        gravityRef.current = { x: acceleration.x, y: acceleration.y, z: acceleration.z };
         const magnitude = Math.hypot(acceleration.x, acceleration.y, acceleration.z);
         const rotation = event.rotationRate;
         const tilt = tiltRef.current;
@@ -245,5 +276,7 @@ export function useLiveTracking({
     stop,
     confirmFloor,
     plausible: sensorsPlausible(),
+    peek,
+    tracker,
   };
 }

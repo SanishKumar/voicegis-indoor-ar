@@ -80,7 +80,8 @@ test('camera preview returns to the same shared instruction without moving the c
   const instruction = await page.locator('.jr-banner-text').innerText();
   const floor = await page.locator('.compiled-map').getAttribute('data-location-floor');
   await page.getByRole('button', { name: 'Camera view' }).click();
-  await expect(page.locator('.camera-preview-step-kicker')).toContainText('Preview instruction 2');
+  // The camera shows the instruction the banner shows: one guidance, two windows onto it.
+  await expect(page.locator('.camera-preview-instruction-text')).toHaveText(instruction);
   await expectCenterHitTarget(page.getByRole('button', { name: 'Exit to plan' }));
   await page.getByRole('button', { name: 'Exit to plan' }).click();
   await expect(page.locator('.jr-banner-text')).toHaveText(instruction);
@@ -131,91 +132,81 @@ test('a missing camera explains the failure and preserves the route on return', 
   });
 });
 
-test('camera heading stays uncalibrated and its controls remain reachable', async ({
+test('the camera view says what it knows and its controls remain reachable', async ({
   page,
 }, testInfo) => {
-  // Controlled browser events test UI semantics, not sensor accuracy.
   await page.addInitScript(() => {
     Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
       value: async () => new MediaStream(),
     });
-    Object.defineProperty(window, 'DeviceOrientationEvent', {
-      value: class {
-        static requestPermission() {
-          return Promise.resolve('granted');
-        }
-      },
-    });
-    for (const name of ['deviceorientation', 'deviceorientationabsolute']) {
-      window.addEventListener(
-        name,
-        (event) => {
-          if (event.isTrusted) event.stopImmediatePropagation();
-        },
-        true,
-      );
-    }
   });
   await openPharmacyRoute(page);
   await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
   await page.getByRole('button', { name: 'Camera view' }).click();
+  const view = page.locator('.camera-preview');
   const telemetry = page.getByRole('complementary', { name: 'Guidance readiness' });
-  await expect(telemetry).toContainText('Not enabled');
-  await page.getByRole('button', { name: 'Enable heading' }).click();
-  await expect(page.getByRole('button', { name: 'Disable heading' })).toBeVisible();
-  await page.evaluate(() => {
-    const event = new Event('deviceorientation');
-    Object.defineProperties(event, {
-      alpha: { value: 270 },
-      absolute: { value: false },
-      timeStamp: { value: performance.now() },
-    });
-    window.dispatchEvent(event);
-  });
-  await expect(telemetry).toContainText('Relative only');
-  await expect(page.locator('.camera-preview-step-kicker span')).toHaveCount(0);
-  const compassTimer = await page.evaluate(() => {
-    const emitCompass = () => {
-      const event = new Event('deviceorientation');
-      Object.defineProperties(event, {
-        webkitCompassHeading: { value: 90 },
-        webkitCompassAccuracy: { value: 5 },
-        timeStamp: { value: performance.now() },
-      });
-      window.dispatchEvent(event);
-    };
-    emitCompass();
-    return window.setInterval(emitCompass, 100);
-  });
-  await expect(telemetry).toContainText('Uncalibrated');
-  await expect(page.locator('.camera-preview-step-kicker span')).toHaveCount(0);
-  await expectCenterHitTarget(page.getByRole('button', { name: 'Disable heading' }));
+  // Nothing is tracked yet, so the route is drawn as if the visitor were
+  // looking along it, and the panel says exactly that.
+  await expect(telemetry).toContainText('Not tracked');
+  await expect(telemetry.locator('div', { hasText: 'Heading' })).toContainText('Off');
+  await expect(telemetry).toContainText('Not anchored');
+  await expect(view).toHaveAttribute('data-heading-source', 'off');
+  await expect.poll(async () => Number(await view.getAttribute('data-ribbon'))).toBeGreaterThan(2);
+  await expect(page.locator('.camera-preview-status')).toContainText('Not world-anchored');
+  // No immersive session is offered where the browser has none.
+  await expect(view).toHaveAttribute('data-ar', 'no');
+  await expect(page.getByRole('button', { name: 'Start AR' })).toHaveCount(0);
+  await expectCenterHitTarget(page.getByRole('button', { name: 'Track my walk' }));
   await expectCenterHitTarget(page.getByRole('button', { name: 'Exit to plan' }));
-  await page.screenshot({ path: testInfo.outputPath('heading-uncalibrated.png') });
+  await page.screenshot({ path: testInfo.outputPath('camera-guidance.png') });
   await page.setViewportSize({ width: 320, height: 700 });
   await expect
     .poll(() =>
       telemetry.evaluate((panel) => {
         const bounds = panel.getBoundingClientRect();
-        return (
-          panel.textContent?.includes('Uncalibrated') &&
-          [...panel.querySelectorAll('div, span, strong')].every((element) => {
-            const box = element.getBoundingClientRect();
-            return box.left >= bounds.left && box.right <= bounds.right;
-          })
-        );
+        return [...panel.querySelectorAll('div, span, strong')].every((element) => {
+          const box = element.getBoundingClientRect();
+          return box.left >= bounds.left && box.right <= bounds.right;
+        });
       }),
     )
     .toBe(true);
-  await expectCenterHitTarget(page.getByRole('button', { name: 'Disable heading' }));
+  await expectCenterHitTarget(page.getByRole('button', { name: 'Track my walk' }));
   await expectCenterHitTarget(page.getByRole('button', { name: 'Exit to plan' }));
-  await expect(telemetry).toContainText('Uncalibrated');
-  await page.screenshot({ path: testInfo.outputPath('heading-320px.png') });
-  await page.getByRole('button', { name: 'Disable heading' }).click();
-  await expect(telemetry).toContainText('Not enabled');
-  await page.evaluate((timer) => window.clearInterval(timer), compassTimer);
+  await page.screenshot({ path: testInfo.outputPath('camera-320px.png') });
   await page.getByRole('button', { name: 'Exit to plan' }).click();
   await expect(page.locator('.compiled-map')).toBeVisible();
+});
+
+test('an immersive session is offered where the browser has one, and a refusal is explained', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      value: async () => new MediaStream(),
+    });
+    Object.defineProperty(navigator, 'xr', {
+      value: {
+        isSessionSupported: async (mode: string) => mode === 'immersive-ar',
+        requestSession: async () => {
+          throw new DOMException('Immersive sessions are not allowed here', 'NotAllowedError');
+        },
+      },
+    });
+  });
+  await openPharmacyRoute(page);
+  await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
+  await page.getByRole('button', { name: 'Camera view' }).click();
+  const view = page.locator('.camera-preview');
+  await expect(view).toHaveAttribute('data-ar', 'available');
+  const start = page.getByRole('button', { name: 'Start AR' });
+  await expectCenterHitTarget(start);
+  await start.click();
+  await expect(page.locator('.camera-preview-note')).toContainText(
+    'The immersive session was not allowed.',
+  );
+  await expect(view).toHaveAttribute('data-ar', 'available');
+  await expect(page.locator('.camera-preview-status')).toContainText('Not world-anchored');
 });
 
 test('a verified check-in drives fastest and step-free routes through different connectors', async ({

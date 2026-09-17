@@ -66,6 +66,12 @@ export interface TrackerSnapshot {
   floorId: string;
   /** Plan bearing of travel once departure is established; null before that. */
   headingDegrees: number | null;
+  /** The gyroscope's turn since its zero was last reset; null without a gyroscope. */
+  relativeHeadingDegrees: number | null;
+  /** Counts the resets of that zero, so a reading taken against it can tell when it has moved. */
+  headingEpoch: number;
+  /** True while a visual-inertial pose supplies movement instead of strides. */
+  displacementAttached: boolean;
   walkedSinceAnchorMeters: number;
   stridesSinceAnchor: number;
   strideMeters: number;
@@ -98,6 +104,8 @@ export interface TrackerOptions {
   offRouteFrozen?: number;
   /** Consecutive samples without a usable heading rate before the gyroscope is treated as absent. */
   missingRateSamples?: number;
+  /** Uncertainty added per metre moved by an attached pose, which drifts far less than strides. */
+  displacementDriftPerMeter?: number;
 }
 
 const DEFAULTS: Required<TrackerOptions> = {
@@ -120,6 +128,7 @@ const DEFAULTS: Required<TrackerOptions> = {
   offRouteCaution: 6,
   offRouteFrozen: 12,
   missingRateSamples: 25,
+  displacementDriftPerMeter: 0.03,
 };
 
 export const ANCHOR_SIGMA = Object.freeze({
@@ -133,6 +142,8 @@ type Phase = 'unanchored' | 'orienting' | 'following' | 'floor-change';
 
 /** Sample gap the guidance integrator tolerates before it forgets its heading. */
 const GUIDANCE_SAMPLE_GAP_MS = 2_500;
+/** Pose movement smaller than this is the phone being held, not carried. */
+const MIN_DISPLACEMENT_METERS = 0.05;
 
 function circularMean(degrees: readonly number[]) {
   let x = 0;
@@ -168,6 +179,10 @@ export class RouteTracker {
   private pendingRun: VerticalRun | null = null;
   private sensorsProblem: 'sensors-unavailable' | null = null;
   private lastAnchor: { progress: number; strides: number } | null = null;
+  private displacement = false;
+  private displaced = 0;
+  private facingPlan: number | null = null;
+  private headingEpoch = 0;
 
   constructor(track: RouteTrack, options: TrackerOptions = {}) {
     this.options = { ...DEFAULTS, ...options };
@@ -231,6 +246,7 @@ export class RouteTracker {
     this.progress = progress;
     this.anchorSigma = Math.max(0.1, input.sigmaMeters);
     this.walked = 0;
+    this.displaced = 0;
     this.strides = 0;
     this.disagree = 0;
     this.backward = 0;
@@ -242,10 +258,62 @@ export class RouteTracker {
   }
 
   private beginOrienting() {
-    this.phase = 'orienting';
     this.alignment = null;
     this.orientHeadings = [];
+    this.headingEpoch += 1;
     if (!this.gyroMissing) this.integrator.syncHeading(0);
+    // A pose carries its own direction; there is nothing to establish.
+    this.phase = this.displacement ? 'following' : 'orienting';
+  }
+
+  /**
+   * Take movement from a visual-inertial pose - a WebXR session - instead of
+   * from strides. The pose measures metres in a known direction, so no strides
+   * are needed to establish one, and its drift is a fraction of a stride count's.
+   */
+  attachDisplacement(timeMs: number) {
+    this.nowMs = Math.max(this.nowMs, timeMs);
+    this.displacement = true;
+    this.facingPlan = null;
+    if (this.phase === 'orienting') this.phase = 'following';
+  }
+
+  /** The pose is gone; direction of travel is re-established from strides. */
+  detachDisplacement(timeMs: number) {
+    this.nowMs = Math.max(this.nowMs, timeMs);
+    this.displacement = false;
+    this.facingPlan = null;
+    if (this.phase === 'following') this.beginOrienting();
+  }
+
+  /** Which way the camera faces, as a plan bearing, while a pose is attached. */
+  facing(planDegrees: number | null, timeMs: number) {
+    this.nowMs = Math.max(this.nowMs, timeMs);
+    this.facingPlan =
+      planDegrees === null || !Number.isFinite(planDegrees) ? null : wrapDegrees(planDegrees);
+  }
+
+  /** One movement across the floor, in the plan frame, from the attached pose. */
+  displace(input: { dxMeters: number; dyMeters: number; timeMs: number }) {
+    if (
+      !this.displacement ||
+      !Number.isFinite(input.dxMeters) ||
+      !Number.isFinite(input.dyMeters) ||
+      !Number.isFinite(input.timeMs)
+    )
+      return;
+    this.nowMs = Math.max(this.nowMs, input.timeMs);
+    this.lastMotionMs = input.timeMs;
+    this.sensorsProblem = null;
+    if (this.phase === 'unanchored' || this.phase === 'floor-change') return;
+    const meters = Math.hypot(input.dxMeters, input.dyMeters);
+    if (meters < MIN_DISPLACEMENT_METERS) return;
+    if (this.phase === 'orienting') this.phase = 'following';
+    this.displaced += meters;
+    const heading = wrapDegrees((Math.atan2(input.dxMeters, -input.dyMeters) * 180) / Math.PI);
+    // Off-route and wrong-way tallies are kept in strides, so a metre of
+    // pose movement counts for as many strides as it would have taken.
+    this.follow(meters, heading, meters / this.strideMeters);
   }
 
   /** A compass heading already turned into a plan bearing, or null when there is none. */
@@ -288,6 +356,7 @@ export class RouteTracker {
     // is re-established from the next strides; progress is kept.
     if (!rateMissing && this.integrator.heading === null) {
       this.integrator.syncHeading(0);
+      this.headingEpoch += 1;
       if (this.phase === 'following') this.beginOrienting();
     } else if (wasMissing && !this.gyroMissing && this.phase === 'following') {
       this.beginOrienting();
@@ -301,6 +370,9 @@ export class RouteTracker {
   private stride() {
     if (this.phase === 'unanchored' || this.phase === 'floor-change') return;
     this.strides += 1;
+    // With a pose supplying movement, a stride counts towards the stride
+    // calibration and moves nothing: the same walk is not counted twice.
+    if (this.displacement) return;
     this.walked += this.strideMeters;
 
     if (this.gyroMissing) {
@@ -328,7 +400,17 @@ export class RouteTracker {
     }
 
     if (this.alignment === null || relative === null) return;
-    const heading = wrapDegrees(this.alignment + relative);
+    this.follow(this.strideMeters, wrapDegrees(this.alignment + relative), 1);
+  }
+
+  /**
+   * One movement of a known length in a known plan direction, judged against
+   * the corridor. The weight is what the movement adds to the off-route and
+   * wrong-way tallies, which are kept in strides.
+   */
+  private follow(meters: number, heading: number, weight: number) {
+    // Frozen holds: nothing moves the marker until a scan gives it a new anchor.
+    if (this.frozenBySigma() || this.disagree >= this.options.offRouteFrozen) return;
     const forward = bearingsNear(this.track, this.progress, this.options.turnWindowMeters);
     if (forward.length === 0) forward.push(bearingAt(this.track, this.progress));
     const ahead = Math.min(
@@ -342,13 +424,13 @@ export class RouteTracker {
     if (ahead <= this.options.agreeDegrees) {
       this.disagree = 0;
       this.backward = 0;
-      this.advance(this.strideMeters);
+      this.advance(meters);
     } else if (retreat <= this.options.agreeDegrees) {
-      this.backward += 1;
+      this.backward += weight;
       this.disagree = 0;
-      this.progress = clampProgress(this.track, this.progress - this.strideMeters);
+      this.progress = clampProgress(this.track, this.progress - meters);
     } else {
-      this.disagree += 1;
+      this.disagree += weight;
     }
   }
 
@@ -380,6 +462,7 @@ export class RouteTracker {
     // A ride is a place the estimate cannot follow; it costs certainty.
     this.anchorSigma = this.sigma() + 2;
     this.walked = 0;
+    this.displaced = 0;
     this.strides = 0;
     this.lastAnchor = null;
     this.pendingRun = null;
@@ -389,7 +472,13 @@ export class RouteTracker {
 
   private sigma() {
     const drift = this.options.driftPerMeter * (this.gyroMissing ? 2 : 1);
-    return this.anchorSigma + drift * this.walked + 0.3 * this.disagree + 0.5 * this.backward;
+    return (
+      this.anchorSigma +
+      drift * this.walked +
+      this.options.displacementDriftPerMeter * this.displaced +
+      0.3 * this.disagree +
+      0.5 * this.backward
+    );
   }
 
   private frozenBySigma() {
@@ -408,8 +497,9 @@ export class RouteTracker {
     const arrivedNow =
       this.phase !== 'unanchored' &&
       this.progress >= this.track.length - this.options.arrivalMeters;
-    const heading =
-      this.phase === 'following' && this.alignment !== null && this.integrator.heading !== null
+    const heading = this.displacement
+      ? this.facingPlan
+      : this.phase === 'following' && this.alignment !== null && this.integrator.heading !== null
         ? wrapDegrees(this.alignment + this.integrator.heading)
         : null;
 
@@ -474,7 +564,10 @@ export class RouteTracker {
       sigmaMeters: sigma,
       floorId: position.floor,
       headingDegrees: heading,
-      walkedSinceAnchorMeters: this.walked,
+      relativeHeadingDegrees: this.integrator.heading,
+      headingEpoch: this.headingEpoch,
+      displacementAttached: this.displacement,
+      walkedSinceAnchorMeters: this.walked + this.displaced,
       stridesSinceAnchor: this.strides,
       strideMeters: this.strideMeters,
       lastMotionMs: this.lastMotionMs,

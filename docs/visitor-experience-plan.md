@@ -637,3 +637,36 @@ Implemented in the Visitor surface, after review of the current product:
 - **Gate.** 1,118 unit tests; 100 operator browser journeys including two new
   tracking journeys driven by a synthesised, wall-clock-driven walker that
   obeys the banner; 12 cold-offline and 2 install/update journeys unchanged.
+
+### The camera as a window onto the same guidance — 17 September 2026
+
+- **What changed.** `src/components/CameraPreview.jsx` no longer previews
+  instructions with buttons of its own. It draws the route ahead on the floor
+  of the camera image (`src/ar/floorProjection.ts`: a pinhole camera at
+  chest height, facing a plan bearing, tilted by the pitch and roll the
+  phone's gravity vector gives) from the same progress the map's marker uses,
+  and its instruction card is the banner's copy. The facing is the tracker's
+  direction of travel once walking has established it, else the visitor's word
+  that they are looking along the corridor, else the route's own bearing -
+  and the readiness panel names which (`src/ar/facingFrom.ts`). A compass is
+  never consulted for it. On a browser that offers `immersive-ar`
+  (`navigator.xr.isSessionSupported`, Android Chrome on ARCore hardware; no
+  iOS in 2026) "Start AR" opens a session (`src/ar/arSession.ts`) that anchors
+  chevrons to the world on `local-floor`, refines the floor by hit testing,
+  and feeds the phone's own tracked movement to the tracker as metric
+  displacement (`RouteTracker.displace`), with a DOM overlay carrying the
+  instruction and a one-tap re-alignment.
+- **What it says about itself.** "Not world-anchored" outside a session;
+  "Anchored to your start point" inside one, because the world is lined up
+  with the plan from an assumption about where the visitor stands, not from
+  the building. Frozen now holds until a scan, for strides and poses alike.
+- **What it is not.** No real handset has run the immersive session; the
+  browser journeys stub the capability and prove the offer, the refusal and
+  the flat overlay. The gravity-to-attitude signs in `attitudeFromGravity`
+  follow the W3C device frame and want a check on a physical phone. Spoken
+  guidance still lives in the journey chrome, so it pauses while the camera
+  view is open.
+- **Gate.** lint, tsc, 1,140 unit tests including the new floor projection,
+  plan-world, pose-displacement and camera guidance suites; the visitor
+  browser journeys on both projects, including a tracked walk seen through the
+  camera in `e2e/live-tracking.pw.ts`.

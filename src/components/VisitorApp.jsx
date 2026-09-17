@@ -122,7 +122,7 @@ export default function VisitorApp() {
             />
           </>
         )}
-        <CameraPreview />
+        <CameraPreview tracking={tracking} />
       </main>
       <StatusBar />
       <LocationPicker isOpen={showLocationPicker} onClose={() => setShowLocationPicker(false)} />

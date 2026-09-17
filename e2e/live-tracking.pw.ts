@@ -243,6 +243,68 @@ test('a checked-in visitor can track their walk and the guidance follows their s
   await walker(page, 'walker.stopObeying(); walker.stop();');
 });
 
+test('the camera view draws the route from the tracked position and turns it with the phone', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await installSensors(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      value: async () => new MediaStream(),
+    });
+  });
+  await openPharmacyRoute(page);
+  await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
+  await installWalker(page);
+  const journey = page.locator('.jr');
+  await page.getByRole('button', { name: 'Track my walk' }).click();
+  await expect(journey).toHaveAttribute('data-tracking', 'on');
+  await walker(page, 'walker.start(); walker.walk(300);');
+  await expect(journey).toHaveAttribute('data-tier', 'tracking', { timeout: 15_000 });
+  await expect(journey).toHaveAttribute('data-tracking-reason', 'following', { timeout: 15_000 });
+
+  // Into the camera: the same instruction, the route drawn from the gyroscope's heading.
+  await page.getByRole('button', { name: 'Camera view' }).click();
+  const view = page.locator('.camera-preview');
+  await expect(view).toHaveAttribute('data-tracking', 'on');
+  await expect(view).toHaveAttribute('data-heading-source', 'tracker', { timeout: 15_000 });
+  const telemetry = page.getByRole('complementary', { name: 'Guidance readiness' });
+  await expect(telemetry).toContainText('Gyroscope, aligned by your walk');
+  await expect(telemetry).toContainText('Tracking');
+  await expect.poll(async () => Number(await view.getAttribute('data-ribbon'))).toBeGreaterThan(2);
+  await expect(page.getByRole('button', { name: 'Track my walk' })).toHaveCount(0);
+
+  // Standing still and turning the phone turns the drawn route with it.
+  await walker(page, 'walker.stand();');
+  await page.waitForTimeout(600);
+  const facing = Number(await view.getAttribute('data-facing'));
+  await walker(page, 'walker.turnBy(60);');
+  await expect
+    .poll(async () => {
+      const turned = Number(await view.getAttribute('data-facing'));
+      return Math.abs(((((turned - facing) % 360) + 540) % 360) - 180);
+    })
+    .toBeGreaterThan(40);
+  await walker(page, 'walker.turnBy(-60);');
+  await page.waitForTimeout(1_200);
+
+  // Walking on moves the guidance in this window exactly as it does on the map.
+  const before = await page.locator('.camera-preview-instruction-text').innerText();
+  await walker(page, 'walker.walk(300);');
+  await page.waitForTimeout(6_000);
+  await walker(page, 'walker.stand();');
+  await page.waitForTimeout(600);
+  const after = await page.locator('.camera-preview-instruction-text').innerText();
+  await page.getByRole('button', { name: 'Exit to plan' }).click();
+  await expect(journey).toHaveAttribute('data-tracking', 'on');
+  await expect(page.locator('.jr-banner-text')).toHaveText(after);
+  expect(
+    Number(await page.locator('.compiled-map-canvas').getAttribute('data-route-progress')),
+  ).toBeGreaterThan(5);
+  expect(typeof before).toBe('string');
+  await walker(page, 'walker.stop();');
+});
+
 test('a walk that leaves the route is reported, not followed', async ({ page }) => {
   test.setTimeout(60_000);
   await installSensors(page);

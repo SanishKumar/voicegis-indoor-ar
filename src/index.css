@@ -7885,3 +7885,84 @@ body {
   background: var(--ed-cream);
   color: var(--ed-ink);
 }
+
+/* ==========================================================================
+   Camera guidance: the route on the floor
+   The camera view is a window onto the same guidance as the map. The
+   instruction card, the readiness panel and the controls keep their places;
+   what changes is that the canvas now draws the route where the floor is,
+   the panel says where the facing came from, and an immersive session gets a
+   DOM overlay of its own. Notes are set in ink on cream, as every other
+   statement of what the product knows is.
+   ========================================================================== */
+/* camera guidance: the route on the floor */
+.camera-preview-lead {
+  color: var(--ed-ink);
+}
+
+.camera-preview-control.is-primary {
+  border-color: var(--ed-blue);
+  background: var(--ed-blue);
+  color: var(--ed-cream);
+}
+
+.camera-preview-control.is-primary:hover:not(:disabled) {
+  background: var(--ed-blue);
+  color: var(--ed-cream);
+}
+
+/* A note about what would help sits at the top of the readiness panel. */
+.camera-preview-telemetry .camera-preview-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ed-ink);
+  color: var(--ed-ink);
+  font-family: var(--ed-body);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.camera-ar-overlay {
+  display: none;
+}
+
+.camera-ar-overlay.is-active,
+.camera-ar-overlay:xr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+  background: transparent;
+}
+
+.camera-ar-overlay .camera-preview-instruction {
+  position: static;
+  width: 100%;
+  max-width: 460px;
+  pointer-events: auto;
+}
+
+.camera-ar-overlay-note {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--ed-ink);
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font-family: var(--ed-body);
+  font-size: 13px;
+  line-height: 1.45;
+  pointer-events: auto;
+}
+
+.camera-ar-overlay .camera-preview-controls {
+  position: static;
+  width: 100%;
+  max-width: 460px;
+  transform: none;
+  pointer-events: auto;
+}
