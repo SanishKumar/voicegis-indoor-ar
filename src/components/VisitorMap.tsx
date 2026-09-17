@@ -7,7 +7,7 @@ import { resolveVisitorLocation } from '../navigation/visitorLocation';
 import type { LocationBasis } from '../navigation/visitorJourney';
 import type { CheckInRecord } from '../capture/anchorCheckIn';
 import type { GraphNode, RouteStep } from '../engine/routingCore';
-import { positionAt, trackForRoute, walkedFloors } from '../navigation/routeProgress';
+import { positionShownOn, trackForRoute, walkedFloors } from '../navigation/routeProgress';
 import {
   NO_INSETS,
   defaultMapView,
@@ -215,7 +215,11 @@ export default function VisitorMap({
   const location = resolveVisitorLocation(state, checkIn, buildingPackage);
   const route = state.route?.found === true ? state.route : null;
   const track = route ? trackForRoute(route) : null;
-  const guidancePosition = track ? positionAt(track, state.progressMeters) : null;
+  // Inside a storey change the marker is shown on whichever end of the run is
+  // the floor being read, so stepping to "take the stairs" does not lose it.
+  const guidancePosition = track
+    ? positionShownOn(track, state.progressMeters, String(state.activeFloorId))
+    : null;
   const routeFloorIds = track ? walkedFloors(track) : [];
   const atEnd = track !== null && state.progressMeters >= track.length - 0.05;
   const locationX = location?.position[0];
@@ -319,6 +323,9 @@ export default function VisitorMap({
         ? state.route.path.map((point) => ({ x: point.x, y: point.y, floor: String(point.floor) }))
         : [],
     );
+    // The route's end is the one label the visitor is hunting for.
+    const last = state.route?.found ? state.route.path[state.route.path.length - 1] : undefined;
+    sceneRef.current?.setDestination(last === undefined ? null : String(last.id));
   }, [ready, state.activeFloorId, state.route, attempt, buildingPackage]);
 
   useEffect(() => {

@@ -201,6 +201,26 @@ export function positionAt(track: RouteTrack, meters: number): TrackPosition {
   };
 }
 
+/**
+ * Where to draw the guidance marker on the floor being read. Inside a storey
+ * change the visitor is at one end of the run or the other, and a map showing
+ * the other storey should show them at that storey's end of the same lift or
+ * stair rather than lose them. Anywhere else this is `positionAt`.
+ */
+export function positionShownOn(track: RouteTrack, meters: number, floorId: string): TrackPosition {
+  const position = positionAt(track, meters);
+  if (!position.vertical || position.floor === floorId) return position;
+  const run = nextVerticalRun(track, meters);
+  if (run === null) return position;
+  if (run.toFloorId === floorId) {
+    return { ...positionAt(track, run.alightingMeters), floor: floorId, vertical: true };
+  }
+  if (run.fromFloorId === floorId) {
+    return { ...positionAt(track, run.boardingMeters), floor: floorId, vertical: true };
+  }
+  return position;
+}
+
 export function guidanceAt(track: RouteTrack, meters: number): Guidance {
   const count = track.stepAt.length;
   if (count === 0) {

@@ -670,3 +670,29 @@ Implemented in the Visitor surface, after review of the current product:
   plan-world, pose-displacement and camera guidance suites; the visitor
   browser journeys on both projects, including a tracked walk seen through the
   camera in `e2e/live-tracking.pw.ts`.
+
+### The model as a maquette on the page — 17 September 2026
+
+- **What changed.** `src/map/venueScene.ts` draws the building's own shadow
+  on the page beneath it (a `ShadowMaterial` ground that comes in with the
+  tilt and sits under whatever is lowest in the stack), with soft-edged
+  shadow maps and a normal bias instead of a deep depth bias. The floor stack
+  opens and closes rather than cutting: every storey eases to its height and
+  ghosting, and the lift and stair shafts and the route's climbs are re-laid
+  each frame to wherever the floors are, so a route never detaches from the
+  stop it climbs from; `data-camera-transition` stays `moving` until the
+  floors have settled too. The walls in front of the marker thin out within a
+  couple of metres of it (a world-sized window in the wall shader), so the
+  marker and the floor just ahead of it are never behind a wall. The route's
+  end is a destination tier of label - ink, always eligible, above every
+  other - via `setDestination`.
+- **What was wrong.** Stepping the walk-through onto "take the stairs" lost
+  the marker: the displayed floor switched to where the stairs go while the
+  marker stayed at the top. `positionShownOn` now draws it at whichever end
+  of the run is on the floor being read.
+- **What it is not.** The window through the walls and the ground shadow are
+  presentation; they change nothing about where the guidance says the
+  visitor is. The camera is orthographic and far away, so "walls near the
+  camera" was never the problem - walls between the marker and the eye were.
+- **Gate.** lint, tsc, the unit suite, and the map, journey and tracking
+  browser journeys on both projects.

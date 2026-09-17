@@ -17,12 +17,14 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  PCFShadowMap,
+  PCFSoftShadowMap,
+  PlaneGeometry,
   Raycaster,
   RingGeometry,
   Scene,
   DoubleSide,
   Shape,
+  ShadowMaterial,
   ShapeGeometry,
   SphereGeometry,
   Vector2,
@@ -117,6 +119,12 @@ const WALL_HEIGHT = 1.4;
  * reading a building, not a model of one.
  */
 const EXPLODE = 3.1;
+/** How quickly a storey eases to its place in the stack, and its ghosting. */
+const FLOOR_TAU_MS = 220;
+/** Radius of the window through the walls around the marker, in metres. */
+const WALL_WINDOW_METERS = 2.6;
+/** The route's end outranks every other label. */
+const DESTINATION_PRIORITY = 20;
 
 /** Where the guidance is, and which way the route runs from there. */
 export interface ScenePuck {
@@ -173,6 +181,8 @@ export interface VenueScene {
   focusLocation(): void;
   setActiveFloor(floorId: string): void;
   setRoute(points: ReadonlyArray<{ x: number; y: number; floor: string }>): void;
+  /** The route's end, by label id, raised above every other label; null for none. */
+  setDestination(labelId: string | null): void;
   setSelectedSpace(spaceId: string | null): void;
   /** POI id under a client point, or null. */
   pickPoi(clientX: number, clientY: number): string | null;
@@ -265,7 +275,7 @@ export function createVenueScene(
   const pixelRatio = Math.min(window.devicePixelRatio, 2);
   renderer.setPixelRatio(pixelRatio);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = PCFShadowMap;
+  renderer.shadowMap.type = PCFSoftShadowMap;
   renderer.toneMapping = ACESFilmicToneMapping;
 
   const scene = new Scene();
@@ -302,12 +312,15 @@ export function createVenueScene(
   canvas.addEventListener('webglcontextrestored', onContextRestored);
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-  scene.add(new HemisphereLight(0xd6e7f5, 0xbfae92, 1.5));
-  const key = new DirectionalLight(0xfff2df, 2.4);
+  scene.add(new HemisphereLight(0xd6e7f5, 0xbfae92, 1.7));
+  const key = new DirectionalLight(0xfff2df, 2.0);
   key.position.set(span * 0.55, span * 1.2, span * 0.45);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
-  key.shadow.bias = -0.0015;
+  // Soft-edged shadows, and a normal bias rather than a deep depth bias: the
+  // flat-shaded low walls otherwise show acne along their tops.
+  key.shadow.bias = -0.0004;
+  key.shadow.normalBias = 0.03;
   const shadowSpan = span * 0.8;
   Object.assign(key.shadow.camera, {
     left: -shadowSpan,
@@ -319,7 +332,20 @@ export function createVenueScene(
   });
   key.shadow.camera.updateProjectionMatrix();
   scene.add(key);
-  scene.add(new AmbientLight(0xffffff, 0.28));
+  scene.add(new AmbientLight(0xffffff, 0.24));
+
+  /*
+   * The building's own shadow on the page beneath it. It is a shadow and
+   * nothing else - the page stays the page - but it is what makes the model
+   * sit on a surface rather than float in front of one. Only the tilted view
+   * has an underneath; the plan looks straight down and has nowhere for it.
+   */
+  const groundMaterial = new ShadowMaterial({ color: 0x000609, opacity: 0, transparent: true });
+  const ground = new Mesh(new PlaneGeometry(span * 4, span * 4), groundMaterial);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  ground.visible = false;
+  scene.add(ground);
 
   function shapeFrom(polygon: readonly Coordinate[]) {
     const shape = new Shape();
@@ -329,6 +355,58 @@ export function createVenueScene(
     });
     shape.closePath();
     return shape;
+  }
+
+  /*
+   * A soft window through the walls around the marker. In the tilted view the
+   * wall between the marker and the eye hides the marker and the floor just
+   * ahead of it. Rather than lower every wall, the walls in front of the
+   * marker thin out within a couple of metres of it, and only those; the
+   * window is world-sized, so it is the same room-sized opening at any zoom.
+   */
+  const windowUniforms = {
+    uWindowCentre: { value: new Vector3(0, -1000, 0) },
+    uWindowRadius: { value: 0 },
+    uViewDir: { value: new Vector3(0, 1, 0) },
+  };
+  function wallSurface(color: number) {
+    const material = surface(color, { transparent: true });
+    material.userData.alwaysTransparent = true;
+    material.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, windowUniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWallWorld;')
+        .replace(
+          '#include <project_vertex>',
+          '#include <project_vertex>\nvWallWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;',
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          [
+            '#include <common>',
+            'uniform vec3 uWindowCentre;',
+            'uniform float uWindowRadius;',
+            'uniform vec3 uViewDir;',
+            'varying vec3 vWallWorld;',
+          ].join('\n'),
+        )
+        .replace(
+          '#include <alphatest_fragment>',
+          [
+            'if (uWindowRadius > 0.0) {',
+            '  vec3 rel = vWallWorld - uWindowCentre;',
+            '  float along = dot(rel, uViewDir);',
+            '  float across = length(rel - uViewDir * along);',
+            '  float window = smoothstep(uWindowRadius, uWindowRadius * 0.45, across) * smoothstep(0.0, 0.6, along);',
+            '  diffuseColor.a *= 1.0 - window * 0.85;',
+            '}',
+            '#include <alphatest_fragment>',
+          ].join('\n'),
+        );
+    };
+    material.customProgramCacheKey = () => 'wall-window';
+    return material;
   }
 
   function wallGeometries(
@@ -387,6 +465,9 @@ export function createVenueScene(
     /** Where this floor is easing toward, so the stack opens rather than cuts. */
     targetY: number;
     targetOpacity: number;
+    /** Where it is now, on the way there. */
+    currentY: number;
+    currentOpacity: number;
     group: Group;
     materials: MeshStandardMaterial[];
     routeGroup: Group;
@@ -482,7 +563,7 @@ export function createVenueScene(
     addWalls(floor.outline as Coordinate[], WALL_FILL);
     for (const [color, geometries] of wallsByColor) {
       if (geometries.length === 0) continue;
-      const mesh = new Mesh(mergeGeometries(geometries), track(surface(color)));
+      const mesh = new Mesh(mergeGeometries(geometries), track(wallSurface(color)));
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
@@ -611,6 +692,8 @@ export function createVenueScene(
       elevation: floor.elevation,
       targetY: 0,
       targetOpacity: 1,
+      currentY: 0,
+      currentOpacity: 1,
       group,
       materials,
       routeGroup,
@@ -634,6 +717,7 @@ export function createVenueScene(
   let routePoints: ReadonlyArray<{ x: number; y: number; floor: string }> = [];
   let routeFloors: string[] = [];
   let selectedSpaceId: string | null = null;
+  let destinationId: string | null = null;
 
   const locationGroup = new Group();
   let location: Omit<VisitorLocation, 'label'> | null = null;
@@ -708,6 +792,38 @@ export function createVenueScene(
     splittable: boolean;
   }
   let tubes: RouteTube[] = [];
+
+  interface Shaft {
+    mesh: Mesh;
+    bottom: FloorView;
+    top: FloorView;
+    position: Coordinate;
+  }
+  interface Hop {
+    tube: RouteTube;
+    exit: Coordinate;
+    entry: Coordinate;
+    from: FloorView;
+    to: FloorView;
+  }
+  let shafts: Shaft[] = [];
+  let hops: Hop[] = [];
+
+  /** Put the climbs between storeys where the floors are now, not where they are heading. */
+  function placeConnectors() {
+    for (const shaft of shafts) {
+      const bottom = shaft.bottom.currentY;
+      const height = shaft.top.currentY - bottom;
+      shaft.mesh.visible = height > 0.01;
+      shaft.mesh.scale.y = Math.max(0.01, height);
+      shaft.mesh.position.copy(vec(shaft.position, bottom + height / 2));
+    }
+    for (const hop of hops) {
+      hop.tube.from.copy(vec(hop.exit, hop.from.currentY + 0.52));
+      hop.tube.to.copy(vec(hop.entry, hop.to.currentY + 0.52));
+      placeTube(hop.tube.mesh, hop.tube.from, hop.tube.to);
+    }
+  }
   let routeProgress: number | null = null;
   const splitBehind = tubeMesh(travelledMaterial);
   const splitAhead = tubeMesh(aheadMaterial);
@@ -759,6 +875,8 @@ export function createVenueScene(
     invalidate();
     clearRoute();
     tubes = [];
+    shafts = [];
+    hops = [];
     if (routePoints.length < 2) return;
 
     const distances = cumulativeDistances(routePoints);
@@ -797,11 +915,12 @@ export function createVenueScene(
           )
           .sort((left, right) => stackY(left.view) - stackY(right.view));
         if (stops.length < 2) continue;
-        const bottom = stackY(stops[0].view);
-        const height = stackY(stops[stops.length - 1].view) - bottom;
-        if (height <= 0) continue;
+        const bottom = stops[0].view;
+        const top = stops[stops.length - 1].view;
+        if (stackY(top) - stackY(bottom) <= 0) continue;
+        // A unit shaft, stretched to wherever the floors are on every frame.
         const shaft = new Mesh(
-          new CylinderGeometry(0.5, 0.5, height, connector.kind === 'elevator' ? 12 : 4),
+          new CylinderGeometry(0.5, 0.5, 1, connector.kind === 'elevator' ? 12 : 4),
           new MeshStandardMaterial({
             color: SHAFT_COLOR,
             flatShading: true,
@@ -810,8 +929,8 @@ export function createVenueScene(
             opacity: 0.4,
           }),
         );
-        shaft.position.copy(vec(stops[0].stop.position as Coordinate, bottom + height / 2));
         shaftsGroup.add(shaft);
+        shafts.push({ mesh: shaft, bottom, top, position: stops[0].stop.position as Coordinate });
       }
 
       routePoints.forEach((exit, index) => {
@@ -820,20 +939,25 @@ export function createVenueScene(
         const from = floors.get(exit.floor);
         const to = floors.get(entry.floor);
         if (from === undefined || to === undefined) return;
-        const start = vec([exit.x, exit.y], stackY(from) + 0.52);
-        const end = vec([entry.x, entry.y], stackY(to) + 0.52);
-        const hop = routeTube(start, end);
-        if (!hop) return;
+        // Built where the floors are now, which as a stack opens is on top of
+        // each other; the climb grows with the gap rather than being skipped.
+        const start = vec([exit.x, exit.y], from.currentY + 0.52);
+        const end = vec([entry.x, entry.y], to.currentY + 0.52);
+        const hop = tubeMesh(aheadMaterial);
+        placeTube(hop, start, end);
         hopsGroup.add(hop);
-        tubes.push({
+        const tube: RouteTube = {
           mesh: hop,
           from: start,
           to: end,
           start: distances[index],
           end: distances[index + 1],
           splittable: false,
-        });
+        };
+        tubes.push(tube);
+        hops.push({ tube, exit: [exit.x, exit.y], entry: [entry.x, entry.y], from, to });
       });
+      placeConnectors();
     }
     applyProgress();
   }
@@ -893,7 +1017,6 @@ export function createVenueScene(
     mesh.renderOrder = 1000 + index;
   });
 
-  const appliedFloors = new Map<string, { y: number; opacity: number }>();
   let puckTarget: ScenePuck | null = null;
   const puckShown = { x: 0, y: 0, angle: 0, floorId: '' };
   let follow: SceneFollow | null = null;
@@ -1045,8 +1168,8 @@ export function createVenueScene(
         ],
         width: size[0],
         height: size[1],
-        priority: label.priority,
-        minScale: label.minScale,
+        priority: label.id === destinationId ? DESTINATION_PRIORITY : label.priority,
+        minScale: label.id === destinationId ? 0 : label.minScale,
       });
     }
 
@@ -1089,6 +1212,7 @@ export function createVenueScene(
       }
       element.style.transform = `translate(${Math.round(minX)}px, ${Math.round(minY)}px)`;
       element.style.opacity = '1';
+      element.classList.toggle('map-pill-destination', label.id === destinationId);
       placed.add(label.id);
     }
     for (const [id, element] of labelElements) {
@@ -1354,6 +1478,12 @@ export function createVenueScene(
       rebuildRoute();
     },
 
+    setDestination(labelId) {
+      if (destinationId === labelId) return;
+      destinationId = labelId;
+      invalidate();
+    },
+
     setSelectedSpace(spaceId) {
       invalidate();
       const view = floors.get(activeFloorId);
@@ -1412,29 +1542,46 @@ export function createVenueScene(
         renderer.setSize(width, height, false);
         invalidate();
       }
-      for (const view of floors.values()) {
-        const last = appliedFloors.get(view.id);
-        if (last && last.y === view.targetY && last.opacity === view.targetOpacity) continue;
-        appliedFloors.set(view.id, { y: view.targetY, opacity: view.targetOpacity });
-        invalidate();
-        // Connector segments and floors must share exact endpoints while the
-        // camera animates. Moving only floors would detach routes from stops.
-        view.group.position.y = view.targetY;
-        const ghosted = view.targetOpacity < 0.995;
-        for (const material of view.materials) {
-          material.opacity = view.targetOpacity;
-          material.transparent = material.opacity < 0.995;
-          material.depthWrite = material.opacity > 0.6;
-        }
-        // A ghosted storey must not throw shadows across the one being read.
-        // Walked once when that changes, not across every mesh every frame.
-        view.group.traverse((object) => {
-          const mesh = object as Mesh;
-          if (mesh.isMesh === true) mesh.castShadow = !ghosted;
-        });
-      }
       const now = performance.now();
       const elapsed = now - lastFrame;
+      // The stack opens and closes rather than cutting: every storey eases to
+      // its height and its ghosting, and the climbs between them are re-laid
+      // to wherever the floors are on the way, so a route never detaches from
+      // the stop it climbs from.
+      const ease = motionPreference.matches
+        ? 1
+        : 1 - Math.exp(-Math.min(100, Math.max(0, elapsed)) / FLOOR_TAU_MS);
+      let floorsMoving = false;
+      let floorsMoved = false;
+      for (const view of floors.values()) {
+        let y = view.currentY + (view.targetY - view.currentY) * ease;
+        if (Math.abs(view.targetY - y) < 0.003) y = view.targetY;
+        let opacity = view.currentOpacity + (view.targetOpacity - view.currentOpacity) * ease;
+        if (Math.abs(view.targetOpacity - opacity) < 0.003) opacity = view.targetOpacity;
+        if (y !== view.targetY || opacity !== view.targetOpacity) floorsMoving = true;
+        if (y === view.currentY && opacity === view.currentOpacity) continue;
+        const wasGhosted = view.currentOpacity < 0.995;
+        view.currentY = y;
+        view.currentOpacity = opacity;
+        floorsMoved = true;
+        invalidate();
+        view.group.position.y = y;
+        const ghosted = opacity < 0.995;
+        for (const material of view.materials) {
+          material.opacity = opacity;
+          material.transparent = material.userData.alwaysTransparent === true || ghosted;
+          material.depthWrite = opacity > 0.6;
+        }
+        // A ghosted storey must not throw shadows across the one being read.
+        // Walked when that changes, not across every mesh every frame.
+        if (ghosted !== wasGhosted) {
+          view.group.traverse((object) => {
+            const mesh = object as Mesh;
+            if (mesh.isMesh === true) mesh.castShadow = !ghosted;
+          });
+        }
+      }
+      if (floorsMoved) placeConnectors();
       const puckBefore = `${puckShown.x},${puckShown.y},${puckShown.angle},${puck.parent?.id}`;
       placePuck(motionPreference.matches, elapsed);
       if (`${puckShown.x},${puckShown.y},${puckShown.angle},${puck.parent?.id}` !== puckBefore)
@@ -1465,10 +1612,31 @@ export function createVenueScene(
         puck.scale.setScalar(cameraRig.worldUnitsPerPixel(width, height) * PUCK_PIXELS);
       if (cameraChanged()) invalidate();
 
+      // The shadow underneath sits below whatever is lowest in the stack and
+      // comes in with the tilt; the window through the walls follows the marker.
+      let lowest = 0;
+      for (const view of floors.values()) {
+        if (view.group.visible) lowest = Math.min(lowest, view.currentY);
+      }
+      ground.position.y = lowest - 1.1;
+      const groundOpacity = cameraView.mode === '3d' ? 0.14 * Math.min(1, pose.tilt / 0.5) : 0;
+      if (groundOpacity !== groundMaterial.opacity) {
+        groundMaterial.opacity = groundOpacity;
+        invalidate();
+      }
+      ground.visible = groundOpacity > 0.005;
+      if (puck.parent !== null && cameraView.mode === '3d') {
+        puck.getWorldPosition(windowUniforms.uWindowCentre.value);
+        camera.getWorldDirection(windowUniforms.uViewDir.value).negate();
+        windowUniforms.uWindowRadius.value = WALL_WINDOW_METERS;
+      } else {
+        windowUniforms.uWindowRadius.value = 0;
+      }
+
       const diagnostics = {
         cameraMode: cameraView.mode,
         cameraTilt: pose.tilt.toFixed(4),
-        cameraTransition: pose.settled ? 'settled' : 'moving',
+        cameraTransition: pose.settled && !floorsMoving ? 'settled' : 'moving',
         cameraScale: cameraView.scale.toFixed(4),
         cameraTarget: cameraView.target.map((value) => value.toFixed(4)).join(','),
         cameraBearing: cameraView.azimuth.toFixed(4),

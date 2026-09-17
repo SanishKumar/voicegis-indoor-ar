@@ -6770,6 +6770,14 @@ body {
   color: var(--ed-blue);
   font-weight: 700;
 }
+/* The destination is the one label being hunted for: ink, and always placed. */
+.map-pill-destination,
+.map-pill-poi.map-pill-destination {
+  border-color: var(--ed-ink);
+  background: var(--ed-ink);
+  color: var(--ed-cream);
+  font-weight: 700;
+}
 
 /* --------------------------------------------------------------------------
    Floor selector
