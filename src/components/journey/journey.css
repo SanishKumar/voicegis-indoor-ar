@@ -1,0 +1,536 @@
+/* ==========================================================================
+   Journey chrome
+   --------------------------------------------------------------------------
+   Phone: an instruction banner across the top of the map and a trip sheet
+   across the bottom, with the map live between them. Wide screens: the two
+   stack into one side panel and the map takes the rest.
+
+   Own classes only. The old directions panel was styled through several
+   generations of overrides in index.css, and every change there fought the
+   one before it.
+   ========================================================================== */
+
+.visitor-shell.is-journey .visitor-header,
+.visitor-shell.is-journey .visitor-status-bar {
+  display: none;
+}
+
+.jr {
+  display: contents;
+}
+
+/* ---------------------------------------------------------------- banner */
+.jr-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 88px;
+  padding: 14px 14px 14px 16px;
+  background: var(--ed-ink);
+  color: var(--ed-cream);
+}
+
+.jr-banner-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 9999px;
+  background: var(--ed-blue);
+  color: var(--ed-cream);
+}
+
+.jr-banner.is-arriving .jr-banner-icon {
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+}
+
+.jr-banner.is-problem .jr-banner-icon {
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+}
+
+.jr-banner-copy {
+  min-width: 0;
+}
+
+.jr-banner-lead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 2px;
+  font-family: var(--ed-body);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: rgba(255, 249, 240, 0.78);
+  font-variant-numeric: tabular-nums;
+}
+
+.jr-banner-status {
+  padding: 1px 8px;
+  border: 1px solid rgba(255, 249, 240, 0.38);
+  border-radius: 9999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 249, 240, 0.72);
+}
+
+.jr-banner-text {
+  display: block;
+  margin: 0;
+  font-family: var(--ed-display);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: 0.006em;
+  color: var(--ed-cream);
+  text-wrap: balance;
+}
+
+.jr-banner-then {
+  margin: 5px 0 0;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: rgba(255, 249, 240, 0.78);
+}
+
+.jr-banner-voice {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 249, 240, 0.38);
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--ed-cream);
+  cursor: pointer;
+}
+
+.jr-banner-voice[aria-pressed='true'] {
+  border-color: var(--ed-cream);
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+}
+
+/* ----------------------------------------------------------------- sheet */
+.jr-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 72%;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--ed-ink);
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font-family: var(--ed-body);
+  outline: none;
+}
+
+.jr-sheet:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--ed-blue);
+}
+
+.jr-sheet p {
+  margin: 0;
+}
+
+/* Only the step list gives up height when the sheet is short; everything
+   above it keeps the size it asked for. */
+.jr-sheet > :not(.jr-steps) {
+  flex: none;
+}
+
+.jr-venue {
+  display: none;
+}
+
+.jr-trip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.jr-trip-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.jr-trip-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.jr-trip-time {
+  display: block;
+  font-family: var(--ed-display);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.jr-trip-to {
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ed-ink-soft);
+}
+
+.jr-trip-to strong {
+  color: var(--ed-ink);
+}
+
+.jr-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(0, 6, 9, 0.14);
+  border-bottom: 1px solid rgba(0, 6, 9, 0.14);
+}
+
+.jr-meta-copy {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.jr-via,
+.jr-from {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  white-space: nowrap;
+  color: var(--ed-ink-soft);
+}
+
+.jr-via strong,
+.jr-from strong {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  color: var(--ed-ink);
+}
+
+.jr-link {
+  flex: none;
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ed-blue);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.jr-chip,
+.jr-pill,
+.jr-primary,
+.jr-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+  background: var(--ed-cream);
+  color: var(--ed-ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.jr-chip {
+  flex: none;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.jr-chip.is-on {
+  border-color: var(--ed-blue);
+  background: var(--ed-blue);
+  color: var(--ed-cream);
+}
+
+.jr-pill {
+  padding: 0 18px;
+  font-size: 14px;
+}
+
+.jr-icon-button {
+  flex: none;
+  width: 44px;
+  padding: 0;
+}
+
+.jr-primary {
+  flex: 1;
+  min-width: 0;
+  padding: 0 18px;
+  border-color: var(--ed-ink);
+  background: var(--ed-ink);
+  color: var(--ed-cream);
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.jr-primary[aria-pressed='true'] {
+  border-color: var(--ed-blue);
+  background: var(--ed-blue);
+}
+
+.jr-chip:hover:not(:disabled):not(.is-on),
+.jr-pill:hover:not(:disabled),
+.jr-icon-button:hover:not(:disabled) {
+  border-color: var(--ed-blue);
+  color: var(--ed-blue);
+}
+
+.jr-primary:hover:not(:disabled) {
+  border-color: var(--ed-blue);
+  background: var(--ed-blue);
+}
+
+.jr-chip:focus-visible,
+.jr-pill:focus-visible,
+.jr-primary:focus-visible,
+.jr-icon-button:focus-visible,
+.jr-link:focus-visible,
+.jr-banner-voice:focus-visible,
+.jr-step button:focus-visible {
+  outline: 2px solid var(--ed-blue);
+  outline-offset: 2px;
+}
+
+.jr-icon-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.jr-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.jr-note {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ed-ink-soft);
+}
+
+/* ------------------------------------------------------------ step list */
+.jr-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.jr-steps[hidden] {
+  display: none;
+}
+
+.jr-step-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jr-step + .jr-step {
+  border-top: 1px solid rgba(0, 6, 9, 0.12);
+}
+
+.jr-step button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 4px;
+  border: 0;
+  background: none;
+  color: var(--ed-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.jr-step-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 9999px;
+}
+
+.jr-step-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.jr-step-text {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.jr-step small {
+  font-size: 12.5px;
+  color: var(--ed-ink-soft);
+}
+
+.jr-step.is-done .jr-step-copy,
+.jr-step.is-done .jr-step-icon {
+  opacity: 0.45;
+}
+
+.jr-step.is-next .jr-step-icon {
+  border-color: var(--ed-blue);
+  background: var(--ed-blue);
+  color: var(--ed-cream);
+}
+
+.jr-step.is-next .jr-step-text {
+  color: var(--ed-blue);
+}
+
+.jr-spin {
+  animation: jr-spin 900ms linear infinite;
+}
+
+@keyframes jr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A recovery message for a failed map display lives inside the sheet, where
+   it is seen, rather than behind it. */
+.jr-sheet .map-recovery-slot:empty {
+  display: none;
+}
+
+/* ------------------------------------------------------ map in a journey */
+/* No transitions on these: they are measured the moment they move, so labels can
+   be kept out from under them. A sliding button is measured where it started. */
+.visitor-shell.is-journey .compiled-map-floors {
+  top: calc(var(--map-inset-top, 0px) + 12px);
+  right: 12px;
+  bottom: auto;
+  left: auto;
+  transform: none;
+}
+
+.visitor-shell.is-journey .compiled-map-presentation {
+  top: calc(var(--map-inset-top, 0px) + 12px);
+  right: auto;
+  bottom: auto;
+  left: calc(var(--map-inset-left, 0px) + 12px);
+  align-items: flex-start;
+}
+
+.visitor-shell.is-journey .compiled-map-zoom {
+  top: auto;
+  right: 12px;
+  bottom: calc(var(--map-inset-bottom, 0px) + 12px);
+  left: auto;
+  transform: none;
+}
+
+/* ------------------------------------------------------------ wide screens */
+@media (min-width: 900px) {
+  .jr {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    width: 400px;
+    border-right: 1px solid var(--ed-ink);
+    background: var(--ed-cream);
+  }
+
+  .jr-banner,
+  .jr-sheet {
+    position: static;
+    z-index: auto;
+  }
+
+  .jr-banner {
+    min-height: 104px;
+    padding: 18px 18px 18px 20px;
+  }
+
+  .jr-banner-text {
+    font-size: 23px;
+  }
+
+  .jr-sheet {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    padding: 16px 20px 20px;
+    border-top: 0;
+  }
+
+  .jr-venue {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ed-ink-soft);
+  }
+
+  /* There is room for the whole list; hiding it behind a toggle is a phone economy. */
+  .jr-steps[hidden] {
+    display: flex;
+  }
+
+  .jr-steps-toggle {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jr-spin {
+    animation: none;
+  }
+}
+
+/* Icons keep their size; a nowrap label must not squeeze them to a sliver. */
+.jr svg {
+  flex: none;
+}

@@ -12,26 +12,28 @@ test('previewing the whole route preserves location and totals until arrival is 
   test.setTimeout(45_000);
   await openPharmacyRoute(page);
   const directions = page.getByRole('region', { name: 'Directions to Outpatient Pharmacy' });
-  await expect(directions.getByText('Route preview', { exact: true })).toBeVisible();
-  await expect(directions.locator('.nav-legs')).toBeHidden();
-  const facts = await directions.locator('.nav-journey-facts').innerText();
+  const banner = page.getByRole('region', { name: 'Next step' });
+  await expect(banner).toContainText('Overview');
+  const facts = await directions.locator('.jr-trip-time').innerText();
   const start = page.getByRole('button', { name: /Change start location/ });
   const startLabel = await start.getAttribute('aria-label');
   const map = page.locator('.compiled-map');
   const locationFloor = await map.getAttribute('data-location-floor');
-  const label = await directions.locator('.nav-current-instruction-label').innerText();
-  const total = Number(label.match(/of\s+(\d+)/i)?.[1]);
+  const total = Number(await directions.getAttribute('data-step-count'));
   expect(total).toBeGreaterThan(1);
   for (let index = 1; index < total; index += 1) {
     await directions.getByRole('button', { name: 'Next instruction' }).click();
   }
-  await expect(directions.locator('.nav-journey-facts')).toHaveText(facts, { useInnerText: true });
+  await expect(directions).toHaveAttribute('data-step-index', String(total - 1));
+  // Stepping through is a preview: the trip, the start and its floor stay put.
+  await expect(directions.locator('.jr-trip-time')).toHaveText(facts, { useInnerText: true });
   await expect(start).toHaveAttribute('aria-label', startLabel!);
   await expect(map).toHaveAttribute('data-location-floor', locationFloor!);
-  await expect(page.getByLabel('Map status')).toContainText('Route ready');
-  await expect(directions.locator('.nav-arrived')).toHaveCount(0);
+  await expect(banner).toContainText('Preview');
+  // Reaching the end of the steps is not arriving.
+  await expect(page.locator('.jr-arrived')).toHaveCount(0);
   await directions.getByRole('button', { name: 'I’m at my destination' }).click();
-  await expect(directions.locator('.nav-arrived')).toContainText('Arrival confirmed by you');
+  await expect(page.locator('.jr-arrived')).toContainText('Arrival confirmed by you');
   await directions.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(directions).toHaveCount(0);
 });
@@ -55,7 +57,8 @@ test('dismissing a check-in and browsing floors preserves a recenterable checkpo
     .getAttribute('aria-label');
   await floors.locator('button[aria-pressed="false"]').first().click();
   await expect(map).toHaveAttribute('data-location-floor', floor!);
-  await page.getByRole('button', { name: 'Recenter on last check-in' }).click();
+  // Inside a journey, recentering returns to the route from where guidance is.
+  await page.getByRole('button', { name: 'Show whole route' }).click();
   await expect(floors.getByRole('button', { name: checkpointFloor! })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -74,13 +77,13 @@ test('camera preview returns to the same shared instruction without moving the c
   await openPharmacyRoute(page);
   await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
   await page.getByRole('button', { name: 'Next instruction' }).click();
-  const instruction = await page.locator('.nav-current-instruction strong').innerText();
+  const instruction = await page.locator('.jr-banner-text').innerText();
   const floor = await page.locator('.compiled-map').getAttribute('data-location-floor');
-  await page.getByRole('button', { name: 'Which way?' }).click();
+  await page.getByRole('button', { name: 'Camera view' }).click();
   await expect(page.locator('.camera-preview-step-kicker')).toContainText('Preview instruction 2');
   await expectCenterHitTarget(page.getByRole('button', { name: 'Exit to plan' }));
   await page.getByRole('button', { name: 'Exit to plan' }).click();
-  await expect(page.locator('.nav-current-instruction strong')).toHaveText(instruction);
+  await expect(page.locator('.jr-banner-text')).toHaveText(instruction);
   await expect(page.locator('.compiled-map')).toHaveAttribute('data-location-floor', floor!);
 });
 
@@ -115,15 +118,15 @@ test('a missing camera explains the failure and preserves the route on return', 
   });
   await openPharmacyRoute(page);
   await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
-  const instruction = await page.locator('.nav-current-instruction').innerText();
-  await page.getByRole('button', { name: 'Which way?' }).click();
+  const instruction = await page.locator('.jr-banner-copy').innerText();
+  await page.getByRole('button', { name: 'Camera view' }).click();
   await expect(page.locator('.camera-preview-fallback')).toContainText(
     'Requested device not found',
   );
   const exit = page.getByRole('button', { name: 'Exit to plan', exact: true });
   await expectCenterHitTarget(exit);
   await exit.click();
-  await expect(page.locator('.nav-current-instruction')).toHaveText(instruction, {
+  await expect(page.locator('.jr-banner-copy')).toHaveText(instruction, {
     useInnerText: true,
   });
 });
@@ -155,7 +158,7 @@ test('camera heading stays uncalibrated and its controls remain reachable', asyn
   });
   await openPharmacyRoute(page);
   await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
-  await page.getByRole('button', { name: 'Which way?' }).click();
+  await page.getByRole('button', { name: 'Camera view' }).click();
   const telemetry = page.getByRole('complementary', { name: 'Guidance readiness' });
   await expect(telemetry).toContainText('Not enabled');
   await page.getByRole('button', { name: 'Enable heading' }).click();
@@ -238,32 +241,28 @@ test('map guidance preserves every exact turn without opening the camera', async
   await openPharmacyRoute(page);
 
   const directions = page.getByRole('region', { name: 'Directions to Outpatient Pharmacy' });
-  const current = directions.locator('.nav-current-instruction');
-  await expect(current).toContainText(/^Instruction 1 of \d+/);
+  const current = page.locator('.jr-banner-text');
+  await expect(directions).toHaveAttribute('data-step-index', '0');
   await expect(page.locator('.camera-preview')).toHaveCount(0);
 
-  const expand = directions.getByRole('button', { name: /Show all \d+ legs/ });
+  const expand = directions.getByRole('button', { name: /Show all \d+ steps/ });
   if (await expand.isVisible()) await expand.click();
   const exactTurn = directions
-    .locator('.nav-leg-instructions li')
+    .locator('.jr-step-text')
     .filter({ hasText: /(?:Turn|Bear|Keep|Make a U-turn)/i })
     .first();
-  await expect(exactTurn, 'the expanded route contains no exact turn instruction').toBeVisible();
-  const turnText = (await exactTurn.locator('span').innerText()).trim();
+  await expect(exactTurn, 'the step list contains no exact turn instruction').toBeVisible();
+  const turnText = (await exactTurn.innerText()).trim();
   expect(turnText).not.toBe('');
 
-  const label = await current.locator('.nav-current-instruction-label').innerText();
-  const total = Number(label.match(/\d+\s+of\s+(\d+)/i)?.[1]);
+  const total = Number(await directions.getAttribute('data-step-count'));
   expect(total).toBeGreaterThan(1);
-  for (
-    let index = 1;
-    index < total && !(await current.innerText()).includes(turnText);
-    index += 1
-  ) {
+  for (let index = 1; index < total && (await current.innerText()) !== turnText; index += 1) {
     await directions.getByRole('button', { name: 'Next instruction' }).click();
   }
 
-  await expect(current).toContainText(turnText);
+  // The banner carries the exact manoeuvre, word for word, without the camera.
+  await expect(current).toHaveText(turnText);
   await expect(page.locator('.camera-preview')).toHaveCount(0);
 });
 
@@ -274,7 +273,7 @@ test('the current map instruction and its controls stay reachable on a small pho
   await openPharmacyRoute(page);
 
   const directions = page.getByRole('region', { name: 'Directions to Outpatient Pharmacy' });
-  const current = directions.locator('.nav-current-instruction');
+  const current = page.locator('.jr-banner-copy');
   const next = directions.getByRole('button', { name: 'Next instruction' });
   await expect(current).toBeVisible();
   await expect(next).toBeVisible();
@@ -356,7 +355,7 @@ test('the stack requires a cross-floor route and an explicit 3D overview', async
   await expect(map).toHaveAttribute('data-route-floors', '1');
   await expect(map).toHaveAttribute('data-floors-shown', '1');
 
-  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'End route' }).click();
 
   // A route that climbs still starts with just the floor being inspected.
   await routeTo('Maternity Clinic');

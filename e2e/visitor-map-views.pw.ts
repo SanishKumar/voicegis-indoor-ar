@@ -16,6 +16,16 @@ test('the two map presentations render an unobstructed venue', async ({ page }, 
   await page.getByRole('button', { name: '3D model', exact: true }).click();
   await expect(canvas).toHaveAttribute('data-camera-transition', 'settled');
   await page.screenshot({ path: testInfo.outputPath('venue-3d.png') });
+
+  // A map nobody is touching is not redrawn: on a phone that is battery.
+  const idle = await canvas.getAttribute('data-draws');
+  await page.waitForTimeout(1000);
+  await expect(canvas).toHaveAttribute('data-draws', idle!);
+  // And it is redrawn the moment the view changes.
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-draws')))
+    .toBeGreaterThan(Number(idle));
 });
 
 test('two-finger gestures pan and zoom the 3D view without rotating it', async ({ page }) => {
@@ -66,6 +76,8 @@ test('two-finger gestures pan and zoom the 3D view without rotating it', async (
 });
 
 test('2D and 3D use one scene and preserve the inspected journey', async ({ page }) => {
+  // Four eased camera switches under software rendering; the budget is time, not frames.
+  test.setTimeout(60_000);
   await openPharmacyRoute(page);
   await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
   const map = page.locator('.compiled-map');
@@ -76,14 +88,16 @@ test('2D and 3D use one scene and preserve the inspected journey', async ({ page
   );
   await expect(canvas).toHaveAttribute('data-camera-tilt', '0.0000');
   await page.getByRole('button', { name: 'Next instruction' }).click();
-  const instruction = await page.locator('.nav-current-instruction').innerText();
-  const facts = await page.locator('.nav-journey-facts').innerText();
+  const instruction = await page.locator('.jr-banner-copy').innerText();
+  const facts = await page.locator('.jr-trip-time').innerText();
   const location = await map.getAttribute('data-location-floor');
   const floor = await page
     .getByRole('group', { name: 'Floors', exact: true })
     .locator('[aria-pressed="true"]')
     .getAttribute('aria-label');
   await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  // The camera eases; read the zoom the visitor chose once it has landed.
+  await expect(canvas).toHaveAttribute('data-camera-transition', 'settled');
   const zoom = await canvas.getAttribute('data-camera-scale');
   await canvas.evaluate((element) => element.setAttribute('data-same-scene', 'yes'));
 
@@ -102,10 +116,10 @@ test('2D and 3D use one scene and preserve the inspected journey', async ({ page
       'aria-pressed',
       'true',
     );
-    await expect(page.locator('.nav-current-instruction')).toHaveText(instruction, {
+    await expect(page.locator('.jr-banner-copy')).toHaveText(instruction, {
       useInnerText: true,
     });
-    await expect(page.locator('.nav-journey-facts')).toHaveText(facts, { useInnerText: true });
+    await expect(page.locator('.jr-trip-time')).toHaveText(facts, { useInnerText: true });
   }
 });
 
@@ -121,19 +135,31 @@ test('a small-phone map keeps browsing intent through switching and camera previ
   await openPharmacyRoute(page);
   await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
   const canvas = page.locator('.compiled-map-canvas');
-  const originalInstruction = await page.locator('.nav-current-instruction').innerText();
-  await page.getByRole('button', { name: 'Expand map', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Show directions', exact: true })).toBeFocused();
-  await expect(page.locator('.nav-current-instruction')).toBeHidden();
+  const map = page.locator('.compiled-map');
+  const originalInstruction = await page.locator('.jr-banner-copy').innerText();
+  await expect(canvas).toHaveAttribute('data-camera-transition', 'settled');
+  // Directions and map share the screen: drag in the band left between them.
+  const inset = async (edge: string) =>
+    Number.parseFloat(
+      await map.evaluate(
+        (element, name) => getComputedStyle(element).getPropertyValue(`--map-inset-${name}`),
+        edge,
+      ),
+    );
+  const top = await inset('top');
+  const bottom = await inset('bottom');
   const bounds = await canvas.boundingBox();
+  expect(bounds!.height - top - bottom, 'no map left between the panels').toBeGreaterThan(160);
+  const y = bounds!.y + top + (bounds!.height - top - bottom) / 2;
   const before = await canvas.getAttribute('data-camera-target');
   // In the flat plan, dragging pans rather than rotating the building.
-  await page.mouse.move(bounds!.x + 110, bounds!.y + 95);
+  await page.mouse.move(bounds!.x + 110, y - 12);
   await page.mouse.down();
-  await page.mouse.move(bounds!.x + 150, bounds!.y + 120, { steps: 15 });
+  await page.mouse.move(bounds!.x + 150, y + 12, { steps: 15 });
   await page.mouse.up();
   await expect(canvas).not.toHaveAttribute('data-camera-target', before!);
   await expect(canvas).toHaveAttribute('data-camera-bearing', '0.0000');
+  await expect(map).toHaveAttribute('data-camera-owner', 'visitor');
   const target = await canvas.getAttribute('data-camera-target');
   await page.screenshot({ path: testInfo.outputPath('visitor-2d-320.png') });
   for (const name of ['3D model', '2D plan']) {
@@ -148,19 +174,19 @@ test('a small-phone map keeps browsing intent through switching and camera previ
   await expect(canvas).toHaveAttribute('data-camera-transition', 'settled');
   await expect(canvas).toHaveAttribute('data-camera-target', target!);
   await page.screenshot({ path: testInfo.outputPath('visitor-3d-320.png') });
-  await page.getByRole('button', { name: 'Which way?', exact: true }).click();
+  await page.getByRole('button', { name: 'Camera view', exact: true }).click();
   await page.getByRole('button', { name: 'Exit to plan', exact: true }).click();
   await expect(page.getByRole('button', { name: '3D model', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
+  // Coming back from the camera keeps the view the visitor chose.
   await expect(canvas).toHaveAttribute('data-camera-target', target!);
-  await expectCenterHitTarget(page.getByRole('button', { name: 'Show directions', exact: true }));
-  await page.getByRole('button', { name: 'Show directions', exact: true }).click();
+  await expect(map).toHaveAttribute('data-camera-owner', 'visitor');
   await expect(
     page.getByRole('region', { name: 'Directions to Outpatient Pharmacy' }),
-  ).toBeFocused();
-  await expect(page.locator('.nav-current-instruction')).toHaveText(originalInstruction, {
+  ).toBeVisible();
+  await expect(page.locator('.jr-banner-copy')).toHaveText(originalInstruction, {
     useInnerText: true,
   });
 });
@@ -202,7 +228,7 @@ test('WebGL context restoration keeps the presentation and written journey', asy
   await page.getByRole('button', { name: '3D model', exact: true }).click();
   const map = page.locator('.compiled-map');
   const canvas = map.locator('canvas');
-  const instruction = await page.locator('.nav-current-instruction').innerText();
+  const instruction = await page.locator('.jr-banner-copy').innerText();
   await canvas.evaluate((element) => {
     if (!(element instanceof HTMLCanvasElement)) throw new Error('Map canvas not found');
     const context = element.getContext('webgl2')!;
@@ -215,13 +241,13 @@ test('WebGL context restoration keeps the presentation and written journey', asy
   });
   await expect(map).toHaveAttribute('data-render-status', 'lost');
   await expect(page.getByText('Map display paused', { exact: true })).toBeVisible();
-  await expect(page.locator('.nav-current-instruction')).toHaveText(instruction, {
+  await expect(page.locator('.jr-banner-copy')).toHaveText(instruction, {
     useInnerText: true,
   });
   await canvas.dispatchEvent('test-restore-map');
   await expect(map).toHaveAttribute('data-render-status', 'ready');
   await expect(canvas).toHaveAttribute('data-camera-mode', '3d');
-  await expect(page.locator('.nav-current-instruction')).toHaveText(instruction, {
+  await expect(page.locator('.jr-banner-copy')).toHaveText(instruction, {
     useInnerText: true,
   });
 });
@@ -246,16 +272,19 @@ test('a device without WebGL can still search and read the full route', async ({
   testInfo.annotations.push({ type: 'capability', description: 'No WebGL context available' });
   await openPharmacyRoute(page);
   await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
+  const directions = page.getByRole('region', { name: 'Directions to Outpatient Pharmacy' });
   await expect(page.getByText('Map display unavailable', { exact: true })).toBeVisible();
-  await expect(page.locator('.nav-current-instruction')).toBeVisible();
+  await expect(page.locator('.jr-banner-copy')).toBeVisible();
   await page.getByRole('button', { name: 'Next instruction', exact: true }).click();
-  await expect(page.locator('.nav-current-instruction-label')).toContainText('2 of');
+  await expect(directions).toHaveAttribute('data-step-index', '1');
   await expect(page.getByRole('button', { name: '3D model', exact: true })).toBeDisabled();
-  const instruction = await page.locator('.nav-current-instruction').innerText();
+  const instruction = await page.locator('.jr-banner-copy').innerText();
   const retry = page.getByRole('button', { name: 'Retry map display', exact: true });
   await retry.scrollIntoViewIfNeeded();
   await expectCenterHitTarget(retry);
-  await page.getByRole('button', { name: /^Show all .* legs$/ }).click();
+  // Phones keep the step list folded; wide screens always show it.
+  const showSteps = page.getByRole('button', { name: /^Show all \d+ steps$/ });
+  if (await showSteps.isVisible()) await showSteps.click();
   await retry.scrollIntoViewIfNeeded();
   await expectInsideViewport(retry);
   await expectCenterHitTarget(retry);
@@ -264,16 +293,62 @@ test('a device without WebGL can still search and read the full route', async ({
   await retry.scrollIntoViewIfNeeded();
   await expectInsideViewport(retry);
   await expectCenterHitTarget(retry);
-  await expectInsideViewport(page.getByRole('button', { name: 'Cancel', exact: true }));
+  await expectInsideViewport(page.getByRole('button', { name: 'End route', exact: true }));
   await page.screenshot({ path: testInfo.outputPath('map-recovery-in-directions.png') });
   await page.evaluate(() => document.dispatchEvent(new Event('test-enable-webgl')));
   await page.getByRole('button', { name: 'Retry map display', exact: true }).click();
   await expect(page.locator('.compiled-map')).toHaveAttribute('data-render-status', 'ready');
   await page.setViewportSize(originalViewport);
-  await page.getByRole('button', { name: 'Hide route details' }).click();
+  const hideSteps = page.getByRole('button', { name: 'Hide all steps' });
+  if (await hideSteps.isVisible()) await hideSteps.click();
   await page.getByRole('button', { name: '3D model', exact: true }).click();
   await expect(page.locator('.compiled-map-canvas')).toHaveAttribute('data-camera-mode', '3d');
-  await expect(page.locator('.nav-current-instruction')).toHaveText(instruction, {
+  await expect(page.locator('.jr-banner-copy')).toHaveText(instruction, {
     useInnerText: true,
   });
+});
+
+test('route labels never sit under the map controls or the directions', async ({ page }) => {
+  await openPharmacyRoute(page);
+  await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
+  await expect(page.locator('.compiled-map-canvas')).toHaveAttribute(
+    'data-camera-transition',
+    'settled',
+  );
+  const covered = () =>
+    page.evaluate(() => {
+      const box = (element: Element) => element.getBoundingClientRect();
+      const covers = [
+        ...document.querySelectorAll(
+          '.compiled-map-presentation, .compiled-map-floors, .compiled-map-zoom, .jr-banner, .jr-sheet',
+        ),
+      ].map(box);
+      return [...document.querySelectorAll<HTMLElement>('.map-pill')]
+        .filter((pill) => pill.style.opacity === '1')
+        .filter((pill) => {
+          const label = box(pill);
+          return covers.some(
+            (cover) =>
+              label.right > cover.left &&
+              cover.right > label.left &&
+              label.bottom > cover.top &&
+              cover.bottom > label.top,
+          );
+        })
+        .map((pill) => pill.textContent);
+    });
+  await expect.poll(covered).toEqual([]);
+  // The controls are measured the moment they move. If they slid there, the
+  // measurement would record where they started, and nothing would measure
+  // them again: a slow test browser measures late and hides that, so the
+  // cause is pinned directly.
+  const durations = await page
+    .locator('.compiled-map-presentation, .compiled-map-floors, .compiled-map-zoom')
+    .evaluateAll((groups) => groups.map((group) => getComputedStyle(group).transitionDuration));
+  expect(durations.every((value) => value.split(',').every((part) => parseFloat(part) === 0))).toBe(
+    true,
+  );
+  // Still true after the controls change shape and the view changes.
+  await page.getByRole('button', { name: '3D model', exact: true }).click();
+  await expect.poll(covered).toEqual([]);
 });

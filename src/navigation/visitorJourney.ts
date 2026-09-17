@@ -1,4 +1,11 @@
 import type { GraphNode, RouteResult } from '../engine/routingCore';
+import {
+  clampProgress,
+  guidanceAt,
+  positionAt,
+  progressForStep,
+  trackForRoute,
+} from './routeProgress';
 
 export const NAV_STATUS = {
   IDLE: 'idle',
@@ -24,7 +31,14 @@ export interface VisitorJourneyState {
   locationFloorId: string;
   locationBasis: LocationBasis;
   selectedPOI: GraphNode | null;
+  /** Step the guidance is on, derived from `progressMeters`. */
   previewStepIndex: number;
+  /**
+   * Distance along the route the guidance is showing. Supplied by a
+   * walk-through today and by a matched position later; never by the planning
+   * location, which only an explicit start or a check-in may change.
+   */
+  progressMeters: number;
   navStatus: (typeof NAV_STATUS)[keyof typeof NAV_STATUS];
   arrivalSource: 'user-confirmed' | null;
 }
@@ -42,6 +56,7 @@ export const JOURNEY_ACTION = {
   NEXT_STEP: 'NEXT_STEP',
   PREV_STEP: 'PREV_STEP',
   PREVIEW_STEP: 'PREVIEW_STEP',
+  SET_PROGRESS: 'SET_PROGRESS',
   CONFIRM_ARRIVAL: 'CONFIRM_ARRIVAL',
 } as const;
 
@@ -54,6 +69,7 @@ type JourneyAction =
   | { type: 'SET_ROUTE_START'; payload: { startId: string; endId: string; startFloorId?: string } }
   | { type: 'SET_ROUTE_RESULT'; payload: RouteResult }
   | { type: 'PREVIEW_STEP'; payload: number }
+  | { type: 'SET_PROGRESS'; payload: number }
   | { type: 'SET_VIEW' | 'SET_FLOOR'; payload: string }
   | { type: 'SET_SELECTED_POI'; payload: GraphNode & { poi?: { floorId?: string } } }
   | { type: 'CLEAR_ROUTE' | 'CLEAR_SELECTED_POI' | 'NEXT_STEP' | 'PREV_STEP' | 'CONFIRM_ARRIVAL' };
@@ -74,6 +90,7 @@ export function visitorJourneyReducer(
         locationBasis: action.payload.locationBasis ?? 'selected',
         route: null,
         previewStepIndex: 0,
+        progressMeters: 0,
         navStatus: NAV_STATUS.IDLE,
         arrivalSource: null,
       };
@@ -92,6 +109,7 @@ export function visitorJourneyReducer(
         locationBasis: changedStart ? 'selected' : state.locationBasis,
         route: null,
         previewStepIndex: 0,
+        progressMeters: 0,
         navStatus: NAV_STATUS.ROUTING,
         arrivalSource: null,
         selectedPOI: null,
@@ -102,6 +120,7 @@ export function visitorJourneyReducer(
         ...state,
         route: action.payload,
         previewStepIndex: 0,
+        progressMeters: 0,
         navStatus: action.payload.found ? NAV_STATUS.NAVIGATING : NAV_STATUS.IDLE,
         arrivalSource: null,
       };
@@ -111,6 +130,7 @@ export function visitorJourneyReducer(
         destinationNodeId: null,
         route: null,
         previewStepIndex: 0,
+        progressMeters: 0,
         navStatus: NAV_STATUS.IDLE,
         arrivalSource: null,
       };
@@ -143,7 +163,23 @@ export function visitorJourneyReducer(
       return {
         ...state,
         previewStepIndex,
+        progressMeters: progressForStep(trackForRoute(state.route), previewStepIndex),
         activeFloorId: floorId === undefined ? state.activeFloorId : String(floorId),
+      };
+    }
+    case 'SET_PROGRESS': {
+      if (!state.route?.found || state.route.steps.length === 0) return state;
+      if (state.navStatus !== NAV_STATUS.NAVIGATING) return state;
+      const track = trackForRoute(state.route);
+      const progressMeters = clampProgress(track, action.payload);
+      if (progressMeters === state.progressMeters) return state;
+      const { floor } = positionAt(track, progressMeters);
+      return {
+        ...state,
+        progressMeters,
+        previewStepIndex: guidanceAt(track, progressMeters).stepIndex,
+        // The displayed storey follows the guidance, as it does for a manual step.
+        activeFloorId: floor || state.activeFloorId,
       };
     }
     case 'CONFIRM_ARRIVAL':

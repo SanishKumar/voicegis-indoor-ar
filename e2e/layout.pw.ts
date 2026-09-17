@@ -225,7 +225,7 @@ test('camera guidance controls fit at both supported narrow widths', async ({ pa
   });
   await openPharmacyRoute(page);
   await page.getByRole('button', { name: 'Dismiss' }).click();
-  await page.getByRole('button', { name: 'Which way?' }).click();
+  await page.getByRole('button', { name: 'Camera view' }).click();
 
   const controls = page.locator('.camera-preview-controls button');
   await expect.poll(() => controls.count()).toBeGreaterThanOrEqual(3);

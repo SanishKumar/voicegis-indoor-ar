@@ -96,7 +96,7 @@ test('destination search sends focus to the outcome of every close path', async 
   await expect(directions).toBeVisible();
   await expect(directions).toBeFocused();
 
-  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'End route' }).click();
   await expect(trigger).toBeFocused();
 });
 
@@ -184,10 +184,13 @@ test('changing the start restores the location opener instead of the search trig
   await picker.getByRole('button', { name: /Civic Plaza Entrance/ }).click();
 
   await expect(picker).toHaveCount(0);
-  await expect(locationTrigger).toBeFocused();
-  await expect(
-    page.getByRole('button', { name: 'Search rooms and departments' }),
-  ).not.toBeFocused();
+  // A new start re-plans the same trip; focus follows the new directions and
+  // never falls back to the search box.
+  const directions = page.getByRole('region', { name: 'Directions to Outpatient Pharmacy' });
+  await expect(directions).toBeFocused();
+  await expect(locationTrigger).toHaveAttribute('aria-label', /Civic Plaza Entrance/);
+  // The journey stays open, so the search trigger is not even on screen to take focus.
+  await expect(page.locator('#btn-search-open')).toHaveCount(0);
 });
 
 test('the 3D inspector exposes keyboard space selection without false application semantics', async ({

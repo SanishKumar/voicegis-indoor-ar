@@ -363,6 +363,10 @@ export function NavigationProvider({ children, venue }) {
     setStart: useCallback(
       (nodeId) => {
         const node = venue.getNodeById(nodeId);
+        // Changing the start in the middle of directions means "route me from
+        // here instead", as it does in every map app. Dropping the route made
+        // the visitor search for their destination a second time.
+        const destination = routeDestinationRef.current;
         routeRequestGenerationRef.current += 1;
         routeDestinationRef.current = null;
         routeStartRef.current = nodeId;
@@ -372,8 +376,16 @@ export function NavigationProvider({ children, venue }) {
           type: ACTION.SET_START,
           payload: { nodeId, floorId: node ? String(node.floor) : undefined },
         });
+        if (destination && destination !== nodeId) {
+          void requestRoute(
+            destination,
+            nodeId,
+            accessibleRoutingRef.current,
+            node ? String(node.floor) : undefined,
+          );
+        }
       },
-      [venue],
+      [venue, requestRoute],
     ),
 
     checkInWithPayload,
@@ -435,6 +447,10 @@ export function NavigationProvider({ children, venue }) {
 
     previewStep: useCallback((index) => {
       dispatch({ type: ACTION.PREVIEW_STEP, payload: index });
+    }, []),
+
+    setProgress: useCallback((meters) => {
+      dispatch({ type: ACTION.SET_PROGRESS, payload: meters });
     }, []),
 
     confirmArrival: useCallback(() => {

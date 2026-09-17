@@ -2,16 +2,20 @@ import {
   ACESFilmicToneMapping,
   AmbientLight,
   BoxGeometry,
+  BufferGeometry,
+  CircleGeometry,
   ConeGeometry,
   CylinderGeometry,
   DirectionalLight,
   ExtrudeGeometry,
+  Float32BufferAttribute,
   Group,
   IcosahedronGeometry,
   InstancedMesh,
   Object3D,
   HemisphereLight,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   PCFShadowMap,
   Raycaster,
@@ -26,12 +30,14 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
-import { resolveCartographicLabels } from '../engine/floorplanCartography';
+import { resolveCartographicLabels, type CartographicBounds } from '../engine/floorplanCartography';
 import type { VisitorLocation } from '../navigation/visitorLocation';
+import { cumulativeDistances } from '../navigation/routeProgress';
 import {
+  azimuthForHeading,
   createVisitorCamera,
   planToWorld,
-  routeSegments,
+  type MapInsets,
   type MapMode,
   type VisitorMapView,
 } from './visitorCamera';
@@ -93,6 +99,10 @@ const SLAB_SIDE = 0x9b8e76;
  * has to show that a way up exists there.
  */
 const ROUTE_COLOR = 0x0a65db;
+/** Route already covered: still legible, clearly behind you. */
+const TRAVELLED_COLOR = 0x9aa6b4;
+/** A walk-through marker stays this many CSS pixels across at any zoom. */
+const PUCK_PIXELS = 30;
 const SHAFT_COLOR = 0xb3aca0;
 const SELECTED_FILL = 0x0a65db;
 
@@ -107,8 +117,50 @@ const WALL_HEIGHT = 1.4;
  */
 const EXPLODE = 3.1;
 
+/** Where the guidance is, and which way the route runs from there. */
+export interface ScenePuck {
+  x: number;
+  y: number;
+  floorId: string;
+  /** Unit direction of travel in plan coordinates. */
+  heading: readonly [number, number];
+}
+
+export interface SceneFollow {
+  /** Turn the map so the way ahead points up the screen. */
+  headingUp: boolean;
+  scale: number;
+  /** Share of the visible height kept ahead of the marker. */
+  lookahead: number;
+}
+
 export interface VenueScene {
   setMode(mode: MapMode): void;
+  /** Screen space covered by interface, so framing avoids it. */
+  setInsets(insets: MapInsets): void;
+  /**
+   * Ease the camera to show the route on the floors being read, clear of the
+   * interface. `northUp` also undoes a bearing that following turned.
+   */
+  frameRoute(options?: { northUp?: boolean }): void;
+  /** Split the route into covered and ahead at this distance, or show it whole. */
+  setProgress(meters: number | null): void;
+  /** Show the walk-through marker, or remove it. */
+  setPuck(puck: ScenePuck | null): void;
+  /** Keep the marker in view every frame until the visitor moves the map. */
+  setFollow(follow: SceneFollow | null): void;
+  /** Undo the visitor's own camera moves: follow again, or reframe the route. */
+  recenter(): void;
+  /** Told whenever the visitor starts or stops owning the camera. */
+  onUserMove(listener: (moved: boolean) => void): () => void;
+  /** Whether the visitor owns the camera. */
+  wasMovedByUser(): boolean;
+  /** Hand the camera back to the visitor, for a scene rebuilt around their view. */
+  restoreUserMove(): void;
+  /** Canvas-relative rectangles labels must stay out of: buttons drawn over the map. */
+  setLabelObstacles(
+    rects: ReadonlyArray<{ x: number; y: number; width: number; height: number }>,
+  ): void;
   setOverview(enabled: boolean): void;
   getView(): VisitorMapView;
   setLocation(location: Omit<VisitorLocation, 'label'> | null): void;
@@ -213,6 +265,35 @@ export function createVenueScene(
   const scene = new Scene();
   const cameraRig = createVisitorCamera(span, initialView);
   const { camera, view: cameraView } = cameraRig;
+
+  /*
+   * The scene is drawn only when something visible has changed. It used to be
+   * redrawn - lit, shadowed and relabelled - sixty times a second while the
+   * map sat still, which on a phone is battery and heat for a picture that is
+   * not changing. Every mutation below marks the frame as needed; the camera
+   * is compared with the pose last drawn, so gestures and easing need nothing.
+   */
+  let needsDraw = true;
+  const invalidate = () => {
+    needsDraw = true;
+  };
+  const drawnView = new Float64Array(16);
+  const drawnProjection = new Float64Array(16);
+  function cameraChanged() {
+    const view = camera.matrixWorld.elements;
+    const projection = camera.projectionMatrix.elements;
+    let changed = false;
+    for (let index = 0; index < 16; index += 1) {
+      if (drawnView[index] !== view[index] || drawnProjection[index] !== projection[index]) {
+        changed = true;
+        drawnView[index] = view[index];
+        drawnProjection[index] = projection[index];
+      }
+    }
+    return changed;
+  }
+  const onContextRestored = invalidate;
+  canvas.addEventListener('webglcontextrestored', onContextRestored);
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   scene.add(new HemisphereLight(0xd6e7f5, 0xbfae92, 1.5));
@@ -554,6 +635,8 @@ export function createVenueScene(
   function emptyGroup(group: Group) {
     for (const child of [...group.children]) {
       group.remove(child);
+      // Route tubes share one geometry and two materials; those outlive a rebuild.
+      if (child.userData.sharedResources === true) continue;
       const mesh = child as Mesh;
       mesh.geometry?.dispose();
       const material = mesh.material;
@@ -577,6 +660,85 @@ export function createVenueScene(
       flatShading: true,
     });
 
+  /*
+   * Every tube is the same unit cylinder, stretched and turned into place, and
+   * every tube is one of two materials. Moving along the route then only swaps
+   * materials and re-stretches the one segment being walked, instead of
+   * allocating geometry on every frame of a walk-through.
+   */
+  const tubeGeometry = new CylinderGeometry(0.26, 0.26, 1, 10);
+  const aheadMaterial = routeMaterial();
+  const travelledMaterial = new MeshStandardMaterial({
+    color: TRAVELLED_COLOR,
+    roughness: 0.6,
+    flatShading: true,
+  });
+  const up = new Vector3(0, 1, 0);
+  const scratchDirection = new Vector3();
+
+  function placeTube(mesh: Mesh, from: Vector3, to: Vector3) {
+    scratchDirection.copy(to).sub(from);
+    const length = scratchDirection.length();
+    mesh.visible = length > 0.001;
+    if (!mesh.visible) return;
+    mesh.position.copy(from).add(to).multiplyScalar(0.5);
+    mesh.scale.set(1, length, 1);
+    mesh.quaternion.setFromUnitVectors(up, scratchDirection.normalize());
+  }
+
+  function tubeMesh(material: MeshStandardMaterial) {
+    const mesh = new Mesh(tubeGeometry, material);
+    mesh.userData.sharedResources = true;
+    return mesh;
+  }
+
+  interface RouteTube {
+    mesh: Mesh;
+    from: Vector3;
+    to: Vector3;
+    start: number;
+    end: number;
+    /** Only floor segments are split; a climb is either done or not. */
+    splittable: boolean;
+  }
+  let tubes: RouteTube[] = [];
+  let routeProgress: number | null = null;
+  const splitBehind = tubeMesh(travelledMaterial);
+  const splitAhead = tubeMesh(aheadMaterial);
+
+  function routeTube(from: Vector3, to: Vector3) {
+    if (from.distanceTo(to) < 0.001) return null;
+    const tube = tubeMesh(aheadMaterial);
+    placeTube(tube, from, to);
+    return tube;
+  }
+
+  function applyProgress() {
+    invalidate();
+    splitBehind.removeFromParent();
+    splitAhead.removeFromParent();
+    for (const tube of tubes) {
+      if (routeProgress === null || routeProgress <= tube.start) {
+        tube.mesh.material = aheadMaterial;
+        tube.mesh.visible = true;
+      } else if (routeProgress >= tube.end || !tube.splittable) {
+        tube.mesh.material = travelledMaterial;
+        tube.mesh.visible = true;
+      } else {
+        // The segment underfoot: covered up to here, ahead from here.
+        const t = (routeProgress - tube.start) / Math.max(1e-6, tube.end - tube.start);
+        const split = tube.from.clone().lerp(tube.to, t);
+        tube.mesh.visible = false;
+        const parent = tube.mesh.parent;
+        if (parent) {
+          parent.add(splitBehind, splitAhead);
+          placeTube(splitBehind, tube.from, split);
+          placeTube(splitAhead, split, tube.to);
+        }
+      }
+    }
+  }
+
   /** Where a floor sits when the stack is showing, relative to the active one. */
   function stackY(view: FloorView) {
     const active = floors.get(activeFloorId);
@@ -587,75 +749,169 @@ export function createVenueScene(
   // A route crossing floors does not itself change the visitor's camera.
   const stacked = () => cameraView.mode === '3d' && cameraView.overview && routeFloors.length > 1;
 
-  function routeTube(from: Vector3, to: Vector3) {
-    const direction = to.clone().sub(from);
-    if (direction.length() < 0.001) return null;
-    const tube = new Mesh(new CylinderGeometry(0.24, 0.24, direction.length(), 8), routeMaterial());
-    tube.position.copy(from).add(to).multiplyScalar(0.5);
-    tube.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), direction.normalize());
-    return tube;
-  }
-
   function rebuildRoute() {
+    invalidate();
     clearRoute();
+    tubes = [];
     if (routePoints.length < 2) return;
 
+    const distances = cumulativeDistances(routePoints);
     const showing = stacked() ? routeFloors : [activeFloorId];
-    for (const [from, to] of routeSegments(routePoints)) {
-      if (from.floor !== to.floor || !showing.includes(from.floor)) continue;
+    routePoints.forEach((from, index) => {
+      const to = routePoints[index + 1];
+      if (to === undefined || from.floor !== to.floor || !showing.includes(from.floor)) return;
       const view = floors.get(from.floor);
-      if (!view) continue;
+      if (!view) return;
       // Actual graph edges, never a spline that cuts across a corner.
-      const tube = routeTube(vec([from.x, from.y], 0.52), vec([to.x, to.y], 0.52));
-      if (tube) view.routeGroup.add(tube);
-    }
+      const start = vec([from.x, from.y], 0.52);
+      const end = vec([to.x, to.y], 0.52);
+      const tube = routeTube(start, end);
+      if (!tube) return;
+      view.routeGroup.add(tube);
+      tubes.push({
+        mesh: tube,
+        from: start,
+        to: end,
+        start: distances[index],
+        end: distances[index + 1],
+        splittable: true,
+      });
+    });
 
-    if (!stacked()) return;
+    if (stacked()) {
+      // Every connector that touches the storeys on show, not only the one the
+      // route picked: seeing the alternatives is half of reading a stack.
+      for (const connector of buildingPackage.verticalConnectors) {
+        const stops = connector.stops
+          .filter((stop) => routeFloors.includes(stop.floorId))
+          .map((stop) => ({ stop, view: floors.get(stop.floorId) }))
+          .filter(
+            (entry): entry is { stop: typeof entry.stop; view: FloorView } =>
+              entry.view !== undefined,
+          )
+          .sort((left, right) => stackY(left.view) - stackY(right.view));
+        if (stops.length < 2) continue;
+        const bottom = stackY(stops[0].view);
+        const height = stackY(stops[stops.length - 1].view) - bottom;
+        if (height <= 0) continue;
+        const shaft = new Mesh(
+          new CylinderGeometry(0.5, 0.5, height, connector.kind === 'elevator' ? 12 : 4),
+          new MeshStandardMaterial({
+            color: SHAFT_COLOR,
+            flatShading: true,
+            roughness: 0.8,
+            transparent: true,
+            opacity: 0.4,
+          }),
+        );
+        shaft.position.copy(vec(stops[0].stop.position as Coordinate, bottom + height / 2));
+        shaftsGroup.add(shaft);
+      }
 
-    // Every connector that touches the storeys on show, not only the one the
-    // route picked: seeing the alternatives is half of reading a stack.
-    for (const connector of buildingPackage.verticalConnectors) {
-      const stops = connector.stops
-        .filter((stop) => routeFloors.includes(stop.floorId))
-        .map((stop) => ({ stop, view: floors.get(stop.floorId) }))
-        .filter(
-          (entry): entry is { stop: typeof entry.stop; view: FloorView } =>
-            entry.view !== undefined,
-        )
-        .sort((left, right) => stackY(left.view) - stackY(right.view));
-      if (stops.length < 2) continue;
-      const bottom = stackY(stops[0].view);
-      const height = stackY(stops[stops.length - 1].view) - bottom;
-      if (height <= 0) continue;
-      const shaft = new Mesh(
-        new CylinderGeometry(0.5, 0.5, height, connector.kind === 'elevator' ? 12 : 4),
-        new MeshStandardMaterial({
-          color: SHAFT_COLOR,
-          flatShading: true,
-          roughness: 0.8,
-          transparent: true,
-          opacity: 0.4,
-        }),
-      );
-      shaft.position.copy(vec(stops[0].stop.position as Coordinate, bottom + height / 2));
-      shaftsGroup.add(shaft);
+      routePoints.forEach((exit, index) => {
+        const entry = routePoints[index + 1];
+        if (entry === undefined || exit.floor === entry.floor) return;
+        const from = floors.get(exit.floor);
+        const to = floors.get(entry.floor);
+        if (from === undefined || to === undefined) return;
+        const start = vec([exit.x, exit.y], stackY(from) + 0.52);
+        const end = vec([entry.x, entry.y], stackY(to) + 0.52);
+        const hop = routeTube(start, end);
+        if (!hop) return;
+        hopsGroup.add(hop);
+        tubes.push({
+          mesh: hop,
+          from: start,
+          to: end,
+          start: distances[index],
+          end: distances[index + 1],
+          splittable: false,
+        });
+      });
     }
+    applyProgress();
+  }
 
-    for (const [exit, entry] of routeSegments(routePoints)) {
-      if (exit.floor === entry.floor) continue;
-      const from = floors.get(exit.floor);
-      const to = floors.get(entry.floor);
-      if (from === undefined || to === undefined) continue;
-      const hop = routeTube(
-        vec([exit.x, exit.y], stackY(from) + 0.52),
-        vec([entry.x, entry.y], stackY(to) + 0.52),
-      );
-      if (hop) hopsGroup.add(hop);
+  /*
+   * The walk-through marker: a disc with an arrow along the route. It shows
+   * where the guidance is, not where a handset is, so it carries no accuracy
+   * halo - there is no measurement for one to describe. Drawn over everything
+   * and at a constant screen size, as a location puck is.
+   */
+  const puck = new Group();
+  const overlay = (color: number, opacity = 1) =>
+    new MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthTest: false,
+      depthWrite: false,
+      side: DoubleSide,
+    });
+  const puckDiscs = new Group();
+  puckDiscs.rotation.x = -Math.PI / 2;
+  const puckShadow = new Mesh(new CircleGeometry(0.6, 40), overlay(0x000609, 0.16));
+  puckShadow.position.set(0.03, -0.05, 0);
+  const puckRim = new Mesh(new CircleGeometry(0.54, 40), overlay(0xfff9f0));
+  const puckCore = new Mesh(new CircleGeometry(0.42, 40), overlay(ROUTE_COLOR));
+  puckDiscs.add(puckShadow, puckRim, puckCore);
+  const arrowGeometry = new BufferGeometry();
+  // A chevron pointing along -Z, which the pivot turns onto the route.
+  arrowGeometry.setAttribute(
+    'position',
+    new Float32BufferAttribute(
+      [0, 0, -0.3, -0.22, 0, 0.22, 0, 0, 0.08, 0, 0, -0.3, 0, 0, 0.08, 0.22, 0, 0.22],
+      3,
+    ),
+  );
+  const arrowPivot = new Group();
+  const arrow = new Mesh(arrowGeometry, overlay(0xfff9f0));
+  arrowPivot.add(arrow);
+  puck.add(puckDiscs, arrowPivot);
+  // Painted in this order, last on top, regardless of depth.
+  [puckShadow, puckRim, puckCore, arrow].forEach((mesh, index) => {
+    mesh.renderOrder = 1000 + index;
+  });
+
+  const appliedFloors = new Map<string, { y: number; opacity: number }>();
+  let puckTarget: ScenePuck | null = null;
+  const puckShown = { x: 0, y: 0, angle: 0, floorId: '' };
+  let follow: SceneFollow | null = null;
+  const userMoveListeners = new Set<(moved: boolean) => void>();
+  let reportedUserMove = false;
+
+  function placePuck(immediate: boolean, elapsedMs: number) {
+    const floor = puckTarget ? floors.get(puckTarget.floorId) : undefined;
+    // Only drawn on the storey being read; a marker floating over the wrong
+    // floor is worse than none.
+    if (puckTarget === null || floor === undefined || !floor.group.visible) {
+      puck.removeFromParent();
+      return;
     }
+    const wanted = azimuthForHeading(puckTarget.heading);
+    if (immediate || puckShown.floorId !== puckTarget.floorId) {
+      puckShown.x = puckTarget.x;
+      puckShown.y = puckTarget.y;
+      puckShown.angle = wanted;
+      puckShown.floorId = puckTarget.floorId;
+    } else {
+      const step = Math.min(100, Math.max(0, elapsedMs));
+      const k = 1 - Math.exp(-step / 90);
+      puckShown.x += (puckTarget.x - puckShown.x) * k;
+      puckShown.y += (puckTarget.y - puckShown.y) * k;
+      let turn = (wanted - puckShown.angle) % (Math.PI * 2);
+      if (turn > Math.PI) turn -= Math.PI * 2;
+      if (turn < -Math.PI) turn += Math.PI * 2;
+      puckShown.angle += turn * (1 - Math.exp(-step / 120));
+    }
+    if (puck.parent !== floor.group) floor.group.add(puck);
+    puck.position.copy(vec([puckShown.x, puckShown.y], 0.72));
+    arrowPivot.rotation.y = puckShown.angle;
   }
 
   /** Target height and opacity for every floor, given route and active floor. */
   function layout() {
+    invalidate();
     let shown = 0;
     for (const view of floors.values()) {
       const inStack = stacked() && routeFloors.includes(view.id);
@@ -678,6 +934,7 @@ export function createVenueScene(
    * offsetWidth per label per frame forces a layout on every one of them.
    */
   const labelElements = new Map<string, HTMLElement>();
+  let labelObstacles: CartographicBounds[] = [];
   const labelSizes = new Map<string, [number, number]>();
   const projected = new Vector3();
 
@@ -688,7 +945,10 @@ export function createVenueScene(
    * Throw the cache away once the fonts are done and measure again.
    */
   if (typeof document !== 'undefined' && document.fonts !== undefined) {
-    void document.fonts.ready.then(() => labelSizes.clear());
+    void document.fonts.ready.then(() => {
+      labelSizes.clear();
+      invalidate();
+    });
   }
 
   function elementFor(id: string, text: string) {
@@ -701,6 +961,27 @@ export function createVenueScene(
     labelLayer.appendChild(element);
     labelElements.set(id, element);
     return element;
+  }
+
+  /** The marker's footprint on screen, so no label is placed over it. */
+  function puckObstacle(width: number, height: number) {
+    if (puck.parent === null) return [];
+    const centre = puck.getWorldPosition(projected).project(camera);
+    if (centre.z > 1) return [];
+    const x = (centre.x * 0.5 + 0.5) * width;
+    const y = (-centre.y * 0.5 + 0.5) * height;
+    const half = PUCK_PIXELS * 0.7;
+    return [
+      {
+        minX: x - half,
+        minY: y - half,
+        maxX: x + half,
+        maxY: y + half,
+        width: half * 2,
+        height: half * 2,
+        center: [x, y] as [number, number],
+      },
+    ];
   }
 
   function drawLabels(width: number, height: number) {
@@ -720,6 +1001,7 @@ export function createVenueScene(
         element.style.opacity = '0.001';
         size = [element.offsetWidth, element.offsetHeight];
         if (size[0] > 0) labelSizes.set(label.id, size);
+        else invalidate();
       }
       projected.copy(label.anchor).project(camera);
       if (projected.z > 1) {
@@ -743,7 +1025,27 @@ export function createVenueScene(
     // Scale is how far in the camera has come from its opening distance, which
     // is what decides which tier of labels is allowed to compete.
     const scale = 1 / cameraView.scale;
-    for (const label of resolveCartographicLabels(candidates, [], 6, scale).placed) {
+    // Nothing is labelled under the interface: the covered strips and the
+    // map's own buttons are taken before any label competes for space.
+    const insets = cameraRig.getInsets();
+    const strip = (minX: number, minY: number, maxX: number, maxY: number) => ({
+      minX,
+      minY,
+      maxX,
+      maxY,
+      width: maxX - minX,
+      height: maxY - minY,
+      center: [(minX + maxX) / 2, (minY + maxY) / 2] as [number, number],
+    });
+    const reserved = [
+      ...labelObstacles,
+      ...puckObstacle(width, height),
+      ...(insets.top > 0 ? [strip(0, 0, width, insets.top)] : []),
+      ...(insets.bottom > 0 ? [strip(0, height - insets.bottom, width, height)] : []),
+      ...(insets.left > 0 ? [strip(0, 0, insets.left, height)] : []),
+      ...(insets.right > 0 ? [strip(width - insets.right, 0, width, height)] : []),
+    ];
+    for (const label of resolveCartographicLabels(candidates, reserved, 6, scale).placed) {
       const element = labelElements.get(label.id);
       if (element === undefined) continue;
       // `bounds`, not `center`. The placer moves a colliding label to whichever
@@ -823,8 +1125,7 @@ export function createVenueScene(
       return;
     }
 
-    cameraView.azimuth -= dx * 0.005;
-    cameraView.tilt3d = Math.min(1.3, Math.max(0.2, cameraView.tilt3d - dy * 0.005));
+    cameraRig.orbit(dx * 0.005, dy * 0.005);
   };
 
   const releasePointer = (event: PointerEvent) => {
@@ -860,7 +1161,98 @@ export function createVenueScene(
   const raycaster = new Raycaster();
   const pointer = new Vector2();
 
+  /** World points for the part of the route being read, stack heights included. */
+  function routeFramePoints() {
+    const showing = stacked() ? routeFloors : [activeFloorId];
+    const points: Array<[number, number, number]> = [];
+    for (const point of routePoints) {
+      if (!showing.includes(point.floor)) continue;
+      const view = floors.get(point.floor);
+      const world = vec([point.x, point.y], view && stacked() ? stackY(view) : 0);
+      points.push([world.x, world.y, world.z]);
+    }
+    if (location && showing.includes(location.floorId)) {
+      const world = vec(location.position);
+      points.push([world.x, 0, world.z]);
+    }
+    return points;
+  }
+
   const handle: VenueScene = {
+    setInsets(insets) {
+      cameraRig.setInsets(insets);
+      invalidate();
+    },
+
+    frameRoute(options = {}) {
+      let points = routeFramePoints();
+      if (points.length === 0) {
+        const floor = buildingPackage.floors.find((entry) => entry.id === activeFloorId);
+        points = ((floor?.outline ?? []) as Coordinate[]).map((point) => {
+          const world = vec(point);
+          return [world.x, 0, world.z] as [number, number, number];
+        });
+      }
+      cameraRig.fit(points, canvas.clientWidth, canvas.clientHeight, {
+        azimuth: options.northUp ? 0 : undefined,
+      });
+    },
+
+    setProgress(meters) {
+      routeProgress = meters === null || !Number.isFinite(meters) ? null : meters;
+      applyProgress();
+    },
+
+    setPuck(next) {
+      invalidate();
+      const immediate = puckTarget === null;
+      puckTarget = next;
+      placePuck(immediate, 0);
+    },
+
+    setFollow(next) {
+      follow = next;
+      if (next === null) cameraRig.stop();
+    },
+
+    recenter() {
+      if (follow && puckTarget) {
+        // Following resumes on the next frame, now the visitor no longer owns the camera.
+        const world = vec([puckTarget.x, puckTarget.y]);
+        cameraRig.follow([world.x, world.z]);
+        return;
+      }
+      handle.frameRoute();
+    },
+
+    setLabelObstacles(rects) {
+      invalidate();
+      labelObstacles = rects.map((rect) => ({
+        minX: rect.x,
+        minY: rect.y,
+        maxX: rect.x + rect.width,
+        maxY: rect.y + rect.height,
+        width: rect.width,
+        height: rect.height,
+        center: [rect.x + rect.width / 2, rect.y + rect.height / 2] as [number, number],
+      }));
+    },
+
+    wasMovedByUser() {
+      return cameraRig.wasMovedByUser();
+    },
+
+    restoreUserMove() {
+      cameraRig.markMovedByUser();
+    },
+
+    onUserMove(listener) {
+      userMoveListeners.add(listener);
+      return () => {
+        userMoveListeners.delete(listener);
+      };
+    },
+
     setMode(mode) {
       cameraView.mode = mode;
       pointers.clear();
@@ -874,6 +1266,7 @@ export function createVenueScene(
     },
     getView: cameraRig.snapshot,
     setLocation(nextLocation) {
+      invalidate();
       emptyGroup(locationGroup);
       locationGroup.removeFromParent();
       location = nextLocation;
@@ -898,8 +1291,15 @@ export function createVenueScene(
     focusLocation() {
       if (!location) return;
       handle.setActiveFloor(location.floorId);
-      cameraView.target = planToWorld(location.position[0], location.position[1], centre);
-      cameraView.scale = 0.7;
+      const [x, z] = planToWorld(location.position[0], location.position[1], centre);
+      cameraRig.fit(
+        [
+          [x - 12, 0, z - 12],
+          [x + 12, 0, z + 12],
+        ],
+        canvas.clientWidth,
+        canvas.clientHeight,
+      );
     },
 
     setActiveFloor(floorId) {
@@ -909,6 +1309,7 @@ export function createVenueScene(
       // one in hand stays put and the others move around it.
       layout();
       rebuildRoute();
+      placePuck(true, 0);
     },
 
     setRoute(points) {
@@ -925,6 +1326,7 @@ export function createVenueScene(
     },
 
     setSelectedSpace(spaceId) {
+      invalidate();
       const view = floors.get(activeFloorId);
       if (view === undefined) return;
       if (selectedSpaceId !== null) {
@@ -979,8 +1381,13 @@ export function createVenueScene(
       if (width === 0 || height === 0) return;
       if (venueDrawingBufferNeedsResize(canvas.width, canvas.height, width, height, pixelRatio)) {
         renderer.setSize(width, height, false);
+        invalidate();
       }
       for (const view of floors.values()) {
+        const last = appliedFloors.get(view.id);
+        if (last && last.y === view.targetY && last.opacity === view.targetOpacity) continue;
+        appliedFloors.set(view.id, { y: view.targetY, opacity: view.targetOpacity });
+        invalidate();
         // Connector segments and floors must share exact endpoints while the
         // camera animates. Moving only floors would detach routes from stops.
         view.group.position.y = view.targetY;
@@ -991,14 +1398,44 @@ export function createVenueScene(
           material.depthWrite = material.opacity > 0.6;
         }
         // A ghosted storey must not throw shadows across the one being read.
+        // Walked once when that changes, not across every mesh every frame.
         view.group.traverse((object) => {
           const mesh = object as Mesh;
           if (mesh.isMesh === true) mesh.castShadow = !ghosted;
         });
       }
       const now = performance.now();
-      const pose = cameraRig.update(width, height, now - lastFrame, motionPreference.matches);
+      const elapsed = now - lastFrame;
+      const puckBefore = `${puckShown.x},${puckShown.y},${puckShown.angle},${puck.parent?.id}`;
+      placePuck(motionPreference.matches, elapsed);
+      if (`${puckShown.x},${puckShown.y},${puckShown.angle},${puck.parent?.id}` !== puckBefore)
+        invalidate();
+      if (follow && puckTarget && !cameraRig.wasMovedByUser()) {
+        // The marker sits low in the view so the way ahead has the room.
+        const ahead =
+          cameraRig.worldUnitsPerPixel(width, height) *
+          cameraRig.visibleHeight(width, height) *
+          follow.lookahead;
+        const world = vec([
+          puckShown.x + puckTarget.heading[0] * ahead,
+          puckShown.y + puckTarget.heading[1] * ahead,
+        ]);
+        cameraRig.follow([world.x, world.z], {
+          azimuth: follow.headingUp ? puckShown.angle : undefined,
+          scale: follow.scale,
+        });
+      }
+      const moved = cameraRig.wasMovedByUser();
+      if (moved !== reportedUserMove) {
+        reportedUserMove = moved;
+        for (const listener of userMoveListeners) listener(moved);
+      }
+      const pose = cameraRig.update(width, height, elapsed, motionPreference.matches);
       lastFrame = now;
+      if (puckTarget)
+        puck.scale.setScalar(cameraRig.worldUnitsPerPixel(width, height) * PUCK_PIXELS);
+      if (cameraChanged()) invalidate();
+
       const diagnostics = {
         cameraMode: cameraView.mode,
         cameraTilt: pose.tilt.toFixed(4),
@@ -1006,9 +1443,15 @@ export function createVenueScene(
         cameraScale: cameraView.scale.toFixed(4),
         cameraTarget: cameraView.target.map((value) => value.toFixed(4)).join(','),
         cameraBearing: cameraView.azimuth.toFixed(4),
+        cameraFollow: follow && !moved ? 'following' : 'free',
+        routeProgress: routeProgress === null ? 'none' : routeProgress.toFixed(2),
+        labelObstacles: String(labelObstacles.length),
       };
       for (const [key, value] of Object.entries(diagnostics))
         if (canvas.dataset[key] !== value) canvas.dataset[key] = value;
+      if (!needsDraw) return;
+      needsDraw = false;
+      canvas.dataset.draws = String(Number(canvas.dataset.draws ?? 0) + 1);
       renderer.render(scene, camera);
       drawLabels(width, height);
     },
@@ -1021,7 +1464,18 @@ export function createVenueScene(
       canvas.removeEventListener('lostpointercapture', releasePointer);
       canvas.removeEventListener('wheel', wheel);
       canvas.removeEventListener('keydown', keyDown);
+      canvas.removeEventListener('webglcontextrestored', onContextRestored);
       clearRoute();
+      puck.removeFromParent();
+      userMoveListeners.clear();
+      tubeGeometry.dispose();
+      aheadMaterial.dispose();
+      travelledMaterial.dispose();
+      puck.traverse((object) => {
+        const mesh = object as Mesh;
+        mesh.geometry?.dispose();
+        (mesh.material as MeshBasicMaterial | undefined)?.dispose();
+      });
       for (const element of labelElements.values()) element.remove();
       labelElements.clear();
       scene.traverse((object) => {

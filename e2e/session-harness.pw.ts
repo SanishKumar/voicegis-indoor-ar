@@ -135,7 +135,7 @@ test('opt-in handset diagnostics reject partial input without granting Visitor p
   const count = await complete.innerText();
   await page.evaluate((id) => window.clearInterval(id), timer);
   await page.getByRole('link', { name: 'Visitor view', exact: true }).click();
-  await expect(page.locator('.nav-current-instruction-label')).toContainText('1 of');
+  await expect(page.locator('#nav-panel')).toHaveAttribute('data-step-index', '0');
   await expect(page.locator('.compiled-map')).toHaveAttribute('data-location-floor', 'l2');
   await page.getByRole('link', { name: 'Record', exact: true }).click();
   await expect(input).toContainText('Off · no sensor listeners');
@@ -205,8 +205,8 @@ test('the operator checkpoint diagnostic expires, reacquires and leaves Visitor 
   await openPharmacyRoute(page);
   await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
   await page.getByRole('button', { name: 'Next instruction' }).click();
-  const instruction = await page.locator('.nav-current-instruction').innerText();
-  const facts = await page.locator('.nav-journey-facts').innerText();
+  const instruction = await page.locator('.jr-banner-copy').innerText();
+  const facts = await page.locator('.jr-trip-time').innerText();
   const floor = await page.locator('.compiled-map').getAttribute('data-location-floor');
   await page.getByRole('link', { name: 'Record', exact: true }).click();
   const diagnostic = page.getByRole('region', { name: 'Checkpoint session diagnostic' });
@@ -252,10 +252,10 @@ test('the operator checkpoint diagnostic expires, reacquires and leaves Visitor 
     ),
   ).toBe(0);
   await page.getByRole('link', { name: 'Visitor view', exact: true }).click();
-  await expect(page.locator('.nav-current-instruction')).toHaveText(instruction, {
+  await expect(page.locator('.jr-banner-copy')).toHaveText(instruction, {
     useInnerText: true,
   });
-  await expect(page.locator('.nav-journey-facts')).toHaveText(facts, { useInnerText: true });
+  await expect(page.locator('.jr-trip-time')).toHaveText(facts, { useInnerText: true });
   await expect(page.locator('.compiled-map')).toHaveAttribute('data-location-floor', floor!);
   await page.getByRole('link', { name: 'Record', exact: true }).click();
   await expect(diagnostic).toContainText('Not started');

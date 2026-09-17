@@ -20,6 +20,7 @@ export function createVenueScopedState(venue: CompiledBuildingRuntime): VenueSco
       locationBasis: 'default',
       selectedPOI: null,
       previewStepIndex: 0,
+      progressMeters: 0,
       navStatus: 'idle',
       arrivalSource: null,
     },

@@ -3,6 +3,7 @@ import { ASTERION_RUNTIME } from '../test/venueFixtures';
 import { createVenueScopedState } from '../data/venueSession';
 import { calculateCompiledRoute } from '../engine/compiledRoutePolicy';
 import { visitorJourneyReducer as reduce } from './visitorJourney';
+import { guidanceAt, positionAt, trackForRoute } from './routeProgress';
 
 function journey() {
   const initial = createVenueScopedState(ASTERION_RUNTIME).navigation;
@@ -91,5 +92,61 @@ describe('visitor journey presentation versus location', () => {
       route: null,
       previewStepIndex: 0,
     });
+  });
+
+  it('progress drives the step and the displayed floor, never the planning location', () => {
+    const { state, route } = journey();
+    const track = trackForRoute(route);
+    const halfway = reduce(state, { type: 'SET_PROGRESS', payload: track.length / 2 });
+    expect(halfway.progressMeters).toBeCloseTo(track.length / 2);
+    expect(halfway.previewStepIndex).toBe(guidanceAt(track, track.length / 2).stepIndex);
+    expect(halfway.activeFloorId).toBe(positionAt(track, track.length / 2).floor);
+    expect(halfway).toMatchObject({
+      startNodeId: state.startNodeId,
+      locationFloorId: state.locationFloorId,
+      locationBasis: state.locationBasis,
+      navStatus: 'navigating',
+      arrivalSource: null,
+    });
+
+    const end = reduce(halfway, { type: 'SET_PROGRESS', payload: track.length + 50 });
+    expect(end.progressMeters).toBe(track.length);
+    expect(end.previewStepIndex).toBe(route.steps.length - 1);
+    // Reaching the end of a walk-through is not arriving.
+    expect(end.navStatus).toBe('navigating');
+    expect(reduce(end, { type: 'CONFIRM_ARRIVAL' }).navStatus).toBe('arrived');
+  });
+
+  it('manual steps and progress describe the same place', () => {
+    const { state, route } = journey();
+    const track = trackForRoute(route);
+    const stepped = reduce(reduce(state, { type: 'NEXT_STEP' }), { type: 'NEXT_STEP' });
+    expect(stepped.progressMeters).toBe(track.stepAt[2]);
+    const back = reduce(stepped, { type: 'PREV_STEP' });
+    expect(back.progressMeters).toBe(track.stepAt[1]);
+    const moved = reduce(back, { type: 'SET_PROGRESS', payload: track.stepAt[1] + 0.2 });
+    expect(reduce(moved, { type: 'NEXT_STEP' }).previewStepIndex).toBe(moved.previewStepIndex + 1);
+  });
+
+  it('progress is ignored without a route and reset by every route change', () => {
+    const initial = createVenueScopedState(ASTERION_RUNTIME).navigation;
+    expect(reduce(initial, { type: 'SET_PROGRESS', payload: 12 })).toBe(initial);
+    expect(
+      reduce(journey().state, { type: 'SET_PROGRESS', payload: Number.NaN }).progressMeters,
+    ).toBe(0);
+    const { state } = journey();
+    const moved = reduce(state, { type: 'SET_PROGRESS', payload: 10 });
+    expect(reduce(moved, { type: 'CLEAR_ROUTE' }).progressMeters).toBe(0);
+    expect(reduce(moved, { type: 'SET_ROUTE_RESULT', payload: state.route! }).progressMeters).toBe(
+      0,
+    );
+    const arrived = reduce(
+      reduce(state, {
+        type: 'PREVIEW_STEP',
+        payload: state.route!.found ? state.route!.steps.length - 1 : 0,
+      }),
+      { type: 'CONFIRM_ARRIVAL' },
+    );
+    expect(reduce(arrived, { type: 'SET_PROGRESS', payload: 3 })).toBe(arrived);
   });
 });

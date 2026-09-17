@@ -1,11 +1,13 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { useNavigation } from '../context/NavigationContext.jsx';
+import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { VISITOR_VIEW, visitorViewFor } from '../context/visitorView.ts';
+import { trackForRoute } from '../navigation/routeProgress';
 import CameraPreview from './CameraPreview.jsx';
 import CheckInToast from './CheckInToast.tsx';
 import Header from './Header.jsx';
+import JourneyChrome from './journey/JourneyChrome.jsx';
+import { useWalkthrough } from './journey/useWalkthrough.js';
 import LocationPicker from './LocationPicker.jsx';
-import NavigationPanel from './NavigationPanel.jsx';
 import POICard from './POICard.jsx';
 import SearchPanel from './SearchPanel.jsx';
 import StatusBar from './StatusBar.jsx';
@@ -16,6 +18,8 @@ const VisitorMap = lazy(() => import('./VisitorMap.tsx'));
 export default function VisitorApp() {
   const {
     state,
+    actions,
+    venue,
     onboardingComplete,
     completeOnboarding,
     showLocationPicker,
@@ -24,9 +28,22 @@ export default function VisitorApp() {
   const previousOnboardingCompleteRef = useRef(onboardingComplete);
   // Camera presentation survives a camera-preview visit, never a venue change.
   const mapViewMemory = useRef(null);
-  const [expandedRoute, setExpandedRoute] = useState(null);
   const [mapRecoveryTarget, setMapRecoveryTarget] = useState(null);
-  const mapExpanded = state.route?.found === true && expandedRoute === state.route;
+
+  /*
+   * A journey is on screen from the moment a route is asked for until it is
+   * dismissed. While it is, the map belongs to the journey: the header and
+   * status strip give their space to the instruction banner and trip sheet.
+   */
+  const journey = state.navStatus === NAV_STATUS.ROUTING || state.route !== null;
+  const track = state.route?.found === true ? trackForRoute(state.route) : null;
+  const walkthrough = useWalkthrough({
+    track,
+    progressMeters: state.progressMeters,
+    setProgress: actions.setProgress,
+    walkSpeedMps: venue.config.walkSpeedMps,
+  });
+  const following = track !== null && (walkthrough.playing || state.progressMeters > 0);
 
   useEffect(() => {
     const previous = previousOnboardingCompleteRef.current;
@@ -43,10 +60,8 @@ export default function VisitorApp() {
   /*
    * The header's height is a layout fact other fixed elements need, and it is
    * not a constant: the control row wraps at narrow widths and the venue name
-   * is as tall as the venue names it is given. The check-in toast used to
-   * clear it with a hard-coded 74px, which stopped clearing it the moment the
-   * header grew, and the toast then sat on top of the routing control and
-   * swallowed its clicks. Measured and published instead of assumed.
+   * is as tall as the venue names it is given. Measured and published instead
+   * of assumed.
    */
   useEffect(() => {
     const header = document.getElementById('app-header');
@@ -59,14 +74,14 @@ export default function VisitorApp() {
     const observer = new ResizeObserver(publish);
     observer.observe(header);
     return () => observer.disconnect();
-  }, []);
+  }, [onboardingComplete]);
 
   if (!onboardingComplete) {
     return <WelcomeScreen onComplete={completeOnboarding} />;
   }
 
   return (
-    <div className="visitor-shell">
+    <div className={`visitor-shell${journey ? ' is-journey' : ''}`}>
       <Header />
       <CheckInToast />
       <main className="main-content visitor-map-stage" id="main-content">
@@ -76,35 +91,14 @@ export default function VisitorApp() {
               <VisitorMap
                 key={state.venueKey}
                 viewMemory={mapViewMemory}
-                recoveryTarget={mapExpanded ? null : mapRecoveryTarget}
+                recoveryTarget={journey ? mapRecoveryTarget : null}
+                journey={journey}
+                following={following}
               />
             </Suspense>
             <SearchPanel />
             <POICard />
-            <div className="visitor-directions-layer" hidden={mapExpanded}>
-              <NavigationPanel
-                mapRecoveryRef={setMapRecoveryTarget}
-                onExpandMap={() => {
-                  setExpandedRoute(state.route);
-                  window.requestAnimationFrame(() =>
-                    document.getElementById('btn-show-directions')?.focus(),
-                  );
-                }}
-              />
-            </div>
-            {mapExpanded && (
-              <button
-                id="btn-show-directions"
-                className="visitor-map-return"
-                type="button"
-                onClick={() => {
-                  setExpandedRoute(null);
-                  window.requestAnimationFrame(() => document.getElementById('nav-panel')?.focus());
-                }}
-              >
-                Show directions
-              </button>
-            )}
+            <JourneyChrome walkthrough={walkthrough} onRecoverySlot={setMapRecoveryTarget} />
           </>
         )}
         <CameraPreview />
