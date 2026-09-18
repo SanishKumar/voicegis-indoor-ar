@@ -86,6 +86,21 @@ journey reducer shares); a visitor who confirms it from within that radius is
 believed, the marker lands at the door and tracking ends. Nothing here
 persists across a reload.
 
+## The camera view's own sensors
+
+The camera view subscribes to the phone's orientation itself rather than
+reading the tracker's, because the two want different things. The tracker
+wants turn rates while a walk is being followed, and only once the visitor
+has asked for that. The camera wants to know where the phone is pointing from
+the moment it opens, tracked or not, because a route drawn at a guessed
+heading and a guessed tilt sits in a fixed place on the glass. Neither feed
+is a position, and neither is evidence.
+
+Where the tracker has learned a direction of travel, the camera prefers it:
+it is the same gyroscope, already tied to the route by a walk. Otherwise the
+camera's own yaw carries the turn and its zero is fixed by the visitor, or
+assumed from the route and labelled as an assumption.
+
 ## What it is not
 
 It is not an accuracy claim. The 8% drift figure, the 60° agreement band, the

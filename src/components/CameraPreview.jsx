@@ -2,7 +2,9 @@
  * The camera as a window onto the same guidance as the map.
  *
  * The route ahead is drawn on the floor of the camera image from where the
- * visitor is along the route and which way the phone faces. Progress is the
+ * visitor is along the route and which way the phone faces; the destination,
+ * the next corner, the stair or lift and the places nearby are labelled in
+ * the world where they stand, with how far away they are. Progress is the
  * same progress the map's marker uses - from live tracking or from the
  * walk-through - and the facing comes from the phone's gyroscope once
  * tracking has established the direction of travel, or from the visitor
@@ -13,7 +15,7 @@
  * world instead and the phone's own tracked movement moves the marker.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Camera,
@@ -21,28 +23,58 @@ import {
   Compass,
   Crosshair,
   LocateFixed,
-  Map,
+  Map as MapIcon,
   Navigation,
   Square,
   Volume2,
   VolumeX,
 } from 'lucide-react';
 import { useNavigation, VIEW_TYPE, NAV_STATUS } from '../context/NavigationContext.jsx';
-import { bannerCopy } from './journey/guidanceCopy';
+import { planBearing, signedHeadingDifference } from '../navigation/coordinateFrames';
+import { bannerCopy, formatMeters, formatMinutes } from './journey/guidanceCopy';
 import { speechAvailable } from './journey/useSpokenGuidance.js';
 import ManeuverIcon from './journey/ManeuverIcon.jsx';
+import { landmarksFrom } from '../engine/routeLandmarks';
 import { ANCHOR_SIGMA } from '../navigation/liveTracker';
 import { bearingAt, guidanceAt, positionAt, trackForRoute } from '../navigation/routeProgress';
 import { facingFrom } from '../ar/facingFrom';
-import { DEFAULT_CAMERA_MODEL, projectRouteAhead } from '../ar/floorProjection';
+import { startOrientationFeed } from '../ar/orientationFeed';
+import { calloutsAhead } from '../ar/callouts';
+import { drawMiniMap, prepareMiniMap } from '../ar/cameraMiniMap';
+import { createProjector, DEFAULT_CAMERA_MODEL, projectRouteAhead } from '../ar/floorProjection';
 import { ArStartError, immersiveArSupported, startArGuidance } from '../ar/arSession';
 
-const INK = '#000609';
 const CREAM = '#fff9f0';
-/** How often the drawn state is written out for the readiness panel and tests. */
+const GLOW = '#8ec5ff';
+/** How often the drawn state is written out for the readiness chips and tests. */
 const REPORT_MS = 200;
-/** The phone held a little below level when nothing says otherwise. */
-const RESTING_PITCH_DEGREES = -18;
+/** How often the world labels are recomputed from progress. */
+const CALLOUTS_MS = 250;
+/** Labels float this high above the floor point they name. */
+const CALLOUT_HEIGHT_METERS = 1.7;
+/** Labels further than this are not drawn. */
+const CALLOUT_MAX_DEPTH_METERS = 40;
+/** How far along the route to look when saying which way to turn to find it. */
+const AIM_AHEAD_METERS = 8;
+/**
+ * How the phone is taken to be held before it has said. A view drawn at a
+ * guessed tilt is a picture on the glass, so this is only ever the first
+ * frame or two, and the readiness panel says the heading is not known.
+ */
+const RESTING_ATTITUDE = Object.freeze({ pitchDegrees: -20, rollDegrees: 0 });
+
+const ARROWS = {
+  turn_left: '↰',
+  turn_right: '↱',
+  slight_left: '↖',
+  slight_right: '↗',
+  u_turn: '↶',
+  stairs: '⇅',
+  elevator: '⇅',
+  escalator: '⇅',
+  ramp: '⇅',
+  arrive: '●',
+};
 
 /**
  * @param {{
@@ -64,23 +96,6 @@ export default function CameraPreview({ tracking = null, voice = false, onVoice 
       onVoice={onVoice}
     />
   );
-}
-
-/** Pitch and roll of the rear camera from the gravity the phone reports, in portrait. */
-function attitudeFromGravity(gravity) {
-  if (!gravity) return { pitch: RESTING_PITCH_DEGREES, roll: 0, known: false };
-  const size = Math.hypot(gravity.x, gravity.y, gravity.z);
-  if (!(size > 1)) return { pitch: RESTING_PITCH_DEGREES, roll: 0, known: false };
-  // The rear camera looks along the phone's minus-z; its height above the
-  // horizon is the angle between that and the up the reported gravity gives.
-  const pitch = (Math.asin(Math.max(-1, Math.min(1, -gravity.z / size))) * 180) / Math.PI;
-  // Roll is the screen's top leaning away from up, clockwise positive.
-  const roll = (Math.atan2(-gravity.x, gravity.y) * 180) / Math.PI;
-  return {
-    pitch: Math.max(-89, Math.min(89, pitch)),
-    roll: Math.max(-60, Math.min(60, roll)),
-    known: true,
-  };
 }
 
 function tierLabel(snapshot) {
@@ -107,18 +122,121 @@ function headingLabel(source) {
     case 'ar':
       return 'World-tracked';
     case 'tracker':
-      return 'Gyroscope, aligned by your walk';
+      return 'From your walk';
     case 'aligned':
-      return 'Gyroscope, aligned by you';
+      return 'Set by you';
     case 'assumed':
-      return 'Assumed along route';
+      return 'Zero assumed';
     default:
-      return 'Off';
+      return 'Not known';
   }
 }
 
+/** Route points on one floor, split into walked and still to walk. */
+function routeOnFloor(track, progress, floorId) {
+  const behind = [];
+  const ahead = [];
+  const here = positionAt(track, progress);
+  for (let index = 0; index < track.points.length; index += 1) {
+    const point = track.points[index];
+    if (point.floor !== floorId) continue;
+    if (track.at[index] <= progress) behind.push([point.x, point.y]);
+    else ahead.push([point.x, point.y]);
+  }
+  if (here.floor === floorId) {
+    behind.push([here.x, here.y]);
+    ahead.unshift([here.x, here.y]);
+  }
+  return { behind, ahead };
+}
+
+/** Keep one element per callout, reusing what is there. */
+function syncCalloutElements(layer, elements, callouts) {
+  const wanted = new Set(callouts.map((callout) => callout.id));
+  for (const [id, element] of elements) {
+    if (!wanted.has(id)) {
+      element.remove();
+      elements.delete(id);
+    }
+  }
+  for (const callout of callouts) {
+    let element = elements.get(callout.id);
+    const stamp = `${callout.kicker}|${callout.title}|${callout.detail}|${callout.stepType}`;
+    if (element && element.dataset.stamp === stamp) continue;
+    if (!element) {
+      element = document.createElement('div');
+      element.hidden = true;
+      layer.appendChild(element);
+      elements.set(callout.id, element);
+    }
+    element.className = `ar-callout is-${callout.kind}`;
+    element.dataset.stamp = stamp;
+    element.replaceChildren();
+    if (callout.kind === 'destination') {
+      const pin = document.createElement('span');
+      pin.className = 'ar-callout-pin';
+      element.appendChild(pin);
+    }
+    const copy = document.createElement('span');
+    copy.className = 'ar-callout-copy';
+    if (callout.kicker) {
+      const kicker = document.createElement('span');
+      kicker.className = 'ar-callout-kicker';
+      kicker.textContent = callout.kicker;
+      copy.appendChild(kicker);
+    }
+    const title = document.createElement('strong');
+    title.textContent = callout.title;
+    copy.appendChild(title);
+    if (callout.detail) {
+      const detail = document.createElement('span');
+      detail.className = 'ar-callout-detail';
+      detail.textContent = callout.detail;
+      copy.appendChild(detail);
+    }
+    element.appendChild(copy);
+    const arrow = callout.stepType ? ARROWS[callout.stepType] : null;
+    if (arrow && callout.kind !== 'destination') {
+      const glyph = document.createElement('span');
+      glyph.className = 'ar-callout-arrow';
+      glyph.setAttribute('aria-hidden', 'true');
+      glyph.textContent = arrow;
+      element.appendChild(glyph);
+    }
+  }
+}
+
+/** Put every callout where its plan point is on screen; hide those behind the camera. */
+function placeCallouts(elements, callouts, projector, width, height, topInset) {
+  let shown = 0;
+  for (const callout of callouts) {
+    const element = elements.get(callout.id);
+    if (!element) continue;
+    const point = projector.project(callout.x, callout.y, CALLOUT_HEIGHT_METERS);
+    const onScreen =
+      point !== null &&
+      point.depthMeters <= CALLOUT_MAX_DEPTH_METERS &&
+      point.x > -80 &&
+      point.x < width + 80 &&
+      point.y > topInset &&
+      point.y < height + 40;
+    if (!onScreen) {
+      if (!element.hidden) element.hidden = true;
+      continue;
+    }
+    shown += 1;
+    if (element.hidden) element.hidden = false;
+    // Nearer labels are a little larger and drawn over further ones.
+    const scale = Math.max(0.78, Math.min(1.08, 0.7 + 4 / point.depthMeters));
+    element.style.transform = `translate(${point.x.toFixed(1)}px, ${point.y.toFixed(1)}px) translate(-50%, -100%) scale(${scale.toFixed(3)})`;
+    element.style.opacity = String(Math.max(0.35, Math.min(1, 1.3 - point.depthMeters / 32)));
+    element.style.zIndex = String(Math.round(1000 - point.depthMeters * 10));
+  }
+  return shown;
+}
+
 function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
-  const { route, navStatus, progressMeters, locationBasis } = state;
+  const { route, navStatus, progressMeters, locationBasis, destinationNodeId } = state;
   const navigating = navStatus === NAV_STATUS.NAVIGATING || navStatus === NAV_STATUS.ARRIVED;
   const found = navigating && Boolean(route?.found) && route.steps.length > 0;
   const track = found ? trackForRoute(route) : null;
@@ -129,13 +247,17 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
     track && guidance
       ? bannerCopy(route.steps, track, guidance, progressMeters, floorName, riding)
       : null;
+  const destinationName = venue.getNodeById?.(destinationNodeId)?.poi?.name ?? 'Destination';
+  const walkSpeedMps = venue.config?.walkSpeedMps ?? 1.2;
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const calloutLayerRef = useRef(null);
+  const miniMapRef = useRef(null);
   const streamRef = useRef(null);
   const overlayRef = useRef(null);
-  const controlsRef = useRef(null);
-  const telemetryRef = useRef(null);
+  const sheetRef = useRef(null);
+  const topRef = useRef(null);
   const [cameraError, setCameraError] = useState(null);
   const [videoReady, setVideoReady] = useState(false);
   const [arSupport, setArSupport] = useState('checking');
@@ -143,13 +265,33 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   const [arStarting, setArStarting] = useState(false);
   const [arProblem, setArProblem] = useState(null);
   const [arReport, setArReport] = useState(null);
-  /** The visitor said they were looking along the corridor: the gyroscope reading at that moment. */
-  const [alignment, setAlignment] = useState(null);
-  const [drawn, setDrawn] = useState({ facing: null, points: 0, gravity: false });
-  // The loop below draws every frame; it reads progress here rather than restarting for it.
+  const [orientationState, setOrientationState] = useState('starting');
+  const [drawn, setDrawn] = useState({
+    source: 'off',
+    facing: null,
+    points: 0,
+    callouts: 0,
+    hint: null,
+  });
+  /*
+   * The phone reports its orientation far faster than anything should be
+   * re-rendered for, and the draw loop is the only reader, so the freshest
+   * attitude and the zero its yaw is measured from live in refs.
+   */
+  const attitudeRef = useRef(null);
+  const yawRef = useRef(null);
+  const anchorRef = useRef(null);
+  const feedRef = useRef(null);
+  // The loop below draws every frame; it reads these here rather than restarting for them.
   const progressRef = useRef(progressMeters);
+  const trackRef = useRef(track);
+  const stepsRef = useRef(route?.steps ?? []);
+  const destinationRef = useRef(destinationName);
   useEffect(() => {
     progressRef.current = progressMeters;
+    trackRef.current = track;
+    stepsRef.current = route?.steps ?? [];
+    destinationRef.current = destinationName;
   });
 
   const live = tracking?.status === 'on';
@@ -168,24 +310,57 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         : 'Track my walk';
   const arAvailable = arSupport === 'yes' && found && plausible && !sensorsOut;
 
-  // Controls wrap on phones. The readiness panel keeps clear of their measured height.
+  // The sheet's height is what the inset map and the ribbon's fade keep clear of.
   useEffect(() => {
-    const controls = controlsRef.current;
-    const root = controls?.parentElement;
-    if (!controls || !root) return undefined;
+    const sheet = sheetRef.current;
+    const root = sheet?.parentElement;
+    if (!sheet || !root) return undefined;
     const publish = () =>
-      root.style.setProperty(
-        '--camera-preview-controls-height',
-        `${controls.getBoundingClientRect().height}px`,
-      );
+      root.style.setProperty('--ar-sheet-height', `${sheet.getBoundingClientRect().height}px`);
     publish();
     const observer = new ResizeObserver(publish);
-    observer.observe(controls);
+    observer.observe(sheet);
     return () => {
       observer.disconnect();
-      root.style.removeProperty('--camera-preview-controls-height');
+      root.style.removeProperty('--ar-sheet-height');
     };
   }, []);
+
+  /*
+   * Where the phone is pointing, for as long as the view is open. Without it
+   * the route would be drawn in a fixed place on the glass however the phone
+   * moved, which is a diagram rather than a view of the floor.
+   */
+  useEffect(() => {
+    if (!found) return undefined;
+    const feed = startOrientationFeed({
+      onReading(reading) {
+        attitudeRef.current = reading;
+        yawRef.current = { degrees: reading.yawDegrees, epoch: reading.epoch };
+        const anchor = anchorRef.current;
+        if (anchor !== null && anchor.epoch === reading.epoch) return;
+        // The yaw's zero means nothing until something says what the camera
+        // was looking at when it read that. Assume the route, and say so.
+        const current = trackRef.current;
+        if (!current) return;
+        anchorRef.current = {
+          yawDegrees: reading.yawDegrees,
+          planBearing: bearingAt(current, progressRef.current),
+          epoch: reading.epoch,
+          source: 'route',
+        };
+      },
+      onState: setOrientationState,
+    });
+    feedRef.current = feed;
+    return () => {
+      feed.dispose();
+      feedRef.current = null;
+      attitudeRef.current = null;
+      yawRef.current = null;
+      anchorRef.current = null;
+    };
+  }, [found]);
 
   useEffect(() => {
     let cancelled = false;
@@ -239,17 +414,26 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
     };
   }, [found]);
 
-  // The drawing loop: the route on the floor, from the freshest reading every frame.
+  // The drawing loop: the route on the floor and the labels in the world,
+  // from the freshest reading every frame.
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !track || cameraError) return undefined;
+    const layer = calloutLayerRef.current;
+    if (!canvas || !layer || !track || cameraError) return undefined;
     const context = canvas.getContext('2d');
     if (!context) return undefined;
     const container = canvas.parentElement;
     let frame = 0;
     let lastReport = 0;
+    let lastCallouts = -Infinity;
+    const landmarks = venue.buildingPackage?.pois ? landmarksFrom(venue.buildingPackage) : [];
+    let callouts = [];
+    const calloutElements = new Map();
+    let calloutFloor = '';
+    let miniMapScene = null;
     let lastDrawn = null;
     let fadeFrom = null;
+    let topInset = 0;
 
     const fit = () => {
       const bounds = container?.getBoundingClientRect() ?? { width: 0, height: 0 };
@@ -272,51 +456,98 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.clearRect(0, 0, width, height);
 
-      const reading = tracking?.peek ? tracking.peek() : { gravity: null, snapshot: null };
-      const { facing, progress } = facingFrom(
+      const reading = tracking?.peek ? tracking.peek() : { snapshot: null };
+      const { source, facing, progress } = facingFrom({
         track,
         live,
-        reading.snapshot,
-        alignment,
-        progressRef.current,
-      );
-      const attitude = attitudeFromGravity(live ? reading.gravity : null);
+        snapshot: reading.snapshot,
+        yaw: yawRef.current,
+        anchor: anchorRef.current,
+        fallbackProgress: progressRef.current,
+      });
+      const attitude = attitudeRef.current ?? RESTING_ATTITUDE;
       const here = positionAt(track, progress);
-      const projection = projectRouteAhead(
-        track,
-        progress,
-        {
+      const pose = {
+        x: here.x,
+        y: here.y,
+        facingDegrees: facing,
+        pitchDegrees: attitude.pitchDegrees,
+        rollDegrees: attitude.rollDegrees,
+      };
+      const cameraModel = { width, height, ...DEFAULT_CAMERA_MODEL };
+      const projection = projectRouteAhead(track, progress, pose, cameraModel);
+      const now = performance.now();
+
+      // An immersive session draws its own floor and labels; the flat overlay stays out of its way.
+      if (!arSession) {
+        paintProjection(context, { width, height }, projection, fadeFrom);
+        if (now - lastCallouts >= CALLOUTS_MS || calloutFloor !== here.floor) {
+          lastCallouts = now;
+          calloutFloor = here.floor;
+          callouts = calloutsAhead({
+            track,
+            steps: stepsRef.current,
+            progressMeters: progress,
+            floorId: here.floor,
+            destinationName: destinationRef.current,
+            landmarks,
+            walkSpeedMps,
+          });
+          syncCalloutElements(layer, calloutElements, callouts);
+          miniMapScene = prepareMiniMap(venue.buildingPackage, here.floor);
+        }
+      } else if (calloutElements.size > 0) {
+        layer.replaceChildren();
+        calloutElements.clear();
+        callouts = [];
+      }
+      const projector = createProjector(pose, cameraModel);
+      const shown = arSession
+        ? 0
+        : placeCallouts(calloutElements, callouts, projector, width, height, topInset);
+
+      /*
+       * Turning away from the route used to leave a blank picture with no way
+       * of telling where it had gone. The way back is the angle between where
+       * the phone points and the route a few metres on, and it is only worth
+       * saying once that is further round than the camera can see.
+       */
+      let hint = null;
+      if (!arSession && !projection.destination) {
+        const aim = positionAt(track, Math.min(track.length, progress + AIM_AHEAD_METERS));
+        const toAim = planBearing([here.x, here.y], [aim.x, aim.y]);
+        const halfView = (Math.atan(width / 2 / projector.focal) * 180) / Math.PI;
+        const away = toAim === null ? 0 : signedHeadingDifference(toAim, facing);
+        if (toAim !== null && Math.abs(away) > halfView + 4) {
+          hint = away > 0 ? 'right' : 'left';
+        }
+      }
+      if (miniMapRef.current && miniMapScene) {
+        drawMiniMap(miniMapRef.current, miniMapScene, {
           x: here.x,
           y: here.y,
           facingDegrees: facing,
-          pitchDegrees: attitude.pitch,
-          rollDegrees: attitude.roll,
-        },
-        { width, height, ...DEFAULT_CAMERA_MODEL },
-      );
+          ...routeOnFloor(track, progress, here.floor),
+        });
+      }
 
-      // An immersive session draws its own floor; the flat overlay stays out of its way.
-      if (!arSession) paintProjection(context, { width, height }, projection, fadeFrom);
-
-      const now = performance.now();
       const points = projection.ribbon.reduce((sum, line) => sum + line.length, 0);
       if (now - lastReport >= REPORT_MS) {
         lastReport = now;
-        // The ribbon's near end would run under the readiness panel; it fades out above it.
-        const panel = telemetryRef.current;
-        fadeFrom = panel
-          ? panel.getBoundingClientRect().top - canvas.getBoundingClientRect().top - 16
-          : height * 0.72;
-        const next = {
-          facing: Math.round(facing),
-          points,
-          gravity: attitude.known,
-        };
+        // The ribbon's near end would run under the sheet; it fades out above it.
+        const bounds = canvas.getBoundingClientRect();
+        const sheet = sheetRef.current;
+        fadeFrom = sheet ? sheet.getBoundingClientRect().top - bounds.top - 12 : height * 0.78;
+        const top = topRef.current;
+        topInset = top ? top.getBoundingClientRect().bottom - bounds.top + 8 : 0;
+        const next = { source, facing: Math.round(facing), points, callouts: shown, hint };
         if (
           lastDrawn === null ||
+          next.source !== lastDrawn.source ||
           next.facing !== lastDrawn.facing ||
           next.points !== lastDrawn.points ||
-          next.gravity !== lastDrawn.gravity
+          next.callouts !== lastDrawn.callouts ||
+          next.hint !== lastDrawn.hint
         ) {
           lastDrawn = next;
           setDrawn(next);
@@ -328,23 +559,30 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
     return () => {
       cancelAnimationFrame(frame);
       observer?.disconnect();
+      layer.replaceChildren();
     };
-  }, [alignment, arSession, cameraError, live, track, tracking]);
+  }, [arSession, cameraError, live, track, tracking, venue, walkSpeedMps]);
 
   useEffect(() => () => void arSession?.end(), [arSession]);
 
-  const alignNow = useCallback(() => {
-    if (!track || !tracking?.peek) return;
-    const { snapshot } = tracking.peek();
-    if (!snapshot || snapshot.relativeHeadingDegrees === null) return;
-    setAlignment({
-      epoch: snapshot.headingEpoch,
-      relative: snapshot.relativeHeadingDegrees,
-      facing: bearingAt(track, snapshot.progressMeters),
-    });
-  }, [track, tracking]);
+  /** The visitor says they are looking along the corridor: fix the yaw's zero there. */
+  const alignNow = () => {
+    const yaw = yawRef.current;
+    if (!track || yaw === null) return;
+    anchorRef.current = {
+      yawDegrees: yaw.degrees,
+      planBearing: bearingAt(track, progressRef.current),
+      epoch: yaw.epoch,
+      source: 'visitor',
+    };
+  };
 
-  const startAr = useCallback(async () => {
+  /** Back to assuming the route, which the next reading will re-anchor. */
+  const unalign = () => {
+    anchorRef.current = null;
+  };
+
+  const startAr = async () => {
     if (!track || !tracking || !overlayRef.current || arStarting) return;
     setArProblem(null);
     setArStarting(true);
@@ -393,7 +631,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
     } finally {
       setArStarting(false);
     }
-  }, [arStarting, progressMeters, track, tracking]);
+  };
 
   const exit = () => {
     void arSession?.end();
@@ -401,19 +639,54 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   };
 
   const snapshot = live ? tracking.snapshot : null;
-  const source = track
-    ? facingFrom(track, live, snapshot, alignment, progressMeters).source
-    : 'off';
-  const showAlign = live && !arSession && source === 'assumed';
+  // Published by the draw loop, because the phone's yaw is read there.
+  const source = arSession ? 'ar' : drawn.source;
+  const needsOrientation = orientationState === 'needs-permission';
+  const showAlign = !arSession && source === 'assumed';
   const arActive = arSession !== null;
+  const remaining = guidance ? guidance.remainingMeters : 0;
+  const arrived = navStatus === NAV_STATUS.ARRIVED || (guidance?.atEnd ?? false);
+  /*
+   * One line, and only when there is something to do about it. The chips above
+   * already say what is known; a paragraph repeating them every frame of a
+   * walk is what turned this view into an instrument panel.
+   */
+  const note = arProblem
+    ? arProblem
+    : needsOrientation
+      ? 'Turn the AR view on and the route will lie on the floor and follow the camera.'
+      : source === 'off'
+        ? 'This phone is not saying which way it is pointing, so the route is drawn along itself.'
+        : !live && !canTrack && !plausible
+          ? 'Nothing here measures how far you have walked; step through the route to move along it.'
+          : !live && !canTrack && !knownStart
+            ? 'Scan a check-in code on the map so tracking knows how far along you are.'
+            : null;
+
+  const instructionCard = copy && (
+    <div className="camera-preview-instruction">
+      <div className="camera-preview-instruction-icon">
+        <ManeuverIcon type={copy.step.type} size={24} />
+      </div>
+      <div className="camera-preview-instruction-copy">
+        <div className="camera-preview-step-kicker">
+          <span className="camera-preview-lead">{copy.lead}</span>
+          {live && snapshot && <span>{snapshot.tier}</span>}
+        </div>
+        <div className="camera-preview-instruction-text">{copy.text}</div>
+        {copy.then && <div className="camera-preview-instruction-distance">{copy.then}</div>}
+      </div>
+    </div>
+  );
 
   return (
     <div
-      className="camera-preview animate-fade-in"
+      className="camera-preview"
       id="camera-preview"
       data-heading-source={source}
       data-facing={drawn.facing ?? ''}
       data-ribbon={drawn.points}
+      data-callouts={drawn.callouts}
       data-ar={arActive ? 'active' : arSupport === 'yes' ? 'available' : arSupport}
       data-tracking={tracking?.status ?? 'none'}
     >
@@ -421,13 +694,8 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         <video ref={videoRef} className="camera-preview-video" playsInline muted autoPlay />
       )}
       {found && !cameraError && <canvas ref={canvasRef} className="camera-preview-canvas" />}
-
-      {found && (
-        <div className="camera-preview-status" role="status">
-          <Camera size={14} />
-          <strong>{arActive ? 'Immersive guidance' : 'Camera guidance'}</strong>
-          <span>{arActive ? 'Anchored to your start point' : 'Not world-anchored'}</span>
-        </div>
+      {found && !cameraError && (
+        <div ref={calloutLayerRef} className="ar-callouts" aria-hidden="true" />
       )}
 
       {!found && (
@@ -446,7 +714,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
             onClick={() => actions.setView(VIEW_TYPE.MAP)}
             style={{ marginTop: 'var(--space-4)' }}
           >
-            <Map size={16} /> Choose a destination
+            <MapIcon size={16} /> Choose a destination
           </button>
         </div>
       )}
@@ -470,116 +738,135 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
             onClick={() => actions.setView(VIEW_TYPE.MAP)}
             style={{ marginTop: 'var(--space-4)' }}
           >
-            <Map size={16} /> Switch to Map View
+            <MapIcon size={16} /> Switch to Map View
           </button>
+        </div>
+      )}
+
+      {found && (
+        <header className="ar-top" ref={topRef}>
+          {!cameraError && instructionCard}
+          <div className="camera-preview-status" role="status">
+            <Camera size={13} />
+            <strong>{arActive ? 'Immersive guidance' : 'Camera guidance'}</strong>
+            <span>{arActive ? 'Anchored to your start point' : 'Not world-anchored'}</span>
+          </div>
+          {!cameraError && (
+            <aside className="camera-preview-telemetry" aria-label="Guidance readiness">
+              <div>
+                <Camera size={12} />
+                <span>Video</span>
+                <strong>{videoReady ? 'Live' : 'Starting'}</strong>
+              </div>
+              <div className={live ? undefined : 'not-ready'}>
+                <LocateFixed size={12} />
+                <span>Position</span>
+                <strong>{live ? tierLabel(snapshot) : 'Not tracked'}</strong>
+              </div>
+              <div className={source === 'assumed' || source === 'off' ? 'not-ready' : undefined}>
+                <Compass size={12} />
+                <span>Heading</span>
+                <strong>{headingLabel(source)}</strong>
+              </div>
+              <div className={arActive ? undefined : 'not-ready'}>
+                <Crosshair size={12} />
+                <span>World anchor</span>
+                <strong>
+                  {arActive
+                    ? arReport?.floorHits
+                      ? 'Floor found'
+                      : 'Your start point'
+                    : 'Not anchored'}
+                </strong>
+              </div>
+            </aside>
+          )}
+          {!cameraError && note && (
+            <p className="camera-preview-note" role="status">
+              {note}
+            </p>
+          )}
+        </header>
+      )}
+
+      {found && !cameraError && drawn.hint && !arActive && (
+        <div className={`ar-offscreen is-${drawn.hint}`} role="status">
+          <span className="ar-offscreen-arrow" aria-hidden="true">
+            {drawn.hint === 'right' ? '›' : '‹'}
+          </span>
+          <span>Turn {drawn.hint} to find the route</span>
         </div>
       )}
 
       {found && !cameraError && (
-        <aside
-          className="camera-preview-telemetry"
-          aria-label="Guidance readiness"
-          ref={telemetryRef}
-        >
-          {(showAlign || arProblem || (!live && !canTrack)) && (
-            <p className="camera-preview-note" role="status">
-              {arProblem
-                ? arProblem
-                : showAlign
-                  ? 'Hold the phone up, looking along the corridor the route follows, then say so. The gyroscope keeps the route turning with you from there.'
-                  : !plausible
-                    ? 'This device has no motion sensors, so the route is drawn as if you were looking along it. Step through the route or play the walk-through to move.'
-                    : !knownStart
-                      ? 'Scan a check-in code on the map so tracking knows where you are.'
-                      : 'Tracking is paused; the route is drawn as if you were looking along it.'}
-            </p>
-          )}
-          <div>
-            <Camera size={13} />
-            <span>Video</span>
-            <strong>{videoReady ? 'Live' : 'Starting'}</strong>
-          </div>
-          <div className={live ? undefined : 'not-ready'}>
-            <LocateFixed size={13} />
-            <span>Position</span>
-            <strong>{live ? tierLabel(snapshot) : 'Not tracked'}</strong>
-          </div>
-          <div className={source === 'assumed' || source === 'off' ? 'not-ready' : undefined}>
-            <Compass size={13} />
-            <span>Heading</span>
-            <strong>{headingLabel(source)}</strong>
-          </div>
-          <div className={arActive ? undefined : 'not-ready'}>
-            <Crosshair size={13} />
-            <span>World anchor</span>
-            <strong>
-              {arActive
-                ? arReport?.floorHits
-                  ? 'Floor found'
-                  : 'Your start point'
-                : 'Not anchored'}
-            </strong>
-          </div>
-        </aside>
+        <canvas ref={miniMapRef} className="ar-minimap" aria-label="Plan of this floor" />
       )}
 
-      {found && !cameraError && copy && (
-        <div className="camera-preview-instruction animate-slide-down">
-          <div className="camera-preview-instruction-icon">
-            <ManeuverIcon type={copy.step.type} size={22} />
-          </div>
-          <div className="camera-preview-instruction-copy">
-            <div className="camera-preview-step-kicker">
-              <span className="camera-preview-lead">{copy.lead}</span>
-              {live && snapshot && <span>{snapshot.tier}</span>}
+      {found && (
+        <footer className="ar-sheet" ref={sheetRef}>
+          {!cameraError && guidance && (
+            <div className="ar-sheet-facts">
+              <div>
+                <span>Arrival</span> {arrived ? 'Now' : formatMinutes(remaining, walkSpeedMps)}
+              </div>
+              <div>{arrived ? 'You are here' : `${formatMeters(remaining)} left`}</div>
             </div>
-            <div className="camera-preview-instruction-text">{copy.text}</div>
-            {copy.then && <div className="camera-preview-instruction-distance">{copy.then}</div>}
+          )}
+          <div className="camera-preview-controls">
+            {!cameraError && speechAvailable() && onVoice && (
+              <button
+                className="camera-preview-control"
+                aria-pressed={voice}
+                aria-label={voice ? 'Mute spoken directions' : 'Speak directions aloud'}
+                onClick={() => onVoice(!voice)}
+              >
+                {voice ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                {voice ? 'Mute' : 'Speak'}
+              </button>
+            )}
+            {!cameraError && canTrack && (
+              <button
+                className="camera-preview-control is-primary"
+                onClick={() => tracking.start()}
+              >
+                <LocateFixed size={16} />
+                {trackLabel}
+              </button>
+            )}
+            {!cameraError && needsOrientation && (
+              <button
+                className="camera-preview-control is-primary"
+                onClick={() => feedRef.current?.request()}
+              >
+                <Compass size={16} />
+                Turn on AR view
+              </button>
+            )}
+            {!cameraError && showAlign && (
+              <button className="camera-preview-control is-primary" onClick={alignNow}>
+                <Compass size={16} />
+                I’m facing the corridor
+              </button>
+            )}
+            {!cameraError && !arSession && source === 'aligned' && (
+              <button className="camera-preview-control" onClick={unalign}>
+                <Compass size={16} />
+                Re-align
+              </button>
+            )}
+            {!cameraError && arAvailable && !arSession && (
+              <button className="camera-preview-control" onClick={startAr} disabled={arStarting}>
+                <Box size={16} />
+                {arStarting ? 'Starting AR…' : 'Start AR'}
+              </button>
+            )}
+            <button className="camera-preview-control" onClick={exit} id="btn-exit-camera-preview">
+              <MapIcon size={16} />
+              Exit to plan
+            </button>
           </div>
-        </div>
+        </footer>
       )}
-
-      <div className="camera-preview-controls" ref={controlsRef}>
-        <button className="camera-preview-control" onClick={exit} id="btn-exit-camera-preview">
-          <Map size={16} />
-          Exit to plan
-        </button>
-        {found && !cameraError && speechAvailable() && onVoice && (
-          <button
-            className="camera-preview-control"
-            aria-pressed={voice}
-            aria-label={voice ? 'Mute spoken directions' : 'Speak directions aloud'}
-            onClick={() => onVoice(!voice)}
-          >
-            {voice ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            {voice ? 'Mute' : 'Speak'}
-          </button>
-        )}
-        {found && !cameraError && canTrack && (
-          <button className="camera-preview-control is-primary" onClick={() => tracking.start()}>
-            <LocateFixed size={16} />
-            {trackLabel}
-          </button>
-        )}
-        {found && !cameraError && showAlign && (
-          <button className="camera-preview-control is-primary" onClick={alignNow}>
-            <Compass size={16} />
-            I’m facing the corridor
-          </button>
-        )}
-        {found && !cameraError && live && !arSession && source === 'aligned' && (
-          <button className="camera-preview-control" onClick={() => setAlignment(null)}>
-            <Compass size={16} />
-            Re-align
-          </button>
-        )}
-        {found && !cameraError && arAvailable && !arSession && (
-          <button className="camera-preview-control" onClick={startAr} disabled={arStarting}>
-            <Box size={16} />
-            {arStarting ? 'Starting AR…' : 'Start AR'}
-          </button>
-        )}
-      </div>
 
       {/* Shown over the camera by the immersive session, for as long as it runs. */}
       <div
@@ -587,58 +874,58 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         className={`camera-ar-overlay${arActive ? ' is-active' : ''}`}
         aria-hidden={!arActive}
       >
-        {arActive && copy && (
-          <div className="camera-preview-instruction">
-            <div className="camera-preview-instruction-icon">
-              <ManeuverIcon type={copy.step.type} size={22} />
-            </div>
-            <div className="camera-preview-instruction-copy">
-              <div className="camera-preview-step-kicker">
-                <span className="camera-preview-lead">{copy.lead}</span>
-                {snapshot && <span>{snapshot.tier}</span>}
+        {arActive && (
+          <>
+            <div className="ar-top">{instructionCard}</div>
+            <div>
+              <p className="camera-ar-overlay-note">
+                {arReport?.aligned
+                  ? 'The route is placed from where the guidance says you are, looking the way it goes. If the chevrons point into a wall, face along the corridor and re-align.'
+                  : 'Placing the route…'}
+              </p>
+              <div className="ar-sheet is-overlay">
+                {guidance && (
+                  <div className="ar-sheet-facts">
+                    <div>
+                      <span>Arrival</span>{' '}
+                      {arrived ? 'Now' : formatMinutes(remaining, walkSpeedMps)}
+                    </div>
+                    <div>{arrived ? 'You are here' : `${formatMeters(remaining)} left`}</div>
+                  </div>
+                )}
+                <div className="camera-preview-controls">
+                  <button className="camera-preview-control" onClick={() => arSession?.realign()}>
+                    <Compass size={16} />
+                    Re-align
+                  </button>
+                  <button
+                    className="camera-preview-control is-primary"
+                    onClick={() => void arSession?.end()}
+                  >
+                    <Square size={16} />
+                    Leave AR
+                  </button>
+                </div>
               </div>
-              <div className="camera-preview-instruction-text">{copy.text}</div>
-              {copy.then && <div className="camera-preview-instruction-distance">{copy.then}</div>}
             </div>
-          </div>
+          </>
         )}
-        <p className="camera-ar-overlay-note">
-          {arReport?.aligned
-            ? 'The route is placed from where the guidance says you are, looking the way it goes. If the chevrons point into a wall, face along the corridor and re-align.'
-            : 'Placing the route…'}
-        </p>
-        <div className="camera-preview-controls">
-          <button
-            className="camera-preview-control"
-            onClick={() => arSession?.realign()}
-            disabled={!arSession}
-          >
-            <Compass size={16} />
-            Re-align
-          </button>
-          <button
-            className="camera-preview-control is-primary"
-            onClick={() => void arSession?.end()}
-            disabled={!arSession}
-          >
-            <Square size={16} />
-            Leave AR
-          </button>
-        </div>
       </div>
     </div>
   );
 }
 
 /**
- * The projected route as a ribbon on the floor: blue edged in ink, sixty
- * centimetres wide at every depth, chevrons along it and a ring at the end.
+ * The projected route as a lit ribbon on the floor - a translucent blue bed,
+ * bright edges that glow, big chevrons that recede with it - and a ring at
+ * the end. Sixty centimetres wide at every depth.
  */
 function paintProjection(context, viewport, projection, fadeFrom) {
   const focal =
     viewport.height / 2 / Math.tan((DEFAULT_CAMERA_MODEL.verticalFovDegrees / 2) * (Math.PI / 180));
   context.save();
   context.lineJoin = 'round';
+  context.lineCap = 'round';
   for (const line of projection.ribbon) {
     if (line.length < 2) continue;
     const left = [];
@@ -650,7 +937,9 @@ function paintProjection(context, viewport, projection, fadeFrom) {
       const dx = next.x - previous.x;
       const dy = next.y - previous.y;
       const length = Math.hypot(dx, dy) || 1;
-      const half = Math.max(2, Math.min(48, (focal / Math.max(0.3, point.depthMeters)) * 0.3));
+      // A path about two thirds of a metre across, and never so near that it
+      // fills the frame with a slab of colour.
+      const half = Math.max(2, Math.min(150, (focal / Math.max(1, point.depthMeters)) * 0.32));
       const nx = (-dy / length) * half;
       const ny = (dx / length) * half;
       left.push([point.x + nx, point.y + ny]);
@@ -665,39 +954,62 @@ function paintProjection(context, viewport, projection, fadeFrom) {
       context.lineTo(right[index][0], right[index][1]);
     }
     context.closePath();
-    context.fillStyle = 'rgba(10, 101, 219, 0.82)';
+    context.fillStyle = 'rgba(10, 101, 219, 0.42)';
     context.fill();
-    context.strokeStyle = 'rgba(0, 6, 9, 0.7)';
-    context.lineWidth = 2;
-    context.stroke();
+    for (const edge of [left, right]) {
+      context.beginPath();
+      context.moveTo(edge[0][0], edge[0][1]);
+      for (let index = 1; index < edge.length; index += 1) {
+        context.lineTo(edge[index][0], edge[index][1]);
+      }
+      context.shadowColor = 'rgba(142, 197, 255, 0.95)';
+      context.shadowBlur = 16;
+      context.strokeStyle = GLOW;
+      context.lineWidth = 2.5;
+      context.stroke();
+      context.stroke();
+      context.shadowBlur = 0;
+    }
   }
   for (const chevron of projection.chevrons) {
-    const size = Math.max(4, Math.min(18, chevron.pixelsPerMeter * 0.2));
+    const size = Math.max(5, Math.min(22, chevron.pixelsPerMeter * 0.22));
     context.save();
     context.translate(chevron.x, chevron.y);
     context.rotate(chevron.angleRadians);
     context.beginPath();
-    context.moveTo(-size * 0.55, -size * 0.8);
-    context.lineTo(size * 0.45, 0);
-    context.lineTo(-size * 0.55, size * 0.8);
-    context.strokeStyle = CREAM;
-    context.lineCap = 'round';
-    context.lineWidth = Math.max(2, size * 0.22);
-    context.stroke();
+    context.moveTo(-size * 0.75, -size * 0.9);
+    context.lineTo(size * 0.35, 0);
+    context.lineTo(-size * 0.75, size * 0.9);
+    context.lineTo(-size * 0.25, size * 0.9);
+    context.lineTo(size * 0.85, 0);
+    context.lineTo(-size * 0.25, -size * 0.9);
+    context.closePath();
+    context.shadowColor = 'rgba(142, 197, 255, 0.9)';
+    context.shadowBlur = 12;
+    context.fillStyle = 'rgba(223, 240, 255, 0.95)';
+    context.fill();
     context.restore();
   }
   if (projection.destination) {
-    const radius = Math.max(8, Math.min(40, 400 / Math.max(1, projection.destination.depthMeters)));
+    const radius = Math.max(8, Math.min(44, 420 / Math.max(1, projection.destination.depthMeters)));
+    context.save();
+    context.shadowColor = 'rgba(142, 197, 255, 0.9)';
+    context.shadowBlur = 18;
     context.beginPath();
     context.arc(projection.destination.x, projection.destination.y, radius, 0, Math.PI * 2);
-    context.strokeStyle = INK;
-    context.lineWidth = 6;
+    context.strokeStyle = GLOW;
+    context.lineWidth = 4;
     context.stroke();
+    context.beginPath();
+    context.arc(projection.destination.x, projection.destination.y, radius * 0.55, 0, Math.PI * 2);
+    context.fillStyle = 'rgba(142, 197, 255, 0.35)';
+    context.fill();
     context.strokeStyle = CREAM;
-    context.lineWidth = 3;
+    context.lineWidth = 2;
     context.stroke();
+    context.restore();
   }
-  // The near end of the ribbon would run under the panels: let it go before it gets there.
+  // The near end of the ribbon would run under the sheet: let it go before it gets there.
   if (fadeFrom !== null && fadeFrom < viewport.height) {
     const start = Math.max(0, fadeFrom - 90);
     const gradient = context.createLinearGradient(0, start, 0, Math.max(start + 1, fadeFrom));

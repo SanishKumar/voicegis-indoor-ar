@@ -269,7 +269,7 @@ test('the camera view draws the route from the tracked position and turns it wit
   await expect(view).toHaveAttribute('data-tracking', 'on');
   await expect(view).toHaveAttribute('data-heading-source', 'tracker', { timeout: 15_000 });
   const telemetry = page.getByRole('complementary', { name: 'Guidance readiness' });
-  await expect(telemetry).toContainText('Gyroscope, aligned by your walk');
+  await expect(telemetry).toContainText('From your walk');
   await expect(telemetry).toContainText('Tracking');
   await expect.poll(async () => Number(await view.getAttribute('data-ribbon'))).toBeGreaterThan(2);
   await expect(page.getByRole('button', { name: 'Track my walk' })).toHaveCount(0);

@@ -697,3 +697,48 @@ Implemented in the Visitor surface, after review of the current product:
   camera" was never the problem - walls between the marker and the eye were.
 - **Gate.** lint, tsc, the unit suite, and the map, journey and tracking
   browser journeys on both projects.
+
+### The camera view reads the phone, not the route — 18 September 2026
+
+- **What was wrong.** The camera view drew the route in a fixed place on the
+  glass. Two things caused it and both were mine. The facing came from
+  `facingFrom`, which fell back to the route's own bearing whenever live
+  tracking was off - so the path was always dead ahead however the phone was
+  pointed. The tilt came from `attitudeFromGravity(live ? gravity : null)`,
+  and gravity only flowed while the tracking subscription ran, so with
+  tracking off the pitch was a constant -18°. A fixed heading and a fixed
+  tilt is a diagram, not a view of the floor. It also crashed on open:
+  lucide's `Map` icon shadowed the global `Map` constructor, so `new Map()`
+  in the draw loop threw and React unmounted the whole view.
+- **Why the tests missed it.** `CameraPreview.heading.test.tsx` mocked
+  `getContext` to null, so the draw loop returned before its first line. The
+  suite has been rewritten around a canvas that answers and frames that are
+  run by hand on a clock the test controls; it now asserts that a ribbon of
+  floor points is painted, which is what the crash destroyed.
+- **What changed.** The view owns an orientation feed of its own
+  (`src/ar/orientationFeed.js`), running from the moment it opens whether or
+  not anything is tracked, and asking iOS for permission through a button of
+  its own. `src/ar/deviceAttitude.ts` rebuilds the W3C rotation matrix and
+  reads the camera's pitch, roll and yaw out of it, which keeps the answers
+  stable at beta = 90 - a phone held upright to look ahead, and exactly where
+  the alpha/gamma decomposition is degenerate. `facingFrom` now takes that
+  yaw and an anchor saying what its arbitrary zero was looking at: the
+  visitor's word, or the route's own bearing, said plainly as an assumption.
+  Turning the phone turns the drawn route by the same angle either way.
+- **What else the view gained.** Labels floating in the world where the
+  destination, the next corner, the stair and the nearby places are, with how
+  far off they are (`src/ar/callouts.ts`); a plan in the corner turned the
+  way the visitor faces (`src/ar/cameraMiniMap.js`); an arrow saying which way
+  to turn when the route is further round than the camera can see; and a path
+  that starts a metre or so ahead rather than under the visitor's feet, which
+  is what made the old near end a slab of colour across the bottom.
+- **What it is not.** The vertical field of view is a stated 55°, not a
+  measurement - no browser reports a camera's true field of view, and the
+  video is cropped to the screen besides. Nothing here has run on a physical
+  handset, so the attitude signs and that field of view both want checking on
+  one. Without an immersive session the zero of the yaw is still an
+  assumption: face along the corridor and say so, and it is right; walk off
+  without saying, and the route points the wrong way until you do.
+- **Gate.** lint, tsc, 1,169 unit tests including new suites for the attitude
+  maths, the facing rule and the world labels; 48 visitor browser journeys on
+  both projects.

@@ -338,19 +338,3 @@
     flex-shrink: 0;
   }
 }
-
-@media (max-width: 680px) {
-  .visitor-shell .camera-preview-telemetry {
-    bottom: calc(var(--camera-preview-controls-height, 104px) + 26px);
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .visitor-shell .camera-preview-telemetry > div {
-    grid-template-columns: 18px minmax(0, 1fr);
-    row-gap: 2px;
-    padding-top: 6px;
-    padding-bottom: 6px;
-  }
-  .visitor-shell .camera-preview-telemetry strong {
-    grid-column: 2;
-  }
-}

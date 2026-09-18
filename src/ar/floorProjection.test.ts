@@ -83,9 +83,14 @@ describe('the route ahead on the floor of the camera image', () => {
   });
 
   it('moves the floor up the screen as the phone tilts down', () => {
+    // The nearest sample to five metres along, whatever the sampling lands on.
     const at = (pitch: number) =>
-      points(projectRouteAhead(bend, 0, atStart(0, pitch), camera)).find(
-        (point) => Math.abs(point.alongMeters - 5) < 1e-9,
+      points(projectRouteAhead(bend, 0, atStart(0, pitch), camera)).reduce(
+        (best, point) =>
+          best === null || Math.abs(point.alongMeters - 5) < Math.abs(best.alongMeters - 5)
+            ? point
+            : best,
+        null as ReturnType<typeof points>[number] | null,
       );
     const level = at(0);
     const down = at(-30);
@@ -101,6 +106,22 @@ describe('the route ahead on the floor of the camera image', () => {
     const seen = points(projection);
     expect(seen.length).toBeGreaterThan(5);
     for (const point of seen) expect(point.x).toBeLessThan(centreX);
+  });
+
+  it('begins the path ahead of the visitor rather than under their feet', () => {
+    const projection = projectRouteAhead(bend, 0, atStart(0), camera);
+    const nearest = points(projection).reduce(
+      (least, point) => Math.min(least, point.alongMeters),
+      Number.POSITIVE_INFINITY,
+    );
+    expect(nearest).toBeCloseTo(1.2, 6);
+    // Asked for none, it runs right up to the lens, which is the near end
+    // filling the bottom of the frame that the offset exists to avoid.
+    const underfoot = projectRouteAhead(bend, 0, atStart(0), camera, { startOffsetMeters: 0 });
+    expect(points(underfoot)[0].alongMeters).toBeLessThan(0.5);
+    expect(points(underfoot)[0].depthMeters).toBeLessThan(points(projection)[0].depthMeters);
+    // The distance still counts from the visitor, not from where drawing starts.
+    expect(projection.drawnMeters).toBe(25);
   });
 
   it('draws nothing when the whole route is behind the camera', () => {

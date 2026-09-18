@@ -148,7 +148,7 @@ test('the camera view says what it knows and its controls remain reachable', asy
   // Nothing is tracked yet, so the route is drawn as if the visitor were
   // looking along it, and the panel says exactly that.
   await expect(telemetry).toContainText('Not tracked');
-  await expect(telemetry.locator('div', { hasText: 'Heading' })).toContainText('Off');
+  await expect(telemetry.locator('div', { hasText: 'Heading' })).toContainText('Not known');
   await expect(telemetry).toContainText('Not anchored');
   await expect(view).toHaveAttribute('data-heading-source', 'off');
   await expect.poll(async () => Number(await view.getAttribute('data-ribbon'))).toBeGreaterThan(2);

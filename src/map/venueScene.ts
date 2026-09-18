@@ -17,7 +17,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  PCFSoftShadowMap,
+  PCFShadowMap,
   PlaneGeometry,
   Raycaster,
   RingGeometry,
@@ -275,7 +275,7 @@ export function createVenueScene(
   const pixelRatio = Math.min(window.devicePixelRatio, 2);
   renderer.setPixelRatio(pixelRatio);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = PCFSoftShadowMap;
+  renderer.shadowMap.type = PCFShadowMap;
   renderer.toneMapping = ACESFilmicToneMapping;
 
   const scene = new Scene();
@@ -317,8 +317,9 @@ export function createVenueScene(
   key.position.set(span * 0.55, span * 1.2, span * 0.45);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
-  // Soft-edged shadows, and a normal bias rather than a deep depth bias: the
-  // flat-shaded low walls otherwise show acne along their tops.
+  // Three deprecated its soft filter in r184 and falls back to this one, so
+  // softness comes from the map size and a normal bias rather than a deep
+  // depth bias: the flat-shaded low walls otherwise show acne along their tops.
   key.shadow.bias = -0.0004;
   key.shadow.normalBias = 0.03;
   const shadowSpan = span * 0.8;

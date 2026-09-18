@@ -8,6 +8,7 @@ import { nextVerticalRun, positionAt, type RouteTrack } from '../navigation/rout
  * at one place on the screen. The route is a line on the floor, so it can be
  * drawn where the floor is - which is what makes a camera view useful when
  * the phone knows which way it faces but nothing anchors it to the building.
+ * The same camera places a label floating above a door or a corner.
  *
  * Everything here is geometry on stated inputs. It does not know whether the
  * facing is right; the caller says where the facing came from.
@@ -67,6 +68,8 @@ export interface FloorProjection {
 
 export interface ProjectionOptions {
   aheadMeters?: number;
+  /** The route nearer than this to the visitor is left undrawn; it is under them. */
+  startOffsetMeters?: number;
   spacingMeters?: number;
   chevronEveryMeters?: number;
   /** Depth in front of the lens below which a point is behind the camera. */
@@ -81,17 +84,85 @@ export const DEFAULT_CAMERA_MODEL = Object.freeze({
 
 const DEFAULTS: Required<ProjectionOptions> = {
   aheadMeters: 25,
+  startOffsetMeters: 1.2,
   spacingMeters: 0.5,
-  chevronEveryMeters: 2,
+  chevronEveryMeters: 2.5,
   nearMeters: 0.15,
 };
 
 const DEG = Math.PI / 180;
 
-interface CameraSpace {
+export interface CameraSpace {
   x: number;
   y: number;
   z: number;
+}
+
+export interface Projected {
+  x: number;
+  y: number;
+  depthMeters: number;
+}
+
+/** One camera, for placing anything in the plan on the screen. */
+export interface Projector {
+  /** Pixels per metre at a depth of one metre. */
+  focal: number;
+  nearMeters: number;
+  toCamera(planX: number, planY: number, heightMeters?: number): CameraSpace;
+  toScreen(point: CameraSpace): { x: number; y: number };
+  /** A plan point at a height above the floor, or null when it is behind the camera. */
+  project(planX: number, planY: number, heightMeters?: number): Projected | null;
+}
+
+export function createProjector(
+  pose: ViewerPose,
+  camera: CameraModel,
+  nearMeters = DEFAULTS.nearMeters,
+): Projector {
+  const focal = camera.height / 2 / Math.tan((camera.verticalFovDegrees / 2) * DEG);
+  const centreX = camera.width / 2;
+  const centreY = camera.height / 2;
+  const bearing = pose.facingDegrees * DEG;
+  const forward = [Math.sin(bearing), -Math.cos(bearing)];
+  const right = [Math.cos(bearing), Math.sin(bearing)];
+  const pitch = pose.pitchDegrees * DEG;
+  const roll = pose.rollDegrees * DEG;
+  const sinPitch = Math.sin(pitch);
+  const cosPitch = Math.cos(pitch);
+  const sinRoll = Math.sin(roll);
+  const cosRoll = Math.cos(roll);
+
+  const toCamera = (planX: number, planY: number, heightMeters = 0): CameraSpace => {
+    const dx = planX - pose.x;
+    const dy = planY - pose.y;
+    const across = dx * right[0] + dy * right[1];
+    const ahead = dx * forward[0] + dy * forward[1];
+    const above = heightMeters - camera.eyeHeightMeters;
+    // The camera tilts up by the pitch; in its own frame the world tilts the other way.
+    const depth = above * sinPitch + ahead * cosPitch;
+    const up = above * cosPitch - ahead * sinPitch;
+    return {
+      x: across * cosRoll - up * sinRoll,
+      y: across * sinRoll + up * cosRoll,
+      z: depth,
+    };
+  };
+  const toScreen = (point: CameraSpace) => ({
+    x: centreX + (focal * point.x) / point.z,
+    y: centreY - (focal * point.y) / point.z,
+  });
+  return {
+    focal,
+    nearMeters,
+    toCamera,
+    toScreen,
+    project(planX, planY, heightMeters = 0) {
+      const point = toCamera(planX, planY, heightMeters);
+      if (point.z < nearMeters) return null;
+      return { ...toScreen(point), depthMeters: point.z };
+    },
+  };
 }
 
 export function projectRouteAhead(
@@ -112,47 +183,22 @@ export function projectRouteAhead(
   };
   if (!(track.length > 0) || !(camera.width > 0) || !(camera.height > 0)) return empty;
 
-  const progress = Math.min(Math.max(0, progressMeters), track.length);
-  const run = nextVerticalRun(track, progress);
+  const here = Math.min(Math.max(0, progressMeters), track.length);
+  const progress = Math.min(here + settings.startOffsetMeters, track.length);
+  const run = nextVerticalRun(track, here);
   const limit = Math.min(
-    progress + settings.aheadMeters,
+    here + settings.aheadMeters,
     track.length,
     run === null ? Number.POSITIVE_INFINITY : run.boardingMeters,
   );
   const endsAtVerticalRun = run !== null && limit === run.boardingMeters;
   const reachesEnd = limit >= track.length;
+  if (limit <= progress && !reachesEnd) return { ...empty, endsAtVerticalRun };
 
-  const focal = camera.height / 2 / Math.tan((camera.verticalFovDegrees / 2) * DEG);
-  const centreX = camera.width / 2;
-  const centreY = camera.height / 2;
-  const bearing = pose.facingDegrees * DEG;
-  const forward = [Math.sin(bearing), -Math.cos(bearing)];
-  const right = [Math.cos(bearing), Math.sin(bearing)];
-  const pitch = pose.pitchDegrees * DEG;
-  const roll = pose.rollDegrees * DEG;
-  const sinPitch = Math.sin(pitch);
-  const cosPitch = Math.cos(pitch);
-  const sinRoll = Math.sin(roll);
-  const cosRoll = Math.cos(roll);
-
-  const toCamera = (planX: number, planY: number): CameraSpace => {
-    const dx = planX - pose.x;
-    const dy = planY - pose.y;
-    const across = dx * right[0] + dy * right[1];
-    const ahead = dx * forward[0] + dy * forward[1];
-    const below = -camera.eyeHeightMeters;
-    // The camera tilts up by the pitch; in its own frame the world tilts the other way.
-    const depth = below * sinPitch + ahead * cosPitch;
-    const up = below * cosPitch - ahead * sinPitch;
-    return {
-      x: across * cosRoll - up * sinRoll,
-      y: across * sinRoll + up * cosRoll,
-      z: depth,
-    };
-  };
+  const projector = createProjector(pose, camera, settings.nearMeters);
+  const { focal, toCamera } = projector;
   const toScreen = (point: CameraSpace, along: number): ScreenPoint => ({
-    x: centreX + (focal * point.x) / point.z,
-    y: centreY - (focal * point.y) / point.z,
+    ...projector.toScreen(point),
     depthMeters: point.z,
     alongMeters: along,
   });
@@ -202,7 +248,7 @@ export function projectRouteAhead(
 
   const chevrons: Chevron[] = [];
   const every = settings.chevronEveryMeters;
-  for (let along = Math.ceil((progress + 1) / every) * every; along < limit; along += every) {
+  for (let along = Math.ceil(progress / every) * every; along < limit; along += every) {
     const here = positionAt(track, along);
     const step = along + 0.3 <= limit ? 0.3 : -0.3;
     const there = positionAt(track, along + step);
@@ -229,7 +275,10 @@ export function projectRouteAhead(
   }
 
   // The horizon is where a level line of sight lands: above centre when looking down.
-  const horizon = Math.abs(cosPitch) < 1e-6 ? null : centreY + (focal * sinPitch) / cosPitch;
+  const sinPitch = Math.sin(pose.pitchDegrees * DEG);
+  const cosPitch = Math.cos(pose.pitchDegrees * DEG);
+  const horizon =
+    Math.abs(cosPitch) < 1e-6 ? null : camera.height / 2 + (focal * sinPitch) / cosPitch;
   const horizonY = horizon !== null && horizon >= 0 && horizon <= camera.height ? horizon : null;
 
   return {
@@ -237,7 +286,7 @@ export function projectRouteAhead(
     chevrons,
     destination,
     horizonY,
-    drawnMeters: Math.max(0, limit - progress),
+    drawnMeters: Math.max(0, limit - here),
     endsAtVerticalRun,
   };
 }
