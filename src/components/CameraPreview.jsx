@@ -39,7 +39,7 @@ import { ANCHOR_SIGMA } from '../navigation/liveTracker';
 import { bearingAt, guidanceAt, positionAt, trackForRoute } from '../navigation/routeProgress';
 import { facingFrom } from '../ar/facingFrom';
 import { startOrientationFeed } from '../ar/orientationFeed';
-import { calloutsAhead } from '../ar/callouts';
+import { calloutsAhead, shortStepTitle } from '../ar/callouts';
 import { drawMiniMap, prepareMiniMap } from '../ar/cameraMiniMap';
 import { createProjector, DEFAULT_CAMERA_MODEL, projectRouteAhead } from '../ar/floorProjection';
 import { ArStartError, immersiveArSupported, startArGuidance } from '../ar/arSession';
@@ -759,21 +759,17 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
                   : source === 'assumed'
                     ? 'At your check-in point, face the corridor in the route’s direction, then tap “I’m facing the corridor”.'
                     : !live
-                      ? 'Direction follows your phone. Position stays at your last location until you start tracking.'
+                      ? 'Direction follows your phone; position holds until you track your walk.'
                       : null;
 
   const instructionCard = copy && (
     <div className="camera-preview-instruction">
       <div className="camera-preview-instruction-icon">
-        <ManeuverIcon type={copy.step.type} size={24} />
+        <ManeuverIcon type={copy.step.type} size={28} />
       </div>
       <div className="camera-preview-instruction-copy">
-        <div className="camera-preview-step-kicker">
-          <span className="camera-preview-lead">{copy.lead}</span>
-          {live && snapshot && <span>{snapshot.tier}</span>}
-        </div>
-        <div className="camera-preview-instruction-text">{copy.text}</div>
-        {copy.then && <div className="camera-preview-instruction-distance">{copy.then}</div>}
+        <div className="camera-preview-lead">{copy.lead}</div>
+        <div className="camera-preview-instruction-text">{shortStepTitle(copy.step)}</div>
       </div>
     </div>
   );
@@ -853,11 +849,13 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
           </div>
           {!cameraError && (
             <aside className="camera-preview-telemetry" aria-label="Guidance readiness">
-              <div>
-                <Camera size={12} />
-                <span>Video</span>
-                <strong>{videoReady ? 'Live' : 'Starting'}</strong>
-              </div>
+              {!videoReady && (
+                <div className="not-ready">
+                  <Camera size={12} />
+                  <span>Video</span>
+                  <strong>Starting</strong>
+                </div>
+              )}
               <div className={live ? undefined : 'not-ready'}>
                 <LocateFixed size={12} />
                 <span>Position</span>
@@ -868,17 +866,13 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
                 <span>Heading</span>
                 <strong>{headingLabel(source)}</strong>
               </div>
-              <div className={arActive ? undefined : 'not-ready'}>
-                <Crosshair size={12} />
-                <span>World anchor</span>
-                <strong>
-                  {arActive
-                    ? arReport?.floorHits
-                      ? 'Floor found'
-                      : 'Your start point'
-                    : 'Not anchored'}
-                </strong>
-              </div>
+              {arActive && (
+                <div>
+                  <Crosshair size={12} />
+                  <span>World anchor</span>
+                  <strong>{arReport?.floorHits ? 'Floor found' : 'Your start point'}</strong>
+                </div>
+              )}
             </aside>
           )}
           {!cameraError && note && (
@@ -904,6 +898,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
 
       {found && (
         <footer className="ar-sheet" ref={sheetRef}>
+          {!cameraError && copy && <p className="ar-sheet-instruction">{copy.text}</p>}
           {!cameraError && guidance && (
             <div className="ar-sheet-facts">
               <div>

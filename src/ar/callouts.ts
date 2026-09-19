@@ -97,6 +97,30 @@ function connectorTitle(step: RouteStep): { title: string; goesTo: string | null
   return { title: step.instruction, goesTo: null };
 }
 
+/**
+ * The place a step is about, for a card read at walking pace.
+ *
+ * A camera held up at arm's length is not where a sentence belongs. The
+ * manoeuvre is already drawn as an arrow and counted down in metres beside
+ * it, so what is left to say is where: the corridor being turned onto, the
+ * stair being taken, the door being arrived at. The whole instruction is
+ * still spoken and still written out under it; this is only the part that
+ * has to survive a glance.
+ */
+export function shortStepTitle(step: RouteStep): string {
+  if (VERTICAL.has(step.type)) return connectorTitle(step).title;
+  if (TURNS.has(step.type)) return turnTitle(step);
+  if (step.type === 'arrive') {
+    const at = /^Arrive at (.+?)(?:,|$)/.exec(step.instruction);
+    return at ? at[1] : step.instruction;
+  }
+  // "…continue on Family Care Concourse, towards Women's Imaging" is a
+  // corridor and then a reason; the corridor is the part being walked.
+  const on = / on (.+?)(?:,| · |$)/.exec(step.instruction);
+  if (on) return on[1];
+  return step.instruction;
+}
+
 export function calloutsAhead(input: CalloutInput): Callout[] {
   const {
     track,

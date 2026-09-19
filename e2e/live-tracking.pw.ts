@@ -299,12 +299,12 @@ test('the camera view draws the route from the tracked position and turns it wit
   await page.waitForTimeout(1_200);
 
   // Walking on moves the guidance in this window exactly as it does on the map.
-  const before = await page.locator('.camera-preview-instruction-text').innerText();
+  const before = await page.locator('.ar-sheet-instruction').innerText();
   await walker(page, 'walker.walk(300);');
   await page.waitForTimeout(6_000);
   await walker(page, 'walker.stand();');
   await page.waitForTimeout(600);
-  const after = await page.locator('.camera-preview-instruction-text').innerText();
+  const after = await page.locator('.ar-sheet-instruction').innerText();
   await page.getByRole('button', { name: 'Exit to plan' }).click();
   await expect(journey).toHaveAttribute('data-tracking', 'on');
   await expect(page.locator('.jr-banner-text')).toHaveText(after);

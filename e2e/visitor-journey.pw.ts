@@ -81,7 +81,9 @@ test('camera preview returns to the same shared instruction without moving the c
   const floor = await page.locator('.compiled-map').getAttribute('data-location-floor');
   await page.getByRole('button', { name: 'Camera view' }).click();
   // The camera shows the instruction the banner shows: one guidance, two windows onto it.
-  await expect(page.locator('.camera-preview-instruction-text')).toHaveText(instruction);
+  // The card names the place at a glance; the sheet keeps the whole sentence.
+  await expect(page.locator('.ar-sheet-instruction')).toHaveText(instruction);
+  await expect(page.locator('.camera-preview-instruction-text')).not.toBeEmpty();
   await expectCenterHitTarget(page.getByRole('button', { name: 'Exit to plan' }));
   await page.getByRole('button', { name: 'Exit to plan' }).click();
   await expect(page.locator('.jr-banner-text')).toHaveText(instruction);
@@ -148,7 +150,6 @@ test('the camera view says what it knows and its controls remain reachable', asy
   // With no attitude/alignment, no fictitious floor route is drawn.
   await expect(telemetry).toContainText('Not tracked');
   await expect(telemetry.locator('div', { hasText: 'Heading' })).toContainText('Not known');
-  await expect(telemetry).toContainText('Not anchored');
   await expect(view).toHaveAttribute('data-heading-source', 'off');
   await expect(view).toHaveAttribute('data-ribbon', '0');
   await expect(page.locator('.camera-preview-status')).toContainText('Not world-anchored');

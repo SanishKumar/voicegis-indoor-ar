@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GraphNode, RouteStep } from '../engine/routingCore';
 import type { Landmark } from '../engine/routeLandmarks';
 import { buildRouteTrack } from '../navigation/routeProgress';
-import { calloutsAhead } from './callouts';
+import { calloutsAhead, shortStepTitle } from './callouts';
 
 const node = (id: string, x: number, y: number, floor = 'g'): GraphNode => ({
   id,
@@ -147,5 +147,48 @@ describe('what is labelled in the world ahead', () => {
       ['destination', 'Somewhere'],
       ['turn', 'Turn left'],
     ]);
+  });
+});
+
+describe('the place a step is about, for a card read at a glance', () => {
+  const titled = (type: RouteStep['type'], instruction: string) =>
+    shortStepTitle(step(type, 'n', instruction));
+
+  it('names the corridor a turn leads onto', () => {
+    expect(titled('turn_right', 'Turn right at Reception onto South Corridor')).toBe(
+      'South Corridor',
+    );
+    // No corridor named, so the place the turn happens at will do.
+    expect(titled('turn_left', 'Turn left at Maternity Clinic')).toBe('Maternity Clinic');
+    // Neither, so the manoeuvre stands on its own.
+    expect(titled('u_turn', 'Turn around')).toBe('Turn around');
+  });
+
+  it('names the corridor being walked, not the reason for walking it', () => {
+    expect(
+      titled(
+        'start',
+        "Start at your location and continue on Family Care Concourse, towards Women's Imaging",
+      ),
+    ).toBe('Family Care Concourse');
+    expect(titled('straight', 'Continue on South Stair Hall · Level 2')).toBe('South Stair Hall');
+    expect(titled('straight', 'Continue on East Corridor, past Café')).toBe('East Corridor');
+  });
+
+  it('names the stair or lift being taken, not the floor it reaches', () => {
+    expect(titled('stairs', 'Take South Public Stair to Ground · Diagnostics')).toBe(
+      'South Public Stair',
+    );
+  });
+
+  it('names the destination without the side its door is on', () => {
+    expect(titled('arrive', 'Arrive at Outpatient Pharmacy, on your left')).toBe(
+      'Outpatient Pharmacy',
+    );
+    expect(titled('arrive', 'Arrive at Ear Clinic')).toBe('Ear Clinic');
+  });
+
+  it('falls back to the instruction when it names no place at all', () => {
+    expect(titled('start', 'Start here')).toBe('Start here');
   });
 });

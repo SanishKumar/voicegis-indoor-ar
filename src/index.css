@@ -7765,7 +7765,7 @@ body {
   display: grid;
   flex: none;
   place-items: center;
-  width: 58px;
+  width: 62px;
   background: var(--ed-blue);
   color: var(--ed-cream);
 }
@@ -7773,7 +7773,7 @@ body {
 .camera-preview-instruction-copy {
   flex: 1;
   min-width: 0;
-  padding: 10px 14px 11px;
+  padding: 9px 14px 10px;
 }
 
 .camera-preview-step-kicker {
@@ -7789,15 +7789,26 @@ body {
 }
 
 .camera-preview-lead {
+  font-family: var(--ed-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: #8ec5ff;
 }
 
+/* One place name, big enough to read at arm's length and clipped rather
+   than allowed to push the camera off the screen. */
 .camera-preview-instruction-text {
+  display: -webkit-box;
+  overflow: hidden;
   font-family: var(--ed-display);
-  font-size: 18px;
+  font-size: 21px;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.15;
   letter-spacing: 0.006em;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .camera-preview-instruction-distance {
@@ -7943,6 +7954,14 @@ body {
   border-top: 1px solid rgba(255, 249, 240, 0.16);
   background: rgba(0, 6, 9, 0.74);
   backdrop-filter: blur(18px);
+}
+
+/* The whole instruction, where there is room for a sentence. */
+.ar-sheet-instruction {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: rgba(255, 249, 240, 0.82);
 }
 
 .ar-sheet-facts {

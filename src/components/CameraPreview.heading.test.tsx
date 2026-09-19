@@ -325,15 +325,17 @@ describe('the camera view follows where the phone points', () => {
     render(<CameraPreview tracking={tracking} />);
     await waitFor(() => expect(view().getAttribute('data-ar')).toBe('no'));
     expect(panel().textContent).toContain('Not tracked');
-    expect(panel().textContent).toContain('Not anchored');
+    // Whether anything is anchored to the world is the pill's line, not a chip's.
     expect(document.querySelector('.camera-preview-status')!.textContent).toContain(
       'Not world-anchored',
     );
     expect(screen.queryByRole('button', { name: 'Start AR' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Track my walk' }));
     expect(tracking.start).toHaveBeenCalledTimes(1);
-    // The instruction is the banner's, word for word.
-    expect(screen.getByText('Go along the corridor')).toBeTruthy();
+    // The sheet carries the banner's sentence, word for word.
+    expect(document.querySelector('.ar-sheet-instruction')!.textContent).toBe(
+      'Go along the corridor',
+    );
   });
 
   it('offers an immersive session only where the browser has one, and explains a refusal', async () => {
