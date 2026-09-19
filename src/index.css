@@ -8030,8 +8030,9 @@ body {
   display: none;
 }
 
-.camera-ar-overlay.is-active,
-.camera-ar-overlay:xr-overlay {
+/* The session sets .is-active; :xr-overlay says the same thing and is not
+   a selector every minifier knows. */
+.camera-ar-overlay.is-active {
   position: fixed;
   inset: 0;
   z-index: 1000;

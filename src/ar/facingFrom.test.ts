@@ -54,6 +54,17 @@ const routeAnchor: FacingAnchor = {
 };
 
 describe('which way the camera is taken to be looking', () => {
+  it('keeps an explicit camera alignment responsive even when the walk tracker has a different heading', () => {
+    const facing = facingFrom({
+      track,
+      live: true,
+      snapshot: snapshotWith({ headingDegrees: 123 }),
+      yaw: { degrees: 290, epoch: 1 },
+      anchor: { ...routeAnchor, source: 'visitor' },
+      fallbackProgress: 2,
+    });
+    expect(facing).toEqual({ source: 'aligned', facing: 180, progress: 4 });
+  });
   it('has no idea without a yaw, and says so rather than pretending', () => {
     const facing = facingFrom({
       track,

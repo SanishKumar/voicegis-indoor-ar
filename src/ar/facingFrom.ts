@@ -45,13 +45,13 @@ export interface FacingInput {
 /**
  * Which way the route is drawn as facing, and where that came from.
  *
- * An immersive session's world tracking comes first, then the direction of
- * travel the tracker learned by watching a walk. Failing both, the phone's
+ * An immersive session's world tracking comes first, then an explicit camera
+ * alignment, then the direction the tracker learned by watching a walk. The phone's
  * own yaw carries the turn and something has to fix its zero: the visitor
  * saying they are looking along the corridor, or - said plainly as an
  * assumption - the route's own bearing where they stand. With no yaw at all
- * the view cannot know where the phone points, and the route is laid along
- * itself as a diagram rather than pretending otherwise.
+ * the view cannot know where the phone points. An assumed/off facing is only
+ * a setup value: the camera must not paint it as a route on the floor.
  *
  * A compass never enters into it. The venue's north offset is not surveyed,
  * and magnetic north indoors is not to be trusted with a heading.
@@ -63,6 +63,15 @@ export function facingFrom(input: FacingInput): Facing {
 
   if (live && snapshot?.displacementAttached && snapshot.headingDegrees !== null) {
     return { source: 'ar', facing: snapshot.headingDegrees, progress };
+  }
+  // A camera can turn while the person keeps travelling straight. An explicit
+  // camera alignment must not be overwritten by the walking estimator.
+  if (yaw !== null && anchor?.source === 'visitor' && anchor.epoch === yaw.epoch) {
+    return {
+      source: 'aligned',
+      facing: wrapDegrees(anchor.planBearing + yaw.degrees - anchor.yawDegrees),
+      progress,
+    };
   }
   if (live && snapshot && snapshot.headingDegrees !== null) {
     return { source: 'tracker', facing: snapshot.headingDegrees, progress };

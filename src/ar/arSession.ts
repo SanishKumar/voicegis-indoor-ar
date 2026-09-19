@@ -31,16 +31,16 @@ import {
 /**
  * Route guidance inside an immersive WebXR session.
  *
- * Where the browser offers `immersive-ar` - Android Chrome on ARCore hardware
- * in 2026, and nothing on iOS - the phone tracks its own movement through the
+ * Where runtime capability detection offers `immersive-ar`, the phone tracks
+ * its own movement through the
  * room with its camera and inertial sensors. That gives two things the
  * ordinary camera view cannot have: chevrons that stay put on the floor as the
  * phone moves, and metric displacement that moves the visitor's marker
  * without counting strides.
  *
  * What it still cannot have is knowledge of the building. The session's world
- * is aligned to the plan once, from an assumption - the visitor is at their
- * progress along the route, looking the way it goes - and everything after is
+ * is aligned to the plan from the visitor's explicit camera alignment and
+ * assumed position at their progress along the route. Everything after is
  * relative to that. The chevrons are anchored to the world, not to the walls;
  * a wrong assumption shows up as chevrons pointing into a wall, and the
  * tracker notices the walk disagreeing with the corridor exactly as it does
@@ -74,6 +74,7 @@ export class ArStartError extends Error {
 
 export interface ArFrameReport {
   aligned: boolean;
+  recovery: 'pose-lost' | 'floor-change' | null;
   /** Height of the floor in the session's frame, refined by hit testing. */
   floorY: number;
   /** Floor hits accepted so far; zero means the floor is where the platform guessed it. */
@@ -88,7 +89,7 @@ export interface ArGuidanceOptions {
   tracker: RouteTracker;
   /** The element shown over the camera for the length of the session. */
   overlay: HTMLElement;
-  /** Plan bearing the visitor faces at alignment, or null to assume the route's own bearing there. */
+  /** Explicitly aligned plan bearing; null withholds the route until alignment is available. */
   facingDegrees: () => number | null;
   onFrame?: (report: ArFrameReport) => void;
   onEnd?: (reason: ArEndReason) => void;
@@ -191,6 +192,8 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
   let chevrons: { holder: Group; along: number }[] = [];
   let builtTo = 0;
   let alignment: PlanWorldAlignment | null = null;
+  let recovery: ArFrameReport['recovery'] = null;
+  let requestedFacing: number | null = null;
   let alignedFloor: string | null = null;
   let floorY = 0;
   let floorHits = 0;
@@ -249,7 +252,9 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
   const align = (viewer: ViewerReading, nowMs: number) => {
     const snapshot = tracker.read(nowMs);
     const here = positionAt(track, snapshot.progressMeters);
-    const facing = options.facingDegrees() ?? bearingAt(track, snapshot.progressMeters);
+    const facing = requestedFacing ?? options.facingDegrees();
+    // A world pose has an arbitrary origin. It is not a venue alignment.
+    if (facing === null || !Number.isFinite(facing)) return;
     alignment = alignPlanToWorld(
       { x: here.x, y: here.y, bearingDegrees: facing },
       { x: viewer.x, z: viewer.z, bearingDegrees: viewer.bearingDegrees },
@@ -260,6 +265,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     pendingX = 0;
     pendingZ = 0;
     pendingSince = nowMs;
+    tracker.facing(worldBearingToPlan(alignment, viewer.bearingDegrees), nowMs);
     buildRoute(snapshot.progressMeters);
   };
 
@@ -300,13 +306,46 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
   };
   session.addEventListener('end', cleanup);
 
+  const hold = (reason: NonNullable<ArFrameReport['recovery']>, nowMs: number) => {
+    const changed = recovery !== reason;
+    recovery = reason;
+    alignment = null;
+    last = null;
+    pendingX = 0;
+    pendingZ = 0;
+    route.visible = false;
+    tracker.facing(null, nowMs);
+    if (changed)
+      options.onFrame?.({
+        aligned: false,
+        recovery,
+        floorY,
+        floorHits,
+        facingDegrees: null,
+        progressMeters: tracker.read(nowMs).progressMeters,
+      });
+  };
+  const referenceSpace = renderer.xr.getReferenceSpace();
+  const reset = () => hold('pose-lost', performance.now());
+  referenceSpace?.addEventListener?.('reset', reset);
+  session.addEventListener('end', () => referenceSpace?.removeEventListener?.('reset', reset), {
+    once: true,
+  });
+
   renderer.setAnimationLoop((_time, frame) => {
     if (ended || !frame) return;
     const space = renderer.xr.getReferenceSpace();
-    if (!space) return;
-    const pose = frame.getViewerPose(space);
-    if (!pose) return;
     const nowMs = performance.now();
+    const pose = space ? frame.getViewerPose(space) : null;
+    if (!space || !pose || pose.emulatedPosition) {
+      hold('pose-lost', nowMs);
+      renderer.render(scene, camera);
+      return;
+    }
+    if (recovery !== null) {
+      renderer.render(scene, camera);
+      return;
+    }
     const viewer = viewerFromMatrix(pose.transform.matrix);
 
     if (hitSource !== null) {
@@ -337,11 +376,14 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       tracker.facing(worldBearingToPlan(alignment, viewer.bearingDegrees), nowMs);
     }
 
+    // A valid stationary pose is still a position observation. Keep it fresh
+    // without counting any movement; missing/emulated/recovering poses exit above.
+    if (alignment !== null) tracker.displace({ dxMeters: 0, dyMeters: 0, timeMs: nowMs });
     const snapshot = tracker.read(nowMs);
     if (alignment !== null) {
       // A storey change moves the floor under the session's feet: start again there.
       if (snapshot.floorId !== alignedFloor) {
-        alignment = null;
+        hold('floor-change', nowMs);
         floorY = 0;
         floorHits = 0;
       } else if (snapshot.progressMeters + AHEAD_METERS > builtTo + 5 && builtTo < track.length) {
@@ -351,10 +393,13 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     for (const entry of chevrons)
       entry.holder.visible = entry.along > snapshot.progressMeters + 0.5;
 
+    route.visible = alignment !== null && recovery === null && snapshot.tier !== 'frozen';
+
     if (nowMs - lastReport >= REPORT_MS) {
       lastReport = nowMs;
       options.onFrame?.({
         aligned: alignment !== null,
+        recovery,
         floorY,
         floorHits,
         facingDegrees: snapshot.headingDegrees,
@@ -370,7 +415,14 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       cleanup();
     },
     realign() {
+      // This explicit action means the visitor is facing the route again.
+      requestedFacing = bearingAt(track, tracker.read(performance.now()).progressMeters);
+      recovery = null;
       alignment = null;
+      last = null;
+      pendingX = 0;
+      pendingZ = 0;
+      route.visible = false;
     },
   };
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { headingRateDegreesPerSecond } from '@voicegis/localization-core';
 import { HANDSET_SENSOR_PROFILE } from '../../capture/handsetCapture';
-import { startHandsetSubscription } from '../../capture/handsetSubscription';
+import { startHandsetSubscription } from '../../sensors/handsetSubscription';
 import { wrapDegrees } from '../../navigation/coordinateFrames';
 import { ANCHOR_SIGMA, RouteTracker } from '../../navigation/liveTracker';
 

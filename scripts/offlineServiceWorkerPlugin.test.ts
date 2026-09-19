@@ -190,7 +190,7 @@ describe('public offline build', () => {
         'D:\\repo\\src\\components\\SessionHarness.tsx',
         'D:\\repo\\src\\navigation\\prepareDiagnosticSession.ts',
         'D:\\repo\\src\\capture\\liveHandsetInput.ts',
-        'D:\\repo\\src\\capture\\handsetSubscription.ts',
+        'D:\\repo\\src\\sensors\\handsetSubscription.ts',
         'D:\\repo\\src\\components\\VisitorApp.jsx',
       ]),
     ).toEqual([
@@ -198,7 +198,11 @@ describe('public offline build', () => {
       'D:/repo/src/components/SessionHarness.tsx',
       'D:/repo/src/navigation/prepareDiagnosticSession.ts',
       'D:/repo/src/capture/liveHandsetInput.ts',
-      'D:/repo/src/capture/handsetSubscription.ts',
+      // src/sensors/handsetSubscription.ts is deliberately absent. The visitor
+      // tracker asks the browser for motion through the same consent-correct
+      // subscription the operator harness uses, and a second copy of it would
+      // drift exactly where it is hardest to test. What this list guards is
+      // the evidence pipeline and the operator surfaces, not sensor plumbing.
     ]);
   });
 });

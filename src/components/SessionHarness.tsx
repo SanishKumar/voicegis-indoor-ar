@@ -13,7 +13,7 @@ import type { CompiledBuildingRuntime } from '../data/compiledBuilding';
 import type { ExplainedRouteResult } from '../engine/compiledRoutePolicy';
 import type { OperationalOverlay } from '../engine/operationalOverlay';
 import { LiveHandsetInput, type HandsetInputSnapshot } from '../capture/liveHandsetInput';
-import { startHandsetSubscription, type HandsetAccessState } from '../capture/handsetSubscription';
+import { startHandsetSubscription, type HandsetAccessState } from '../sensors/handsetSubscription';
 import './sessionHarness.css';
 
 interface HarnessNavigation {

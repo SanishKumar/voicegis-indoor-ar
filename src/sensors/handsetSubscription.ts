@@ -2,7 +2,7 @@ import {
   requestMotionPermission,
   type MotionEventLike,
   type OrientationEventLike,
-} from './handsetCapture';
+} from '../capture/handsetCapture';
 
 export type HandsetAccessState =
   'requesting' | 'listening' | 'denied' | 'unsupported' | 'insecure' | 'hidden' | 'error';

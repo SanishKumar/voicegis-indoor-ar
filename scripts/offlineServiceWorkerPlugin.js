@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -12,6 +13,13 @@ const PUBLIC_BUNDLE_FORBIDDEN = [
   '#/studio',
   '#/recorder',
 ];
+/*
+ * Operator surfaces and the evidence pipeline. Sensor plumbing that both
+ * surfaces need lives in src/sensors and is deliberately not listed here:
+ * the visitor tracker asks for motion the same way, and a second copy of
+ * the permission, visibility and revocation handling would drift from this
+ * one in exactly the places that are hard to test.
+ */
 const OPERATOR_MODULE_SUFFIXES = [
   '/src/App.jsx',
   '/src/components/BuildingSourceWorkspace.tsx',
@@ -22,7 +30,6 @@ const OPERATOR_MODULE_SUFFIXES = [
   '/src/components/SessionHarness.tsx',
   '/src/navigation/prepareDiagnosticSession.ts',
   '/src/capture/liveHandsetInput.ts',
-  '/src/capture/handsetSubscription.ts',
 ];
 
 async function filesBelow(directory, prefix = '') {
@@ -55,6 +62,14 @@ export async function collectOfflineEntries(outDir) {
 }
 
 export async function assertVisitorOnlyBundle(outDir) {
+  // An earlier hook that threw leaves nothing written. Saying that plainly
+  // beats a scandir stack trace standing in for the real build error.
+  const assets = path.join(outDir, 'assets');
+  if (!existsSync(assets)) {
+    throw new Error(
+      `Public build wrote no ${assets}; an earlier build error is the cause of this one.`,
+    );
+  }
   const javascriptFiles = (await filesBelow(path.join(outDir, 'assets'))).filter((file) =>
     file.endsWith('.js'),
   );

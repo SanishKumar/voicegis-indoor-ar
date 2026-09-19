@@ -6,6 +6,7 @@ import type { TrackerSnapshot } from '../navigation/liveTracker';
 import { RouteTracker } from '../navigation/liveTracker';
 import { trackForRoute } from '../navigation/routeProgress';
 import CameraPreview from './CameraPreview.jsx';
+import * as arRuntime from '../ar/arSession';
 
 const node = (id: string, x: number, y: number): GraphNode => ({
   id,
@@ -207,8 +208,17 @@ const facing = () => Number(view().getAttribute('data-facing'));
 const note = () => document.querySelector('.camera-preview-note')?.textContent ?? '';
 
 describe('the camera view follows where the phone points', () => {
+  it('does not paint a fictitious floor route before the phone reports its attitude', () => {
+    render(<CameraPreview tracking={trackingLike('off')} />);
+    runFrames();
+    expect(Number(view().getAttribute('data-ribbon'))).toBe(0);
+    expect(Number(view().getAttribute('data-callouts'))).toBe(0);
+  });
   it('paints the route on the floor rather than a fixed picture on the glass', () => {
     render(<CameraPreview tracking={trackingLike('off')} />);
+    upright(0);
+    runFrames(1);
+    fireEvent.click(screen.getByRole('button', { name: 'I’m facing the corridor' }));
     upright(0);
     runFrames();
     // A ribbon of floor points, drawn - the crash this guards against left none.
@@ -237,20 +247,20 @@ describe('the camera view follows where the phone points', () => {
     runFrames();
     expect(view().getAttribute('data-heading-source')).toBe('off');
     expect(panel().textContent).toContain('Not known');
-    expect(note()).toContain('not saying which way it is pointing');
+    expect(note()).toContain('No floor route is shown');
   });
 
   it('never takes a compass reading for the facing', () => {
     render(<CameraPreview tracking={trackingLike('off')} />);
     upright(0);
     runFrames();
-    const before = facing();
     // A reading with a heading but no orientation angles describes no attitude.
     orientation({ webkitCompassHeading: 270, webkitCompassAccuracy: 5 });
     orientation({ alpha: 200, absolute: true }, 'deviceorientationabsolute');
     runFrames();
-    expect(facing()).toBe(before);
-    expect(view().getAttribute('data-heading-source')).toBe('assumed');
+    expect(view().getAttribute('data-facing')).toBe('');
+    expect(Number(view().getAttribute('data-ribbon'))).toBe(0);
+    expect(view().getAttribute('data-heading-source')).toBe('off');
   });
 
   it('lets the visitor fix the zero, and offers to set it again', () => {
@@ -288,7 +298,11 @@ describe('the camera view follows where the phone points', () => {
     expect(view().getAttribute('data-heading-source')).toBe('tracker');
     expect(facing()).toBe(123);
     expect(panel().textContent).toContain('From your walk');
-    expect(screen.queryByRole('button', { name: 'I’m facing the corridor' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'I’m facing the corridor' }));
+    upright(330);
+    runFrames();
+    expect(facing()).toBe(120);
+    expect(view().getAttribute('data-heading-source')).toBe('aligned');
   });
 
   it('asks before reading the orientation where the platform requires it', () => {
@@ -301,8 +315,8 @@ describe('the camera view follows where the phone points', () => {
     );
     render(<CameraPreview tracking={trackingLike('off')} />);
     runFrames();
-    expect(note()).toContain('Turn the AR view on');
-    fireEvent.click(screen.getByRole('button', { name: 'Turn on AR view' }));
+    expect(note()).toContain('Enable camera orientation');
+    fireEvent.click(screen.getByRole('button', { name: 'Enable camera orientation' }));
     expect(request).toHaveBeenCalledTimes(1);
   });
 
@@ -335,12 +349,40 @@ describe('the camera view follows where the phone points', () => {
     render(<CameraPreview tracking={trackingLike('on', anchored())} />);
     const start = await screen.findByRole('button', { name: 'Start AR' });
     expect(view().getAttribute('data-ar')).toBe('available');
+    expect(start.hasAttribute('disabled')).toBe(true);
+    upright(0);
+    runFrames(1);
+    fireEvent.click(screen.getByRole('button', { name: 'I’m facing the corridor' }));
+    upright(0);
+    runFrames(1);
     await act(async () => fireEvent.click(start));
     expect(await screen.findByText('The immersive session was not allowed.')).toBeTruthy();
     expect(view().getAttribute('data-ar')).toBe('available');
     // The overlay an immersive session would show holds nothing until one runs.
     expect(document.querySelectorAll('.camera-preview-instruction-text')).toHaveLength(1);
     expect(document.querySelector('.camera-ar-overlay')!.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('ends an immersive session that finishes starting after the camera view was left', async () => {
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    let finish!: (handle: arRuntime.ArGuidanceHandle) => void;
+    vi.spyOn(arRuntime, 'startArGuidance').mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const rendered = render(<CameraPreview tracking={trackingLike('on', anchored())} />);
+    await screen.findByRole('button', { name: 'Start AR' });
+    upright(0);
+    runFrames(1);
+    fireEvent.click(screen.getByRole('button', { name: 'I’m facing the corridor' }));
+    upright(0);
+    runFrames(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Start AR' }));
+    rendered.unmount();
+    const end = vi.fn(async () => {});
+    await act(async () => finish({ end, realign() {} }));
+    expect(end).toHaveBeenCalledOnce();
   });
 
   it('releases the camera on exit and leaves tracking to the map', async () => {
@@ -352,5 +394,42 @@ describe('the camera view follows where the phone points', () => {
     rendered.unmount();
     expect(stopTrack).toHaveBeenCalled();
     expect(tracking.stop).not.toHaveBeenCalled();
+  });
+
+  it('hides a stale projection and requires alignment again after fresh input returns', () => {
+    render(<CameraPreview tracking={trackingLike('off')} />);
+    upright(0);
+    runFrames(1);
+    expect(Number(view().getAttribute('data-ribbon'))).toBe(0);
+    fireEvent.click(screen.getByRole('button', { name: 'I’m facing the corridor' }));
+    upright(0);
+    runFrames(1);
+    expect(Number(view().getAttribute('data-ribbon'))).toBeGreaterThan(5);
+    runFrames(3);
+    expect(Number(view().getAttribute('data-ribbon'))).toBe(0);
+    expect(Number(view().getAttribute('data-callouts'))).toBe(0);
+    expect(note()).toContain('Orientation signal lost');
+    upright(30);
+    runFrames(1);
+    expect(view().getAttribute('data-heading-source')).toBe('assumed');
+    expect(Number(view().getAttribute('data-ribbon'))).toBe(0);
+  });
+
+  it('does not draw from a frozen position estimate', () => {
+    render(
+      <CameraPreview
+        tracking={trackingLike(
+          'on',
+          anchored({ tier: 'frozen', reason: 'sensors-silent', headingDegrees: 90 }),
+        )}
+      />,
+    );
+    upright(0);
+    runFrames(1);
+    fireEvent.click(screen.getByRole('button', { name: 'I’m facing the corridor' }));
+    upright(0);
+    runFrames(1);
+    expect(Number(view().getAttribute('data-ribbon'))).toBe(0);
+    expect(note()).toContain('Position tracking is paused');
   });
 });

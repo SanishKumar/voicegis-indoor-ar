@@ -56,13 +56,6 @@ const CALLOUT_HEIGHT_METERS = 1.7;
 const CALLOUT_MAX_DEPTH_METERS = 40;
 /** How far along the route to look when saying which way to turn to find it. */
 const AIM_AHEAD_METERS = 8;
-/**
- * How the phone is taken to be held before it has said. A view drawn at a
- * guessed tilt is a picture on the glass, so this is only ever the first
- * frame or two, and the readiness panel says the heading is not known.
- */
-const RESTING_ATTITUDE = Object.freeze({ pitchDegrees: -20, rollDegrees: 0 });
-
 const ARROWS = {
   turn_left: '↰',
   turn_right: '↱',
@@ -126,7 +119,7 @@ function headingLabel(source) {
     case 'aligned':
       return 'Set by you';
     case 'assumed':
-      return 'Zero assumed';
+      return 'Align camera';
     default:
       return 'Not known';
   }
@@ -265,9 +258,12 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   const [arStarting, setArStarting] = useState(false);
   const [arProblem, setArProblem] = useState(null);
   const [arReport, setArReport] = useState(null);
+  const arOwnerRef = useRef(0);
+  const arHandleRef = useRef(null);
   const [orientationState, setOrientationState] = useState('starting');
   const [drawn, setDrawn] = useState({
     source: 'off',
+    tilted: false,
     facing: null,
     points: 0,
     callouts: 0,
@@ -336,11 +332,16 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
     const feed = startOrientationFeed({
       onReading(reading) {
         attitudeRef.current = reading;
+        if (reading === null) {
+          yawRef.current = null;
+          anchorRef.current = null;
+          return;
+        }
         yawRef.current = { degrees: reading.yawDegrees, epoch: reading.epoch };
         const anchor = anchorRef.current;
         if (anchor !== null && anchor.epoch === reading.epoch) return;
-        // The yaw's zero means nothing until something says what the camera
-        // was looking at when it read that. Assume the route, and say so.
+        // Keep a candidate bearing for the alignment UI, not a drawable pose.
+        // Only an explicit alignment or the live estimator can place the route.
         const current = trackRef.current;
         if (!current) return;
         anchorRef.current = {
@@ -360,7 +361,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       yawRef.current = null;
       anchorRef.current = null;
     };
-  }, [found]);
+  }, [found, route, state.venueKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -431,6 +432,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
     const calloutElements = new Map();
     let calloutFloor = '';
     let miniMapScene = null;
+    let miniMapFloor = null;
     let lastDrawn = null;
     let fadeFrom = null;
     let topInset = 0;
@@ -456,8 +458,9 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.clearRect(0, 0, width, height);
 
+      const attitude = feedRef.current?.read() ?? null;
       const reading = tracking?.peek ? tracking.peek() : { snapshot: null };
-      const { source, facing, progress } = facingFrom({
+      const resolved = facingFrom({
         track,
         live,
         snapshot: reading.snapshot,
@@ -465,21 +468,41 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         anchor: anchorRef.current,
         fallbackProgress: progressRef.current,
       });
-      const attitude = attitudeRef.current ?? RESTING_ATTITUDE;
+      const { facing, progress, source } = resolved;
+      /*
+       * Two separate things have to be known before a path can be laid on the
+       * floor, and they come from different places: which way the camera
+       * looks, and how far it is tilted. A walk gives the first without the
+       * second, so they are reported apart - saying the heading is unknown
+       * when the tracker has just measured it would be a lie - and both are
+       * required before anything is painted.
+       */
+      const tilted = attitude !== null;
       const here = positionAt(track, progress);
+      if (miniMapFloor !== here.floor) {
+        miniMapFloor = here.floor;
+        miniMapScene = prepareMiniMap(venue.buildingPackage, here.floor);
+      }
+      const drawable =
+        tilted &&
+        source !== 'off' &&
+        source !== 'assumed' &&
+        knownStart &&
+        !here.vertical &&
+        (!live || reading.snapshot?.tier !== 'frozen');
       const pose = {
         x: here.x,
         y: here.y,
         facingDegrees: facing,
-        pitchDegrees: attitude.pitchDegrees,
-        rollDegrees: attitude.rollDegrees,
+        pitchDegrees: attitude?.pitchDegrees ?? 0,
+        rollDegrees: attitude?.rollDegrees ?? 0,
       };
       const cameraModel = { width, height, ...DEFAULT_CAMERA_MODEL };
       const projection = projectRouteAhead(track, progress, pose, cameraModel);
       const now = performance.now();
 
       // An immersive session draws its own floor and labels; the flat overlay stays out of its way.
-      if (!arSession) {
+      if (!arSession && drawable) {
         paintProjection(context, { width, height }, projection, fadeFrom);
         if (now - lastCallouts >= CALLOUTS_MS || calloutFloor !== here.floor) {
           lastCallouts = now;
@@ -502,9 +525,10 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         callouts = [];
       }
       const projector = createProjector(pose, cameraModel);
-      const shown = arSession
-        ? 0
-        : placeCallouts(calloutElements, callouts, projector, width, height, topInset);
+      const shown =
+        arSession || !drawable
+          ? 0
+          : placeCallouts(calloutElements, callouts, projector, width, height, topInset);
 
       /*
        * Turning away from the route used to leave a blank picture with no way
@@ -513,7 +537,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
        * saying once that is further round than the camera can see.
        */
       let hint = null;
-      if (!arSession && !projection.destination) {
+      if (!arSession && drawable && !projection.destination) {
         const aim = positionAt(track, Math.min(track.length, progress + AIM_AHEAD_METERS));
         const toAim = planBearing([here.x, here.y], [aim.x, aim.y]);
         const halfView = (Math.atan(width / 2 / projector.focal) * 180) / Math.PI;
@@ -526,12 +550,13 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         drawMiniMap(miniMapRef.current, miniMapScene, {
           x: here.x,
           y: here.y,
-          facingDegrees: facing,
+          facingDegrees: drawable ? facing : 0,
           ...routeOnFloor(track, progress, here.floor),
         });
       }
 
-      const points = projection.ribbon.reduce((sum, line) => sum + line.length, 0);
+      const points =
+        drawable && !arSession ? projection.ribbon.reduce((sum, line) => sum + line.length, 0) : 0;
       if (now - lastReport >= REPORT_MS) {
         lastReport = now;
         // The ribbon's near end would run under the sheet; it fades out above it.
@@ -540,10 +565,18 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         fadeFrom = sheet ? sheet.getBoundingClientRect().top - bounds.top - 12 : height * 0.78;
         const top = topRef.current;
         topInset = top ? top.getBoundingClientRect().bottom - bounds.top + 8 : 0;
-        const next = { source, facing: Math.round(facing), points, callouts: shown, hint };
+        const next = {
+          source,
+          tilted,
+          facing: attitude ? Math.round(facing) : null,
+          points,
+          callouts: shown,
+          hint,
+        };
         if (
           lastDrawn === null ||
           next.source !== lastDrawn.source ||
+          next.tilted !== lastDrawn.tilted ||
           next.facing !== lastDrawn.facing ||
           next.points !== lastDrawn.points ||
           next.callouts !== lastDrawn.callouts ||
@@ -561,12 +594,35 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       observer?.disconnect();
       layer.replaceChildren();
     };
-  }, [arSession, cameraError, live, track, tracking, venue, walkSpeedMps]);
+  }, [arSession, cameraError, knownStart, live, track, tracking, venue, walkSpeedMps]);
 
-  useEffect(() => () => void arSession?.end(), [arSession]);
+  useEffect(() => {
+    const cancel = () => {
+      arOwnerRef.current += 1;
+      void arHandleRef.current?.end();
+      arHandleRef.current = null;
+    };
+    const hide = () => {
+      cancel();
+      setArSession(null);
+      setArReport(null);
+      setArStarting(false);
+    };
+    const visibility = () => {
+      if (document.hidden) hide();
+    };
+    window.addEventListener('pagehide', hide);
+    document.addEventListener('visibilitychange', visibility);
+    return () => {
+      cancel();
+      window.removeEventListener('pagehide', hide);
+      document.removeEventListener('visibilitychange', visibility);
+    };
+  }, []);
 
   /** The visitor says they are looking along the corridor: fix the yaw's zero there. */
   const alignNow = () => {
+    if (!feedRef.current?.read()) return;
     const yaw = yawRef.current;
     if (!track || yaw === null) return;
     anchorRef.current = {
@@ -583,7 +639,25 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   };
 
   const startAr = async () => {
-    if (!track || !tracking || !overlayRef.current || arStarting) return;
+    if (
+      !track ||
+      !tracking ||
+      !overlayRef.current ||
+      arStarting ||
+      !knownStart ||
+      !feedRef.current?.read()
+    )
+      return;
+    const cameraFacing = facingFrom({
+      track,
+      live,
+      snapshot: tracking.peek().snapshot,
+      yaw: yawRef.current,
+      anchor: anchorRef.current,
+      fallbackProgress: progressMeters,
+    });
+    if (cameraFacing.source !== 'aligned') return;
+    const owner = ++arOwnerRef.current;
     setArProblem(null);
     setArStarting(true);
     try {
@@ -608,18 +682,27 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         track,
         tracker,
         overlay: overlayRef.current,
-        facingDegrees: () => {
-          const snapshot = tracker.read(performance.now());
-          return snapshot.displacementAttached ? null : snapshot.headingDegrees;
+        // Snapshot the camera alignment BEFORE attaching XR displacement, which
+        // clears the walk heading. Do not silently substitute the route bearing.
+        facingDegrees: () => cameraFacing.facing,
+        onFrame: (report) => {
+          if (arOwnerRef.current === owner) setArReport(report);
         },
-        onFrame: setArReport,
         onEnd: () => {
+          if (arOwnerRef.current !== owner) return;
+          arHandleRef.current = null;
           setArSession(null);
           setArReport(null);
         },
       });
+      if (arOwnerRef.current !== owner) {
+        await handle.end();
+        return;
+      }
+      arHandleRef.current = handle;
       setArSession(handle);
     } catch (error) {
+      if (arOwnerRef.current !== owner) return;
       const reason = error instanceof ArStartError ? error.reason : 'failed';
       setArProblem(
         reason === 'refused'
@@ -629,20 +712,23 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
             : 'The immersive session could not start.',
       );
     } finally {
-      setArStarting(false);
+      if (arOwnerRef.current === owner) setArStarting(false);
     }
   };
 
   const exit = () => {
-    void arSession?.end();
+    arOwnerRef.current += 1;
+    void arHandleRef.current?.end();
+    arHandleRef.current = null;
     actions.setView(VIEW_TYPE.MAP);
   };
 
   const snapshot = live ? tracking.snapshot : null;
   // Published by the draw loop, because the phone's yaw is read there.
   const source = arSession ? 'ar' : drawn.source;
-  const needsOrientation = orientationState === 'needs-permission';
-  const showAlign = !arSession && source === 'assumed';
+  const needsOrientation = orientationState === 'needs-permission' || orientationState === 'denied';
+  const showAlign =
+    !arSession && knownStart && orientationState === 'listening' && source !== 'aligned';
   const arActive = arSession !== null;
   const remaining = guidance ? guidance.remainingMeters : 0;
   const arrived = navStatus === NAV_STATUS.ARRIVED || (guidance?.atEnd ?? false);
@@ -654,14 +740,27 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   const note = arProblem
     ? arProblem
     : needsOrientation
-      ? 'Turn the AR view on and the route will lie on the floor and follow the camera.'
-      : source === 'off'
-        ? 'This phone is not saying which way it is pointing, so the route is drawn along itself.'
-        : !live && !canTrack && !plausible
-          ? 'Nothing here measures how far you have walked; step through the route to move along it.'
-          : !live && !canTrack && !knownStart
-            ? 'Scan a check-in code on the map so tracking knows how far along you are.'
-            : null;
+      ? 'Enable camera orientation, then point along the corridor to align the route.'
+      : orientationState === 'paused'
+        ? 'Camera alignment paused. Return here and align again before following the route.'
+        : orientationState === 'stale' || orientationState === 'unavailable'
+          ? 'Orientation signal lost. The floor route is hidden until fresh readings return and you align again.'
+          : live && snapshot?.tier === 'frozen'
+            ? 'Position tracking is paused. Check your location on the map before following the floor route.'
+            : !knownStart
+              ? 'Set your location on the map or scan a check-in code before placing the route.'
+              : // Nothing arriving at all is an orientation problem; a heading
+                // the walk has measured, with no tilt behind it, is the rarer
+                // case where only the tilt is missing, and says so.
+                source === 'off'
+                ? 'Waiting for the phone’s orientation. No floor route is shown without a fresh reading.'
+                : !drawn.tilted
+                  ? 'Waiting for the phone’s tilt. The route cannot be laid on the floor without it.'
+                  : source === 'assumed'
+                    ? 'At your check-in point, face the corridor in the route’s direction, then tap “I’m facing the corridor”.'
+                    : !live
+                      ? 'Direction follows your phone. Position stays at your last location until you start tracking.'
+                      : null;
 
   const instructionCard = copy && (
     <div className="camera-preview-instruction">
@@ -685,6 +784,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       id="camera-preview"
       data-heading-source={source}
       data-facing={drawn.facing ?? ''}
+      data-tilted={drawn.tilted ? 'yes' : 'no'}
       data-ribbon={drawn.points}
       data-callouts={drawn.callouts}
       data-ar={arActive ? 'active' : arSupport === 'yes' ? 'available' : arSupport}
@@ -839,7 +939,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
                 onClick={() => feedRef.current?.request()}
               >
                 <Compass size={16} />
-                Turn on AR view
+                Enable camera orientation
               </button>
             )}
             {!cameraError && showAlign && (
@@ -855,7 +955,13 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
               </button>
             )}
             {!cameraError && arAvailable && !arSession && (
-              <button className="camera-preview-control" onClick={startAr} disabled={arStarting}>
+              <button
+                className="camera-preview-control"
+                onClick={startAr}
+                disabled={
+                  arStarting || source !== 'aligned' || !knownStart || snapshot?.tier === 'frozen'
+                }
+              >
                 <Box size={16} />
                 {arStarting ? 'Starting AR…' : 'Start AR'}
               </button>
@@ -879,9 +985,11 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
             <div className="ar-top">{instructionCard}</div>
             <div>
               <p className="camera-ar-overlay-note">
-                {arReport?.aligned
-                  ? 'The route is placed from where the guidance says you are, looking the way it goes. If the chevrons point into a wall, face along the corridor and re-align.'
-                  : 'Placing the route…'}
+                {arReport?.recovery
+                  ? 'Tracking lost or floor changed. Check your location, face along the route, then re-align. No movement is counted across the gap.'
+                  : arReport?.aligned
+                    ? 'World-tracked from your chosen position and camera alignment. Stop and re-align if the route does not match the corridor.'
+                    : 'Placing the route from your camera alignment…'}
               </p>
               <div className="ar-sheet is-overlay">
                 {guidance && (

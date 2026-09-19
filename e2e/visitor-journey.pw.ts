@@ -145,13 +145,12 @@ test('the camera view says what it knows and its controls remain reachable', asy
   await page.getByRole('button', { name: 'Camera view' }).click();
   const view = page.locator('.camera-preview');
   const telemetry = page.getByRole('complementary', { name: 'Guidance readiness' });
-  // Nothing is tracked yet, so the route is drawn as if the visitor were
-  // looking along it, and the panel says exactly that.
+  // With no attitude/alignment, no fictitious floor route is drawn.
   await expect(telemetry).toContainText('Not tracked');
   await expect(telemetry.locator('div', { hasText: 'Heading' })).toContainText('Not known');
   await expect(telemetry).toContainText('Not anchored');
   await expect(view).toHaveAttribute('data-heading-source', 'off');
-  await expect.poll(async () => Number(await view.getAttribute('data-ribbon'))).toBeGreaterThan(2);
+  await expect(view).toHaveAttribute('data-ribbon', '0');
   await expect(page.locator('.camera-preview-status')).toContainText('Not world-anchored');
   // No immersive session is offered where the browser has none.
   await expect(view).toHaveAttribute('data-ar', 'no');
@@ -200,6 +199,27 @@ test('an immersive session is offered where the browser has one, and a refusal i
   const view = page.locator('.camera-preview');
   await expect(view).toHaveAttribute('data-ar', 'available');
   const start = page.getByRole('button', { name: 'Start AR' });
+  await expect(start).toBeDisabled();
+  await page.evaluate(() => {
+    for (const type of ['deviceorientation', 'deviceorientationabsolute']) {
+      window.addEventListener(
+        type,
+        (event) => {
+          if (event.isTrusted) event.stopImmediatePropagation();
+        },
+        true,
+      );
+    }
+    setInterval(() => {
+      const event = new Event('deviceorientation');
+      Object.entries({ alpha: 0, beta: 90, gamma: 0, timeStamp: performance.now() }).forEach(
+        ([key, value]) => Object.defineProperty(event, key, { value }),
+      );
+      window.dispatchEvent(event);
+    }, 50);
+  });
+  await page.getByRole('button', { name: 'I’m facing the corridor' }).click();
+  await expect(start).toBeEnabled();
   await expectCenterHitTarget(start);
   await start.click();
   await expect(page.locator('.camera-preview-note')).toContainText(

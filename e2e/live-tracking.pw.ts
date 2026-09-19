@@ -267,12 +267,22 @@ test('the camera view draws the route from the tracked position and turns it wit
   await page.getByRole('button', { name: 'Camera view' }).click();
   const view = page.locator('.camera-preview');
   await expect(view).toHaveAttribute('data-tracking', 'on');
+  // These stubs carry requestPermission, as iOS does, so the view asks first.
+  await page.getByRole('button', { name: 'Enable camera orientation' }).click();
+  await expect(view).toHaveAttribute('data-tilted', 'yes', { timeout: 15_000 });
   await expect(view).toHaveAttribute('data-heading-source', 'tracker', { timeout: 15_000 });
   const telemetry = page.getByRole('complementary', { name: 'Guidance readiness' });
   await expect(telemetry).toContainText('From your walk');
   await expect(telemetry).toContainText('Tracking');
-  await expect.poll(async () => Number(await view.getAttribute('data-ribbon'))).toBeGreaterThan(2);
   await expect(page.getByRole('button', { name: 'Track my walk' })).toHaveCount(0);
+  /*
+   * How much floor is in frame is not this rig's business. The walker lies
+   * flat on its back, because that is the pose whose turn rate maps onto the
+   * heading the tracker integrates; a phone held up to look along a corridor
+   * is what e2e/camera-alignment.pw.ts drives, and that is where the drawn
+   * ribbon is measured. What matters here is that the camera takes its
+   * heading from the walk rather than from an assumption.
+   */
 
   // Standing still and turning the phone turns the drawn route with it.
   await walker(page, 'walker.stand();');
