@@ -200,26 +200,9 @@ test('an immersive session is offered where the browser has one, and a refusal i
   const view = page.locator('.camera-preview');
   await expect(view).toHaveAttribute('data-ar', 'available');
   const start = page.getByRole('button', { name: 'Start AR' });
-  await expect(start).toBeDisabled();
-  await page.evaluate(() => {
-    for (const type of ['deviceorientation', 'deviceorientationabsolute']) {
-      window.addEventListener(
-        type,
-        (event) => {
-          if (event.isTrusted) event.stopImmediatePropagation();
-        },
-        true,
-      );
-    }
-    setInterval(() => {
-      const event = new Event('deviceorientation');
-      Object.entries({ alpha: 0, beta: 90, gamma: 0, timeStamp: performance.now() }).forEach(
-        ([key, value]) => Object.defineProperty(event, key, { value }),
-      );
-      window.dispatchEvent(event);
-    }, 50);
-  });
-  await page.getByRole('button', { name: 'I’m facing the corridor' }).click();
+  // Nothing from the flat view's orientation feed is needed first: the
+  // session tracks the phone itself, and the tap is the visitor facing the
+  // corridor. Requiring an alignment first left this button dead on a phone.
   await expect(start).toBeEnabled();
   await expectCenterHitTarget(start);
   await start.click();

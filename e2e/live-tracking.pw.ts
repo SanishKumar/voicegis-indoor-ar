@@ -267,9 +267,14 @@ test('the camera view draws the route from the tracked position and turns it wit
   await page.getByRole('button', { name: 'Camera view' }).click();
   const view = page.locator('.camera-preview');
   await expect(view).toHaveAttribute('data-tracking', 'on');
-  // These stubs carry requestPermission, as iOS does, so the view asks first.
-  await page.getByRole('button', { name: 'Enable camera orientation' }).click();
+  /*
+   * These stubs advertise requestPermission, as iOS does, and then send
+   * orientation anyway - which is what a handset in testing did. The view must
+   * read those events without making the visitor find a button first.
+   */
   await expect(view).toHaveAttribute('data-tilted', 'yes', { timeout: 15_000 });
+  await expect(view).toHaveAttribute('data-orientation', 'listening');
+  await expect(page.getByRole('button', { name: 'Enable camera orientation' })).toHaveCount(0);
   await expect(view).toHaveAttribute('data-heading-source', 'tracker', { timeout: 15_000 });
   const telemetry = page.getByRole('complementary', { name: 'Guidance readiness' });
   await expect(telemetry).toContainText('From your walk');

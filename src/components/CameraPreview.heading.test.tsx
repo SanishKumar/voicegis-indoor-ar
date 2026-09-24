@@ -247,7 +247,10 @@ describe('the camera view follows where the phone points', () => {
     runFrames();
     expect(view().getAttribute('data-heading-source')).toBe('off');
     expect(panel().textContent).toContain('Not known');
-    expect(note()).toContain('No floor route is shown');
+    // Listeners are attached from the start, so before any reading arrives the
+    // honest thing to say is that none has, not that the phone cannot report.
+    expect(view().getAttribute('data-orientation')).toBe('waiting');
+    expect(note()).toContain('Waiting for the first orientation reading');
   });
 
   it('never takes a compass reading for the facing', () => {
@@ -351,18 +354,31 @@ describe('the camera view follows where the phone points', () => {
     render(<CameraPreview tracking={trackingLike('on', anchored())} />);
     const start = await screen.findByRole('button', { name: 'Start AR' });
     expect(view().getAttribute('data-ar')).toBe('available');
-    expect(start.hasAttribute('disabled')).toBe(true);
-    upright(0);
-    runFrames(1);
-    fireEvent.click(screen.getByRole('button', { name: 'I’m facing the corridor' }));
-    upright(0);
-    runFrames(1);
+    // It waits on nothing from the flat view's orientation feed: the session
+    // tracks the phone itself. Gating it on that feed left the button dead on
+    // a handset where the feed never started - which was the handset it was for.
+    expect(start.hasAttribute('disabled')).toBe(false);
     await act(async () => fireEvent.click(start));
     expect(await screen.findByText('The immersive session was not allowed.')).toBeTruthy();
     expect(view().getAttribute('data-ar')).toBe('available');
     // The overlay an immersive session would show holds nothing until one runs.
     expect(document.querySelectorAll('.camera-preview-instruction-text')).toHaveLength(1);
     expect(document.querySelector('.camera-ar-overlay')!.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('starts an immersive session from one tap, taking that tap as facing the corridor', async () => {
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    const started = vi
+      .spyOn(arRuntime, 'startArGuidance')
+      .mockResolvedValue({ end: async () => {}, realign: () => {} });
+    render(<CameraPreview tracking={trackingLike('on', anchored())} />);
+    const start = await screen.findByRole('button', { name: 'Start AR' });
+    // No orientation reading has arrived at all, and it does not need one.
+    expect(view().getAttribute('data-orientation')).not.toBe('listening');
+    await act(async () => fireEvent.click(start));
+    expect(started).toHaveBeenCalledTimes(1);
+    // Twenty metres east: facing along the corridor here is plan bearing 90.
+    expect(started.mock.calls[0][0].facingDegrees()).toBe(90);
   });
 
   it('ends an immersive session that finishes starting after the camera view was left', async () => {

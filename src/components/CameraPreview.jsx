@@ -305,6 +305,9 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         ? 'Try tracking again'
         : 'Track my walk';
   const arAvailable = arSupport === 'yes' && found && plausible && !sensorsOut;
+  // What genuinely stops an immersive session: nowhere to start the route
+  // from, or a tracker that has stopped trusting its own position.
+  const arBlocked = !knownStart || (live && tracking?.snapshot?.tier === 'frozen');
 
   // The sheet's height is what the inset map and the ribbon's fade keep clear of.
   useEffect(() => {
@@ -639,15 +642,10 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   };
 
   const startAr = async () => {
-    if (
-      !track ||
-      !tracking ||
-      !overlayRef.current ||
-      arStarting ||
-      !knownStart ||
-      !feedRef.current?.read()
-    )
-      return;
+    // An immersive session tracks the phone itself. Requiring a reading from
+    // the flat view's orientation feed left this button doing nothing at all on
+    // phones where that feed never started - which were the phones it was for.
+    if (!track || !tracking || !overlayRef.current || arStarting || arBlocked) return;
     const cameraFacing = facingFrom({
       track,
       live,
@@ -656,7 +654,6 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       anchor: anchorRef.current,
       fallbackProgress: progressMeters,
     });
-    if (cameraFacing.source !== 'aligned') return;
     const owner = ++arOwnerRef.current;
     setArProblem(null);
     setArStarting(true);
@@ -682,9 +679,17 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         track,
         tracker,
         overlay: overlayRef.current,
-        // Snapshot the camera alignment BEFORE attaching XR displacement, which
-        // clears the walk heading. Do not silently substitute the route bearing.
-        facingDegrees: () => cameraFacing.facing,
+        /*
+         * Tapping Start AR is the declaration that the visitor is facing along
+         * the corridor, which is what the note beside the button asks of them.
+         * An alignment the flat view already holds is more exact - the phone
+         * may have turned since - so it is used when there is one; it was taken
+         * before XR displacement attaches and clears the walk heading.
+         */
+        facingDegrees: () =>
+          cameraFacing.source === 'aligned'
+            ? cameraFacing.facing
+            : bearingAt(track, tracker.read(performance.now()).progressMeters),
         onFrame: (report) => {
           if (arOwnerRef.current === owner) setArReport(report);
         },
@@ -730,6 +735,35 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   const showAlign =
     !arSession && knownStart && orientationState === 'listening' && source !== 'aligned';
   const arActive = arSession !== null;
+  /*
+   * One place per control, and each keeps its place as the state moves on.
+   * Buttons that unmounted when tapped read as broken on a phone: the thing
+   * just pressed vanished and something else jumped into its spot. The
+   * orientation control walks through its steps in one position, and a control
+   * that cannot act says why in its own words rather than silently doing nothing.
+   */
+  // Plain data here; the handlers stay in the click, because they reach into refs.
+  const orientationSlot =
+    arSession || orientationState === 'unsupported' || orientationState === 'insecure'
+      ? null
+      : needsOrientation
+        ? { kind: 'enable', label: 'Enable camera orientation', lead: !arAvailable }
+        : orientationState === 'requesting'
+          ? { kind: 'asking', label: 'Asking for orientation…', lead: false }
+          : source === 'aligned'
+            ? { kind: 'realign', label: 'Re-align', lead: false }
+            : showAlign
+              ? { kind: 'align', label: 'I’m facing the corridor', lead: !arAvailable }
+              : {
+                  kind: 'waiting',
+                  label: knownStart ? 'Waiting for orientation…' : 'I’m facing the corridor',
+                  lead: false,
+                };
+  const orientationActs =
+    orientationSlot !== null &&
+    orientationSlot.kind !== 'asking' &&
+    orientationSlot.kind !== 'waiting';
+  const trackLeads = !arAvailable && !live && source === 'aligned';
   const remaining = guidance ? guidance.remainingMeters : 0;
   const arrived = navStatus === NAV_STATUS.ARRIVED || (guidance?.atEnd ?? false);
   /*
@@ -737,30 +771,41 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
    * already say what is known; a paragraph repeating them every frame of a
    * walk is what turned this view into an instrument panel.
    */
+  /*
+   * What stops the route being placed comes first, then the best way to place
+   * it on this phone: an immersive session where there is one, because the
+   * phone tracks the floor itself there, and the flat view's steps otherwise.
+   */
   const note = arProblem
     ? arProblem
-    : needsOrientation
-      ? 'Enable camera orientation, then point along the corridor to align the route.'
-      : orientationState === 'paused'
-        ? 'Camera alignment paused. Return here and align again before following the route.'
-        : orientationState === 'stale' || orientationState === 'unavailable'
-          ? 'Orientation signal lost. The floor route is hidden until fresh readings return and you align again.'
-          : live && snapshot?.tier === 'frozen'
-            ? 'Position tracking is paused. Check your location on the map before following the floor route.'
-            : !knownStart
-              ? 'Set your location on the map or scan a check-in code before placing the route.'
-              : // Nothing arriving at all is an orientation problem; a heading
-                // the walk has measured, with no tilt behind it, is the rarer
-                // case where only the tilt is missing, and says so.
-                source === 'off'
-                ? 'Waiting for the phone’s orientation. No floor route is shown without a fresh reading.'
-                : !drawn.tilted
-                  ? 'Waiting for the phone’s tilt. The route cannot be laid on the floor without it.'
-                  : source === 'assumed'
-                    ? 'At your check-in point, face the corridor in the route’s direction, then tap “I’m facing the corridor”.'
-                    : !live
-                      ? 'Direction follows your phone; position holds until you track your walk.'
-                      : null;
+    : live && snapshot?.tier === 'frozen'
+      ? 'Position tracking is paused. Check your location on the map before following the floor route.'
+      : !knownStart
+        ? 'Set your location on the map or scan a check-in code before placing the route.'
+        : arAvailable && !arSession && source !== 'aligned'
+          ? 'Face along the corridor the route follows, then tap Start AR.'
+          : needsOrientation
+            ? 'This phone wants permission before it reports which way it is pointing. Enable camera orientation, then point along the corridor.'
+            : orientationState === 'requesting'
+              ? 'Asking the phone for its orientation.'
+              : orientationState === 'waiting'
+                ? 'Waiting for the first orientation reading from this phone.'
+                : orientationState === 'paused'
+                  ? 'Camera alignment paused. Return here and align again before following the route.'
+                  : orientationState === 'stale' || orientationState === 'unavailable'
+                    ? 'Orientation signal lost. The floor route is hidden until fresh readings return and you align again.'
+                    : // Nothing arriving at all is an orientation problem; a heading
+                      // the walk has measured, with no tilt behind it, is the rarer
+                      // case where only the tilt is missing, and says so.
+                      source === 'off'
+                      ? 'Waiting for the phone’s orientation. No floor route is shown without a fresh reading.'
+                      : !drawn.tilted
+                        ? 'Waiting for the phone’s tilt. The route cannot be laid on the floor without it.'
+                        : source === 'assumed'
+                          ? 'At your check-in point, face the corridor in the route’s direction, then tap “I’m facing the corridor”.'
+                          : !live
+                            ? 'Direction follows your phone; position holds until you track your walk.'
+                            : null;
 
   const instructionCard = copy && (
     <div className="camera-preview-instruction">
@@ -781,6 +826,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       data-heading-source={source}
       data-facing={drawn.facing ?? ''}
       data-tilted={drawn.tilted ? 'yes' : 'no'}
+      data-orientation={orientationState}
       data-ribbon={drawn.points}
       data-callouts={drawn.callouts}
       data-ar={arActive ? 'active' : arSupport === 'yes' ? 'available' : arSupport}
@@ -908,6 +954,40 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
             </div>
           )}
           <div className="camera-preview-controls">
+            {!cameraError && arAvailable && !arSession && (
+              <button
+                className="camera-preview-control is-primary"
+                onClick={startAr}
+                disabled={arStarting || arBlocked}
+              >
+                <Box size={16} />
+                {arStarting ? 'Starting AR…' : 'Start AR'}
+              </button>
+            )}
+            {!cameraError && orientationSlot && (
+              <button
+                className={`camera-preview-control${orientationSlot.lead ? ' is-primary' : ''}`}
+                onClick={() => {
+                  if (orientationSlot.kind === 'enable') feedRef.current?.request();
+                  else if (orientationSlot.kind === 'align') alignNow();
+                  else if (orientationSlot.kind === 'realign') unalign();
+                }}
+                disabled={!orientationActs}
+              >
+                <Compass size={16} />
+                {orientationSlot.label}
+              </button>
+            )}
+            {!cameraError && !arSession && (canTrack || live) && (
+              <button
+                className={`camera-preview-control${trackLeads ? ' is-primary' : ''}`}
+                aria-pressed={live}
+                onClick={() => (live ? tracking.stop() : tracking.start())}
+              >
+                <LocateFixed size={16} />
+                {live ? 'Stop tracking' : trackLabel}
+              </button>
+            )}
             {!cameraError && speechAvailable() && onVoice && (
               <button
                 className="camera-preview-control"
@@ -917,48 +997,6 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
               >
                 {voice ? <Volume2 size={16} /> : <VolumeX size={16} />}
                 {voice ? 'Mute' : 'Speak'}
-              </button>
-            )}
-            {!cameraError && canTrack && (
-              <button
-                className="camera-preview-control is-primary"
-                onClick={() => tracking.start()}
-              >
-                <LocateFixed size={16} />
-                {trackLabel}
-              </button>
-            )}
-            {!cameraError && needsOrientation && (
-              <button
-                className="camera-preview-control is-primary"
-                onClick={() => feedRef.current?.request()}
-              >
-                <Compass size={16} />
-                Enable camera orientation
-              </button>
-            )}
-            {!cameraError && showAlign && (
-              <button className="camera-preview-control is-primary" onClick={alignNow}>
-                <Compass size={16} />
-                I’m facing the corridor
-              </button>
-            )}
-            {!cameraError && !arSession && source === 'aligned' && (
-              <button className="camera-preview-control" onClick={unalign}>
-                <Compass size={16} />
-                Re-align
-              </button>
-            )}
-            {!cameraError && arAvailable && !arSession && (
-              <button
-                className="camera-preview-control"
-                onClick={startAr}
-                disabled={
-                  arStarting || source !== 'aligned' || !knownStart || snapshot?.tier === 'frozen'
-                }
-              >
-                <Box size={16} />
-                {arStarting ? 'Starting AR…' : 'Start AR'}
               </button>
             )}
             <button className="camera-preview-control" onClick={exit} id="btn-exit-camera-preview">

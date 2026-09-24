@@ -68,6 +68,8 @@ export function startOrientationFeed({ onReading, onState }) {
       return;
     }
     read(); // Notice a gap before accepting a new yaw under the previous alignment.
+    // Whatever the permission API implied, readings are arriving.
+    granted = true;
     source = frame;
     lastTime = at;
     reading = { ...attitude, epoch, timeMs: at, absolute: event.absolute === true };
@@ -79,8 +81,16 @@ export function startOrientationFeed({ onReading, onState }) {
     window.removeEventListener('deviceorientationabsolute', handle, true);
     window.removeEventListener('deviceorientation', handle, true);
   };
+  /*
+   * Listeners go on whether or not a permission has been granted. Platforms
+   * that gate orientation behind a gesture send nothing until it is given, so
+   * attaching early costs nothing; platforms that advertise the gate and then
+   * send events regardless - which is what happens on some Android browsers -
+   * work without the visitor having to find a button. The state still says a
+   * permission is outstanding, so the button is there for the ones that need it.
+   */
   const listen = () => {
-    if (disposed || listening || paused || document.hidden || capability || !granted) return;
+    if (disposed || listening || paused || document.hidden || capability) return;
     listening = true;
     epoch += 1;
     boundary = performance.now();
@@ -88,7 +98,7 @@ export function startOrientationFeed({ onReading, onState }) {
     lastTime = -Infinity;
     window.addEventListener('deviceorientationabsolute', handle, true);
     window.addEventListener('deviceorientation', handle, true);
-    report('waiting');
+    report(needsPermission && !granted ? 'needs-permission' : 'waiting');
   };
   const request = () => {
     if (disposed || capability || paused || document.hidden || requesting) return;
@@ -100,9 +110,10 @@ export function startOrientationFeed({ onReading, onState }) {
     requesting = true;
     report('requesting');
     const complete = (permission) => {
-      if (disposed || owner !== requestId || paused || document.hidden) return;
+      if (disposed || owner !== requestId) return;
       requesting = false;
       granted = permission === 'granted';
+      if (paused || document.hidden) return;
       if (granted) listen();
       else report('denied');
     };
@@ -123,8 +134,7 @@ export function startOrientationFeed({ onReading, onState }) {
     if (disposed || document.hidden) return;
     paused = false;
     if (capability) report(capability);
-    else if (granted) listen();
-    else report('needs-permission');
+    else listen();
   };
   const visibility = () => (document.hidden ? suspend() : resume());
   document.addEventListener('visibilitychange', visibility);
@@ -132,8 +142,7 @@ export function startOrientationFeed({ onReading, onState }) {
   window.addEventListener('pageshow', resume);
   if (capability) report(capability);
   else if (paused) report('paused');
-  else if (granted) listen();
-  else report('needs-permission');
+  else listen();
 
   return {
     read,

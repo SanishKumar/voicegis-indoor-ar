@@ -33,6 +33,59 @@ function setup() {
   return { feed, readings, state };
 }
 
+/** A platform that advertises the permission gate, as iOS does. */
+function gatedBy(permission: string | Promise<string>) {
+  const requestPermission = vi.fn(() => Promise.resolve(permission));
+  vi.stubGlobal(
+    'DeviceOrientationEvent',
+    class {
+      static requestPermission = requestPermission;
+    },
+  );
+  return requestPermission;
+}
+
+describe('a platform that asks before it reports orientation', () => {
+  it('still reads the events it sends without waiting to be asked', () => {
+    // Some Android browsers advertise requestPermission and then deliver
+    // orientation anyway. Inferring from the API alone left the camera
+    // switched off, waiting for a tap that was never needed.
+    gatedBy('granted');
+    const { feed, state } = setup();
+    expect(state).toHaveBeenLastCalledWith('needs-permission');
+    emit(40);
+    expect(feed.read()?.yawDegrees).toBeCloseTo(320, 5);
+    expect(state).toHaveBeenLastCalledWith('listening');
+  });
+
+  it('lets a refusal be retried rather than latching on the first tap', async () => {
+    const request = gatedBy('denied');
+    const { feed, state } = setup();
+    feed.request();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(state).toHaveBeenLastCalledWith('denied');
+    // The latch this guards against left every later tap doing nothing.
+    feed.request();
+    await Promise.resolve();
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears a request that settled while the camera was in the background', async () => {
+    // A refusal, so that a retry is meaningful: a grant would rightly not be asked twice.
+    const request = gatedBy('denied');
+    const { feed } = setup();
+    feed.request();
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    feed.request();
+    await Promise.resolve();
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('camera orientation ownership', () => {
   it('expires silence without sensor callbacks and starts a new alignment epoch', () => {
     const { feed, state } = setup();
