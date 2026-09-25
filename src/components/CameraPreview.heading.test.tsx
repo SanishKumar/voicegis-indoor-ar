@@ -7,6 +7,7 @@ import { RouteTracker } from '../navigation/liveTracker';
 import { trackForRoute } from '../navigation/routeProgress';
 import CameraPreview from './CameraPreview.jsx';
 import * as arRuntime from '../ar/arSession';
+import { fieldEvents, resetFieldTest } from '../fieldTest/fieldLog';
 
 const node = (id: string, x: number, y: number): GraphNode => ({
   id,
@@ -478,6 +479,58 @@ describe('the camera view follows where the phone points', () => {
     await act(async () => fireEvent.click(start));
     fireEvent.click(screen.getByRole('button', { name: 'I’m at my destination' }));
     expect(confirmArrival).toHaveBeenCalledTimes(1);
+  });
+
+  it('records how placing the route went, once per change, for a field tester', async () => {
+    resetFieldTest(true);
+    try {
+      vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+      let frame!: (report: arRuntime.ArFrameReport) => void;
+      vi.spyOn(arRuntime, 'startArGuidance').mockImplementation(async (options) => {
+        frame = options.onFrame!;
+        return { end: async () => {}, realign: () => {} };
+      });
+      render(<CameraPreview tracking={trackingLike('on', anchored())} />);
+      const start = await screen.findByRole('button', { name: 'Start AR' });
+      await act(async () => fireEvent.click(start));
+      const steady: arRuntime.ArFrameReport = {
+        aligned: false,
+        recovery: null,
+        placement: 'steady',
+        floorY: 0,
+        floorHits: 0,
+        facingDegrees: null,
+        progressMeters: 0,
+      };
+      act(() => frame(steady));
+      act(() => frame(steady));
+      act(() => frame({ ...steady, placement: null, aligned: true, floorHits: 3, floorY: -0.1 }));
+      fireEvent.click(screen.getByRole('button', { name: 'Re-align' }));
+
+      const ar = fieldEvents().filter((event) => event.kind.startsWith('ar'));
+      expect(
+        ar.map(({ kind, detail }) => {
+          const what = detail.event ?? detail.state ?? detail.prompt ?? detail.action;
+          return `${kind}:${String(what ?? detail.support)}`;
+        }),
+      ).toEqual([
+        'ar-support:yes',
+        'ar:start',
+        'ar:running',
+        'ar-prompt:tracking',
+        'ar-state:steady',
+        'ar-prompt:steady',
+        'ar-state:placed',
+        'ar-prompt:guiding',
+        'ar-action:realign',
+      ]);
+      expect(ar.find(({ detail }) => detail.state === 'placed')?.detail).toMatchObject({
+        floorHits: 3,
+        floorY: -0.1,
+      });
+    } finally {
+      resetFieldTest(null);
+    }
   });
 
   it('starts an immersive session from one tap, taking that tap as facing the corridor', async () => {

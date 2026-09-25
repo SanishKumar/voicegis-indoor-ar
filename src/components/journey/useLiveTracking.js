@@ -4,6 +4,7 @@ import { HANDSET_SENSOR_PROFILE } from '../../capture/handsetCapture';
 import { startHandsetSubscription } from '../../sensors/handsetSubscription';
 import { wrapDegrees } from '../../navigation/coordinateFrames';
 import { ANCHOR_SIGMA, RouteTracker } from '../../navigation/liveTracker';
+import { logField } from '../../fieldTest/fieldLog';
 
 /** How often the tracker's state is read out to the screen. */
 const PUBLISH_MS = 200;
@@ -13,6 +14,8 @@ const TILT_MAX_AGE_MS = 300;
 const INCOMPLETE_BEFORE_UNSUPPORTED = 30;
 /** Progress changes smaller than this are not worth a render. */
 const PROGRESS_STEP_METERS = 0.05;
+/** A field test log notes the position at least this often along the route. */
+const FIELD_LOG_METERS = 5;
 
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 
@@ -71,6 +74,7 @@ export function useLiveTracking({
   const gravityRef = useRef(null);
   const incompleteRef = useRef(0);
   const lastPublishedRef = useRef(null);
+  const fieldLoggedRef = useRef('');
   const anchorRef = useRef({ locationBasis, checkInDistanceMeters });
   const setProgressRef = useRef(setProgress);
   const activeRef = useRef(active);
@@ -106,6 +110,20 @@ export function useLiveTracking({
     const tracker = trackerRef.current;
     if (!tracker) return;
     const next = tracker.read(performance.now());
+    // For a field tester's record: each change of state, and every few metres walked.
+    const logged = `${next.tier}/${next.reason}/${next.floorId}/${Math.floor(next.progressMeters / FIELD_LOG_METERS)}`;
+    if (logged !== fieldLoggedRef.current) {
+      fieldLoggedRef.current = logged;
+      logField('position', {
+        tier: next.tier,
+        reason: next.reason,
+        floor: next.floorId,
+        progress: next.progressMeters,
+        sigma: next.sigmaMeters,
+        pose: next.displacementAttached,
+        strides: next.stridesSinceAnchor,
+      });
+    }
     const last = lastPublishedRef.current;
     const progressMoved =
       last === null || Math.abs(next.progressMeters - last.progressMeters) >= PROGRESS_STEP_METERS;
@@ -285,6 +303,9 @@ export function useLiveTracking({
   // Read the tracker out while listening. The same tick notices the journey
   // ending, so nothing here has to change state during a render.
   const reported = poseAttached ? 'on' : status;
+  useEffect(() => {
+    logField('tracking', { status: reported, pose: poseAttached });
+  }, [reported, poseAttached]);
   useEffect(() => {
     if (reported !== 'on') return undefined;
     const timer = window.setInterval(() => {

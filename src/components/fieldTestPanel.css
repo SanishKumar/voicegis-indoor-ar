@@ -1,0 +1,114 @@
+/* Only rendered with ?fieldtest=1. Kept small and to the side of every view. */
+.field-test-button {
+  position: fixed;
+  left: max(8px, env(safe-area-inset-left));
+  top: 50%;
+  z-index: 1500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 999px;
+  color: var(--ed-ink);
+  background: rgba(255, 249, 240, 0.9);
+  font: 600 12px/1 var(--ed-body);
+  transform: translateY(-50%);
+}
+
+.field-test-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 6, 9, 0.45);
+}
+
+.field-test-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(640px, 100%);
+  max-height: 88dvh;
+  padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  border-radius: 16px 16px 0 0;
+  color: var(--ed-ink);
+  background: var(--ed-cream);
+  font-family: var(--ed-body);
+}
+
+.field-test-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.field-test-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.field-test-close {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 999px;
+  color: inherit;
+  background: transparent;
+}
+
+.field-test-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ed-ink-soft);
+}
+
+.field-test-text {
+  flex: 1;
+  min-height: 240px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(0, 6, 9, 0.25);
+  border-radius: 10px;
+  color: var(--ed-ink);
+  background: #fff;
+  font:
+    11px/1.45 ui-monospace,
+    'SFMono-Regular',
+    Menlo,
+    Consolas,
+    monospace;
+  white-space: pre;
+  resize: none;
+}
+
+.field-test-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.field-test-action {
+  flex: 1;
+  min-height: 44px;
+  border: 1px solid var(--ed-ink);
+  border-radius: 999px;
+  color: var(--ed-ink);
+  background: transparent;
+  font: 600 14px/1 var(--ed-body);
+}
+
+.field-test-action.is-primary {
+  color: var(--ed-cream);
+  background: var(--ed-ink);
+}
+
+.field-test-action:disabled {
+  opacity: 0.5;
+}

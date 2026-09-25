@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GraphNode, RouteStep } from '../../engine/routingCore';
 import type { RouteTracker, TrackerSnapshot } from '../../navigation/liveTracker';
 import { buildRouteTrack } from '../../navigation/routeProgress';
+import { fieldEvents, resetFieldTest } from '../../fieldTest/fieldLog';
 import { useLiveTracking } from './useLiveTracking.js';
 
 /*
@@ -115,6 +116,36 @@ describe('live position with an immersive session attached', () => {
     expect(hook.result.current.status).toBe('on');
     act(() => hook.result.current.detachPose());
     expect(hook.result.current.status).toBe('denied');
+  });
+
+  it('records each change of state and every five metres, for a field tester', () => {
+    resetFieldTest(true);
+    try {
+      const { hook } = tracking();
+      act(() => hook.result.current.start());
+      const tracker = hook.result.current.tracker() as unknown as RouteTracker;
+      tracker.attachDisplacement(clock);
+      act(() => hook.result.current.attachPose());
+      for (let walked = 0; walked < 3; walked += 1) {
+        walkInAr(tracker, 8);
+        tick();
+      }
+      const kinds = fieldEvents().map(({ kind, detail }) =>
+        kind === 'tracking'
+          ? `tracking:${String(detail.status)}`
+          : `${kind}:${String(detail.reason)}`,
+      );
+      expect(kinds[0]).toBe('tracking:off');
+      expect(kinds).toContain('tracking:on');
+      // Twelve metres walked: logged as it set off, at five metres and at ten, not every tick.
+      const positions = fieldEvents().filter(({ kind }) => kind === 'position');
+      expect(positions.map(({ detail }) => Math.floor(Number(detail.progress) / 5))).toEqual([
+        0, 1, 2,
+      ]);
+      expect(positions.at(-1)?.detail).toMatchObject({ pose: true, floor: 'g' });
+    } finally {
+      resetFieldTest(null);
+    }
   });
 
   it('lets stopping tracking release an attached pose too', () => {

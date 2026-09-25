@@ -828,3 +828,22 @@ New regressions failed against the code before each change. Gate: lint, types,
 1,227 unit tests, the public build, and the desktop visitor-journey and
 camera-alignment browser suites (14 tests). Not yet run on a handset; the
 placement thresholds are first estimates to tune there.
+
+### Hosting under a sub-path, and a field test log — 25 September 2026
+
+- **Sub-path hosting.** The public build takes Vite's base, so it can be served
+  from a GitHub Pages project site as well as a domain root. The offline worker's
+  scope, precache keys and navigation fallback follow the base; catalog package
+  URLs keep their root-relative identity and are resolved under the base only
+  when fetched, so venue hashes are unchanged. A browser test builds under
+  `/voicegis-indoor-ar/` and checks boot, worker scope, an offline check-in link,
+  and that nothing is requested outside the path. A hand-started workflow
+  publishes to Pages; pushing publishes nothing.
+- **Field test log.** Opening the app with `?fieldtest=1` keeps an in-memory
+  record of what the phone offers and each change of tracking, orientation and
+  AR state, with a Copy button (see [field testing](field-testing.md)). It
+  records transitions only, drops the same entry repeated within 100 ms (effects
+  run twice in development), and is never sent anywhere or read back.
+
+Both are for getting the guidance onto real phones and learning what it did
+there; neither changes guidance behaviour.

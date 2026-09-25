@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { offlineServiceWorkerPlugin } from './scripts/offlineServiceWorkerPlugin.js';
 
@@ -20,11 +21,26 @@ import { offlineServiceWorkerPlugin } from './scripts/offlineServiceWorkerPlugin
  * The certificate is self-signed, so the phone shows a warning that has to be
  * accepted once per device. That is the whole cost of the mobile path.
  */
+/** The commit a build was made from, so a report from a phone says which build it came from. */
+function revision() {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+  } catch {
+    return 'unknown';
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const mobile = mode === 'mobile';
   const publicBuild = mode === 'public';
   return {
     plugins: mobile ? [react(), basicSsl()] : [react(), offlineServiceWorkerPlugin(publicBuild)],
+    define: {
+      __APP_REVISION__: JSON.stringify(revision()),
+    },
     resolve: {
       alias: {
         '#voicegis-app': fileURLToPath(

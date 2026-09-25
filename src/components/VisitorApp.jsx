@@ -4,6 +4,7 @@ import { VISITOR_VIEW, visitorViewFor } from '../context/visitorView.ts';
 import { guidanceAt, positionAt, trackForRoute } from '../navigation/routeProgress';
 import CameraPreview from './CameraPreview.jsx';
 import CheckInToast from './CheckInToast.tsx';
+import FieldTestPanel from './FieldTestPanel.tsx';
 import Header from './Header.jsx';
 import { bannerCopy } from './journey/guidanceCopy';
 import JourneyChrome from './journey/JourneyChrome.jsx';
@@ -176,6 +177,7 @@ export default function VisitorApp() {
       </main>
       <StatusBar />
       <LocationPicker isOpen={showLocationPicker} onClose={() => setShowLocationPicker(false)} />
+      <FieldTestPanel />
     </div>
   );
 }

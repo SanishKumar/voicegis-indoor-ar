@@ -44,6 +44,7 @@ import { drawMiniMap, prepareMiniMap } from '../ar/cameraMiniMap';
 import { createProjector, DEFAULT_CAMERA_MODEL, projectRouteAhead } from '../ar/floorProjection';
 import { ArStartError, immersiveArSupported, startArGuidance } from '../ar/arSession';
 import { arPrompt } from '../ar/arPrompt';
+import { logField } from '../fieldTest/fieldLog';
 
 const CREAM = '#fff9f0';
 const GLOW = '#8ec5ff';
@@ -290,6 +291,18 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
     stepsRef.current = route?.steps ?? [];
     destinationRef.current = destinationName;
   });
+  useEffect(() => {
+    logField('orientation', { state: orientationState });
+  }, [orientationState]);
+  useEffect(() => {
+    logField('camera-view', { facing: drawn.source, tilted: drawn.tilted });
+  }, [drawn.source, drawn.tilted]);
+  useEffect(() => {
+    if (arSupport !== 'checking') logField('ar-support', { support: arSupport });
+  }, [arSupport]);
+  useEffect(() => {
+    if (cameraError) logField('camera', { error: cameraError });
+  }, [cameraError]);
 
   const live = tracking?.status === 'on';
   const plausible = Boolean(tracking?.plausible);
@@ -652,6 +665,10 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
     const owner = ++arOwnerRef.current;
     setArProblem(null);
     setArStarting(true);
+    const startedAt = performance.now();
+    const since = () => (performance.now() - startedAt) / 1000;
+    let arState = null;
+    logField('ar', { event: 'start' });
     try {
       // Sensors and the tracker come from the same tap the session needs.
       if (tracking.status !== 'on') tracking.start();
@@ -665,6 +682,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
        * of route is not having walked it.
        */
       if (!tracker.isAnchored) {
+        logField('ar', { event: 'refused', why: 'no-anchor' });
         setArProblem('Scan a check-in code so the route can be placed from where you stand.');
         return;
       }
@@ -680,9 +698,21 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
          */
         facingDegrees: () => bearingAt(track, tracker.read(performance.now()).progressMeters),
         onFrame: (report) => {
+          const state = report.recovery ?? (report.aligned ? 'placed' : report.placement);
+          if (state !== arState) {
+            arState = state;
+            logField('ar-state', {
+              state,
+              seconds: since(),
+              floorHits: report.floorHits,
+              floorY: report.floorY,
+              progress: report.progressMeters,
+            });
+          }
           if (arOwnerRef.current === owner) setArReport(report);
         },
         onEnd: () => {
+          logField('ar', { event: 'ended', seconds: since() });
           // Released on every ending, including the camera view closing first,
           // which bumps the owner; otherwise the hook would report a live
           // position with nothing supplying it.
@@ -698,11 +728,13 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         return;
       }
       arHandleRef.current = handle;
+      logField('ar', { event: 'running', seconds: since() });
       tracking.attachPose();
       setArSession(handle);
     } catch (error) {
       if (arOwnerRef.current !== owner) return;
       const reason = error instanceof ArStartError ? error.reason : 'failed';
+      logField('ar', { event: 'failed', reason });
       setArProblem(
         reason === 'refused'
           ? 'The immersive session was not allowed.'
@@ -770,6 +802,10 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         floorName,
       })
     : null;
+  const promptKind = prompt?.kind ?? null;
+  useEffect(() => {
+    if (promptKind !== null) logField('ar-prompt', { prompt: promptKind });
+  }, [promptKind]);
   /*
    * One line, and only when there is something to do about it. The chips above
    * already say what is known; a paragraph repeating them every frame of a
@@ -1041,6 +1077,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
                       className={`camera-preview-control${prompt.leads === 'action' ? ' is-primary' : ''}`}
                       onClick={() => {
                         const kind = prompt.action?.kind;
+                        logField('ar-action', { action: kind ?? null });
                         if (kind === 'confirm-arrival') {
                           actions.confirmArrival();
                         } else if (kind === 'confirm-floor') {
@@ -1062,7 +1099,10 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
                   )}
                   <button
                     className={`camera-preview-control${prompt.leads === 'leave' ? ' is-primary' : ''}`}
-                    onClick={() => void arSession?.end()}
+                    onClick={() => {
+                      logField('ar-action', { action: 'leave' });
+                      void arSession?.end();
+                    }}
                   >
                     <Square size={16} />
                     Leave AR
