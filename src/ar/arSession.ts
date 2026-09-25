@@ -10,6 +10,7 @@ import {
   ShapeGeometry,
   WebGLRenderer,
 } from 'three';
+import { signedHeadingDifference } from '../navigation/coordinateFrames';
 import type { RouteTracker } from '../navigation/liveTracker';
 import {
   bearingAt,
@@ -68,6 +69,18 @@ const MAX_POSE_SPEED_MPS = 4;
 const MAX_POSE_GAP_MS = 1_000;
 /** A floor hit further than this from the running estimate is a table, not the floor. */
 const FLOOR_HIT_TOLERANCE_METERS = 0.8;
+/**
+ * The route is placed only once the phone has been held this still for this
+ * long. Platforms report their first poses while still working out the room,
+ * and the pose at the moment of placing fixes where the whole route lies.
+ */
+const SETTLE_MS = 500;
+const SETTLE_METERS = 0.15;
+const SETTLE_DEGREES = 12;
+/** How long a placement waits for the floor to be found before using the platform's own. */
+const FLOOR_WAIT_MS = 4_000;
+/** Where a phone is held above the floor, until a placement has measured it. */
+const HOLDING_HEIGHT_METERS = 1.4;
 
 export type ArEndReason = 'ended' | 'unsupported' | 'refused' | 'failed';
 
@@ -84,6 +97,11 @@ export class ArStartError extends Error {
 export interface ArFrameReport {
   aligned: boolean;
   recovery: 'pose-lost' | 'floor-change' | null;
+  /**
+   * Why the route is not placed yet, outside a recovery: no pose from the
+   * platform yet, the phone not held still, or the floor not found yet.
+   */
+  placement: 'tracking' | 'steady' | 'floor' | null;
   /** Height of the floor in the session's frame, refined by hit testing. */
   floorY: number;
   /** Floor hits accepted so far; zero means the floor is where the platform guessed it. */
@@ -173,6 +191,8 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
   const scene = new Scene();
   const camera = new PerspectiveCamera();
   const route = new Group();
+  // Nothing is shown until the route has been placed.
+  route.visible = false;
   scene.add(route);
   const chevron = chevronGeometry();
   const ring = new RingGeometry(0.3, 0.45, 40);
@@ -202,8 +222,14 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
   let builtTo = 0;
   let alignment: PlanWorldAlignment | null = null;
   let recovery: ArFrameReport['recovery'] = null;
+  let placement: ArFrameReport['placement'] = null;
+  let settle: { x: number; z: number; bearing: number; atMs: number } | null = null;
+  let floorWaitFrom: number | null = null;
   let requestedFacing: number | null = null;
   let alignedFloor: string | null = null;
+  // The storey the floor estimate belongs to; another one has to be found again.
+  let floorFor = tracker.read(performance.now()).floorId;
+  let holdingHeight = HOLDING_HEIGHT_METERS;
   let floorY = 0;
   let floorHits = 0;
   let last: { x: number; z: number } | null = null;
@@ -271,6 +297,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       floorY,
     );
     alignedFloor = snapshot.floorId;
+    holdingHeight = Math.min(2, Math.max(0.8, viewer.y - floorY));
     last = { x: viewer.x, z: viewer.z };
     lastAtMs = nowMs;
     tracker.poseRestored(nowMs);
@@ -318,6 +345,21 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
   };
   session.addEventListener('end', cleanup);
 
+  const emit = (nowMs: number, immediately: boolean) => {
+    if (!immediately && nowMs - lastReport < REPORT_MS) return;
+    lastReport = nowMs;
+    const snapshot = tracker.read(nowMs);
+    options.onFrame?.({
+      aligned: alignment !== null,
+      recovery,
+      placement: alignment === null && recovery === null ? placement : null,
+      floorY,
+      floorHits,
+      facingDegrees: alignment !== null ? snapshot.headingDegrees : null,
+      progressMeters: snapshot.progressMeters,
+    });
+  };
+
   const hold = (reason: NonNullable<ArFrameReport['recovery']>, nowMs: number) => {
     const changed = recovery !== reason;
     recovery = reason;
@@ -327,18 +369,58 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     pendingZ = 0;
     route.visible = false;
     tracker.facing(null, nowMs);
-    if (changed)
-      options.onFrame?.({
-        aligned: false,
-        recovery,
-        floorY,
-        floorHits,
-        facingDegrees: null,
-        progressMeters: tracker.read(nowMs).progressMeters,
-      });
+    if (changed) emit(nowMs, true);
   };
+
+  const waitFor = (reason: NonNullable<ArFrameReport['placement']>, nowMs: number) => {
+    const changed = placement !== reason;
+    placement = reason;
+    emit(nowMs, changed);
+  };
+
+  /*
+   * Nothing has been placed yet, so nothing is lost: a missing pose here is
+   * the platform still finding the room, which is how every session starts.
+   * Only once the route is placed does a missing pose mean it may be wrong.
+   */
+  const lose = (nowMs: number) => {
+    if (alignment === null && recovery === null) {
+      settle = null;
+      floorWaitFrom = null;
+      waitFor('tracking', nowMs);
+    } else {
+      hold('pose-lost', nowMs);
+    }
+  };
+
+  /**
+   * Placed from a pose held still, facing the way the visitor said, over a
+   * floor that has been found - or, where the platform finds none, once it
+   * has had a fair chance to.
+   */
+  const readyToPlace = (viewer: ViewerReading, nowMs: number) => {
+    if (
+      settle === null ||
+      Math.hypot(viewer.x - settle.x, viewer.z - settle.z) > SETTLE_METERS ||
+      Math.abs(signedHeadingDifference(viewer.bearingDegrees, settle.bearing)) > SETTLE_DEGREES
+    ) {
+      settle = { x: viewer.x, z: viewer.z, bearing: viewer.bearingDegrees, atMs: nowMs };
+      floorWaitFrom = null;
+    }
+    if (nowMs - settle.atMs < SETTLE_MS) {
+      waitFor('steady', nowMs);
+      return false;
+    }
+    floorWaitFrom ??= nowMs;
+    if (hitSource !== null && floorHits === 0 && nowMs - floorWaitFrom < FLOOR_WAIT_MS) {
+      waitFor('floor', nowMs);
+      return false;
+    }
+    return true;
+  };
+
   const referenceSpace = renderer.xr.getReferenceSpace();
-  const reset = () => hold('pose-lost', performance.now());
+  const reset = () => lose(performance.now());
   referenceSpace?.addEventListener?.('reset', reset);
   session.addEventListener('end', () => referenceSpace?.removeEventListener?.('reset', reset), {
     once: true,
@@ -350,7 +432,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     const nowMs = performance.now();
     const pose = space ? frame.getViewerPose(space) : null;
     if (!space || !pose || pose.emulatedPosition) {
-      hold('pose-lost', nowMs);
+      lose(nowMs);
       renderer.render(scene, camera);
       return;
     }
@@ -359,6 +441,18 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       return;
     }
     const viewer = viewerFromMatrix(pose.transform.matrix);
+
+    if (alignment === null) {
+      const floorId = tracker.read(nowMs).floorId;
+      if (floorId !== floorFor) {
+        // A new storey is about as far below the phone as the last one was,
+        // and has to be found again: the old estimate would reject every hit on it.
+        floorFor = floorId;
+        floorY = viewer.y - holdingHeight;
+        floorHits = 0;
+        route.position.y = floorY;
+      }
+    }
 
     if (hitSource !== null) {
       const hit = frame.getHitTestResults(hitSource)[0]?.getPose(space);
@@ -371,8 +465,14 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       }
     }
 
+    let placed = false;
     if (alignment === null) {
+      if (!readyToPlace(viewer, nowMs)) {
+        renderer.render(scene, camera);
+        return;
+      }
       align(viewer, nowMs);
+      placed = alignment !== null;
     } else if (last !== null) {
       const step = Math.hypot(viewer.x - last.x, viewer.z - last.z);
       const elapsedMs = nowMs - lastAtMs;
@@ -415,8 +515,6 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       // A storey change moves the floor under the session's feet: start again there.
       if (snapshot.floorId !== alignedFloor) {
         hold('floor-change', nowMs);
-        floorY = 0;
-        floorHits = 0;
       } else if (snapshot.progressMeters + AHEAD_METERS > builtTo + 5 && builtTo < track.length) {
         buildRoute(snapshot.progressMeters);
       }
@@ -426,17 +524,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
 
     route.visible = alignment !== null && recovery === null && snapshot.tier !== 'frozen';
 
-    if (nowMs - lastReport >= REPORT_MS) {
-      lastReport = nowMs;
-      options.onFrame?.({
-        aligned: alignment !== null,
-        recovery,
-        floorY,
-        floorHits,
-        facingDegrees: snapshot.headingDegrees,
-        progressMeters: snapshot.progressMeters,
-      });
-    }
+    emit(nowMs, placed);
     renderer.render(scene, camera);
   });
 
@@ -450,6 +538,10 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       requestedFacing = bearingAt(track, tracker.read(performance.now()).progressMeters);
       recovery = null;
       alignment = null;
+      // Placed again from a pose held still, as at the start.
+      placement = null;
+      settle = null;
+      floorWaitFrom = null;
       last = null;
       pendingX = 0;
       pendingZ = 0;

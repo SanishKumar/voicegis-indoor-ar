@@ -20,6 +20,7 @@ import {
   Box,
   Camera,
   CameraOff,
+  Check,
   Compass,
   Crosshair,
   LocateFixed,
@@ -42,6 +43,7 @@ import { calloutsAhead, shortStepTitle } from '../ar/callouts';
 import { drawMiniMap, prepareMiniMap } from '../ar/cameraMiniMap';
 import { createProjector, DEFAULT_CAMERA_MODEL, projectRouteAhead } from '../ar/floorProjection';
 import { ArStartError, immersiveArSupported, startArGuidance } from '../ar/arSession';
+import { arPrompt } from '../ar/arPrompt';
 
 const CREAM = '#fff9f0';
 const GLOW = '#8ec5ff';
@@ -758,6 +760,16 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   const trackLeads = !arAvailable && !live && source === 'aligned';
   const remaining = guidance ? guidance.remainingMeters : 0;
   const arrived = navStatus === NAV_STATUS.ARRIVED || (guidance?.atEnd ?? false);
+  // What the session needs from the visitor, and the one control that gives it.
+  const prompt = arActive
+    ? arPrompt({
+        report: arReport,
+        snapshot,
+        arrived: navStatus === NAV_STATUS.ARRIVED,
+        atEnd: guidance?.atEnd ?? false,
+        floorName,
+      })
+    : null;
   /*
    * One line, and only when there is something to do about it. The chips above
    * already say what is known; a paragraph repeating them every frame of a
@@ -1004,17 +1016,14 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         ref={overlayRef}
         className={`camera-ar-overlay${arActive ? ' is-active' : ''}`}
         aria-hidden={!arActive}
+        data-ar-prompt={prompt?.kind ?? ''}
       >
-        {arActive && (
+        {arActive && prompt && (
           <>
             <div className="ar-top">{instructionCard}</div>
             <div>
-              <p className="camera-ar-overlay-note">
-                {arReport?.recovery
-                  ? 'Tracking lost or floor changed. Check your location, face along the route, then re-align. No movement is counted across the gap.'
-                  : arReport?.aligned
-                    ? 'World-tracked from your chosen position and camera alignment. Stop and re-align if the route does not match the corridor.'
-                    : 'Placing the route from your camera alignment…'}
+              <p className="camera-ar-overlay-note" aria-live="polite" hidden={!prompt.note}>
+                {prompt.note}
               </p>
               <div className="ar-sheet is-overlay">
                 {guidance && (
@@ -1027,12 +1036,32 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
                   </div>
                 )}
                 <div className="camera-preview-controls">
-                  <button className="camera-preview-control" onClick={() => arSession?.realign()}>
-                    <Compass size={16} />
-                    Re-align
-                  </button>
+                  {prompt.action && (
+                    <button
+                      className={`camera-preview-control${prompt.leads === 'action' ? ' is-primary' : ''}`}
+                      onClick={() => {
+                        const kind = prompt.action?.kind;
+                        if (kind === 'confirm-arrival') {
+                          actions.confirmArrival();
+                        } else if (kind === 'confirm-floor') {
+                          // The same tap says they are there and facing the way on.
+                          tracking?.confirmFloor();
+                          arSession?.realign();
+                        } else {
+                          arSession?.realign();
+                        }
+                      }}
+                    >
+                      {prompt.action.kind === 'realign' ? (
+                        <Compass size={16} />
+                      ) : (
+                        <Check size={16} />
+                      )}
+                      {prompt.action.label}
+                    </button>
+                  )}
                   <button
-                    className="camera-preview-control is-primary"
+                    className={`camera-preview-control${prompt.leads === 'leave' ? ' is-primary' : ''}`}
                     onClick={() => void arSession?.end()}
                   >
                     <Square size={16} />

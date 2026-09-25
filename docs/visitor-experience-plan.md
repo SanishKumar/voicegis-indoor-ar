@@ -799,3 +799,32 @@ recovery), and an authorized surveyed venue pilot. The flat camera's FOV remains
 assumed; world tracking is not automatic building localization. Dynamic obstacle
 avoidance and real-world occlusion are not implemented. Synthetic tests do not
 establish positional accuracy. This slice is pushed to GitHub; nothing is deployed.
+
+### AR placement and in-session recovery — 25 September 2026
+
+Visitor-only; no operator features, compiler behaviour or venue data changed.
+
+- **Independent of motion access.** AR is offered wherever the browser can run
+  an immersive session, whether motion access was granted, refused or never
+  offered. While a session runs, its pose is the live position source: progress
+  keeps reaching the instruction, countdown and arrival, and a motion refusal
+  arriving mid-session no longer marks the position broken. The pose is released
+  on every ending.
+- **Placement readiness.** The route is placed only from a pose held still for
+  half a second (within 15 cm and 12°), over a floor the hit test has found, or
+  after four seconds without one on the platform's own floor. A missing pose
+  before anything is placed is the platform still finding the room, not lost
+  tracking. Before this, the null poses a session usually starts with put it
+  straight into recovery, waiting for a Re-align tap.
+- **Recovery inside AR.** The overlay names what the route is waiting for and
+  offers the one control that fixes it. At a lift or stair: "I'm on {floor}"
+  confirms the storey change and re-places the route from the same tap. After
+  lost tracking: Re-align. At the end of the route: "I'm at my destination".
+  Where only a scan fixes the position (off route, too uncertain): Leave AR.
+  The floor estimate is re-seeded on a new storey from the height the phone was
+  held at, so hits on the new floor are accepted rather than rejected as a table.
+
+New regressions failed against the code before each change. Gate: lint, types,
+1,227 unit tests, the public build, and the desktop visitor-journey and
+camera-alignment browser suites (14 tests). Not yet run on a handset; the
+placement thresholds are first estimates to tune there.

@@ -33,6 +33,7 @@ const route = {
 };
 
 const setView = vi.fn();
+const confirmArrival = vi.fn();
 /** How far along the guidance on screen is: a walk-through can move it without anyone walking. */
 const guidance = vi.hoisted(() => ({ progress: 0 }));
 vi.mock('../context/NavigationContext.jsx', () => ({
@@ -62,7 +63,7 @@ vi.mock('../context/NavigationContext.jsx', () => ({
         pois: [{ id: 'shop', name: 'Shop', floorId: 'g', position: [6, 3], public: true }],
       },
     },
-    actions: { setView, prevStep: vi.fn(), nextStep: vi.fn() },
+    actions: { setView, prevStep: vi.fn(), nextStep: vi.fn(), confirmArrival },
   }),
 }));
 
@@ -424,6 +425,59 @@ describe('the camera view follows where the phone points', () => {
     // Closing the camera view ends the session first; the pose is still released.
     await act(async () => rendered.unmount());
     expect(tracking.detachPose).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks for the storey change at a lift and re-places the route from the same tap', async () => {
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    const realign = vi.fn();
+    let frame!: (report: arRuntime.ArFrameReport) => void;
+    vi.spyOn(arRuntime, 'startArGuidance').mockImplementation(async (options) => {
+      frame = options.onFrame!;
+      return { end: async () => {}, realign };
+    });
+    const tracking = trackingLike('on', anchored());
+    const rendered = render(<CameraPreview tracking={tracking} />);
+    const start = await screen.findByRole('button', { name: 'Start AR' });
+    await act(async () => fireEvent.click(start));
+    // Walked to the lift in AR; the tracker now waits for the storey change.
+    tracking.snapshot = anchored({
+      tier: 'frozen',
+      reason: 'floor-change',
+      pendingFloor: { toFloorId: '1', alightingMeters: 16 },
+    });
+    rendered.rerender(<CameraPreview tracking={{ ...tracking }} />);
+    act(() =>
+      frame({
+        aligned: false,
+        recovery: 'pose-lost',
+        placement: null,
+        floorY: 0,
+        floorHits: 0,
+        facingDegrees: null,
+        progressMeters: 10,
+      }),
+    );
+    // The lift comes first: confirming it is what brings the route back.
+    fireEvent.click(screen.getByRole('button', { name: 'I’m on Ground' }));
+    expect(tracking.confirmFloor).toHaveBeenCalledTimes(1);
+    expect(realign).toHaveBeenCalledTimes(1);
+    expect(tracking.confirmFloor.mock.invocationCallOrder[0]).toBeLessThan(
+      realign.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('lets the visitor confirm arrival without leaving AR', async () => {
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    vi.spyOn(arRuntime, 'startArGuidance').mockResolvedValue({
+      end: async () => {},
+      realign: () => {},
+    });
+    const tracking = trackingLike('on', anchored({ tier: 'tracking', reason: 'arrived' }));
+    render(<CameraPreview tracking={tracking} />);
+    const start = await screen.findByRole('button', { name: 'Start AR' });
+    await act(async () => fireEvent.click(start));
+    fireEvent.click(screen.getByRole('button', { name: 'I’m at my destination' }));
+    expect(confirmArrival).toHaveBeenCalledTimes(1);
   });
 
   it('starts an immersive session from one tap, taking that tap as facing the corridor', async () => {
