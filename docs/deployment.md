@@ -42,9 +42,24 @@ active known-good cache.
 
 ## Hosting contract
 
-Serve the contents of `dist/` at the domain root over HTTPS. The current URLs
-are root-relative (`/assets`, `/venues`, `/sw.js`), so a subdirectory deployment
-is not supported without making those paths base-aware first.
+Serve the contents of `dist/` over HTTPS, at the domain root or under a
+sub-path. For a sub-path, build with Vite's base set to it:
+
+```bash
+npx vite build --mode public --base=/voicegis-indoor-ar/
+```
+
+The page, its assets, the offline worker's scope and cache keys, and venue
+requests then all live under that path. Catalog package URLs stay root-relative
+(`/venues/…`): they are the packages' identities in the catalog and in storage,
+and are resolved under the base only when fetched, so the committed catalog and
+venue hashes are the same for every host. `npm run test:browser:offline` builds
+under `/voicegis-indoor-ar/` and proves the shell boots, installs, reopens a
+check-in link offline, and requests nothing outside its path.
+
+Host one deployment of this app per origin. Each worker deletes the other
+`voicegis-visitor-` caches when it activates, and site storage is shared by
+everything on the origin.
 
 Recommended response caching:
 
@@ -78,5 +93,31 @@ the document itself.
 
 A first-ever visit while already offline is impossible. A coherently modified
 server deployment, HTTPS certificate failure, arbitrary cross-origin venue URL,
-and physical QR placement are outside this cache guarantee. Deployment itself
-has not been performed by this repository.
+and physical QR placement are outside this cache guarantee.
+
+## Publishing to GitHub Pages
+
+`.github/workflows/publish-visitor.yml` builds the visitor app for the
+repository's project site and deploys it. It runs **only when started by hand**
+(Actions → Publish visitor build → Run workflow); pushing never publishes.
+
+1. Once, in the repository: Settings → Pages → Source: **GitHub Actions**.
+2. Publish from a commit whose Quality run, including the browser smoke, has
+   passed. The workflow repeats `npm run check` but not the browser suites.
+3. The site appears at `https://<owner>.github.io/<repository>/`, for example
+   `https://sanishkumar.github.io/voicegis-indoor-ar/#/visitor`.
+
+Pages chooses its own response headers (currently a ten-minute `max-age` on
+everything) and does not honour the table above. The worker is registered with
+`updateViaCache: 'none'`, so the browser still checks `sw.js` itself on every
+update, and the worker fetches the files it precaches with `no-cache` and
+verifies each against its build digest. A new release can therefore reach a
+visitor up to ten minutes late through the HTTP cache of the page itself,
+never as a mixture of releases. Each Pages deployment replaces the site as a
+whole, so the upload order above does not apply.
+
+Source maps are published beside the scripts. The source is public in this
+repository already; they make an error reported from a phone readable.
+
+This is a real public web address. Nothing has been published by this
+repository until the workflow is run.

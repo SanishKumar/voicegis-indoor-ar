@@ -26,6 +26,7 @@ import {
 } from '../data/runtimeActivationHistory';
 import { LatestActivationQueue } from '../data/latestActivationQueue';
 import { createRuntimeCatalogEntries, parseVenueVersionCatalog } from '../data/venueVersionCatalog';
+import { appPath } from '../appPath';
 
 const VenueContext = createContext(null);
 const CATALOG_URL = '/venues/catalog.json';
@@ -58,7 +59,7 @@ function clearFailedVenueSource() {
 }
 
 async function loadCatalog() {
-  const response = await fetch(CATALOG_URL, { headers: { Accept: 'application/json' } });
+  const response = await fetch(appPath(CATALOG_URL), { headers: { Accept: 'application/json' } });
   if (!response.ok) throw new Error(`Venue catalog request failed (${response.status}).`);
   return parseVenueVersionCatalog(await response.json());
 }
@@ -125,7 +126,12 @@ export function VenueProvider({ children }) {
         error: null,
       }));
       try {
-        const buildingPackage = await loadVenuePackageFromUrl(url, fetch, options.expectation);
+        // The catalog's path stays the package's identity; only the request moves under the base.
+        const buildingPackage = await loadVenuePackageFromUrl(
+          appPath(url),
+          fetch,
+          options.expectation,
+        );
         if (sequence !== activationSequence.current) return null;
         const runtime = await activatePackage(buildingPackage, url, sequence, {
           cacheAsDefault: options.cacheAsDefault,

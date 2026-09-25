@@ -10,12 +10,21 @@ import { announcesPreviewOn } from './previewReadyLine.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const previewPort = 4187;
-const previewUrl = `http://127.0.0.1:${previewPort}/venues/catalog.json`;
 const viteCli = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
 const playwrightCli = path.join(root, 'node_modules', '@playwright', 'test', 'cli.js');
 const commandArguments = process.argv.slice(2);
 const publicBuild = commandArguments.includes('--public-build');
-const playwrightArguments = commandArguments.filter((argument) => argument !== '--public-build');
+/*
+ * `--base=/name/` builds and serves the app under a sub-path, as a project
+ * site such as GitHub Pages hosts it. The suites written against the domain
+ * root are not meant for that; e2e/subpath.pw.ts is.
+ */
+const baseArgument = commandArguments.find((argument) => argument.startsWith('--base='));
+const base = baseArgument === undefined ? '/' : baseArgument.slice('--base='.length);
+const previewUrl = `http://127.0.0.1:${previewPort}${base}venues/catalog.json`;
+const playwrightArguments = commandArguments.filter(
+  (argument) => argument !== '--public-build' && argument !== baseArgument,
+);
 
 /** @type {import('node:child_process').ChildProcess | null} */
 let builder = null;
@@ -55,6 +64,8 @@ function startPreview(outDir) {
       '--port',
       String(previewPort),
       '--strictPort',
+      '--base',
+      base,
     ],
     {
       cwd: root,
@@ -162,6 +173,8 @@ try {
       '--outDir',
       outDir,
       '--emptyOutDir',
+      '--base',
+      base,
     ],
     {
       cwd: root,
@@ -184,6 +197,7 @@ try {
       // throwaway build. They never touch the repository or another run's
       // output, because every invocation owns a distinct temporary directory.
       VOICEGIS_SMOKE_OUT_DIR: outDir,
+      VOICEGIS_SMOKE_BASE: base,
     },
   });
   const [code, signal] = await waitForExit(runner);

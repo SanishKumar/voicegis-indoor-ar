@@ -65,7 +65,8 @@ describe('public offline build', () => {
     expect(secondWorker).not.toBe(firstWorker);
     expect(firstWorker).toContain("request.mode === 'navigate'");
     expect(firstWorker).toContain('navigationResponse()');
-    expect(firstWorker).toContain("PRECACHE_BY_PATH.get('/index.html')");
+    expect(firstWorker).toContain('const INDEX_PATH = "/index.html";');
+    expect(firstWorker).toContain('PRECACHE_BY_PATH.get(INDEX_PATH)');
     expect(firstWorker).toContain('return verifiedResponse');
     expect(firstWorker).toContain('self.clients.claim()');
     expect(firstWorker).toContain("event.data?.type !== 'voicegis:verify-offline-cache'");
@@ -73,6 +74,58 @@ describe('public offline build', () => {
     expect(firstWorker).toContain("crypto.subtle.digest('SHA-256'");
     expect(firstWorker).not.toContain('skipWaiting');
     expect(firstWorker).not.toContain("cache.put('/venues/");
+  });
+
+  it('serves a project site from under its base, and nothing outside it', async () => {
+    const base = '/voicegis-indoor-ar/';
+    const entries = await collectOfflineEntries(await fixture(), base);
+    expect(entries.map(({ url }) => url)).toEqual([
+      `${base}assets/index-hash.js`,
+      `${base}favicon.svg`,
+      `${base}index.html`,
+      `${base}manifest.webmanifest`,
+      `${base}venues/catalog.json`,
+      `${base}venues/venue.package.json`,
+    ]);
+
+    const listeners = new Map<string, (event: unknown) => void>();
+    const shell = new Response('<main>visitor</main>');
+    const match = vi.fn(async (url: string) => (url === `${base}index.html` ? shell : undefined));
+    runInNewContext(renderOfflineWorker(entries, base), {
+      caches: { keys: vi.fn(async () => []), open: vi.fn(async () => ({ match, put: vi.fn() })) },
+      crypto: globalThis.crypto,
+      fetch: vi.fn(async () => new Response('network')),
+      self: {
+        clients: { claim: vi.fn(async () => undefined) },
+        location: { origin: 'https://owner.github.io' },
+        addEventListener(type: string, listener: (event: unknown) => void) {
+          listeners.set(type, listener);
+        },
+      },
+      Set,
+      Map,
+      Uint8Array,
+      URL,
+    });
+    const answered = (url: string, mode = 'cors') => {
+      let response: Promise<unknown> | undefined;
+      listeners.get('fetch')?.({
+        request: { method: 'GET', mode, url },
+        respondWith(result: Promise<unknown>) {
+          response = result;
+        },
+      });
+      return response;
+    };
+
+    // A check-in link opens the cached shell of this site, not the domain's.
+    await expect(
+      answered('https://owner.github.io/voicegis-indoor-ar/?checkin=abc', 'navigate'),
+    ).resolves.toBe(shell);
+    expect(match).toHaveBeenCalledWith(`${base}index.html`);
+    expect(answered(`https://owner.github.io${base}venues/catalog.json`)).toBeDefined();
+    // Another site on the same origin keeps its own files.
+    expect(answered('https://owner.github.io/venues/catalog.json')).toBeUndefined();
   });
 
   it('keeps an active v1 navigation on the cached v1 shell while v2 is on the network', async () => {

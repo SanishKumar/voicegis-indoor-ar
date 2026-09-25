@@ -22,7 +22,8 @@ describe('installed visitor chrome', () => {
       expect.arrayContaining([
         expect.objectContaining({
           purpose: 'any maskable',
-          src: '/favicon.svg',
+          // Relative to the manifest, so the icon is found under any base the app is hosted at.
+          src: 'favicon.svg',
           type: 'image/svg+xml',
         }),
       ]),

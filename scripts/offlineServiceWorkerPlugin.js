@@ -48,7 +48,11 @@ function digest(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-export async function collectOfflineEntries(outDir) {
+/**
+ * @param {string} outDir
+ * @param {string} [base] where the build is served from, as Vite resolved it: `/` or `/name/`
+ */
+export async function collectOfflineEntries(outDir, base = '/') {
   const entries = [];
   for (const relative of (await filesBelow(outDir)).sort()) {
     const normalized = relative.replaceAll('\\', '/');
@@ -56,7 +60,7 @@ export async function collectOfflineEntries(outDir) {
       continue;
     }
     const bytes = await readFile(path.join(outDir, relative));
-    entries.push({ url: `/${normalized}`, revision: digest(bytes) });
+    entries.push({ url: `${base}${normalized}`, revision: digest(bytes) });
   }
   return entries;
 }
@@ -90,7 +94,11 @@ export function operatorModulesIn(moduleIds) {
     .filter((moduleId) => OPERATOR_MODULE_SUFFIXES.some((suffix) => moduleId.endsWith(suffix)));
 }
 
-export function renderOfflineWorker(entries) {
+/**
+ * @param {{ url: string, revision: string }[]} entries
+ * @param {string} [base]
+ */
+export function renderOfflineWorker(entries, base = '/') {
   const revision = digest(JSON.stringify(entries)).slice(0, 24);
   const cacheName = `${OFFLINE_CACHE_PREFIX}${revision}`;
 
@@ -99,6 +107,7 @@ const CACHE_NAME = ${JSON.stringify(cacheName)};
 const CACHE_PREFIX = ${JSON.stringify(OFFLINE_CACHE_PREFIX)};
 const PRECACHE_ENTRIES = ${JSON.stringify(entries)};
 const PRECACHE_BY_PATH = new Map(PRECACHE_ENTRIES.map((entry) => [entry.url, entry]));
+const INDEX_PATH = ${JSON.stringify(`${base}index.html`)};
 
 function bytesToHex(bytes) {
   return [...new Uint8Array(bytes)]
@@ -190,7 +199,7 @@ self.addEventListener('message', (event) => {
 });
 
 async function navigationResponse() {
-  return verifiedResponse(PRECACHE_BY_PATH.get('/index.html'));
+  return verifiedResponse(PRECACHE_BY_PATH.get(INDEX_PATH));
 }
 
 self.addEventListener('fetch', (event) => {
@@ -210,13 +219,25 @@ self.addEventListener('fetch', (event) => {
 `;
 }
 
+/** A served location the worker can own: an absolute path, so its scope and cache keys are exact. */
+function workerBase(base) {
+  if (typeof base !== 'string' || !base.startsWith('/') || !base.endsWith('/')) {
+    throw new Error(
+      `The public build needs an absolute base such as / or /name/ for its offline worker, not ${JSON.stringify(base)}.`,
+    );
+  }
+  return base;
+}
+
 export function offlineServiceWorkerPlugin(enabled) {
   let outputDirectory;
+  let base = '/';
   return {
     name: 'voicegis-offline-service-worker',
     apply: 'build',
     configResolved(config) {
       outputDirectory = config.build.outDir;
+      if (enabled) base = workerBase(config.base);
     },
     generateBundle(_options, bundle) {
       if (!enabled) return;
@@ -232,14 +253,18 @@ export function offlineServiceWorkerPlugin(enabled) {
       if (!enabled) return;
       if (outputDirectory === undefined) throw new Error('Vite output directory was not resolved.');
       await assertVisitorOnlyBundle(outputDirectory);
-      const entries = await collectOfflineEntries(outputDirectory);
-      if (!entries.some(({ url }) => url === '/index.html')) {
+      const entries = await collectOfflineEntries(outputDirectory, base);
+      if (!entries.some(({ url }) => url === `${base}index.html`)) {
         throw new Error('Public build has no index.html to cache for offline navigation.');
       }
-      if (!entries.some(({ url }) => url === '/venues/catalog.json')) {
+      if (!entries.some(({ url }) => url === `${base}venues/catalog.json`)) {
         throw new Error('Public build has no venue catalog to cache.');
       }
-      await writeFile(path.join(outputDirectory, 'sw.js'), renderOfflineWorker(entries), 'utf8');
+      await writeFile(
+        path.join(outputDirectory, 'sw.js'),
+        renderOfflineWorker(entries, base),
+        'utf8',
+      );
     },
   };
 }

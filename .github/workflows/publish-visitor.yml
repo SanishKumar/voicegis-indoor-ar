@@ -1,0 +1,60 @@
+name: Publish visitor build
+
+# Publishing is a decision, not a side effect of pushing: this runs only when
+# started by hand from the Actions tab. It needs GitHub Pages set to deploy
+# from GitHub Actions (Settings -> Pages -> Source) before its first run.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-visitor
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run quality gate
+        run: npm run check
+
+      # A project site is served under /<repository>/, not at the domain root.
+      - name: Build the visitor app for the project site
+        run: npx vite build --mode public --base=/${{ github.event.repository.name }}/
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -97,10 +97,11 @@ means a flaky camera cannot take the demo down.
 
    This does not make a first-ever offline visit possible. Installation needs
    one completed online load, arbitrary remote VenuePackage URLs remain subject
-   to their origin and availability, and production hosting must be HTTPS at the
-   domain root. The automated browser gate repeats fresh-page check-in and
-   routing, and floor switching with Chromium's network disabled. It separately
-   proves that a corrupted IndexedDB package is refused.
+   to their origin and availability, and production hosting must be HTTPS (a
+   sub-path needs a build with that base; see docs/deployment.md). The
+   automated browser gate repeats fresh-page check-in and routing, and floor
+   switching with Chromium's network disabled. It separately proves that a
+   corrupted IndexedDB package is refused.
 
 ## Why the codes are generated, not authored
 

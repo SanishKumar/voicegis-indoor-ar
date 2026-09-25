@@ -177,7 +177,8 @@ CI installs Chromium independently and keeps this gate separate from
 `npm run check`, so a browser-installation failure cannot hide a compiler or
 unit-test failure.
 
-The visitor build is a static, root-hosted HTTPS site. Its generated service
+The visitor build is a static HTTPS site, hosted at a domain root or under a
+sub-path such as a GitHub Pages project site. Its generated service
 worker caches the visitor JavaScript entry graph and bundled venue releases;
 Inspector, Studio, and Recorder route components and rendering dependencies are
 outside that graph. The shared venue provider still contains unexposed package

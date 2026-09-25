@@ -1,3 +1,5 @@
+import { APP_BASE, appPath } from '../appPath';
+
 export type OfflineAvailability = 'preparing' | 'available' | 'online-only';
 
 let availability: OfflineAvailability = 'online-only';
@@ -165,8 +167,8 @@ export async function registerOfflineWorker(): Promise<void> {
 
   publish('preparing');
   try {
-    const registration = await navigator.serviceWorker.register('/sw.js', {
-      scope: '/',
+    const registration = await navigator.serviceWorker.register(appPath('/sw.js'), {
+      scope: APP_BASE,
       updateViaCache: 'none',
     });
     activeRegistration = registration;

@@ -19,7 +19,7 @@
     "test:watch": "vitest",
     "test:browser": "npm run test:browser:operator && npm run test:browser:offline",
     "test:browser:operator": "node scripts/runBrowserSmoke.js",
-    "test:browser:offline": "node scripts/runBrowserSmoke.js --public-build e2e/offline.pw.ts && node scripts/runBrowserSmoke.js --public-build e2e/offline-install-failure.pw.ts --project=desktop-chromium --workers=1",
+    "test:browser:offline": "node scripts/runBrowserSmoke.js --public-build e2e/offline.pw.ts && node scripts/runBrowserSmoke.js --public-build e2e/offline-install-failure.pw.ts --project=desktop-chromium --workers=1 && node scripts/runBrowserSmoke.js --public-build --base=/voicegis-indoor-ar/ e2e/subpath.pw.ts --project=desktop-chromium",
     "test:browser:headed": "node scripts/runBrowserSmoke.js --headed",
     "format": "prettier --write .",
     "compile:reference": "tsx packages/map-compiler/src/cli.ts buildings/reference-medical-centre/source/building.json buildings/reference-medical-centre/compiled",

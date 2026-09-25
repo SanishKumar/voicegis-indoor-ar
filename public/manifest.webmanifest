@@ -2,14 +2,14 @@
   "name": "VoiceGIS Indoor Navigation",
   "short_name": "VoiceGIS",
   "description": "Verified, on-device indoor routing for published venues.",
-  "start_url": "/#/visitor",
-  "scope": "/",
+  "start_url": "./#/visitor",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#fff9f0",
   "theme_color": "#fff9f0",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
