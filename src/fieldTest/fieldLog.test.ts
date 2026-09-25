@@ -58,6 +58,24 @@ describe('the field test record', () => {
     ]);
   });
 
+  it('keeps a return to an earlier state even within the duplicate window', () => {
+    resetFieldTest(true);
+    let now = 1_000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    logField('orientation', { state: 'listening' });
+    now += 20;
+    logField('orientation', { state: 'stale' });
+    // An unrelated entry must not hide the most recent state for this source.
+    logField('camera-view', { facing: 'off' });
+    now += 20;
+    logField('orientation', { state: 'listening' });
+    expect(
+      fieldEvents()
+        .filter(({ kind }) => kind === 'orientation')
+        .map(({ detail }) => detail.state),
+    ).toEqual(['listening', 'stale', 'listening']);
+  });
+
   it('keeps the most recent events of a long walk, and tells a listener', () => {
     resetFieldTest(true);
     let now = 0;

@@ -177,16 +177,31 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
   }
 
   const renderer = new WebGLRenderer({ alpha: true, antialias: true });
+  let ended = false;
+  let attached = false;
+  // Own the session before the first asynchronous setup step. The browser can
+  // end AR while its renderer, reference space or hit-test source is pending.
+  let releaseResources = () => renderer.dispose();
+  const cleanup = () => {
+    if (ended) return;
+    ended = true;
+    session.removeEventListener('end', cleanup);
+    releaseResources();
+    if (attached) tracker.detachDisplacement(performance.now());
+    options.onEnd?.('ended');
+  };
+  session.addEventListener('end', cleanup);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.xr.enabled = true;
   renderer.xr.setReferenceSpaceType('local-floor');
   try {
     await renderer.xr.setSession(session);
   } catch (error) {
-    renderer.dispose();
     await session.end().catch(() => undefined);
+    cleanup();
     throw new ArStartError('failed', error);
   }
+  if (ended) throw new ArStartError('ended');
 
   const scene = new Scene();
   const camera = new PerspectiveCamera();
@@ -239,7 +254,6 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
   let pendingSince = 0;
   let lastReport = 0;
   let hitSource: XRHitTestSource | null = null;
-  let ended = false;
 
   const clearRoute = () => {
     route.clear();
@@ -308,25 +322,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     buildRoute(snapshot.progressMeters);
   };
 
-  try {
-    const viewerSpace = await session.requestReferenceSpace('viewer');
-    if (typeof session.requestHitTestSource === 'function' && typeof XRRay !== 'undefined') {
-      // A ray from the phone, down and forward: where the floor is a pace ahead.
-      hitSource =
-        (await session.requestHitTestSource({
-          space: viewerSpace,
-          offsetRay: new XRRay({ x: 0, y: 0, z: 0, w: 1 }, { x: 0, y: -0.6, z: -0.8, w: 0 }),
-        })) ?? null;
-    }
-  } catch {
-    hitSource = null;
-  }
-
-  tracker.attachDisplacement(performance.now());
-
-  const cleanup = () => {
-    if (ended) return;
-    ended = true;
+  releaseResources = () => {
     renderer.setAnimationLoop(null);
     try {
       hitSource?.cancel();
@@ -340,10 +336,38 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     outlineMaterial.dispose();
     endMaterial.dispose();
     renderer.dispose();
-    tracker.detachDisplacement(performance.now());
-    options.onEnd?.('ended');
   };
-  session.addEventListener('end', cleanup);
+
+  try {
+    const viewerSpace = await session.requestReferenceSpace('viewer');
+    if (
+      !ended &&
+      typeof session.requestHitTestSource === 'function' &&
+      typeof XRRay !== 'undefined'
+    ) {
+      // A ray from the phone, down and forward: where the floor is a pace ahead.
+      hitSource =
+        (await session.requestHitTestSource({
+          space: viewerSpace,
+          offsetRay: new XRRay({ x: 0, y: 0, z: 0, w: 1 }, { x: 0, y: -0.6, z: -0.8, w: 0 }),
+        })) ?? null;
+      // A source resolving after the end event was not available to cleanup.
+      if (ended) {
+        try {
+          hitSource?.cancel();
+        } catch {
+          // The platform may already have released it with the session.
+        }
+        hitSource = null;
+      }
+    }
+  } catch {
+    hitSource = null;
+  }
+  if (ended) throw new ArStartError('ended');
+
+  tracker.attachDisplacement(performance.now());
+  attached = true;
 
   const emit = (nowMs: number, immediately: boolean) => {
     if (!immediately && nowMs - lastReport < REPORT_MS) return;

@@ -36,6 +36,7 @@ function snapshotWith(overrides: Partial<TrackerSnapshot> = {}): TrackerSnapshot
     relativeHeadingDegrees: 0,
     headingEpoch: 1,
     displacementAttached: false,
+    canStartPose: true,
     walkedSinceAnchorMeters: 0,
     stridesSinceAnchor: 0,
     strideMeters: 0.72,

@@ -307,6 +307,12 @@ export function useLiveTracking({
     logField('tracking', { status: reported, pose: poseAttached });
   }, [reported, poseAttached]);
   useEffect(() => {
+    // XR can keep guidance live after motion access is refused. Record that
+    // permission outcome independently so the field log still explains what
+    // the handset allowed, rather than only what supplied the live position.
+    logField('motion-access', { status });
+  }, [status]);
+  useEffect(() => {
     if (reported !== 'on') return undefined;
     const timer = window.setInterval(() => {
       if (activeRef.current) publish();

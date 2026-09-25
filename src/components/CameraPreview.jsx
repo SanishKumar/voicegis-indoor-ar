@@ -235,13 +235,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   const navigating = navStatus === NAV_STATUS.NAVIGATING || navStatus === NAV_STATUS.ARRIVED;
   const found = navigating && Boolean(route?.found) && route.steps.length > 0;
   const track = found ? trackForRoute(route) : null;
-  const guidance = track ? guidanceAt(track, progressMeters) : null;
   const floorName = (floorId) => venue.getFloorById(floorId)?.name;
-  const riding = track ? positionAt(track, progressMeters).vertical : false;
-  const copy =
-    track && guidance
-      ? bannerCopy(route.steps, track, guidance, progressMeters, floorName, riding)
-      : null;
   const destinationName = venue.getNodeById?.(destinationNodeId)?.poi?.name ?? 'Destination';
   const walkSpeedMps = venue.config?.walkSpeedMps ?? 1.2;
 
@@ -260,6 +254,19 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   const [arStarting, setArStarting] = useState(false);
   const [arProblem, setArProblem] = useState(null);
   const [arReport, setArReport] = useState(null);
+  const [arStartProgress, setArStartProgress] = useState(0);
+  // The preview can be at the destination before the visitor has left the
+  // check-in point. All immersive copy follows the physical source too, not
+  // just the world geometry; placement may wait several seconds for a floor.
+  const displayProgress = arSession
+    ? (arReport?.progressMeters ?? arStartProgress)
+    : progressMeters;
+  const guidance = track ? guidanceAt(track, displayProgress) : null;
+  const riding = track ? positionAt(track, displayProgress).vertical : false;
+  const copy =
+    track && guidance
+      ? bannerCopy(route.steps, track, guidance, displayProgress, floorName, riding)
+      : null;
   const arOwnerRef = useRef(0);
   const arHandleRef = useRef(null);
   const [orientationState, setOrientationState] = useState('starting');
@@ -323,7 +330,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   const arAvailable = arSupport === 'yes' && found;
   // What genuinely stops an immersive session: nowhere to start the route
   // from, or a tracker that has stopped trusting its own position.
-  const arBlocked = !knownStart || (live && tracking?.snapshot?.tier === 'frozen');
+  const arBlocked = !knownStart || (tracking?.snapshot != null && !tracking.snapshot.canStartPose);
 
   // The sheet's height is what the inset map and the ribbon's fade keep clear of.
   useEffect(() => {
@@ -686,6 +693,13 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         setArProblem('Scan a check-in code so the route can be placed from where you stand.');
         return;
       }
+      // The published snapshot can lag a tap. Recheck intrinsic position
+      // safety; replacing a failed IMU must not erase an off-route/floor hold.
+      if (!tracker.canStartPose) {
+        setArProblem('Check your location on the map or scan a check-in code before starting AR.');
+        return;
+      }
+      setArStartProgress(tracker.read(performance.now()).progressMeters);
       const handle = await startArGuidance({
         track,
         tracker,
@@ -791,14 +805,15 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
     orientationSlot.kind !== 'waiting';
   const trackLeads = !arAvailable && !live && source === 'aligned';
   const remaining = guidance ? guidance.remainingMeters : 0;
-  const arrived = navStatus === NAV_STATUS.ARRIVED || (guidance?.atEnd ?? false);
+  const arrived =
+    navStatus === NAV_STATUS.ARRIVED ||
+    (arActive ? snapshot?.reason === 'arrived' : (guidance?.atEnd ?? false));
   // What the session needs from the visitor, and the one control that gives it.
   const prompt = arActive
     ? arPrompt({
         report: arReport,
         snapshot,
         arrived: navStatus === NAV_STATUS.ARRIVED,
-        atEnd: guidance?.atEnd ?? false,
         floorName,
       })
     : null;

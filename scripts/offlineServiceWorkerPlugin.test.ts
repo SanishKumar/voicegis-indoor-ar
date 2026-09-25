@@ -90,11 +90,17 @@ describe('public offline build', () => {
 
     const listeners = new Map<string, (event: unknown) => void>();
     const shell = new Response('<main>visitor</main>');
-    const match = vi.fn(async (url: string) => (url === `${base}index.html` ? shell : undefined));
+    const catalog = new Response('{}');
+    const cachedResponses = new Map([
+      [`${base}index.html`, shell],
+      [`${base}venues/catalog.json`, catalog],
+    ]);
+    const match = vi.fn(async (url: string) => cachedResponses.get(url));
+    const networkFetch = vi.fn(async () => new Response('network'));
     runInNewContext(renderOfflineWorker(entries, base), {
       caches: { keys: vi.fn(async () => []), open: vi.fn(async () => ({ match, put: vi.fn() })) },
       crypto: globalThis.crypto,
-      fetch: vi.fn(async () => new Response('network')),
+      fetch: networkFetch,
       self: {
         clients: { claim: vi.fn(async () => undefined) },
         location: { origin: 'https://owner.github.io' },
@@ -123,7 +129,14 @@ describe('public offline build', () => {
       answered('https://owner.github.io/voicegis-indoor-ar/?checkin=abc', 'navigate'),
     ).resolves.toBe(shell);
     expect(match).toHaveBeenCalledWith(`${base}index.html`);
-    expect(answered(`https://owner.github.io${base}venues/catalog.json`)).toBeDefined();
+    await expect(answered(`https://owner.github.io${base}venues/catalog.json`)).resolves.toBe(
+      catalog,
+    );
+    expect(networkFetch).not.toHaveBeenCalled();
+    // A missing package cannot be repaired with bytes from another build.
+    await expect(
+      answered(`https://owner.github.io${base}venues/venue.package.json`),
+    ).rejects.toThrow('Offline asset did not match its build revision');
     // Another site on the same origin keeps its own files.
     expect(answered('https://owner.github.io/venues/catalog.json')).toBeUndefined();
   });

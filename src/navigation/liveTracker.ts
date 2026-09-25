@@ -74,6 +74,8 @@ export interface TrackerSnapshot {
   headingEpoch: number;
   /** True while a visual-inertial pose supplies movement instead of strides. */
   displacementAttached: boolean;
+  /** Position is suitable for an independent pose source, regardless of IMU availability. */
+  canStartPose: boolean;
   walkedSinceAnchorMeters: number;
   stridesSinceAnchor: number;
   strideMeters: number;
@@ -222,6 +224,17 @@ export class RouteTracker {
   /** Whether a known point on this route has been established. */
   get isAnchored() {
     return this.phase !== 'unanchored';
+  }
+
+  /** A new pose cannot repair a lost position or an unconfirmed storey. */
+  get canStartPose() {
+    return (
+      this.isAnchored &&
+      this.phase !== 'floor-change' &&
+      !this.poseJumped &&
+      this.disagree < this.options.offRouteFrozen &&
+      this.sigma() < this.options.frozenSigmaMeters
+    );
   }
 
   /**
@@ -615,6 +628,7 @@ export class RouteTracker {
       relativeHeadingDegrees: this.integrator.heading,
       headingEpoch: this.headingEpoch,
       displacementAttached: this.displacement,
+      canStartPose: this.canStartPose,
       walkedSinceAnchorMeters: this.walked + this.displaced,
       stridesSinceAnchor: this.strides,
       strideMeters: this.strideMeters,

@@ -90,6 +90,45 @@ function anchored(track = corner, options = {}) {
   return { tracker, walker };
 }
 
+describe('independent pose-source eligibility', () => {
+  it('permits a pose source when only the inertial source is missing', () => {
+    const { tracker, walker } = anchored();
+    tracker.sensorsLost('sensors-unavailable');
+    expect(tracker.read(walker.t).reason).toBe('sensors-unavailable');
+    expect(tracker.canStartPose).toBe(true);
+    expect(tracker.read(walker.t).canStartPose).toBe(true);
+  });
+
+  it.each(['no-anchor', 'uncertain', 'off-route', 'floor-change', 'pose-jump'] as const)(
+    'does not let a sensor failure hide an invalid physical position (%s)',
+    (failure) => {
+      const { tracker, walker } = anchored(failure === 'floor-change' ? lifted : corner);
+      if (failure === 'no-anchor') tracker.rebind(corner);
+      if (failure === 'uncertain') {
+        tracker.anchor({ progressMeters: 0, sigmaMeters: 20, timeMs: walker.t });
+      }
+      if (failure === 'floor-change') walker.steps(20);
+      if (failure === 'off-route' || failure === 'pose-jump') {
+        tracker.attachDisplacement(walker.t);
+        if (failure === 'pose-jump') {
+          tracker.displace({ dxMeters: 8, dyMeters: 0, timeMs: walker.t + 50 });
+          walker.t += 50;
+        } else {
+          for (let index = 0; index < 14; index += 1) {
+            walker.t += 500;
+            tracker.displace({ dxMeters: 0, dyMeters: -0.72, timeMs: walker.t });
+          }
+        }
+      }
+      expect(tracker.read(walker.t).reason).toBe(failure);
+      tracker.sensorsLost('sensors-unavailable');
+      expect(tracker.read(walker.t).reason).toBe('sensors-unavailable');
+      expect(tracker.canStartPose).toBe(false);
+      expect(tracker.read(walker.t).canStartPose).toBe(false);
+    },
+  );
+});
+
 describe('route tracker', () => {
   it('does nothing without an anchor', () => {
     const tracker = new RouteTracker(corner);

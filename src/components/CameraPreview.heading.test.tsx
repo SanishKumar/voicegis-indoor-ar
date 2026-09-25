@@ -68,9 +68,13 @@ vi.mock('../context/NavigationContext.jsx', () => ({
   }),
 }));
 
+/** Frozen reasons a new pose source cannot repair; see RouteTracker.canStartPose. */
+const POSITION_LOST = new Set(['no-anchor', 'uncertain', 'off-route', 'floor-change', 'pose-jump']);
+
 /** A snapshot as the tracker would publish it at the check-in point. */
 function anchored(overrides: Partial<TrackerSnapshot> = {}): TrackerSnapshot {
   return {
+    canStartPose: !POSITION_LOST.has(overrides.reason ?? 'awaiting-departure'),
     tier: 'anchored',
     reason: 'awaiting-departure',
     progressMeters: 0,
@@ -403,6 +407,46 @@ describe('the camera view follows where the phone points', () => {
     ).toBeTruthy();
     expect(start.hasAttribute('disabled')).toBe(false);
   });
+
+  it('does not offer AR arrival from a preview while physical placement is still pending', async () => {
+    guidance.progress = 20;
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    vi.spyOn(arRuntime, 'startArGuidance').mockResolvedValue({
+      end: async () => {},
+      realign: () => {},
+    });
+    render(<CameraPreview tracking={trackingLike('denied', anchored())} />);
+    const start = await screen.findByRole('button', { name: 'Start AR' });
+    await act(async () => fireEvent.click(start));
+    expect(screen.queryByRole('button', { name: 'I’m at my destination' })).toBeNull();
+    expect(document.querySelector('.camera-ar-overlay')?.textContent).not.toContain('You are here');
+  });
+
+  it.each(['no-heading', 'sensors-silent', 'sensors-unavailable'] as const)(
+    'offers independent AR when IMU tracking is frozen only for %s',
+    async (reason) => {
+      vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+      const started = vi.spyOn(arRuntime, 'startArGuidance').mockResolvedValue({
+        end: async () => {},
+        realign: () => {},
+      });
+      render(<CameraPreview tracking={trackingLike('on', anchored({ tier: 'frozen', reason }))} />);
+      const start = await screen.findByRole('button', { name: 'Start AR' });
+      expect(start.hasAttribute('disabled')).toBe(false);
+      await act(async () => fireEvent.click(start));
+      expect(started).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(['off-route', 'uncertain', 'floor-change', 'pose-jump', 'no-anchor'] as const)(
+    'does not bypass a frozen physical position (%s) by starting AR',
+    async (reason) => {
+      vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+      render(<CameraPreview tracking={trackingLike('on', anchored({ tier: 'frozen', reason }))} />);
+      const start = await screen.findByRole('button', { name: 'Start AR' });
+      expect(start.hasAttribute('disabled')).toBe(true);
+    },
+  );
 
   it('offers an immersive session where motion sensors are refused or absent', async () => {
     // The session tracks the phone with its own camera; motion access is beside the point.

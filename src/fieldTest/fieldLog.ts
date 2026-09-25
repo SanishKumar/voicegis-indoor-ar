@@ -24,9 +24,10 @@ const SESSION_KEY = 'voicegis_field_test';
 /** Enough for a walk of several minutes; a walk that long keeps its most recent part. */
 const MAX_EVENTS = 500;
 /**
- * The same entry again this soon is one change seen twice, not two: React runs
- * each effect twice in development, which is how the app is served to a phone
- * on the desk (npm run dev:mobile).
+ * The same latest entry for a source again this soon is one change seen twice,
+ * not two: React runs each effect twice in development, which is how the app
+ * is served to a phone on the desk (npm run dev:mobile). A different intervening
+ * state must remain visible, including a quick return to the earlier state.
  */
 const REPEAT_MS = 100;
 
@@ -68,7 +69,9 @@ export function logField(kind: string, detail: FieldEvent['detail'] = {}) {
     index -= 1
   ) {
     const earlier = events[index];
-    if (earlier.kind === kind && JSON.stringify(earlier.detail) === same) return;
+    if (earlier.kind !== kind) continue;
+    if (JSON.stringify(earlier.detail) === same) return;
+    break;
   }
   events.push({ atMs, kind, detail });
   if (events.length > MAX_EVENTS) events.splice(0, events.length - MAX_EVENTS);

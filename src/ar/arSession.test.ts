@@ -89,6 +89,40 @@ function place(z: number, y = 1.4) {
 const route = () => gpu.scene?.children[0];
 
 describe('immersive route pose continuity', () => {
+  it.each(['reference-space', 'hit-test'] as const)(
+    'does not attach an already-ended session while waiting for %s setup',
+    async (stage) => {
+      const session = Object.assign(new EventTarget(), {
+        requestReferenceSpace: async () => {
+          if (stage === 'reference-space') session.dispatchEvent(new Event('end'));
+          return {};
+        },
+        requestHitTestSource: async () => {
+          if (stage === 'hit-test') session.dispatchEvent(new Event('end'));
+          return { cancel: vi.fn() };
+        },
+        end: async () => session.dispatchEvent(new Event('end')),
+      });
+      vi.stubGlobal('navigator', { xr: { requestSession: async () => session } });
+      vi.stubGlobal('XRRay', class {});
+      const tracker = new RouteTracker(track);
+      tracker.anchor({ progressMeters: 0, sigmaMeters: 1, timeMs: now });
+      const onEnd = vi.fn();
+      await expect(
+        startArGuidance({
+          track,
+          tracker,
+          overlay: document.createElement('div'),
+          facingDegrees: () => 90,
+          onEnd,
+        }),
+      ).rejects.toMatchObject({ reason: 'ended' });
+      expect(tracker.read(now).displacementAttached).toBe(false);
+      expect(gpu.loop).toBeNull();
+      expect(onEnd).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('does not count a relocalization jump across a missing pose as walking', async () => {
     const { tracker, handle } = await setup();
     place(0);

@@ -118,6 +118,31 @@ describe('live position with an immersive session attached', () => {
     expect(hook.result.current.status).toBe('denied');
   });
 
+  it('records motion access refusal even while an attached pose keeps guidance live', () => {
+    resetFieldTest(true);
+    try {
+      const { hook } = tracking();
+      act(() => hook.result.current.start());
+      act(() => subscription.onState?.('requesting'));
+      act(() => hook.result.current.attachPose());
+      act(() => subscription.onState?.('denied'));
+
+      expect(hook.result.current.status).toBe('on');
+      expect(
+        fieldEvents()
+          .filter(({ kind }) => kind === 'motion-access')
+          .map(({ detail }) => detail.status),
+      ).toEqual(['off', 'requesting', 'denied']);
+      expect(
+        fieldEvents()
+          .filter(({ kind }) => kind === 'tracking')
+          .at(-1)?.detail,
+      ).toEqual({ status: 'on', pose: true });
+    } finally {
+      resetFieldTest(null);
+    }
+  });
+
   it('records each change of state and every five metres, for a field tester', () => {
     resetFieldTest(true);
     try {

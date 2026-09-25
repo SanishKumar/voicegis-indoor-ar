@@ -14,6 +14,7 @@ function snapshot(overrides: Partial<TrackerSnapshot> = {}): TrackerSnapshot {
     relativeHeadingDegrees: null,
     headingEpoch: 0,
     displacementAttached: true,
+    canStartPose: true,
     walkedSinceAnchorMeters: 4,
     stridesSinceAnchor: 0,
     strideMeters: 0.72,
@@ -40,7 +41,6 @@ function prompt(overrides: Partial<ArPromptInput> = {}) {
     report: report(),
     snapshot: snapshot(),
     arrived: false,
-    atEnd: false,
     floorName: (id) => (id === '1' ? 'Level 1' : undefined),
     ...overrides,
   });
@@ -93,13 +93,22 @@ describe('what the AR view asks of the visitor', () => {
   it('offers to confirm arrival at the end of the route, then only to leave', () => {
     const end = prompt({ snapshot: snapshot({ reason: 'arrived', progressMeters: 20 }) });
     expect(end.action?.kind).toBe('confirm-arrival');
-    expect(prompt({ atEnd: true, snapshot: null }).kind).toBe('arriving');
     expect(prompt({ arrived: true })).toEqual({
       kind: 'arrived',
       note: null,
       action: null,
       leads: 'leave',
     });
+  });
+
+  it('takes arrival only from the physical tracker, never from what the screen shows', () => {
+    // A walk-through preview can have the screen at the destination while the
+    // visitor still stands at the check-in point and the route is being placed.
+    const placing = report({ aligned: false, placement: 'steady', progressMeters: 0 });
+    expect(prompt({ report: placing, snapshot: snapshot({ progressMeters: 0 }) }).kind).toBe(
+      'steady',
+    );
+    expect(prompt({ report: placing, snapshot: null }).action?.kind).not.toBe('confirm-arrival');
   });
 
   it('sends the visitor to scan where re-aligning cannot fix the position', () => {

@@ -54,14 +54,12 @@ export interface ArPromptInput {
   snapshot: TrackerSnapshot | null;
   /** Arrival has been confirmed. */
   arrived: boolean;
-  /** The guidance on screen has reached the end of the route. */
-  atEnd: boolean;
   floorName: (floorId: string) => string | undefined;
 }
 
 const REALIGN = { kind: 'realign', label: 'Re-align' } as const;
 
-export function arPrompt({ report, snapshot, arrived, atEnd, floorName }: ArPromptInput): ArPrompt {
+export function arPrompt({ report, snapshot, arrived, floorName }: ArPromptInput): ArPrompt {
   if (arrived) return { kind: 'arrived', note: null, action: null, leads: 'leave' };
 
   // Before any recovery: the confirmation here also re-places the route.
@@ -76,7 +74,9 @@ export function arPrompt({ report, snapshot, arrived, atEnd, floorName }: ArProm
   }
 
   // Arrival can be confirmed whether or not the phone still knows the room.
-  if (snapshot?.reason === 'arrived' || atEnd) {
+  // Shared guidance may still show a preview while the physical pose is being
+  // placed. Only the physical tracker (or explicit confirmation above) arrives.
+  if (snapshot?.reason === 'arrived') {
     return {
       kind: 'arriving',
       note: 'Your destination is here.',
