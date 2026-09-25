@@ -169,6 +169,46 @@ describe('movement from an attached pose', () => {
     expect(tracker.read(t).floorId).toBe('l1');
   });
 
+  it('refuses a movement no one walks, and waits to be re-aligned', () => {
+    const tracker = attached();
+    let t = move(tracker, 4, EAST); // two metres, walked
+    // Eight metres in fifty milliseconds: the platform re-placed its world.
+    tracker.displace({ dxMeters: 8, dyMeters: 0, timeMs: t + 50 });
+    t += 50;
+    let snap = tracker.read(t);
+    expect(snap.progressMeters).toBeCloseTo(2, 6);
+    expect(snap).toMatchObject({ tier: 'frozen', reason: 'pose-jump', moving: false });
+    // Nothing moves it until the visitor re-aligns.
+    t = move(tracker, 4, EAST, t);
+    expect(tracker.read(t).progressMeters).toBeCloseTo(2, 6);
+    tracker.poseRestored(t);
+    t = move(tracker, 2, EAST, t);
+    snap = tracker.read(t);
+    expect(snap.reason).toBe('following');
+    expect(snap.progressMeters).toBeCloseTo(3, 6);
+  });
+
+  it('refuses a run of small pieces that add up to a sprint', () => {
+    const tracker = attached();
+    // Half a metre every fifty milliseconds is ten metres a second.
+    const t = move(tracker, 6, EAST, 0, 50);
+    expect(tracker.read(t).reason).toBe('pose-jump');
+    expect(tracker.read(t).progressMeters).toBeLessThan(1);
+  });
+
+  it('checks speed on the first piece after alignment too', () => {
+    const tracker = attached();
+    tracker.displace({ dxMeters: 0.4, dyMeters: 0, timeMs: 50 });
+    expect(tracker.read(50)).toMatchObject({ progressMeters: 0, reason: 'pose-jump' });
+  });
+
+  it('does not accept movement reported twice at the same time', () => {
+    const tracker = attached();
+    tracker.displace({ dxMeters: 0.2, dyMeters: 0, timeMs: 200 });
+    tracker.displace({ dxMeters: 0.2, dyMeters: 0, timeMs: 200 });
+    expect(tracker.read(200)).toMatchObject({ progressMeters: 0.2, reason: 'pose-jump' });
+  });
+
   it('grows uncertainty far more slowly than strides would', () => {
     const tracker = attached();
     const t = move(tracker, 40, EAST);

@@ -49,11 +49,13 @@ export type TrackingReason =
   | 'wrong-way'
   /** Strides keep disagreeing with the corridor. */
   | 'off-route'
-  /** The gyroscope is missing or silent; strides are counted along the route without a heading check. */
+  /** The gyroscope is missing or silent; strides are counted but move nothing, since their direction is unknown. */
   | 'no-heading'
   /** At a lift or stair, waiting for the storey change to be confirmed. */
   | 'floor-change'
   | 'arrived'
+  /** An attached pose reported a movement no one walks; it waits for re-alignment or a scan. */
+  | 'pose-jump'
   /** The motion stream stopped. */
   | 'sensors-silent'
   | 'sensors-unavailable';
@@ -144,6 +146,14 @@ type Phase = 'unanchored' | 'orienting' | 'following' | 'floor-change';
 const GUIDANCE_SAMPLE_GAP_MS = 2_500;
 /** Pose movement smaller than this is the phone being held, not carried. */
 const MIN_DISPLACEMENT_METERS = 0.05;
+/**
+ * A pose reports movement in small pieces - the session hands it over every
+ * quarter of a metre or so. A single piece longer than this, or one implying
+ * a speed nobody walks at indoors, is the platform re-placing its world, and
+ * counting it would carry the marker metres down a corridor in an instant.
+ */
+const MAX_DISPLACEMENT_METERS = 1.5;
+const MAX_DISPLACEMENT_SPEED_MPS = 5;
 
 function circularMean(degrees: readonly number[]) {
   let x = 0;
@@ -181,6 +191,8 @@ export class RouteTracker {
   private lastAnchor: { progress: number; strides: number } | null = null;
   private displacement = false;
   private displaced = 0;
+  private poseJumped = false;
+  private lastMovedMs: number | null = null;
   private facingPlan: number | null = null;
   private headingEpoch = 0;
 
@@ -245,6 +257,8 @@ export class RouteTracker {
     }
     this.progress = progress;
     this.anchorSigma = Math.max(0.1, input.sigmaMeters);
+    this.poseJumped = false;
+    this.lastMovedMs = input.timeMs;
     this.walked = 0;
     this.displaced = 0;
     this.strides = 0;
@@ -274,6 +288,8 @@ export class RouteTracker {
   attachDisplacement(timeMs: number) {
     this.nowMs = Math.max(this.nowMs, timeMs);
     this.displacement = true;
+    this.poseJumped = false;
+    this.lastMovedMs = timeMs;
     this.facingPlan = null;
     if (this.phase === 'orienting') this.phase = 'following';
   }
@@ -282,8 +298,20 @@ export class RouteTracker {
   detachDisplacement(timeMs: number) {
     this.nowMs = Math.max(this.nowMs, timeMs);
     this.displacement = false;
+    this.poseJumped = false;
     this.facingPlan = null;
     if (this.phase === 'following') this.beginOrienting();
+  }
+
+  /**
+   * The visitor has re-aligned the pose to the route after a jump. What the
+   * jump claimed was never counted, so there is nothing to undo; the next
+   * movement is measured from here.
+   */
+  poseRestored(timeMs: number) {
+    this.nowMs = Math.max(this.nowMs, timeMs);
+    this.poseJumped = false;
+    this.lastMovedMs = timeMs;
   }
 
   /** Which way the camera faces, as a plan bearing, while a pose is attached. */
@@ -308,6 +336,16 @@ export class RouteTracker {
     if (this.phase === 'unanchored' || this.phase === 'floor-change') return;
     const meters = Math.hypot(input.dxMeters, input.dyMeters);
     if (meters < MIN_DISPLACEMENT_METERS) return;
+    const seconds = this.lastMovedMs === null ? null : (input.timeMs - this.lastMovedMs) / 1000;
+    if (
+      this.poseJumped ||
+      meters > MAX_DISPLACEMENT_METERS ||
+      (seconds !== null && (seconds <= 0 || meters / seconds > MAX_DISPLACEMENT_SPEED_MPS))
+    ) {
+      this.poseJumped = true;
+      return;
+    }
+    this.lastMovedMs = input.timeMs;
     if (this.phase === 'orienting') this.phase = 'following';
     this.displaced += meters;
     const heading = wrapDegrees((Math.atan2(input.dxMeters, -input.dyMeters) * 180) / Math.PI);
@@ -376,19 +414,26 @@ export class RouteTracker {
     this.walked += this.strideMeters;
 
     if (this.gyroMissing) {
-      // No direction at all: count the stride along the route and say so.
-      this.advance(this.strideMeters);
+      /*
+       * No direction at all. A stride with no heading could be along the
+       * corridor, across it or back the way the visitor came, and moving the
+       * marker on regardless is guessing out loud. The distance still counts
+       * towards uncertainty - the person is moving, even if the marker is not.
+       */
       return;
     }
 
     const relative = this.integrator.heading;
+    // Do not guess during the short diagnostic window before gyroMissing
+    // becomes true either. A detected footfall still needs a usable heading.
+    if (relative === null) return;
     if (this.phase === 'orienting') {
       if (this.compassOpposesRoute()) {
         this.wrongWay = true;
         return;
       }
       this.wrongWay = false;
-      if (relative !== null) this.orientHeadings.push(relative);
+      this.orientHeadings.push(relative);
       this.advance(this.strideMeters);
       if (this.orientHeadings.length >= this.options.orientingStrides) {
         this.alignment = wrapDegrees(
@@ -515,6 +560,9 @@ export class RouteTracker {
     } else if (this.silent(this.nowMs)) {
       tier = 'frozen';
       reason = 'sensors-silent';
+    } else if (this.poseJumped) {
+      tier = 'frozen';
+      reason = 'pose-jump';
     } else if (this.phase === 'floor-change') {
       tier = 'frozen';
       reason = 'floor-change';
@@ -531,10 +579,10 @@ export class RouteTracker {
     } else if (this.wrongWay) {
       tier = 'caution';
       reason = 'wrong-way';
-    } else if (this.gyroMissing) {
-      tier = 'caution';
+    } else if (this.gyroMissing && !this.displacement) {
+      // An attached pose carries its own direction; only strides need a gyroscope.
+      tier = 'frozen';
       reason = 'no-heading';
-      moving = true;
     } else if (this.disagree >= this.options.offRouteCaution) {
       tier = 'caution';
       reason = 'off-route';

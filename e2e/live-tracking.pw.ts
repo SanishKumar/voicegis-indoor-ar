@@ -320,6 +320,64 @@ test('the camera view draws the route from the tracked position and turns it wit
   await walker(page, 'walker.stop();');
 });
 
+test('a walk-through preview never runs on underneath a real walk', async ({ page }) => {
+  test.setTimeout(60_000);
+  await installSensors(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      value: async () => new MediaStream(),
+    });
+  });
+  await openPharmacyRoute(page);
+  await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
+  const canvas = page.locator('.compiled-map-canvas');
+
+  // A preview, playing: the guidance moves on with nobody walking.
+  const showSteps = page.getByRole('button', { name: /^Show all [0-9]+ steps$/ });
+  if (await showSteps.isVisible()) await showSteps.click();
+  await page.getByRole('button', { name: /walk-through/i }).click();
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-route-progress')))
+    .toBeGreaterThan(2);
+
+  // The camera's own tracking button used to leave the preview running, so
+  // the distance kept falling while the view said the visitor was standing
+  // at the check-in point. Starting a real walk must stop the preview.
+  await page.getByRole('button', { name: 'Camera view' }).click();
+  await page.getByRole('button', { name: 'Track my walk' }).click();
+  const view = page.locator('.camera-preview');
+  await expect(view).toHaveAttribute('data-tracking', 'on');
+  const left = page.locator('.ar-sheet-facts');
+  await page.waitForTimeout(600);
+  const settled = await left.innerText();
+  await page.waitForTimeout(2_500);
+  expect(await left.innerText()).toBe(settled);
+  await page.getByRole('button', { name: 'Exit to plan' }).click();
+  await expect(canvas).toHaveAttribute('data-route-progress', '0.00');
+});
+
+test('inspecting a step pauses tracking and resuming keeps the physical position', async ({
+  page,
+}) => {
+  await installSensors(page);
+  await openPharmacyRoute(page);
+  await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
+  await page.getByRole('button', { name: 'Track my walk' }).click();
+  const journey = page.locator('.jr');
+  const canvas = page.locator('.compiled-map-canvas');
+  await expect(journey).toHaveAttribute('data-tracking', 'on');
+  const showSteps = page.getByRole('button', { name: /^Show all [0-9]+ steps$/ });
+  if (await showSteps.isVisible()) await showSteps.click();
+  await page.getByRole('button', { name: /^Go to step 2:/ }).click();
+  await expect(journey).toHaveAttribute('data-tracking', 'off');
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-route-progress')))
+    .toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Track my walk' }).click();
+  await expect(journey).toHaveAttribute('data-tracking', 'on');
+  await expect(canvas).toHaveAttribute('data-route-progress', '0.00');
+});
+
 test('a walk that leaves the route is reported, not followed', async ({ page }) => {
   test.setTimeout(60_000);
   await installSensors(page);

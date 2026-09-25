@@ -57,6 +57,15 @@ const AHEAD_METERS = 30;
 const FLUSH_METERS = 0.25;
 const FLUSH_MS = 250;
 const REPORT_MS = 200;
+/**
+ * A viewer that moves further than this between two frames, faster than
+ * anyone walks or after a long silence, has been re-placed by the platform
+ * rather than carried. The route is hidden until the visitor re-aligns; the
+ * jump is never counted as walking.
+ */
+const POSE_JUMP_METERS = 0.5;
+const MAX_POSE_SPEED_MPS = 4;
+const MAX_POSE_GAP_MS = 1_000;
 /** A floor hit further than this from the running estimate is a table, not the floor. */
 const FLOOR_HIT_TOLERANCE_METERS = 0.8;
 
@@ -198,6 +207,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
   let floorY = 0;
   let floorHits = 0;
   let last: { x: number; z: number } | null = null;
+  let lastAtMs = 0;
   let pendingX = 0;
   let pendingZ = 0;
   let pendingSince = 0;
@@ -262,6 +272,8 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     );
     alignedFloor = snapshot.floorId;
     last = { x: viewer.x, z: viewer.z };
+    lastAtMs = nowMs;
+    tracker.poseRestored(nowMs);
     pendingX = 0;
     pendingZ = 0;
     pendingSince = nowMs;
@@ -362,9 +374,21 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     if (alignment === null) {
       align(viewer, nowMs);
     } else if (last !== null) {
+      const step = Math.hypot(viewer.x - last.x, viewer.z - last.z);
+      const elapsedMs = nowMs - lastAtMs;
+      if (
+        step > POSE_JUMP_METERS &&
+        (elapsedMs > MAX_POSE_GAP_MS ||
+          step / Math.max(0.001, elapsedMs / 1000) > MAX_POSE_SPEED_MPS)
+      ) {
+        hold('pose-lost', nowMs);
+        renderer.render(scene, camera);
+        return;
+      }
       pendingX += viewer.x - last.x;
       pendingZ += viewer.z - last.z;
       last = { x: viewer.x, z: viewer.z };
+      lastAtMs = nowMs;
       const moved = Math.hypot(pendingX, pendingZ);
       if (moved >= FLUSH_METERS || (nowMs - pendingSince >= FLUSH_MS && moved >= 0.05)) {
         const [dx, dy] = worldDisplacementToPlan(alignment, pendingX, pendingZ);
@@ -380,6 +404,13 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     // without counting any movement; missing/emulated/recovering poses exit above.
     if (alignment !== null) tracker.displace({ dxMeters: 0, dyMeters: 0, timeMs: nowMs });
     const snapshot = tracker.read(nowMs);
+    if (snapshot.reason === 'pose-jump') {
+      // The tracker also checks movement independently. Its rejection must
+      // use the same explicit recovery path as a lost/jumping viewer pose.
+      hold('pose-lost', nowMs);
+      renderer.render(scene, camera);
+      return;
+    }
     if (alignment !== null) {
       // A storey change moves the floor under the session's feet: start again there.
       if (snapshot.floorId !== alignedFloor) {

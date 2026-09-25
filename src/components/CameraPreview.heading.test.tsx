@@ -33,6 +33,8 @@ const route = {
 };
 
 const setView = vi.fn();
+/** How far along the guidance on screen is: a walk-through can move it without anyone walking. */
+const guidance = vi.hoisted(() => ({ progress: 0 }));
 vi.mock('../context/NavigationContext.jsx', () => ({
   VIEW_TYPE: { MAP: 'map', CAMERA_PREVIEW: 'camera-preview' },
   NAV_STATUS: { NAVIGATING: 'navigating', ARRIVED: 'arrived' },
@@ -40,7 +42,7 @@ vi.mock('../context/NavigationContext.jsx', () => ({
     state: {
       activeView: 'camera-preview',
       navStatus: 'navigating',
-      progressMeters: 0,
+      progressMeters: guidance.progress,
       previewStepIndex: 0,
       venueKey: 'synthetic-venue',
       locationBasis: 'qr',
@@ -155,6 +157,7 @@ function runFrames(count = 2) {
 beforeEach(() => {
   painted.length = 0;
   frames = [];
+  guidance.progress = 0;
   clock = 1_000;
   vi.spyOn(performance, 'now').mockImplementation(() => clock);
   vi.stubGlobal(
@@ -364,6 +367,37 @@ describe('the camera view follows where the phone points', () => {
     // The overlay an immersive session would show holds nothing until one runs.
     expect(document.querySelectorAll('.camera-preview-instruction-text')).toHaveLength(1);
     expect(document.querySelector('.camera-ar-overlay')!.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('places an immersive session from where the visitor is, never from a preview', async () => {
+    // A walk-through has moved the guidance twelve metres on; nobody walked.
+    guidance.progress = 12;
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    const started = vi
+      .spyOn(arRuntime, 'startArGuidance')
+      .mockResolvedValue({ end: async () => {}, realign: () => {} });
+    // The tracker is anchored at the check-in point, which is where they stand.
+    render(<CameraPreview tracking={trackingLike('on', anchored())} />);
+    // Found outside act(): awaiting inside it holds the render that shows the button.
+    const start = await screen.findByRole('button', { name: 'Start AR' });
+    await act(async () => fireEvent.click(start));
+    expect(started).toHaveBeenCalledTimes(1);
+    expect(started.mock.calls[0][0].tracker.read(0).progressMeters).toBe(0);
+    expect(started.mock.calls[0][0].facingDegrees()).toBe(90);
+  });
+
+  it('does not invent an AR anchor when tracking has no physical start', async () => {
+    guidance.progress = 12;
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    const started = vi.spyOn(arRuntime, 'startArGuidance');
+    render(<CameraPreview tracking={trackingLike('off')} />);
+    const start = await screen.findByRole('button', { name: 'Start AR' });
+    await act(async () => fireEvent.click(start));
+    expect(started).not.toHaveBeenCalled();
+    expect(
+      screen.getByText('Scan a check-in code so the route can be placed from where you stand.'),
+    ).toBeTruthy();
+    expect(start.hasAttribute('disabled')).toBe(false);
   });
 
   it('starts an immersive session from one tap, taking that tap as facing the corridor', async () => {

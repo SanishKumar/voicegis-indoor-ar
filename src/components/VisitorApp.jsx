@@ -63,6 +63,33 @@ export default function VisitorApp() {
   });
   const live = tracking.status === 'on';
   const following = track !== null && (live || walkthrough.playing || state.progressMeters > 0);
+  /*
+   * Only one of them may write progress at a time, and that is enforced here,
+   * once, rather than trusted to every button that starts one. The map's own
+   * control paused the walk-through first; the camera's did not, and a preview
+   * went on counting down underneath a real walk. Starting either now stops
+   * the other, whichever view the tap came from. A preview is never where the
+   * visitor physically is, so stopping a walk to preview keeps the tracker's
+   * own position for when tracking resumes.
+   */
+  const trackingControl = {
+    ...tracking,
+    start: () => {
+      walkthrough.pause();
+      tracking.start();
+    },
+  };
+  const walkthroughControl = {
+    ...walkthrough,
+    play: () => {
+      tracking.stop();
+      walkthrough.play();
+    },
+    toggle: () => {
+      if (!walkthrough.playing) tracking.stop();
+      walkthrough.toggle();
+    },
+  };
 
   /*
    * Spoken turns belong to the journey, not to a view: the same instruction
@@ -137,15 +164,15 @@ export default function VisitorApp() {
             <SearchPanel />
             <POICard />
             <JourneyChrome
-              walkthrough={walkthrough}
-              tracking={tracking}
+              walkthrough={walkthroughControl}
+              tracking={trackingControl}
               voice={voice}
               onVoice={setVoice}
               onRecoverySlot={setMapRecoveryTarget}
             />
           </>
         )}
-        <CameraPreview tracking={tracking} voice={voice} onVoice={setVoice} />
+        <CameraPreview tracking={trackingControl} voice={voice} onVoice={setVoice} />
       </main>
       <StatusBar />
       <LocationPicker isOpen={showLocationPicker} onClose={() => setShowLocationPicker(false)} />

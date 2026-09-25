@@ -248,12 +248,23 @@ export default function JourneyChrome({
         : 'Track my walk';
   const scanFixes =
     live &&
-    ['no-anchor', 'uncertain', 'off-route', 'wrong-way', 'floor-change'].includes(snap?.reason);
+    [
+      'no-anchor',
+      'uncertain',
+      'off-route',
+      'wrong-way',
+      'floor-change',
+      'no-heading',
+      'pose-jump',
+    ].includes(snap?.reason);
   const liveArrived = live && snap?.reason === 'arrived';
   const liveFloorChange = live && snap?.reason === 'floor-change' && snap.pendingFloor;
 
   const stepTo = (move) => {
     walkthrough.pause();
+    // The expanded step list remains inspectable during a walk. Entering
+    // preview there must release live progress just like the walk-through.
+    tracking?.stop();
     move();
   };
   const startTracking = () => {
@@ -583,9 +594,15 @@ function describeTracking(snap, floorName) {
         : { label: 'Off route', detail: 'Tracking paused. Return to the route and scan a code.' };
     case 'no-heading':
       return {
-        label: 'Counting steps',
+        label: 'No direction',
         detail:
-          'No gyroscope reading, so steps are counted along the route without a direction check.',
+          'This phone is not reporting turns, so your walk cannot be followed. Step through the route, or scan a code where you are.',
+      };
+    case 'pose-jump':
+      return {
+        label: 'Lost its place',
+        detail:
+          'The camera jumped rather than moved. Face along the corridor and re-align, or scan a code where you are.',
       };
     case 'floor-change':
       return {

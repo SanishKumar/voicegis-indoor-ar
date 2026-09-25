@@ -114,8 +114,12 @@ export function startOrientationFeed({ onReading, onState }) {
       requesting = false;
       granted = permission === 'granted';
       if (paused || document.hidden) return;
-      if (granted) listen();
-      else report('denied');
+      if (!granted) report('denied');
+      // The listeners usually went on at startup, so listen() would change
+      // nothing and the state would sit at 'requesting' for good. Say what is
+      // true now: granted, and either reading or still waiting for a reading.
+      else if (listening) report(reading !== null ? 'listening' : 'waiting');
+      else listen();
     };
     try {
       Promise.resolve(constructor.requestPermission()).then(complete, () => complete('denied'));

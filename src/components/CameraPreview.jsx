@@ -35,7 +35,6 @@ import { bannerCopy, formatMeters, formatMinutes } from './journey/guidanceCopy'
 import { speechAvailable } from './journey/useSpokenGuidance.js';
 import ManeuverIcon from './journey/ManeuverIcon.jsx';
 import { landmarksFrom } from '../engine/routeLandmarks';
-import { ANCHOR_SIGMA } from '../navigation/liveTracker';
 import { bearingAt, guidanceAt, positionAt, trackForRoute } from '../navigation/routeProgress';
 import { facingFrom } from '../ar/facingFrom';
 import { startOrientationFeed } from '../ar/orientationFeed';
@@ -646,14 +645,6 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
     // the flat view's orientation feed left this button doing nothing at all on
     // phones where that feed never started - which were the phones it was for.
     if (!track || !tracking || !overlayRef.current || arStarting || arBlocked) return;
-    const cameraFacing = facingFrom({
-      track,
-      live,
-      snapshot: tracking.peek().snapshot,
-      yaw: yawRef.current,
-      anchor: anchorRef.current,
-      fallbackProgress: progressMeters,
-    });
     const owner = ++arOwnerRef.current;
     setArProblem(null);
     setArStarting(true);
@@ -662,18 +653,16 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       if (tracking.status !== 'on') tracking.start();
       const tracker = tracking.tracker();
       if (!tracker) throw new ArStartError('failed');
-      const now = performance.now();
-      const current = tracker.isAnchored ? tracker.read(now).progressMeters : null;
-      // The session assumes the visitor stands where the guidance is. A
-      // tracker that has not been anchored, or that disagrees with a
-      // walk-through the visitor advanced by hand, is anchored there with the
-      // uncertainty of a chosen point rather than a scanned one.
-      if (current === null || Math.abs(current - progressMeters) > 0.5) {
-        tracker.anchor({
-          progressMeters,
-          sigmaMeters: ANCHOR_SIGMA.selected,
-          timeMs: now,
-        });
+      /*
+       * The session places the route from where the tracker says the visitor
+       * physically is: the check-in point it anchored at, or wherever a walk
+       * has carried it since. It used to re-anchor at the distance shown on
+       * screen, which may be a walk-through preview - and previewing a stretch
+       * of route is not having walked it.
+       */
+      if (!tracker.isAnchored) {
+        setArProblem('Scan a check-in code so the route can be placed from where you stand.');
+        return;
       }
       const handle = await startArGuidance({
         track,
@@ -681,15 +670,11 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         overlay: overlayRef.current,
         /*
          * Tapping Start AR is the declaration that the visitor is facing along
-         * the corridor, which is what the note beside the button asks of them.
-         * An alignment the flat view already holds is more exact - the phone
-         * may have turned since - so it is used when there is one; it was taken
-         * before XR displacement attaches and clears the walk heading.
+         * the corridor where they physically are, which is what the note beside
+         * the button asks of them. A flat-view alignment is not carried over:
+         * it was read against the distance on screen, which a preview can move.
          */
-        facingDegrees: () =>
-          cameraFacing.source === 'aligned'
-            ? cameraFacing.facing
-            : bearingAt(track, tracker.read(performance.now()).progressMeters),
+        facingDegrees: () => bearingAt(track, tracker.read(performance.now()).progressMeters),
         onFrame: (report) => {
           if (arOwnerRef.current === owner) setArReport(report);
         },

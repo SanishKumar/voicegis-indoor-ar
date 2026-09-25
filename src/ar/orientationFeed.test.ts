@@ -71,6 +71,20 @@ describe('a platform that asks before it reports orientation', () => {
     expect(request).toHaveBeenCalledTimes(2);
   });
 
+  it('says a granted permission is waiting for readings rather than still asking', async () => {
+    // Listeners are attached at startup, so a grant that arrives later must
+    // move the state on by itself; it used to sit at 'requesting' for good.
+    gatedBy('granted');
+    const { feed, state } = setup();
+    feed.request();
+    expect(state).toHaveBeenLastCalledWith('requesting');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(state).toHaveBeenLastCalledWith('waiting');
+    emit(10);
+    expect(state).toHaveBeenLastCalledWith('listening');
+  });
+
   it('clears a request that settled while the camera was in the background', async () => {
     // A refusal, so that a retry is meaningful: a grant would rightly not be asked twice.
     const request = gatedBy('denied');

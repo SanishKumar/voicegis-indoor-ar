@@ -1,6 +1,6 @@
 # Visitor live tracking
 
-17 September 2026. `src/navigation/liveTracker.ts` and
+Updated 25 September 2026. `src/navigation/liveTracker.ts` and
 `src/components/journey/useLiveTracking.js` move the visitor's guidance from
 the phone's own motion sensors. This is **guidance, not evidence**: it exists so
 that a person following a route does not have to press anything, and it is
@@ -59,14 +59,22 @@ the new floor. Frozen holds: once twelve stride-equivalents have disagreed, or
 uncertainty has passed twelve metres, nothing moves the marker until a scan
 gives it a new anchor.
 
+Pose continuity is checked in two places. The session rejects a change over
+0.5 m when it implies more than 4 m/s or follows a frame gap over one second.
+The tracker independently rejects a displacement over 1.5 m, speed over
+5 m/s, or non-increasing movement timestamps, including the first movement
+after alignment. Either rejection hides the route and requests explicit
+re-alignment; the rejected movement is not replayed after recovery. These
+are experimental software thresholds, not device-qualified accuracy limits.
+
 ## The four tiers
 
-| Tier     | Meaning                                                                                             | What the interface does                                                             |
-| -------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| anchored | At a known point, no strides yet                                                                    | "Anchored"; says to set off along the route                                         |
-| tracking | Strides agree with the corridor; σ under 6 m                                                        | Marker moves; banner counts down; map follows heading-up                            |
-| caution  | σ over 6 m, a run of disagreeing strides, walking back the way you came, or no gyroscope            | Marker still moves; label says why; a scan is offered                               |
-| frozen   | No anchor, sensors silent or missing, twelve disagreeing strides, σ over 12 m, or waiting at a lift | Marker holds; label says what would help; a scan or a floor confirmation is offered |
+| Tier     | Meaning                                                                                                                            | What the interface does                                                                         |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| anchored | At a known point, no strides yet                                                                                                   | "Anchored"; says to set off along the route                                                     |
+| tracking | Strides agree with the corridor; σ under 6 m                                                                                       | Marker moves; banner counts down; map follows heading-up                                        |
+| caution  | σ over 6 m, a run of disagreeing strides, or walking back the way you came                                                         | Marker still moves; label says why; a scan is offered                                           |
+| frozen   | No anchor or stride heading, sensors silent or missing, a pose jump, twelve disagreeing strides, σ over 12 m, or waiting at a lift | Marker holds; label says what would help; re-alignment, a scan or floor confirmation is offered |
 
 The pill in the instruction banner carries the tier by weight - solid,
 heavier rule, broken rule - not by hue, in keeping with the rest of the
@@ -85,6 +93,15 @@ stride. Arrival is reported from 2.5 m out (`ARRIVAL_METERS`, which the
 journey reducer shares); a visitor who confirms it from within that radius is
 believed, the marker lands at the door and tracking ends. Nothing here
 persists across a reload.
+
+The visitor shell owns the choice between tracking and a walk-through:
+starting tracking pauses the preview, and starting a walk-through or selecting
+an instruction to inspect stops tracking. A preview changes the guidance on screen, never the tracker's
+physical position. AR startup uses that physical position and its route
+bearing; it refuses to create an anchor from a preview. No-heading strides
+increase uncertainty without moving the marker, including the first stride
+before the missing-gyroscope diagnosis settles. XR displacement carries its
+own direction and does not require the stride integrator's heading.
 
 ## The camera view's own sensors
 

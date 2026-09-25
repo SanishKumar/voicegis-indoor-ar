@@ -183,17 +183,43 @@ describe('route tracker', () => {
     expect(walker.read().reason).toBe('following');
   });
 
-  it('counts strides along the route with a warning when there is no gyroscope', () => {
+  it('holds the marker rather than guess when there is no gyroscope', () => {
     const tracker = new RouteTracker(corner);
     const walker = new Walker(tracker, false);
     walker.still(400);
     tracker.anchor({ progressMeters: 0, sigmaMeters: ANCHOR_SIGMA.scan, timeMs: walker.t });
     walker.still(600);
-    walker.steps(8);
+    walker.steps(10);
     const snapshot = walker.read();
-    expect(snapshot).toMatchObject({ tier: 'caution', reason: 'no-heading', moving: true });
-    expect(snapshot.progressMeters).toBeGreaterThan(4);
+    // Ten strides of unknown direction move nothing; they used to move 7 m.
+    expect(snapshot).toMatchObject({ tier: 'frozen', reason: 'no-heading', moving: false });
+    expect(snapshot.progressMeters).toBe(0);
     expect(snapshot.headingDegrees).toBeNull();
+    // The person is moving even though the marker is not, so doubt grows.
+    expect(snapshot.sigmaMeters).toBeGreaterThan(ANCHOR_SIGMA.scan);
+  });
+
+  it('does not move on a heading-free first stride while still diagnosing the gyroscope', () => {
+    const tracker = new RouteTracker(corner);
+    const walker = new Walker(tracker, false);
+    tracker.anchor({ progressMeters: 0, sigmaMeters: ANCHOR_SIGMA.scan, timeMs: 0 });
+    walker.still(200);
+    walker.steps(1);
+    expect(walker.read().stridesSinceAnchor).toBe(1);
+    expect(walker.read().progressMeters).toBe(0);
+  });
+
+  it('lets a pose carry the direction when there is no gyroscope', () => {
+    const tracker = new RouteTracker(corner);
+    const walker = new Walker(tracker, false);
+    walker.still(400);
+    tracker.anchor({ progressMeters: 0, sigmaMeters: ANCHOR_SIGMA.scan, timeMs: walker.t });
+    walker.still(600);
+    tracker.attachDisplacement(walker.t);
+    tracker.displace({ dxMeters: 0.5, dyMeters: 0, timeMs: walker.t + 200 });
+    const snapshot = tracker.read(walker.t + 200);
+    expect(snapshot.reason).not.toBe('no-heading');
+    expect(snapshot.progressMeters).toBeCloseTo(0.5, 6);
   });
 
   it('freezes when the motion stream goes silent', () => {

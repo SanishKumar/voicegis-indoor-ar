@@ -103,8 +103,54 @@ describe('immersive route pose continuity', () => {
     handle.realign();
     frame(-8);
     expect(tracker.read(now).progressMeters).toBe(0);
-    frame(-9);
-    expect(tracker.read(now).progressMeters).toBeCloseTo(1);
+    // A metre at walking pace, a frame at a time; a metre in one frame is a jump.
+    for (let z = -8.05; z >= -9.001; z -= 0.05) frame(z);
+    expect(tracker.read(now).progressMeters).toBeCloseTo(1, 1);
+    await handle.end();
+  });
+
+  it('does not count a jump the platform never flagged as walking', async () => {
+    // Eight metres in fifty milliseconds with a valid pose either side of it.
+    const { tracker, handle, report } = await setup();
+    frame(0);
+    frame(-8);
+    expect(tracker.read(now).progressMeters).toBe(0);
+    expect(gpu.scene?.children[0].visible).toBe(false);
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({ aligned: false, recovery: 'pose-lost' }),
+    );
+    await handle.end();
+  });
+
+  it('does not count a slow-looking jump across a long gap in frames', async () => {
+    const { tracker, handle } = await setup();
+    frame(0);
+    now += 10_000; // the session stalled; eight metres over ten seconds is not a walk seen
+    frame(-8);
+    expect(tracker.read(now).progressMeters).toBe(0);
+    expect(gpu.scene?.children[0].visible).toBe(false);
+    await handle.end();
+  });
+
+  it('offers pose recovery when the tracker rejects small but implausibly fast movements', async () => {
+    const { tracker, handle, report } = await setup();
+    frame(0);
+    // Each change is below the session's large-jump threshold, but the
+    // tracker's independent speed check must still reach the recovery UI.
+    frame(-0.4);
+    frame(-0.8);
+    const heldProgress = tracker.read(now).progressMeters;
+    expect(gpu.scene?.children[0].visible).toBe(false);
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({ aligned: false, recovery: 'pose-lost' }),
+    );
+    frame(-2);
+    expect(tracker.read(now).progressMeters).toBe(heldProgress);
+    handle.realign();
+    frame(-2);
+    for (let index = 1; index <= 20; index += 1) frame(-2 - index * 0.05);
+    expect(tracker.read(now).progressMeters).toBeCloseTo(heldProgress + 1, 1);
+    expect(gpu.scene?.children[0].visible).toBe(true);
     await handle.end();
   });
   it('keeps a genuinely observed stationary pose fresh without inventing movement', async () => {

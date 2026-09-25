@@ -742,3 +742,60 @@ Implemented in the Visitor surface, after review of the current product:
 - **Gate.** lint, tsc, 1,169 unit tests including new suites for the attitude
   maths, the facing rule and the world labels; 48 visitor browser journeys on
   both projects.
+
+### Visitor progress integrity and AR recovery — 25 September 2026
+
+This completes the unfinished visitor-only fixes following `23fff0b`; no
+operator features, compiler behavior or venue data changed in this slice.
+
+- Starting live tracking pauses the walk-through in the shared visitor shell,
+  including starts from the camera view. Starting a walk-through or inspecting
+  an instruction stops tracking. Resuming tracking returns to the tracker's
+  retained physical position, not the inspected step.
+- AR startup uses the tracker's anchored progress and the route bearing there.
+  It never re-anchors to preview progress, and refuses startup without an anchor.
+  Facing the corridor remains an explicit user assumption, not automatic
+  recognition of the building.
+- Permission grants move camera orientation from asking to waiting/listening
+  even when event listeners were attached before the permission request.
+- Missing heading holds stride-based progress while uncertainty grows. This
+  includes the first footfall, before the missing-gyroscope diagnosis settles.
+  An attached XR pose supplies its own movement direction.
+- Large/fast pose changes and long-gap jumps hide the route and require explicit
+  re-alignment. The tracker has a separate distance/speed/time backstop, including
+  first movement and duplicate timestamps. A tracker rejection now enters the
+  same visible AR recovery state; recovery starts from a new pose baseline and
+  does not count rejected movement.
+
+During completion, added regressions first failed against the incoming working
+code: a heading-free first stride moved 0.72 m, the first fast pose delta moved
+0.4 m, repeated movement timestamps counted twice, and tracker rejection failed
+to request AR recovery. A production-browser regression also reproduced manual
+step selection leaving tracking active. These paths were fixed before rerunning
+the checks.
+
+`npm run check` passes: 1,207 tests across 103 files, lint, types, venue/replay/QR
+checks and the public build. Venue hashes are unchanged. The existing large
+JavaScript chunk warning remains.
+
+The first CI-mode visitor browser run hit the shared eight-minute suite limit
+after 46 passing tests; eight mobile map tests never ran. Increased only the
+aggregate Playwright CI budget to 15 minutes and the GitHub job budget to
+25 minutes (installation plus operator and public-offline runs). Individual
+test deadlines, expectations, retries and worker count are unchanged.
+
+The complete local CI-mode `npm run test:browser` then passed: **110
+desktop/mobile tests** in 11.3 minutes, **12 public offline tests** in 39.7
+seconds, and **two install/update-failure tests** in 17.5 seconds. No retries,
+skips or test failures. The earlier intermittent map-idle assertion passed on
+both projects in this full run; this is not a claim that its intermittency has
+been diagnosed. The hosted GitHub workflow runs on the push of this slice;
+its result is not recorded here.
+
+Remaining before a real-life MVP claim: independent XR versus ordinary sensor
+permission/lifecycle handling, explicit in-session placement and floor/arrival
+recovery, supported-handset testing (including camera alignment and interruption
+recovery), and an authorized surveyed venue pilot. The flat camera's FOV remains
+assumed; world tracking is not automatic building localization. Dynamic obstacle
+avoidance and real-world occlusion are not implemented. Synthetic tests do not
+establish positional accuracy. This slice is pushed to GitHub; nothing is deployed.
