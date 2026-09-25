@@ -101,6 +101,8 @@ function trackingLike(status: string, snapshot: TrackerSnapshot | null = null) {
     confirmFloor: vi.fn(),
     peek: () => ({ gravity: null, snapshot }),
     tracker: () => tracker,
+    attachPose: vi.fn(),
+    detachPose: vi.fn(),
   };
 }
 
@@ -398,6 +400,30 @@ describe('the camera view follows where the phone points', () => {
       screen.getByText('Scan a check-in code so the route can be placed from where you stand.'),
     ).toBeTruthy();
     expect(start.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('offers an immersive session where motion sensors are refused or absent', async () => {
+    // The session tracks the phone with its own camera; motion access is beside the point.
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    render(<CameraPreview tracking={{ ...trackingLike('unsupported'), plausible: false }} />);
+    expect(await screen.findByRole('button', { name: 'Start AR' })).toBeTruthy();
+  });
+
+  it('marks the position live for as long as a session runs, however it ends', async () => {
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    vi.spyOn(arRuntime, 'startArGuidance').mockImplementation(async (options) => ({
+      end: async () => options.onEnd?.('ended'),
+      realign: () => {},
+    }));
+    const tracking = trackingLike('on', anchored());
+    const rendered = render(<CameraPreview tracking={tracking} />);
+    const start = await screen.findByRole('button', { name: 'Start AR' });
+    await act(async () => fireEvent.click(start));
+    expect(tracking.attachPose).toHaveBeenCalledTimes(1);
+    expect(tracking.detachPose).not.toHaveBeenCalled();
+    // Closing the camera view ends the session first; the pose is still released.
+    await act(async () => rendered.unmount());
+    expect(tracking.detachPose).toHaveBeenCalledTimes(1);
   });
 
   it('starts an immersive session from one tap, taking that tap as facing the corridor', async () => {

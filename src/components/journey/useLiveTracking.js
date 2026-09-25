@@ -36,6 +36,8 @@ export function sensorsPlausible() {
  * @property {boolean} plausible
  * @property {() => { gravity: { x: number, y: number, z: number } | null, snapshot: import('../../navigation/liveTracker').TrackerSnapshot | null }} peek
  * @property {() => import('../../navigation/liveTracker').RouteTracker | null} tracker
+ * @property {() => void} attachPose
+ * @property {() => void} detachPose
  */
 
 /**
@@ -57,7 +59,11 @@ export function useLiveTracking({
   setProgress,
   active,
 }) /** @type {LiveTracking} */ {
+  // The motion subscription's own state. What the hook reports is this, or
+  // 'on' while an immersive session supplies position instead.
   const [status, setStatus] = useState('off');
+  const [poseAttached, setPoseAttached] = useState(false);
+  const poseRef = useRef(false);
   const [snapshot, setSnapshot] = useState(null);
   const trackerRef = useRef(null);
   const disposeRef = useRef(null);
@@ -124,7 +130,26 @@ export function useLiveTracking({
     disposeRef.current = null;
     tiltRef.current = null;
     gravityRef.current = null;
+    poseRef.current = false;
+    setPoseAttached(false);
     setStatus('off');
+  }, []);
+
+  /*
+   * An immersive session measures the phone's movement itself and needs
+   * nothing from the motion sensors. While one is attached, position is live
+   * whatever the motion permission did, and progress must keep being
+   * published: gating that on the motion subscription froze the instruction,
+   * the countdown and arrival for anyone who had refused motion access.
+   */
+  const attachPose = useCallback(() => {
+    poseRef.current = true;
+    lastPublishedRef.current = null;
+    setPoseAttached(true);
+  }, []);
+  const detachPose = useCallback(() => {
+    poseRef.current = false;
+    setPoseAttached(false);
   }, []);
 
   /**
@@ -234,7 +259,8 @@ export function useLiveTracking({
         // The subscription has ended itself. A hidden page is a pause the
         // visitor can lift with a tap; the rest mean the phone cannot do this.
         disposeRef.current = null;
-        if (state !== 'hidden') tracker.sensorsLost('sensors-unavailable');
+        // With a pose attached the motion sensors are not what position rests on.
+        if (state !== 'hidden' && !poseRef.current) tracker.sensorsLost('sensors-unavailable');
         publish();
       },
     });
@@ -258,25 +284,28 @@ export function useLiveTracking({
 
   // Read the tracker out while listening. The same tick notices the journey
   // ending, so nothing here has to change state during a render.
+  const reported = poseAttached ? 'on' : status;
   useEffect(() => {
-    if (status !== 'on') return undefined;
+    if (reported !== 'on') return undefined;
     const timer = window.setInterval(() => {
       if (activeRef.current) publish();
       else stop();
     }, PUBLISH_MS);
     return () => window.clearInterval(timer);
-  }, [status, publish, stop]);
+  }, [reported, publish, stop]);
 
   useEffect(() => () => disposeRef.current?.(), []);
 
   return {
-    status,
-    snapshot: status === 'off' ? null : snapshot,
+    status: reported,
+    snapshot: reported === 'off' ? null : snapshot,
     start,
     stop,
     confirmFloor,
     plausible: sensorsPlausible(),
     peek,
     tracker,
+    attachPose,
+    detachPose,
   };
 }

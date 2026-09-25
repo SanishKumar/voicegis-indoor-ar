@@ -303,7 +303,9 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       : tracking?.status === 'denied' || tracking?.status === 'error'
         ? 'Try tracking again'
         : 'Track my walk';
-  const arAvailable = arSupport === 'yes' && found && plausible && !sensorsOut;
+  // An immersive session tracks the phone with its own camera and sensors,
+  // so whether the motion subscription is plausible or refused is beside the point.
+  const arAvailable = arSupport === 'yes' && found;
   // What genuinely stops an immersive session: nowhere to start the route
   // from, or a tracker that has stopped trusting its own position.
   const arBlocked = !knownStart || (live && tracking?.snapshot?.tier === 'frozen');
@@ -679,6 +681,10 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
           if (arOwnerRef.current === owner) setArReport(report);
         },
         onEnd: () => {
+          // Released on every ending, including the camera view closing first,
+          // which bumps the owner; otherwise the hook would report a live
+          // position with nothing supplying it.
+          tracking.detachPose();
           if (arOwnerRef.current !== owner) return;
           arHandleRef.current = null;
           setArSession(null);
@@ -690,6 +696,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         return;
       }
       arHandleRef.current = handle;
+      tracking.attachPose();
       setArSession(handle);
     } catch (error) {
       if (arOwnerRef.current !== owner) return;
