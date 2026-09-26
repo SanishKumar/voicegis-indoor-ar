@@ -76,8 +76,8 @@ export default function WelcomeScreen({ onComplete }) {
   );
 
   const handleScannedPayload = useCallback(
-    (payload) => {
-      const result = actions.checkInWithPayload(payload);
+    (payload, observation) => {
+      const result = actions.checkInWithPayload(payload, observation);
       if (!result.ok) {
         // Reported as refused so the scanner keeps its camera running and the
         // visitor can try another sign.

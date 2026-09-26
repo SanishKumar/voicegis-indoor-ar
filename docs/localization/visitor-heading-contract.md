@@ -3,6 +3,12 @@
 Phase 2 slice B, 11–12 September 2026. This is a tested software contract and a
 camera-preview correction, not a claim of working continuous positioning.
 
+26 September update: user-approved [visual sign heading](visual-marker-heading.md)
+is a separate measured-pose path, not a reinterpretation of the QR payload.
+Its first slice preserves unqualified frame geometry and removes implicit
+route-facing XR alignment. The solver and calibrated sensor handoff remain
+unfinished; the existing evidence/recorder contract below is unchanged.
+
 ## Coordinate conventions
 
 | Frame | Axes and units | Meaning of a heading |

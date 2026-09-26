@@ -30,13 +30,16 @@ export type ArPromptKind =
   | 'steady'
   /** Placing: the floor has not been found yet. */
   | 'floor'
+  | 'floor-confirm'
+  | 'floor-unavailable'
+  | 'heading'
   /** The position is frozen for a reason only a check-in scan fixes. */
   | 'rescan'
   | 'wrong-way'
   /** The route is shown and nothing needs doing. */
   | 'guiding';
 
-export type ArActionKind = 'realign' | 'confirm-floor' | 'confirm-arrival';
+export type ArActionKind = 'realign' | 'confirm-floor' | 'confirm-arrival' | 'confirm-surface';
 
 export interface ArPrompt {
   kind: ArPromptKind;
@@ -67,7 +70,7 @@ export function arPrompt({ report, snapshot, arrived, floorName }: ArPromptInput
     const floor = floorName(snapshot.pendingFloor.toFloorId) ?? 'the next floor';
     return {
       kind: 'floor-change',
-      note: `The route carries on from ${floor}. Once you step out there, face the way it goes and tap “I’m on ${floor}”.`,
+      note: `The route carries on from ${floor}. Once you step out there, tap “I’m on ${floor}”, then confirm the floor surface.`,
       action: { kind: 'confirm-floor', label: `I’m on ${floor}` },
       leads: 'action',
     };
@@ -88,7 +91,7 @@ export function arPrompt({ report, snapshot, arrived, floorName }: ArPromptInput
   if (report?.recovery === 'pose-lost') {
     return {
       kind: 'pose-lost',
-      note: 'The phone lost track of the room. Hold it steady, face along the route, then tap Re-align. Nothing you walk is counted until then.',
+      note: 'The phone lost track of the room. Tap Re-align, then find and confirm the floor again. Direction must also be available before the route returns; walking is not counted until then.',
       action: REALIGN,
       leads: 'action',
     };
@@ -96,7 +99,7 @@ export function arPrompt({ report, snapshot, arrived, floorName }: ArPromptInput
   if (report?.recovery === 'floor-change') {
     return {
       kind: 'new-floor',
-      note: 'You are on another floor now. Face along the route, then tap Re-align.',
+      note: 'You are on another floor now. Tap Re-align, then find and confirm this floor. Floor confirmation does not set the building’s direction.',
       action: REALIGN,
       leads: 'action',
     };
@@ -104,15 +107,39 @@ export function arPrompt({ report, snapshot, arrived, floorName }: ArPromptInput
 
   if (!report?.aligned) {
     const placement = report?.placement ?? 'tracking';
+    if (placement === 'heading') {
+      return {
+        kind: placement,
+        note: 'Floor confirmed; building direction is not aligned. Raise the phone slightly. If this remains, leave AR and use the map or set manual camera alignment. Scanning a code does not yet align direction automatically.',
+        action: null,
+        leads: 'leave',
+      };
+    }
+    if (placement === 'floor-unavailable') {
+      return {
+        kind: placement,
+        note: 'Surface detection is unavailable in this session. The route cannot be placed on the floor. Leave AR to use the map.',
+        action: null,
+        leads: 'leave',
+      };
+    }
+    if (placement === 'floor-confirm') {
+      return {
+        kind: placement,
+        note: 'Check that the green ring sits on the floor, not furniture. Confirm only if it does.',
+        action: { kind: 'confirm-surface', label: 'This is the floor' },
+        leads: 'action',
+      };
+    }
     return {
       kind: placement,
       note:
         placement === 'floor'
-          ? 'Point the phone at the floor a few steps ahead.'
+          ? 'Point the phone at the floor nearby. Hold the ring still until it turns green; the route stays hidden until you confirm the floor.'
           : placement === 'steady'
-            ? 'Hold the phone still, facing the way the route goes.'
-            : 'Finding the room. Hold the phone up and look along the route.',
-      action: REALIGN,
+            ? 'Hold the phone still. This stabilizes placement, not the building’s direction.'
+            : 'Finding the room. Move the phone gently to look around.',
+      action: null,
       leads: null,
     };
   }

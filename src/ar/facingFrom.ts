@@ -23,6 +23,8 @@ export interface FacingAnchor {
   epoch: number;
   /** The visitor said so, or the route was assumed. */
   source: 'visitor' | 'route';
+  /** Which axis supplied yaw at alignment; legacy/unknown anchors cannot enter XR. */
+  axis?: 'camera-forward' | 'device-top';
 }
 
 export interface Facing {

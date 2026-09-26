@@ -24,6 +24,7 @@ import { calculateCompiledRoute } from '../engine/compiledRoutePolicy';
 import { useVenue } from './VenueContext.jsx';
 import { createVenueScopedState } from '../data/venueSession';
 import { checkInFromScan } from '../capture/anchorCheckIn.ts';
+import { bindVisualCheckIn } from '../capture/visualCheckIn';
 import {
   canConfirmArrival,
   JOURNEY_ACTION as ACTION,
@@ -321,7 +322,7 @@ export function NavigationProvider({ children, venue }) {
    * places that can drift about what counts as a valid code.
    */
   const checkInWithPayload = useCallback(
-    (payload) => {
+    (payload, observation = null) => {
       const pkg = venue.buildingPackage;
       const result = checkInFromScan(payload, pkg.localizationAnchors, pkg.routing.nodes);
       if (!result.ok) return result;
@@ -346,6 +347,12 @@ export function NavigationProvider({ children, venue }) {
         nodeId: result.nodeId,
         distanceMeters: result.distanceMeters,
         scannedAt: Date.now(),
+        visualCandidate: bindVisualCheckIn(
+          observation,
+          result.anchor,
+          state.venueKey,
+          performance.now(),
+        ),
       });
       if (destinationNodeId) {
         void requestRoute(
@@ -357,7 +364,7 @@ export function NavigationProvider({ children, venue }) {
       }
       return result;
     },
-    [requestRoute, venue],
+    [requestRoute, venue, state.venueKey],
   );
 
   const actions = {

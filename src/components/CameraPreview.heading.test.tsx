@@ -383,7 +383,7 @@ describe('the camera view follows where the phone points', () => {
     vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
     const started = vi
       .spyOn(arRuntime, 'startArGuidance')
-      .mockResolvedValue({ end: async () => {}, realign: () => {} });
+      .mockResolvedValue({ end: async () => {}, realign: () => {}, confirmSurface: () => true });
     // The tracker is anchored at the check-in point, which is where they stand.
     render(<CameraPreview tracking={trackingLike('on', anchored())} />);
     // Found outside act(): awaiting inside it holds the render that shows the button.
@@ -391,7 +391,7 @@ describe('the camera view follows where the phone points', () => {
     await act(async () => fireEvent.click(start));
     expect(started).toHaveBeenCalledTimes(1);
     expect(started.mock.calls[0][0].tracker.read(0).progressMeters).toBe(0);
-    expect(started.mock.calls[0][0].facingDegrees()).toBe(90);
+    expect(started.mock.calls[0][0].facingDegrees()).toBeNull();
   });
 
   it('does not invent an AR anchor when tracking has no physical start', async () => {
@@ -414,6 +414,7 @@ describe('the camera view follows where the phone points', () => {
     vi.spyOn(arRuntime, 'startArGuidance').mockResolvedValue({
       end: async () => {},
       realign: () => {},
+      confirmSurface: () => true,
     });
     render(<CameraPreview tracking={trackingLike('denied', anchored())} />);
     const start = await screen.findByRole('button', { name: 'Start AR' });
@@ -429,6 +430,7 @@ describe('the camera view follows where the phone points', () => {
       const started = vi.spyOn(arRuntime, 'startArGuidance').mockResolvedValue({
         end: async () => {},
         realign: () => {},
+        confirmSurface: () => true,
       });
       render(<CameraPreview tracking={trackingLike('on', anchored({ tier: 'frozen', reason }))} />);
       const start = await screen.findByRole('button', { name: 'Start AR' });
@@ -460,6 +462,7 @@ describe('the camera view follows where the phone points', () => {
     vi.spyOn(arRuntime, 'startArGuidance').mockImplementation(async (options) => ({
       end: async () => options.onEnd?.('ended'),
       realign: () => {},
+      confirmSurface: () => true,
     }));
     const tracking = trackingLike('on', anchored());
     const rendered = render(<CameraPreview tracking={tracking} />);
@@ -478,7 +481,7 @@ describe('the camera view follows where the phone points', () => {
     let frame!: (report: arRuntime.ArFrameReport) => void;
     vi.spyOn(arRuntime, 'startArGuidance').mockImplementation(async (options) => {
       frame = options.onFrame!;
-      return { end: async () => {}, realign };
+      return { end: async () => {}, realign, confirmSurface: () => true };
     });
     const tracking = trackingLike('on', anchored());
     const rendered = render(<CameraPreview tracking={tracking} />);
@@ -511,11 +514,61 @@ describe('the camera view follows where the phone points', () => {
     );
   });
 
+  it.each([true, false])(
+    'confirms only the displayed surface and records acceptance (%s)',
+    async (accepted) => {
+      resetFieldTest(true);
+      try {
+        vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+        const confirmSurface = vi.fn(() => accepted);
+        const realign = vi.fn();
+        let frame!: (report: arRuntime.ArFrameReport) => void;
+        vi.spyOn(arRuntime, 'startArGuidance').mockImplementation(async (options) => {
+          frame = options.onFrame!;
+          return { end: async () => {}, realign, confirmSurface };
+        });
+        const tracking = trackingLike('on', anchored());
+        render(<CameraPreview tracking={tracking} />);
+        const start = await screen.findByRole('button', { name: 'Start AR' });
+        await act(async () => fireEvent.click(start));
+        const report: arRuntime.ArFrameReport = {
+          aligned: false,
+          recovery: null,
+          placement: 'floor',
+          floorY: null,
+          floorHits: 1,
+          facingDegrees: null,
+          progressMeters: 0,
+        };
+        act(() => frame(report));
+        expect(screen.queryByRole('button', { name: 'This is the floor' })).toBeNull();
+        act(() => frame({ ...report, placement: 'floor-confirm', floorHits: 12 }));
+        fireEvent.click(screen.getByRole('button', { name: 'This is the floor' }));
+        expect(confirmSurface).toHaveBeenCalledTimes(1);
+        expect(realign).not.toHaveBeenCalled();
+        expect(tracking.confirmFloor).not.toHaveBeenCalled();
+        expect(
+          fieldEvents().find((event) => event.kind === 'ar-floor-confirmation')?.detail,
+        ).toEqual({ accepted });
+        // A tap alone never moves the UI to guiding. Only the session's report can.
+        expect(document.querySelector('.camera-ar-overlay')?.getAttribute('data-ar-prompt')).toBe(
+          'floor-confirm',
+        );
+        act(() => frame({ ...report, placement: 'floor-unavailable' }));
+        expect(screen.queryByRole('button', { name: 'This is the floor' })).toBeNull();
+        expect(screen.getByRole('button', { name: 'Leave AR' })).toBeTruthy();
+      } finally {
+        resetFieldTest(null);
+      }
+    },
+  );
+
   it('lets the visitor confirm arrival without leaving AR', async () => {
     vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
     vi.spyOn(arRuntime, 'startArGuidance').mockResolvedValue({
       end: async () => {},
       realign: () => {},
+      confirmSurface: () => true,
     });
     const tracking = trackingLike('on', anchored({ tier: 'tracking', reason: 'arrived' }));
     render(<CameraPreview tracking={tracking} />);
@@ -532,7 +585,7 @@ describe('the camera view follows where the phone points', () => {
       let frame!: (report: arRuntime.ArFrameReport) => void;
       vi.spyOn(arRuntime, 'startArGuidance').mockImplementation(async (options) => {
         frame = options.onFrame!;
-        return { end: async () => {}, realign: () => {} };
+        return { end: async () => {}, realign: () => {}, confirmSurface: () => true };
       });
       render(<CameraPreview tracking={trackingLike('on', anchored())} />);
       const start = await screen.findByRole('button', { name: 'Start AR' });
@@ -577,19 +630,39 @@ describe('the camera view follows where the phone points', () => {
     }
   });
 
-  it('starts an immersive session from one tap, taking that tap as facing the corridor', async () => {
+  it('starts a session without treating the Start AR tap as a building heading', async () => {
     vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
     const started = vi
       .spyOn(arRuntime, 'startArGuidance')
-      .mockResolvedValue({ end: async () => {}, realign: () => {} });
+      .mockResolvedValue({ end: async () => {}, realign: () => {}, confirmSurface: () => true });
     render(<CameraPreview tracking={trackingLike('on', anchored())} />);
     const start = await screen.findByRole('button', { name: 'Start AR' });
     // No orientation reading has arrived at all, and it does not need one.
     expect(view().getAttribute('data-orientation')).not.toBe('listening');
     await act(async () => fireEvent.click(start));
     expect(started).toHaveBeenCalledTimes(1);
-    // Twenty metres east: facing along the corridor here is plan bearing 90.
-    expect(started.mock.calls[0][0].facingDegrees()).toBe(90);
+    // XR can find a floor without knowing which way this building faces.
+    expect(started.mock.calls[0][0].facingDegrees()).toBeNull();
+  });
+
+  it('uses a fresh explicit manual heading including a turn around, never a stale one', async () => {
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    const started = vi.spyOn(arRuntime, 'startArGuidance').mockResolvedValue({
+      end: async () => {},
+      realign: () => {},
+      confirmSurface: () => true,
+    });
+    render(<CameraPreview tracking={trackingLike('on', anchored())} />);
+    const start = await screen.findByRole('button', { name: 'Start AR' });
+    upright(0);
+    runFrames(1);
+    fireEvent.click(screen.getByRole('button', { name: 'I’m facing the corridor' }));
+    upright(180);
+    await act(async () => fireEvent.click(start));
+    const facing = started.mock.calls[0][0].facingDegrees;
+    expect(facing()).toBe(270);
+    clock += 101;
+    expect(facing()).toBeNull();
   });
 
   it('ends an immersive session that finishes starting after the camera view was left', async () => {
@@ -610,7 +683,7 @@ describe('the camera view follows where the phone points', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start AR' }));
     rendered.unmount();
     const end = vi.fn(async () => {});
-    await act(async () => finish({ end, realign() {} }));
+    await act(async () => finish({ end, realign() {}, confirmSurface: () => true }));
     expect(end).toHaveBeenCalledOnce();
   });
 

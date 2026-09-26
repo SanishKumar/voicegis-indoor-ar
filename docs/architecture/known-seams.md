@@ -3,6 +3,33 @@
 Deliberately unfinished work, recorded so it is not rediscovered as a bug. Each
 entry says what is incomplete, why it was left, and what finishing it involves.
 
+## Visitor AR floor placement is explicit; automatic sign heading remains unfinished
+
+As of 26 September 2026, immersive AR no longer places a route on an estimated
+`local-floor` zero, after a timeout, or from a single hit. It qualifies a nearby,
+stable, upward-facing surface and shows a target. The visitor must identify it
+as the floor. Height is then fixed until re-alignment, pose/reference-space loss
+or a storey change requires new observations and confirmation. No usable hit
+source means no placed route and an explanation with an exit. See
+[field testing](../field-testing.md) for provisional thresholds.
+
+This is a level-floor placement guard, not semantic floor recognition, a
+survey, or a hardware accuracy result. A tabletop can qualify geometrically;
+the visitor must not confirm it. Runtime normals may themselves be estimates.
+Ramps, sloping floors and environment-depth occlusion are not implemented.
+
+Start AR and Re-align no longer silently assign the route bearing to the camera.
+A missing heading now has an explicit placement state after floor confirmation.
+The remaining manual fallback requires a deliberate camera alignment and fresh
+same-feed orientation; it is not a surveyed visual pose. The approved
+[sign-heading work](../localization/visual-marker-heading.md) now preserves QR
+frame geometry as unqualified, venue-bound metadata. The calibrated pose solver,
+survey metadata and synchronized sensor/XR bridge are still to be implemented.
+QR payload check-in alone remains location-only.
+The ordinary camera overlay still assumes camera height and FOV, and the live
+tracker remains route-constrained. The user's stationary-marker handset report
+still needs acquisition/pose diagnostics. Dynamic obstacle avoidance is absent.
+
 ## Visitor localization is not ready for automatic guidance
 
 The first motion-safety slice (processor 0.3.0, 11 September 2026) removes

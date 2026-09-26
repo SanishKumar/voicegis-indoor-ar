@@ -7,6 +7,8 @@ import { calculateCompiledRoute } from '../engine/compiledRoutePolicy';
 import type { RouteResult } from '../engine/routingCore';
 import type { VisitorJourneyState } from '../navigation/visitorJourney';
 import type { CheckIn, CheckInRecord } from '../capture/anchorCheckIn';
+import type { QrFrameObservation } from '../capture/qrDecoder';
+import type { VisualCheckInCandidate } from '../capture/visualCheckIn';
 
 const mocks = vi.hoisted(() => ({ findRoute: vi.fn(), shutdownRoutingWorker: vi.fn() }));
 vi.mock('../engine/routingEngine', () => mocks);
@@ -17,14 +19,14 @@ import { NavigationProvider, useNavigation } from './NavigationContext.jsx';
 
 interface Binding {
   state: VisitorJourneyState;
-  checkIn: CheckInRecord | null;
+  checkIn: (CheckInRecord & { visualCandidate?: VisualCheckInCandidate | null }) | null;
   checkInToastVisible: boolean;
   accessibleRouting: boolean;
   toggleAccessibleRouting(): void;
   setOperationalOverlay(overlay: unknown, evaluatedAt: string): void;
   actions: {
     navigateTo(destination: string, start?: string): Promise<void>;
-    checkInWithPayload(payload: string): CheckIn;
+    checkInWithPayload(payload: string, observation?: QrFrameObservation): CheckIn;
     dismissCheckIn(): void;
     clearRoute(): void;
     setStart(nodeId: string): void;
@@ -69,6 +71,50 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('visitor journey check-in lifecycle', () => {
+  it('retains camera geometry only for its accepted sign, separately from heading and links', () => {
+    mount();
+    const observation: QrFrameObservation = {
+      payload: anchors[0].payload,
+      engine: 'jsqr',
+      cornerOrder: 'qr-clockwise',
+      corners: null,
+      frame: {
+        width: 640,
+        height: 480,
+        decodeWidth: 640,
+        decodeHeight: 480,
+        copiedAtMs: performance.now(),
+        mediaTimeSeconds: 1,
+      },
+    };
+    act(() => {
+      current.actions.checkInWithPayload(anchors[0].payload, observation);
+    });
+    expect(current.checkIn?.visualCandidate).toMatchObject({
+      anchorId: anchors[0].id,
+      venueKey: current.state.venueKey,
+      status: 'unqualified',
+    });
+    expect(current.checkIn).not.toHaveProperty('headingDegrees');
+    const retained = current.checkIn;
+    act(() => {
+      current.actions.checkInWithPayload('unknown', observation);
+    });
+    expect(current.checkIn).toBe(retained);
+    // A valid position with geometry from a different sign never inherits it.
+    act(() => {
+      current.actions.checkInWithPayload(anchors[1].payload, observation);
+    });
+    expect(current.checkIn?.visualCandidate).toBeNull();
+    act(() => {
+      current.actions.checkInWithPayload(anchors[0].payload);
+    });
+    expect(current.checkIn?.visualCandidate).toBeNull();
+    act(() => {
+      current.actions.setStart(ASTERION_RUNTIME.config.defaultStartNode);
+    });
+    expect(current.checkIn).toBeNull();
+  });
   it('preserves QR provenance when onboarding scans and starts a route in one event', async () => {
     mount();
     await act(async () => {

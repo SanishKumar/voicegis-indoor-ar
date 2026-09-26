@@ -47,6 +47,14 @@ function prompt(overrides: Partial<ArPromptInput> = {}) {
 }
 
 describe('what the AR view asks of the visitor', () => {
+  it('distinguishes a confirmed floor from an unavailable building direction', () => {
+    const waiting = prompt({ report: report({ aligned: false, placement: 'heading' }) });
+    expect(waiting.kind).toBe('heading');
+    expect(waiting.note).toMatch(/building direction is not aligned/);
+    expect(waiting.leads).toBe('leave');
+    expect(waiting.action).toBeNull();
+    expect(waiting.note).not.toMatch(/face.*route/i);
+  });
   it('stays out of the way while the route leads on', () => {
     expect(prompt()).toEqual({
       kind: 'guiding',
@@ -73,6 +81,22 @@ describe('what the AR view asks of the visitor', () => {
     expect(lost.kind).toBe('pose-lost');
     expect(lost.action?.kind).toBe('realign');
     expect(lost.leads).toBe('action');
+  });
+
+  it('requires an explicit surface confirmation and offers an exit when detection is unavailable', () => {
+    const candidate = prompt({
+      report: report({ aligned: false, placement: 'floor-confirm', floorY: null }),
+    });
+    expect(candidate.action).toEqual({ kind: 'confirm-surface', label: 'This is the floor' });
+    expect(candidate.note).toMatch(/not furniture/);
+    expect(candidate.leads).toBe('action');
+    const unavailable = prompt({
+      report: report({ aligned: false, placement: 'floor-unavailable', floorY: null }),
+    });
+    expect(unavailable.action).toBeNull();
+    expect(unavailable.leads).toBe('leave');
+    expect(unavailable.note).toMatch(/cannot be placed/);
+    expect(prompt({ report: report({ aligned: false, placement: 'floor' }) }).action).toBeNull();
   });
 
   it('asks for the storey change at a lift, naming the floor, even while the room is lost', () => {

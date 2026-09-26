@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
 import QrCheckIn from './QrCheckIn';
+import type { QrFrameObservation } from '../capture/qrDecoder';
 
 /**
  * Regression for camera ownership across effect runs.
@@ -25,8 +26,32 @@ import QrCheckIn from './QrCheckIn';
 let nextDecode: () => Promise<string | null> = () => Promise.resolve(null);
 
 vi.mock('../capture/qrDecoder', () => ({
-  createQrDecoder: () => ({ engine: 'jsqr' as const, decode: () => nextDecode() }),
+  createQrDecoder: () => ({
+    engine: 'jsqr' as const,
+    decode: () => nextDecode(),
+    decodeFrame: async () => {
+      const payload = await nextDecode();
+      return payload === null ? null : observationFor(payload);
+    },
+  }),
 }));
+
+function observationFor(payload: string): QrFrameObservation {
+  return {
+    payload,
+    engine: 'jsqr',
+    corners: null,
+    cornerOrder: 'qr-clockwise',
+    frame: {
+      width: 640,
+      height: 480,
+      decodeWidth: 640,
+      decodeHeight: 480,
+      copiedAtMs: performance.now(),
+      mediaTimeSeconds: 1,
+    },
+  };
+}
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -170,6 +195,33 @@ describe('camera ownership across effect restarts on one component', () => {
 });
 
 describe('what the running scan loop does', () => {
+  it('never overlaps decodes, and resumes after a frame fails', async () => {
+    vi.useFakeTimers();
+    const media = fakeMedia();
+    const onPayload = vi.fn(() => true);
+    const view = render(<QrCheckIn onPayload={onPayload} onClose={() => {}} />);
+    await media.openCamera(0);
+    await media.startPlaying(0);
+    makeVideoReady(view.container);
+    const held = deferred<string | null>();
+    const decode = vi.fn(() => held.promise);
+    nextDecode = decode;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(decode).toHaveBeenCalledTimes(1);
+    held.resolve(null);
+    await media.flush();
+    nextDecode = () => Promise.reject(new Error('blurred frame'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    nextDecode = () => Promise.resolve('voicegis://asterion/g/west');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    expect(onPayload).toHaveBeenCalledTimes(1);
+  });
   it('reports an accepted payload once and releases the camera', async () => {
     vi.useFakeTimers();
     const media = fakeMedia();
@@ -187,7 +239,13 @@ describe('what the running scan loop does', () => {
     });
 
     expect(onPayload).toHaveBeenCalledTimes(1);
-    expect(onPayload).toHaveBeenCalledWith('voicegis://asterion/g/west');
+    expect(onPayload).toHaveBeenCalledWith(
+      'voicegis://asterion/g/west',
+      expect.objectContaining({
+        payload: 'voicegis://asterion/g/west',
+        cornerOrder: 'qr-clockwise',
+      }),
+    );
     expect(media.streams[0].track.stop).toHaveBeenCalledTimes(1);
   });
 
@@ -218,7 +276,12 @@ describe('what the running scan loop does', () => {
     });
 
     expect(onPayload).toHaveBeenCalledTimes(2);
-    expect(onPayload).toHaveBeenLastCalledWith('voicegis://asterion/g/east');
+    expect(onPayload).toHaveBeenLastCalledWith(
+      'voicegis://asterion/g/east',
+      expect.objectContaining({
+        payload: 'voicegis://asterion/g/east',
+      }),
+    );
   });
 
   it('does not report a decode that lands after the scanner closed', async () => {

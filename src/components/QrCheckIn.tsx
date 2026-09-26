@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { createQrDecoder } from '../capture/qrDecoder';
+import { createQrDecoder, type QrFrameObservation } from '../capture/qrDecoder';
 import { initialScanGate, shouldSubmitScan } from '../capture/scanGate';
 import { useDialogFocus } from './useDialogFocus';
 
@@ -8,7 +8,7 @@ import { useDialogFocus } from './useDialogFocus';
  * The camera half of a check-in: read a QR code, hand back its payload.
  *
  * Deliberately knows nothing about venues, anchors or routing. It reports a
- * string; deciding whether that string means anything is
+ * payload and optional frame geometry; deciding whether that payload means anything is
  * `checkInFromScan`'s job. Keeping the camera out of that decision means the
  * resolution rules are testable without a webcam.
  *
@@ -38,7 +38,7 @@ export default function QrCheckIn({
    * scanner keeps its camera running until it hears `true`, which is what makes
    * a wrong code recoverable instead of terminal.
    */
-  onPayload: (payload: string) => boolean;
+  onPayload: (payload: string, observation: QrFrameObservation) => boolean;
   onClose: () => void;
   hint?: string | null;
 }) {
@@ -71,6 +71,7 @@ export default function QrCheckIn({
     // Owning the resources is what makes that impossible rather than unlikely.
     let ownedStream: MediaStream | null = null;
     let ownedTimer: number | null = null;
+    let decoding = false;
 
     const release = () => {
       if (ownedTimer !== null) {
@@ -115,19 +116,25 @@ export default function QrCheckIn({
             return;
           }
           const source = videoRef.current;
-          if (!source || gateRef.current.settled || source.readyState < 2) return;
+          if (!source || decoding || gateRef.current.settled || source.readyState < 2) return;
+          decoding = true;
           void decoder
-            .decode(source)
-            .then((value) => {
+            .decodeFrame(source)
+            .then((observation) => {
               // A decode in flight when the scanner closes would otherwise
               // still report its payload, checking the visitor in at a sign
               // they had already dismissed.
-              if (!current() || !shouldSubmitScan(value, gateRef.current)) return;
-              const payload = (value as string).trim();
+              if (
+                !current() ||
+                !observation ||
+                !shouldSubmitScan(observation.payload, gateRef.current)
+              )
+                return;
+              const payload = observation.payload.trim();
               // The camera is only released once the caller has accepted. A
               // rejected code leaves the scanner live so the visitor can walk
               // to another sign and try again.
-              if (onPayload(payload)) {
+              if (onPayload(payload, observation)) {
                 gateRef.current = { ...gateRef.current, settled: true };
                 release();
                 return;
@@ -138,6 +145,9 @@ export default function QrCheckIn({
               // A single failed frame is normal while focus settles. Only a
               // permanently broken detector matters, and that surfaces as no
               // detections rather than as an error worth showing.
+            })
+            .finally(() => {
+              decoding = false;
             });
         }, SCAN_INTERVAL_MS);
 
@@ -172,7 +182,12 @@ export default function QrCheckIn({
       tabIndex={-1}
     >
       <div className="qr-checkin">
-        <button type="button" className="qr-checkin-close" onClick={onClose} aria-label="Close scanner">
+        <button
+          type="button"
+          className="qr-checkin-close"
+          onClick={onClose}
+          aria-label="Close scanner"
+        >
           <X size={18} />
         </button>
 

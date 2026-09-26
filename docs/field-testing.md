@@ -52,20 +52,45 @@ It is a diagnostic of the guidance, not evidence, and nothing reads it back.
 A route and a start point first: pick a destination, then scan a check-in code
 (`/check-in-codes.html` on the computer's screen) or pick a landmark.
 
-- **AR start.** Camera view → **Start AR**. Hold the phone up, facing the way
-  the route goes, then point it at the floor a few steps ahead. The route
-  should appear on its own within a few seconds, without tapping Re-align.
+- **AR with no direction alignment.** Camera view → **Start AR**, then aim at
+  clear floor nearby. A ring marks an observed
+  surface: amber while settling, green when stable. Check that it is on the
+  floor, not furniture, then tap **This is the floor**. The route must not
+  appear before that confirmation. If surface detection is unavailable, leave
+  AR and use the map; waiting must never place it on a guessed floor. With no
+  direction alignment, confirmation must say **building direction is not aligned**,
+  keep the route hidden and leave **Leave AR** reachable. Floor height is not yaw.
+- **Manual direction fallback.** Before Start AR, check the map, face along the
+  route at your actual check-in point, and tap **I'm facing the corridor**.
+  Keep fresh orientation available, then start AR and confirm the floor. If
+  direction is unavailable, raise the camera slightly; otherwise leave AR.
+  Turning around before confirmation must not redefine the route as straight ahead.
+  Automatic sign-derived heading is not implemented yet.
 - **Walking.** Walk the route's direction; the distance left should count down
   and the chevrons stay on the floor.
 - **Lost tracking.** Cover the camera for a few seconds: the view should say it
-  lost track of the room and offer Re-align, which brings the route back.
-- **Without motion access.** Refuse motion access when asked (or in the
-  browser's site settings) and start AR again: it should still start and count
-  down.
+  lost track of the room and offer Re-align. Find and confirm the floor again;
+  an old floor confirmation must not survive loss of the reference frame.
+- **Floor stability.** After placement, point at a table. The route must stay
+  at the confirmed floor height rather than moving onto the tabletop. This
+  is not obstacle detection or occlusion: neither is implemented.
+- **Without motion access.** Refuse motion access and start AR again: the session
+  must still open. Pose walking requires a confirmed floor and direction. If
+  orientation is also unavailable, no direction must be invented to enable it.
 - **Flat camera view** (phones without AR): tap **I'm facing the corridor**
   while facing along the route, then turn — the route should turn with the phone.
 
 After each try, open **Test log → Copy report** and send the text along with
-what you saw. The thresholds the AR placement uses (half a second held still
-within 15 cm and 12°, four seconds to find the floor) are first estimates; the
-log is what they will be tuned from.
+what you saw. Placement requires half a second held still within 15 cm and
+12°. Surface qualification requires at least six observations over half a
+second, no gaps over 250 ms, height variation within 3 cm of the initial hit,
+and a target within 15 cm of its initial horizontal position. The reported
+normal must point up within 10°, with the surface 0.25–2.5 m below the camera
+and within 4 m of it. These are provisional gates, not measured accuracy.
+The log records floor-search/confirmation/unavailable states and whether a
+confirmation tap was accepted. `floorY` remains null until confirmed.
+
+This currently assumes a level floor. It does not fit ramps, classify floors
+automatically, or establish the building's direction. Manual route-facing
+alignment is a declaration, not a measurement. Testing a sample venue in a different corridor
+can exercise placement and relative motion, not navigation to real destinations.

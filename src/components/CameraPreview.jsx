@@ -38,6 +38,7 @@ import ManeuverIcon from './journey/ManeuverIcon.jsx';
 import { landmarksFrom } from '../engine/routeLandmarks';
 import { bearingAt, guidanceAt, positionAt, trackForRoute } from '../navigation/routeProgress';
 import { facingFrom } from '../ar/facingFrom';
+import { alignedCameraHeading } from '../ar/alignedCameraHeading';
 import { startOrientationFeed } from '../ar/orientationFeed';
 import { calloutsAhead, shortStepTitle } from '../ar/callouts';
 import { drawMiniMap, prepareMiniMap } from '../ar/cameraMiniMap';
@@ -648,14 +649,21 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
 
   /** The visitor says they are looking along the corridor: fix the yaw's zero there. */
   const alignNow = () => {
-    if (!feedRef.current?.read()) return;
+    const reading = feedRef.current?.read();
+    if (!reading) return;
     const yaw = yawRef.current;
     if (!track || yaw === null) return;
     anchorRef.current = {
       yawDegrees: yaw.degrees,
-      planBearing: bearingAt(track, progressRef.current),
+      // Preview progress is not where the visitor stands. This remains an
+      // explicit manual declaration, not automatic sign-based alignment.
+      planBearing: bearingAt(
+        track,
+        tracking?.tracker()?.read(performance.now()).progressMeters ?? 0,
+      ),
       epoch: yaw.epoch,
       source: 'visitor',
+      axis: Math.abs(reading.pitchDegrees) < 70 ? 'camera-forward' : 'device-top',
     };
   };
 
@@ -704,13 +712,15 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         track,
         tracker,
         overlay: overlayRef.current,
-        /*
-         * Tapping Start AR is the declaration that the visitor is facing along
-         * the corridor where they physically are, which is what the note beside
-         * the button asks of them. A flat-view alignment is not carried over:
-         * it was read against the distance on screen, which a preview can move.
-         */
-        facingDegrees: () => bearingAt(track, tracker.read(performance.now()).progressMeters),
+        // Finding the floor and tapping Start AR say nothing about building yaw.
+        // Until calibrated sign poses are available, accept only a fresh manual
+        // alignment. Never substitute the route bearing or walking direction.
+        facingDegrees: () =>
+          alignedCameraHeading(
+            feedRef.current?.read() ?? null,
+            anchorRef.current,
+            performance.now(),
+          ),
         onFrame: (report) => {
           const state = report.recovery ?? (report.aligned ? 'placed' : report.placement);
           if (state !== arState) {
@@ -753,7 +763,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         reason === 'refused'
           ? 'The immersive session was not allowed.'
           : reason === 'unsupported'
-            ? 'This phone cannot run an immersive session.'
+            ? 'This phone does not support immersive guidance with on-screen controls.'
             : 'The immersive session could not start.',
       );
     } finally {
@@ -770,7 +780,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
 
   const snapshot = live ? tracking.snapshot : null;
   // Published by the draw loop, because the phone's yaw is read there.
-  const source = arSession ? 'ar' : drawn.source;
+  const source = arSession ? (arReport?.aligned ? 'ar' : 'off') : drawn.source;
   const needsOrientation = orientationState === 'needs-permission' || orientationState === 'denied';
   const showAlign =
     !arSession && knownStart && orientationState === 'listening' && source !== 'aligned';
@@ -838,7 +848,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       : !knownStart
         ? 'Set your location on the map or scan a check-in code before placing the route.'
         : arAvailable && !arSession && source !== 'aligned'
-          ? 'Face along the corridor the route follows, then tap Start AR.'
+          ? 'Start AR can find the floor, but cannot yet determine the building’s direction from a sign. For manual alignment, check the map, face along the route and tap “I’m facing the corridor” first.'
           : needsOrientation
             ? 'This phone wants permission before it reports which way it is pointing. Enable camera orientation, then point along the corridor.'
             : orientationState === 'requesting'
@@ -946,7 +956,13 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
           <div className="camera-preview-status" role="status">
             <Camera size={13} />
             <strong>{arActive ? 'Immersive guidance' : 'Camera guidance'}</strong>
-            <span>{arActive ? 'Anchored to your start point' : 'Not world-anchored'}</span>
+            <span>
+              {arActive
+                ? arReport?.aligned
+                  ? 'Anchored to your start point'
+                  : 'Waiting for placement'
+                : 'Not world-anchored'}
+            </span>
           </div>
           {!cameraError && (
             <aside className="camera-preview-telemetry" aria-label="Guidance readiness">
@@ -970,8 +986,8 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
               {arActive && (
                 <div>
                   <Crosshair size={12} />
-                  <span>World anchor</span>
-                  <strong>{arReport?.floorHits ? 'Floor found' : 'Your start point'}</strong>
+                  <span>Floor surface</span>
+                  <strong>{arReport?.floorY != null ? 'Confirmed' : 'Not confirmed'}</strong>
                 </div>
               )}
             </aside>
@@ -1095,8 +1111,12 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
                         logField('ar-action', { action: kind ?? null });
                         if (kind === 'confirm-arrival') {
                           actions.confirmArrival();
+                        } else if (kind === 'confirm-surface') {
+                          const accepted = arSession?.confirmSurface() ?? false;
+                          logField('ar-floor-confirmation', { accepted });
                         } else if (kind === 'confirm-floor') {
-                          // The same tap says they are there and facing the way on.
+                          // Confirm the storey only; the heading provider must
+                          // independently supply direction when placing again.
                           tracking?.confirmFloor();
                           arSession?.realign();
                         } else {

@@ -847,3 +847,81 @@ placement thresholds are first estimates to tune there.
 
 Both are for getting the guidance onto real phones and learning what it did
 there; neither changes guidance behaviour.
+
+### Explicit immersive floor placement — 26 September 2026
+
+Visitor-only. The handset report identified hovering guidance and a separate
+initial-direction assumption. This slice addresses the floor-placement fallback,
+not the direction assumption or the still-undiagnosed stationary map marker.
+
+- Removed placement on `local-floor`'s guessed height after four seconds or
+  when hit testing is absent. No surface observations means no placed route.
+- A centre-camera plane hit must be nearby, below the phone, approximately
+  upward-facing and stable across fresh observations. An amber/green target
+  shows the candidate; **This is the floor** is required because horizontal
+  geometry cannot distinguish floor from furniture. See the provisional
+  thresholds in [field testing](field-testing.md).
+- Confirmation fixes the route's height. Later hits cannot lift it onto a
+  tabletop. Pose/reference-space loss, re-alignment and storey changes require
+  fresh observations and confirmation. Stale taps hide the stale target and
+  return the prompt to floor search.
+- Surface detection unavailable is explained, with Leave AR available. The
+  session now requires DOM-overlay support so confirmation and exit controls
+  cannot be silently omitted by the platform. Field logs include the new
+  placement states and whether a confirmation tap was accepted.
+
+Three regression tests failed against the incoming code before implementation:
+no hits after the former timeout, no hit-test capability, and a single hit all
+incorrectly placed the route. Unit coverage also checks surface normals,
+distance/height gates, gaps, stale confirmation, post-placement height stability,
+pose recovery and storey changes. A production-browser XR simulator runs the
+real application and Three renderer to exercise the flow and 320 px controls;
+it does not establish handset tracking or camera compositing accuracy.
+
+The ordinary camera overlay's assumed height/FOV, route-facing initial yaw,
+route-constrained position tracking, level-floor restriction, absent occlusion
+and absent dynamic obstacle avoidance remain explicitly open. This is a local
+slice for review; no push or deployment is part of this work.
+
+Verification: `npm run check` passes (1,290 tests in 109 files, lint, types,
+venue/replay/QR checks and public build). The targeted browser run passes all
+32 tests across desktop/mobile (`ar-floor-placement`, `camera-alignment`,
+`visitor-journey`), plus four floor-placement cases against the public-only
+build. No retries or skips. The existing large-chunk build warning remains.
+The full browser suite and hosted GitHub checks were not rerun; the earlier
+synthetic-walker/aggregate-timeout CI failure is not resolved by this slice.
+
+### Approved sign-heading work: acquisition and direction safety — 26 September 2026
+
+First slice only; **automatic sign-derived heading is not implemented**. See
+[the visual-marker heading contract and remaining sequence](localization/visual-marker-heading.md).
+
+- QR decoding now preserves same-frame corners, original/decode dimensions,
+  corner-order provenance, media time and monotonic copy time. It serializes
+  pending work; malformed corners cannot prevent a valid location check-in.
+- Welcome and location-picker scans retain only small, unqualified geometry
+  metadata for the accepted anchor and venue revision. Payload-only links still
+  provide location only. Nothing enters recorder/evidence, persistent storage
+  or a network upload.
+- Start AR no longer declares that the camera faces along the route. Re-align
+  does not replace an absent direction with route bearing. Confirming a floor
+  with no heading exposes an explicit, escapable waiting state, not false guidance.
+- The existing explicit manual alignment remains a provisional fallback, now
+  using physical progress and a fresh same-epoch camera-forward reading. Tests
+  cover facing the opposite direction, stale readings and near-vertical axes.
+- Surveyed marker mounting/size, a calibrated camera model, competing-pose
+  rejection and observation-time sensor/XR continuity remain required. No
+  synthetic venue was promoted to surveyed, and no guessed FOV was promoted
+  to camera calibration. Compass fallback still requires qualified north data.
+
+Four new/updated regression assertions failed against the incoming AR code:
+unknown heading after floor confirmation, Re-align inventing route heading,
+and two Start AR cases inventing heading without orientation. The focused
+implementation then passed. Final unit/build gate: `npm run check`, 1,320 tests
+in 112 files, lint, types, unchanged venue hashes, replay/QR checks and public
+build. Targeted operator-build browser run: all 34 desktop/mobile cases in
+`ar-floor-placement`, `camera-alignment` and `visitor-journey` passed. A separate
+public-build floor-placement/field-log run passed all eight cases too, for 42
+targeted browser passes total, with no retries or skips.
+This does not resolve the older complete-browser-suite CI timeout. The existing
+large-chunk warning remains. No commit, push or deployment is included.

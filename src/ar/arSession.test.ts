@@ -48,17 +48,29 @@ afterEach(() => {
 });
 /** Where the phone's ray meets the floor this frame; null when it finds nothing. */
 let floorHit: number | null = null;
-async function setup(options: { hitTest?: boolean; route?: RouteTrack } = {}) {
-  floorHit = null;
+let confirmSurface: () => boolean;
+let floorNormal = new Matrix4();
+async function setup(
+  options: {
+    hitTest?: boolean;
+    floor?: number | null;
+    route?: RouteTrack;
+    facing?: () => number | null;
+  } = {},
+) {
+  floorHit = options.floor === undefined ? 0 : options.floor;
+  floorNormal = new Matrix4();
+  const hitTest = options.hitTest !== false;
   const session = Object.assign(new EventTarget(), {
     requestReferenceSpace: async () => ({}),
     end: vi.fn(async () => {
       session.dispatchEvent(new Event('end'));
     }),
-    ...(options.hitTest ? { requestHitTestSource: async () => ({ cancel() {} }) } : {}),
+    ...(hitTest ? { requestHitTestSource: async () => ({ cancel() {} }) } : {}),
   });
-  vi.stubGlobal('navigator', { xr: { requestSession: async () => session } });
-  if (options.hitTest) vi.stubGlobal('XRRay', class {});
+  const requestSession = vi.fn(async () => session);
+  vi.stubGlobal('navigator', { xr: { requestSession } });
+  if (hitTest) vi.stubGlobal('XRRay', class {});
   const tracker = new RouteTracker(options.route ?? track);
   tracker.anchor({ progressMeters: 0, sigmaMeters: 1, timeMs: now });
   const report = vi.fn();
@@ -66,10 +78,11 @@ async function setup(options: { hitTest?: boolean; route?: RouteTrack } = {}) {
     track: options.route ?? track,
     tracker,
     overlay: document.createElement('div'),
-    facingDegrees: () => 90,
+    facingDegrees: options.facing ?? (() => 90),
     onFrame: report,
   });
-  return { tracker, handle, report };
+  confirmSurface = handle.confirmSurface;
+  return { tracker, handle, report, requestSession };
 }
 function frame(z: number | null, y = 1.4) {
   now += 50;
@@ -79,16 +92,74 @@ function frame(z: number | null, y = 1.4) {
         ? null
         : { transform: { matrix: new Matrix4().makeTranslation(0, y, z).elements } },
     getHitTestResults: () =>
-      floorHit === null ? [] : [{ getPose: () => ({ transform: { position: { y: floorHit } } }) }],
+      floorHit === null
+        ? []
+        : [
+            {
+              getPose: () => ({
+                transform: {
+                  position: { y: floorHit },
+                  matrix: floorNormal.clone().setPosition(0, floorHit ?? 0, (z ?? 0) - 1).elements,
+                },
+              }),
+            },
+          ],
   } as unknown as XRFrame);
 }
 /** The phone held still long enough for the route to be placed from it. */
-function place(z: number, y = 1.4) {
+function hold(z: number, y = 1.4) {
   for (let index = 0; index < 12; index += 1) frame(z, y);
+}
+function place(z: number, y = 1.4) {
+  hold(z, y);
+  expect(confirmSurface()).toBe(true);
+  frame(z, y);
 }
 const route = () => gpu.scene?.children[0];
 
 describe('immersive route pose continuity', () => {
+  it('reports a missing building heading after confirming a real floor', async () => {
+    const { handle, report } = await setup({ facing: () => null });
+    place(0);
+    expect(route()?.visible).toBe(false);
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        aligned: false,
+        placement: 'heading',
+        floorY: 0,
+      }),
+    );
+    await handle.end();
+  });
+
+  it('re-alignment never substitutes the route bearing for a missing heading', async () => {
+    let facing: number | null = 270; // Looking opposite the eastbound route.
+    const { handle, report, tracker } = await setup({ facing: () => facing });
+    place(0);
+    expect(tracker.read(now).headingDegrees).toBe(270);
+    frame(null);
+    facing = null;
+    handle.realign();
+    place(0);
+    expect(route()?.visible).toBe(false);
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        aligned: false,
+        placement: 'heading',
+      }),
+    );
+    await handle.end();
+  });
+  it('requires the overlay that makes surface confirmation and exit reachable', async () => {
+    const { handle, requestSession } = await setup();
+    expect(requestSession).toHaveBeenCalledWith(
+      'immersive-ar',
+      expect.objectContaining({
+        requiredFeatures: expect.arrayContaining(['dom-overlay']),
+      }),
+    );
+    await handle.end();
+  });
   it.each(['reference-space', 'hit-test'] as const)(
     'does not attach an already-ended session while waiting for %s setup',
     async (stage) => {
@@ -232,27 +303,118 @@ describe('immersive route pose continuity', () => {
   });
 
   it('waits for the floor to be found, then lays the route on it', async () => {
-    const { handle, report } = await setup({ hitTest: true });
-    place(0);
+    const { handle, report } = await setup({ floor: null });
+    hold(0);
     expect(report).toHaveBeenLastCalledWith(
       expect.objectContaining({ aligned: false, placement: 'floor', floorHits: 0 }),
     );
     floorHit = -0.12;
+    hold(0);
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({ aligned: false, placement: 'floor-confirm', floorY: null }),
+    );
+    expect(route()?.visible).toBe(false);
+    expect(handle.confirmSurface()).toBe(true);
     frame(0);
     expect(report).toHaveBeenLastCalledWith(
-      expect.objectContaining({ aligned: true, floorY: -0.12, floorHits: 1 }),
+      expect.objectContaining({ aligned: true, floorY: -0.12 }),
     );
     expect(route()?.position.y).toBeCloseTo(-0.12, 5);
     await handle.end();
   });
 
-  it('uses the platform’s own floor where none is found in fair time', async () => {
-    const { handle, report } = await setup({ hitTest: true });
+  it('never places the route on an estimated floor after waiting for hits', async () => {
+    const { handle, report } = await setup({ floor: null });
     for (let index = 0; index < 100; index += 1) frame(0);
     expect(report).toHaveBeenLastCalledWith(
-      expect.objectContaining({ aligned: true, floorY: 0, floorHits: 0 }),
+      expect.objectContaining({ aligned: false, placement: 'floor', floorHits: 0 }),
     );
+    expect(route()?.visible).toBe(false);
     await handle.end();
+  });
+
+  it('withholds the route when surface detection is unavailable', async () => {
+    const { handle, report } = await setup({ hitTest: false });
+    for (let index = 0; index < 100; index += 1) frame(0);
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({ aligned: false, placement: 'floor-unavailable' }),
+    );
+    expect(route()?.visible).toBe(false);
+    await handle.end();
+  });
+
+  it('does not call a single surface observation a confirmed floor', async () => {
+    const { handle, report } = await setup({ floor: null });
+    hold(0);
+    floorHit = -0.12;
+    frame(0);
+    expect(report).toHaveBeenLastCalledWith(expect.objectContaining({ aligned: false }));
+    expect(route()?.visible).toBe(false);
+    await handle.end();
+  });
+
+  it('rejects a wall even when its hit height looks like the floor', async () => {
+    const { handle, report } = await setup();
+    floorNormal.makeRotationX(Math.PI / 2);
+    for (let index = 0; index < 100; index += 1) frame(0);
+    expect(handle.confirmSurface()).toBe(false);
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({ aligned: false, placement: 'floor', floorHits: 0, floorY: null }),
+    );
+    expect(gpu.scene?.children[1].visible).toBe(false);
+    await handle.end();
+  });
+
+  it('shows a surface target, requires confirmation, and never lifts the route onto later hits', async () => {
+    const { handle, report } = await setup({ floor: -0.12 });
+    hold(0);
+    expect(route()?.visible).toBe(false);
+    expect(gpu.scene?.children[1].visible).toBe(true);
+    expect(handle.confirmSurface()).toBe(true);
+    frame(0);
+    expect(route()?.visible).toBe(true);
+    expect(gpu.scene?.children[1].visible).toBe(false);
+    floorHit = 0.65; // Looking at a table must not drag the floor upwards.
+    hold(0);
+    expect(route()?.position.y).toBeCloseTo(-0.12);
+    expect(report).toHaveBeenLastCalledWith(expect.objectContaining({ floorY: -0.12 }));
+    await handle.end();
+  });
+
+  it('requires a new floor observation and confirmation after pose recovery', async () => {
+    const { handle, report } = await setup();
+    place(0);
+    frame(null);
+    handle.realign();
+    floorHit = null;
+    for (let index = 0; index < 100; index += 1) frame(0);
+    expect(handle.confirmSurface()).toBe(false);
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({ aligned: false, placement: 'floor', floorY: null }),
+    );
+    floorHit = -0.2;
+    place(0);
+    expect(route()?.position.y).toBeCloseTo(-0.2);
+    await handle.end();
+  });
+
+  it('rejects a stale confirmation and clears an unplaced confirmation across a frame gap', async () => {
+    const { handle, report } = await setup();
+    hold(0);
+    now += 500;
+    expect(handle.confirmSurface()).toBe(false);
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({ placement: 'floor', aligned: false }),
+    );
+    expect(gpu.scene?.children[1].visible).toBe(false);
+    hold(0);
+    expect(handle.confirmSurface()).toBe(true);
+    now += 500;
+    frame(0);
+    expect(route()?.visible).toBe(false);
+    expect(handle.confirmSurface()).toBe(false);
+    await handle.end();
+    expect(handle.confirmSurface()).toBe(false);
   });
 
   it('finds the floor again on the storey a lift reaches', async () => {
