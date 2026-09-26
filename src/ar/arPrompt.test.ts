@@ -50,11 +50,29 @@ describe('what the AR view asks of the visitor', () => {
   it('distinguishes a confirmed floor from an unavailable building direction', () => {
     const waiting = prompt({ report: report({ aligned: false, placement: 'heading' }) });
     expect(waiting.kind).toBe('heading');
-    expect(waiting.note).toMatch(/building direction is not aligned/);
+    expect(waiting.note).toMatch(/does not know which way you are facing/);
+    expect(waiting.note).toMatch(/scan a check-in sign/);
     expect(waiting.leads).toBe('leave');
     expect(waiting.action).toBeNull();
     expect(waiting.note).not.toMatch(/face.*route/i);
   });
+  it('points the way to a route placed beside or behind the camera', () => {
+    expect(prompt({ turnDegrees: 170 })).toMatchObject({
+      kind: 'turn-around',
+      note: 'The route is behind you. Turn around.',
+    });
+    expect(prompt({ turnDegrees: -130 }).kind).toBe('turn-around');
+    expect(prompt({ turnDegrees: 70 }).note).toBe('Turn right to see the route.');
+    expect(prompt({ turnDegrees: -70 }).note).toBe('Turn left to see the route.');
+    // Within the view, or unknown, there is nothing to say.
+    expect(prompt({ turnDegrees: 30 }).kind).toBe('guiding');
+    expect(prompt({ turnDegrees: null }).kind).toBe('guiding');
+    // A lost room or a lift matters more than where the camera points.
+    expect(
+      prompt({ turnDegrees: 170, report: report({ aligned: false, recovery: 'pose-lost' }) }).kind,
+    ).toBe('pose-lost');
+  });
+
   it('stays out of the way while the route leads on', () => {
     expect(prompt()).toEqual({
       kind: 'guiding',

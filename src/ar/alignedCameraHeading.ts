@@ -15,7 +15,7 @@ export function alignedCameraHeading(
   if (
     !reading ||
     !anchor ||
-    anchor.source !== 'visitor' ||
+    (anchor.source !== 'visitor' && anchor.source !== 'sign') ||
     anchor.axis !== 'camera-forward' ||
     anchor.epoch !== reading.epoch ||
     ![

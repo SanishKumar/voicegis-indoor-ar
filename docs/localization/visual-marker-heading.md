@@ -49,6 +49,32 @@ The preview's assumed 55-degree FOV is **not** a calibrated camera model.
    pitch at least 70° from horizontal are refused. These are provisional guards,
    not a measured camera/IMU synchronization or accuracy bound.
 
+## Approximate sign direction (MVP) — 26 September 2026
+
+Agreed as an interim step before the calibrated solver below. It is
+**approximate** and labelled so wherever it is shown.
+
+- An anchor's `headingDegrees` means the plan bearing the sign's printed face
+  points: its outward normal, away from the wall. Pilot venues must set it from
+  the sign as mounted; the bundled synthetic values are authored, not surveyed.
+- The scanner asks the visitor to face the sign squarely. At an accepted scan,
+  the orientation reading nearest the decoded frame (within 150 ms, camera within
+  40° of level) is paired with the sign's facing reversed: that is the camera's
+  approximate plan bearing at that yaw. A link, a missing reading or a steep
+  camera sets no direction. It lives in memory with the check-in only.
+- One orientation feed runs for the page, from app start, so the scan and the
+  camera view and AR read the same yaw zero. Any loss of continuity (hidden page,
+  readings stale for 500 ms) starts a new epoch and the sign direction is
+  dropped; the visitor scans again or aligns by hand.
+- The camera view draws from it as source `sign` and says "Direction from the
+  sign · approximate"; a manual "I'm facing the corridor" overrides it. AR is
+  placed from it at floor confirmation, whichever way the phone points, and
+  then gives broad turn cues (left, right, turn around) from the session's own
+  camera heading. No corridor snapping and no claim of precise alignment.
+- Untested on a handset: whether orientation readings continue while Chrome
+  starts an immersive session. A pause over 500 ms would drop the direction at
+  placement; the field test log records it.
+
 ## Remaining implementation order
 
 ### A. Survey and camera-model inputs

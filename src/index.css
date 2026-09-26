@@ -7920,6 +7920,11 @@ body {
   flex-direction: row-reverse;
 }
 
+.ar-offscreen.is-behind {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .ar-offscreen-arrow {
   font-size: 26px;
   line-height: 0.7;

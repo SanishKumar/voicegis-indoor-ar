@@ -8,6 +8,8 @@ import { trackForRoute } from '../navigation/routeProgress';
 import CameraPreview from './CameraPreview.jsx';
 import * as arRuntime from '../ar/arSession';
 import { fieldEvents, resetFieldTest } from '../fieldTest/fieldLog';
+import { resetSharedOrientation, sharedOrientation } from '../ar/sharedOrientation';
+import type { SignHeading } from '../ar/signHeading';
 
 const node = (id: string, x: number, y: number): GraphNode => ({
   id,
@@ -36,7 +38,7 @@ const route = {
 const setView = vi.fn();
 const confirmArrival = vi.fn();
 /** How far along the guidance on screen is: a walk-through can move it without anyone walking. */
-const guidance = vi.hoisted(() => ({ progress: 0 }));
+const guidance = vi.hoisted(() => ({ progress: 0, sign: null as SignHeading | null }));
 vi.mock('../context/NavigationContext.jsx', () => ({
   VIEW_TYPE: { MAP: 'map', CAMERA_PREVIEW: 'camera-preview' },
   NAV_STATUS: { NAVIGATING: 'navigating', ARRIVED: 'arrived' },
@@ -52,7 +54,7 @@ vi.mock('../context/NavigationContext.jsx', () => ({
       route,
     },
     // Deliberately tempting anchor data. It must never become the drawn facing.
-    checkIn: { anchorId: 'test-anchor', headingDegrees: 90 },
+    checkIn: { anchorId: 'test-anchor', headingDegrees: 90, signHeading: guidance.sign },
     venue: {
       getFloorById: () => ({ name: 'Ground' }),
       getNodeById: () => ({ poi: { name: 'The Desk' } }),
@@ -166,6 +168,7 @@ beforeEach(() => {
   painted.length = 0;
   frames = [];
   guidance.progress = 0;
+  guidance.sign = null;
   clock = 1_000;
   vi.spyOn(performance, 'now').mockImplementation(() => clock);
   vi.stubGlobal(
@@ -196,6 +199,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  // The page keeps one orientation feed; each test starts its own page.
+  resetSharedOrientation();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
@@ -236,6 +241,91 @@ describe('the camera view follows where the phone points', () => {
     expect(Number(view().getAttribute('data-ribbon'))).toBeGreaterThan(5);
     expect(painted.some((call) => call.startsWith('fill('))).toBe(true);
     expect(painted.some((call) => call.startsWith('stroke('))).toBe(true);
+  });
+
+  it('takes an approximate direction from a scanned sign, and says when the route is behind', () => {
+    // Scanned before the camera view opened, on the page's one orientation feed.
+    sharedOrientation.start();
+    upright(0);
+    const scanned = sharedOrientation.read()!;
+    // The sign faces east, so reading it the camera looked west - and the route runs east.
+    guidance.sign = {
+      source: 'sign',
+      anchorId: 'test-anchor',
+      venueKey: 'synthetic-venue',
+      planBearing: 270,
+      yawDegrees: scanned.yawDegrees,
+      epoch: scanned.epoch,
+      timeMs: scanned.timeMs,
+    };
+    render(<CameraPreview tracking={trackingLike('off')} />);
+    clock += 16;
+    upright(0);
+    runFrames(1);
+    expect(view().getAttribute('data-heading-source')).toBe('sign');
+    expect(facing()).toBe(270);
+    expect(screen.getByText('The route is behind you. Turn around')).toBeTruthy();
+    // Turned round, the route is ahead and drawn. Readings keep arriving, as on a phone.
+    clock += 16;
+    upright(180);
+    runFrames(1);
+    expect(facing()).toBe(90);
+    expect(screen.queryByText(/behind you/)).toBeNull();
+    expect(Number(view().getAttribute('data-ribbon'))).toBeGreaterThan(0);
+  });
+
+  it('ignores a sign scanned on readings that have since stopped', () => {
+    sharedOrientation.start();
+    upright(0);
+    const scanned = sharedOrientation.read()!;
+    guidance.sign = {
+      source: 'sign',
+      anchorId: 'test-anchor',
+      venueKey: 'synthetic-venue',
+      planBearing: 270,
+      yawDegrees: scanned.yawDegrees,
+      // A later epoch than the one the camera view will read: continuity was lost.
+      epoch: scanned.epoch - 1,
+      timeMs: scanned.timeMs,
+    };
+    render(<CameraPreview tracking={trackingLike('off')} />);
+    clock += 16;
+    upright(0);
+    runFrames();
+    expect(view().getAttribute('data-heading-source')).toBe('assumed');
+  });
+
+  it('places AR from the scanned sign’s direction, wherever the phone points when tapped', async () => {
+    sharedOrientation.start();
+    upright(0);
+    const scanned = sharedOrientation.read()!;
+    guidance.sign = {
+      source: 'sign',
+      anchorId: 'test-anchor',
+      venueKey: 'synthetic-venue',
+      planBearing: 270,
+      yawDegrees: scanned.yawDegrees,
+      epoch: scanned.epoch,
+      timeMs: scanned.timeMs,
+    };
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    const started = vi.spyOn(arRuntime, 'startArGuidance').mockResolvedValue({
+      end: async () => {},
+      realign: () => {},
+      confirmSurface: () => false,
+    });
+    render(<CameraPreview tracking={trackingLike('on', anchored())} />);
+    upright(0);
+    runFrames(1);
+    const start = await screen.findByRole('button', { name: 'Start AR' });
+    await act(async () => fireEvent.click(start));
+    clock += 16;
+    upright(0);
+    // Facing away from the route: the session is told so, not handed the route's bearing.
+    expect(started.mock.calls[0][0].facingDegrees()).toBe(270);
+    clock += 16;
+    upright(90);
+    expect(started.mock.calls[0][0].facingDegrees()).toBe(180);
   });
 
   it('turns the drawn route by exactly the angle the phone was turned', () => {

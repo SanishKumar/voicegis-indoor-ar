@@ -108,6 +108,18 @@ describe('which way the camera is taken to be looking', () => {
     expect(facing).toMatchObject({ source: 'aligned', facing: 105 });
   });
 
+  it('says a direction from a scanned sign is its own, approximate source', () => {
+    const facing = facingFrom({
+      track,
+      live: false,
+      snapshot: null,
+      yaw: { degrees: 215, epoch: 1 },
+      anchor: { ...routeAnchor, source: 'sign' },
+      fallbackProgress: 2,
+    });
+    expect(facing).toMatchObject({ source: 'sign', facing: 105 });
+  });
+
   it('drops an anchor taken against a yaw zero that has since restarted', () => {
     const facing = facingFrom({
       track,

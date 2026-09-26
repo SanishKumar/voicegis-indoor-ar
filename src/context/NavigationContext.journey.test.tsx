@@ -9,6 +9,8 @@ import type { VisitorJourneyState } from '../navigation/visitorJourney';
 import type { CheckIn, CheckInRecord } from '../capture/anchorCheckIn';
 import type { QrFrameObservation } from '../capture/qrDecoder';
 import type { VisualCheckInCandidate } from '../capture/visualCheckIn';
+import { resetSharedOrientation, sharedOrientation } from '../ar/sharedOrientation';
+import type { SignHeading } from '../ar/signHeading';
 
 const mocks = vi.hoisted(() => ({ findRoute: vi.fn(), shutdownRoutingWorker: vi.fn() }));
 vi.mock('../engine/routingEngine', () => mocks);
@@ -19,7 +21,12 @@ import { NavigationProvider, useNavigation } from './NavigationContext.jsx';
 
 interface Binding {
   state: VisitorJourneyState;
-  checkIn: (CheckInRecord & { visualCandidate?: VisualCheckInCandidate | null }) | null;
+  checkIn:
+    | (CheckInRecord & {
+        visualCandidate?: VisualCheckInCandidate | null;
+        signHeading?: SignHeading | null;
+      })
+    | null;
   checkInToastVisible: boolean;
   accessibleRouting: boolean;
   toggleAccessibleRouting(): void;
@@ -71,6 +78,60 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('visitor journey check-in lifecycle', () => {
+  it('takes an approximate direction from a sign scanned on live orientation readings', () => {
+    vi.stubGlobal('isSecureContext', true);
+    vi.stubGlobal('DeviceOrientationEvent', class {});
+    resetSharedOrientation();
+    sharedOrientation.start();
+    try {
+      mount();
+      const frameAt = performance.now();
+      // The phone upright and level, as it is held to read a sign on a wall.
+      const event = new Event('deviceorientation');
+      Object.entries({
+        alpha: 30,
+        beta: 90,
+        gamma: 0,
+        timeStamp: frameAt,
+        absolute: false,
+      }).forEach(([key, value]) => Object.defineProperty(event, key, { value }));
+      act(() => {
+        window.dispatchEvent(event);
+      });
+      const frame = {
+        width: 640,
+        height: 480,
+        decodeWidth: 640,
+        decodeHeight: 480,
+        copiedAtMs: frameAt,
+        mediaTimeSeconds: 1,
+      };
+      act(() => {
+        current.actions.checkInWithPayload(anchors[0].payload, {
+          payload: anchors[0].payload,
+          engine: 'jsqr',
+          cornerOrder: 'qr-clockwise',
+          corners: null,
+          frame,
+        });
+      });
+      expect(current.checkIn?.signHeading).toMatchObject({
+        source: 'sign',
+        anchorId: anchors[0].id,
+        venueKey: current.state.venueKey,
+        planBearing: (anchors[0].headingDegrees + 180) % 360,
+      });
+      // A link has no frame to pair a reading with, and sets no direction.
+      act(() => {
+        current.actions.checkInWithPayload(anchors[1].payload);
+      });
+      expect(current.checkIn?.signHeading).toBeNull();
+    } finally {
+      resetSharedOrientation();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('retains camera geometry only for its accepted sign, separately from heading and links', () => {
     mount();
     const observation: QrFrameObservation = {

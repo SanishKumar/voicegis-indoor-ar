@@ -11,6 +11,7 @@ import { useNavigation } from '../context/NavigationContext.jsx';
 import QrCheckIn from './QrCheckIn.tsx';
 import { useDialogFocus } from './useDialogFocus.ts';
 import { scanProblemText } from '../capture/scanProblemText.ts';
+import { sharedOrientation } from '../ar/sharedOrientation';
 
 export default function LocationPicker({ isOpen, onClose }) {
   const { actions, venue } = useNavigation();
@@ -109,6 +110,10 @@ export default function LocationPicker({ isOpen, onClose }) {
           className="lp-scan-cta"
           onClick={() => {
             setScanProblem(null);
+            // Scanning a sign is what tells the app which way the visitor faces;
+            // the orientation readings have to be running, and some platforms
+            // only start them from a tap.
+            sharedOrientation.request();
             setScanning(true);
           }}
         >

@@ -14,6 +14,9 @@ describe('explicit manual camera heading bridge', () => {
   it('carries a turn around instead of forcing the route to point ahead', () => {
     expect(alignedCameraHeading(reading, anchor, 100)).toBe(270);
   });
+  it('carries a scanned sign’s approximate direction into AR the same way', () => {
+    expect(alignedCameraHeading(reading, { ...anchor, source: 'sign' }, 100)).toBe(270);
+  });
   it('refuses route assumptions and a missing calibration', () => {
     expect(alignedCameraHeading(reading, null, 100)).toBeNull();
     expect(alignedCameraHeading(reading, { ...anchor, source: 'route' }, 100)).toBeNull();

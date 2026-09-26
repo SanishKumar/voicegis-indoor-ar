@@ -198,7 +198,8 @@ export default function QrCheckIn({
 
         <p className="qr-checkin-status" role="status">
           {state.kind === 'starting' && 'Opening the camera…'}
-          {state.kind === 'scanning' && 'Point the camera at a check-in code.'}
+          {state.kind === 'scanning' &&
+            'Face the sign squarely and point the camera at its code. That also tells the app which way you are facing.'}
           {state.kind === 'denied' &&
             'Camera access was refused. The camera also needs a secure connection — https, not http.'}
           {state.kind === 'failed' && `The camera could not be opened (${state.detail}).`}

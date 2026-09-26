@@ -36,6 +36,10 @@ export type ArPromptKind =
   /** The position is frozen for a reason only a check-in scan fixes. */
   | 'rescan'
   | 'wrong-way'
+  /** Placed, but the camera looks well away from where the route goes. */
+  | 'turn'
+  /** Placed, and the route is behind the camera. */
+  | 'turn-around'
   /** The route is shown and nothing needs doing. */
   | 'guiding';
 
@@ -58,11 +62,22 @@ export interface ArPromptInput {
   /** Arrival has been confirmed. */
   arrived: boolean;
   floorName: (floorId: string) => string | undefined;
+  /**
+   * From where the camera looks to where the route goes a few metres on,
+   * signed, positive to the right; null when either is unknown.
+   */
+  turnDegrees?: number | null;
 }
 
 const REALIGN = { kind: 'realign', label: 'Re-align' } as const;
 
-export function arPrompt({ report, snapshot, arrived, floorName }: ArPromptInput): ArPrompt {
+export function arPrompt({
+  report,
+  snapshot,
+  arrived,
+  floorName,
+  turnDegrees = null,
+}: ArPromptInput): ArPrompt {
   if (arrived) return { kind: 'arrived', note: null, action: null, leads: 'leave' };
 
   // Before any recovery: the confirmation here also re-places the route.
@@ -110,7 +125,7 @@ export function arPrompt({ report, snapshot, arrived, floorName }: ArPromptInput
     if (placement === 'heading') {
       return {
         kind: placement,
-        note: 'Floor confirmed; building direction is not aligned. Raise the phone slightly. If this remains, leave AR and use the map or set manual camera alignment. Scanning a code does not yet align direction automatically.',
+        note: 'Floor confirmed, but the app does not know which way you are facing. Raise the phone slightly. If this stays, leave AR and scan a check-in sign while facing it squarely, or set the direction by hand in the camera view.',
         action: null,
         leads: 'leave',
       };
@@ -160,6 +175,24 @@ export function arPrompt({ report, snapshot, arrived, floorName }: ArPromptInput
     return {
       kind: 'wrong-way',
       note: 'You are heading away from the route. Turn around.',
+      action: REALIGN,
+      leads: null,
+    };
+  }
+
+  // Placed wherever the phone pointed; the route may well be beside or behind it.
+  if (turnDegrees !== null && Math.abs(turnDegrees) > 120) {
+    return {
+      kind: 'turn-around',
+      note: 'The route is behind you. Turn around.',
+      action: REALIGN,
+      leads: null,
+    };
+  }
+  if (turnDegrees !== null && Math.abs(turnDegrees) > 45) {
+    return {
+      kind: 'turn',
+      note: `Turn ${turnDegrees > 0 ? 'right' : 'left'} to see the route.`,
       action: REALIGN,
       leads: null,
     };

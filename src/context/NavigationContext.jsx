@@ -25,6 +25,9 @@ import { useVenue } from './VenueContext.jsx';
 import { createVenueScopedState } from '../data/venueSession';
 import { checkInFromScan } from '../capture/anchorCheckIn.ts';
 import { bindVisualCheckIn } from '../capture/visualCheckIn';
+import { sharedOrientation } from '../ar/sharedOrientation';
+import { SIGN_READING_MAX_SKEW_MS, signHeadingFrom } from '../ar/signHeading';
+import { logField } from '../fieldTest/fieldLog';
 import {
   canConfirmArrival,
   JOURNEY_ACTION as ACTION,
@@ -340,6 +343,28 @@ export function NavigationProvider({ children, venue }) {
       });
       setCheckInProblem(null);
       setCheckInToastVisible(true);
+      /*
+       * Scanning a sign means facing it, roughly: the phone's rotation at the
+       * decoded frame, paired with the way the sign faces, says which way the
+       * visitor looks - approximately, and only while the same orientation
+       * readings keep arriving. A link carries no frame and sets no direction.
+       */
+      const frameTimeMs = observation?.frame?.copiedAtMs ?? null;
+      const sign = signHeadingFrom({
+        anchor: result.anchor,
+        venueKey: state.venueKey,
+        frameTimeMs,
+        reading:
+          frameTimeMs === null
+            ? null
+            : sharedOrientation.readNear(frameTimeMs, SIGN_READING_MAX_SKEW_MS),
+      });
+      logField(
+        'sign-heading',
+        sign.heading
+          ? { accepted: true, anchor: result.anchor.id, bearing: sign.heading.planBearing }
+          : { accepted: false, anchor: result.anchor.id, why: sign.refusal },
+      );
       setCheckIn({
         anchorId: result.anchor.id,
         floorId: result.anchor.floorId,
@@ -353,6 +378,7 @@ export function NavigationProvider({ children, venue }) {
           state.venueKey,
           performance.now(),
         ),
+        signHeading: sign.heading,
       });
       if (destinationNodeId) {
         void requestRoute(

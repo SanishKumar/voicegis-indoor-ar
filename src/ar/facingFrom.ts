@@ -3,7 +3,7 @@ import type { TrackerSnapshot } from '../navigation/liveTracker';
 import { bearingAt, type RouteTrack } from '../navigation/routeProgress';
 
 /** Where a drawn facing came from, in the order they are trusted. */
-export type FacingSource = 'ar' | 'tracker' | 'aligned' | 'assumed' | 'off';
+export type FacingSource = 'ar' | 'tracker' | 'aligned' | 'sign' | 'assumed' | 'off';
 
 /** A yaw straight from the phone, whose zero means nothing on its own. */
 export interface YawReading {
@@ -21,8 +21,11 @@ export interface FacingAnchor {
   yawDegrees: number;
   planBearing: number;
   epoch: number;
-  /** The visitor said so, or the route was assumed. */
-  source: 'visitor' | 'route';
+  /**
+   * The visitor said so; a scanned sign said so, approximately; or the route
+   * was assumed, which is never drawn.
+   */
+  source: 'visitor' | 'sign' | 'route';
   /** Which axis supplied yaw at alignment; legacy/unknown anchors cannot enter XR. */
   axis?: 'camera-forward' | 'device-top';
 }
@@ -68,9 +71,13 @@ export function facingFrom(input: FacingInput): Facing {
   }
   // A camera can turn while the person keeps travelling straight. An explicit
   // camera alignment must not be overwritten by the walking estimator.
-  if (yaw !== null && anchor?.source === 'visitor' && anchor.epoch === yaw.epoch) {
+  if (
+    yaw !== null &&
+    (anchor?.source === 'visitor' || anchor?.source === 'sign') &&
+    anchor.epoch === yaw.epoch
+  ) {
     return {
-      source: 'aligned',
+      source: anchor.source === 'visitor' ? 'aligned' : 'sign',
       facing: wrapDegrees(anchor.planBearing + yaw.degrees - anchor.yawDegrees),
       progress,
     };

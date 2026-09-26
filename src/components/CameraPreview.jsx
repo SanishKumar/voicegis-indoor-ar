@@ -39,7 +39,7 @@ import { landmarksFrom } from '../engine/routeLandmarks';
 import { bearingAt, guidanceAt, positionAt, trackForRoute } from '../navigation/routeProgress';
 import { facingFrom } from '../ar/facingFrom';
 import { alignedCameraHeading } from '../ar/alignedCameraHeading';
-import { startOrientationFeed } from '../ar/orientationFeed';
+import { sharedOrientation } from '../ar/sharedOrientation';
 import { calloutsAhead, shortStepTitle } from '../ar/callouts';
 import { drawMiniMap, prepareMiniMap } from '../ar/cameraMiniMap';
 import { createProjector, DEFAULT_CAMERA_MODEL, projectRouteAhead } from '../ar/floorProjection';
@@ -80,7 +80,7 @@ const ARROWS = {
  * }} props
  */
 export default function CameraPreview({ tracking = null, voice = false, onVoice = null }) {
-  const { state, actions, venue } = useNavigation();
+  const { state, actions, venue, checkIn } = useNavigation();
   if (state.activeView !== VIEW_TYPE.CAMERA_PREVIEW) return null;
   return (
     <CameraGuidance
@@ -90,6 +90,7 @@ export default function CameraPreview({ tracking = null, voice = false, onVoice 
       tracking={tracking}
       voice={voice}
       onVoice={onVoice}
+      signHeading={checkIn?.signHeading ?? null}
     />
   );
 }
@@ -231,7 +232,7 @@ function placeCallouts(elements, callouts, projector, width, height, topInset) {
   return shown;
 }
 
-function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
+function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signHeading }) {
   const { route, navStatus, progressMeters, locationBasis, destinationNodeId } = state;
   const navigating = navStatus === NAV_STATUS.NAVIGATING || navStatus === NAV_STATUS.ARRIVED;
   const found = navigating && Boolean(route?.found) && route.steps.length > 0;
@@ -255,6 +256,8 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   const [arStarting, setArStarting] = useState(false);
   const [arProblem, setArProblem] = useState(null);
   const [arReport, setArReport] = useState(null);
+  // Where the direction the session was placed with came from, for saying how far to trust it.
+  const [arHeadingSource, setArHeadingSource] = useState(null);
   const [arStartProgress, setArStartProgress] = useState(0);
   // The preview can be at the destination before the visitor has left the
   // check-in point. All immersive copy follows the physical source too, not
@@ -288,6 +291,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
   const yawRef = useRef(null);
   const anchorRef = useRef(null);
   const feedRef = useRef(null);
+  const signRef = useRef(null);
   // The loop below draws every frame; it reads these here rather than restarting for them.
   const progressRef = useRef(progressMeters);
   const trackRef = useRef(track);
@@ -298,6 +302,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
     trackRef.current = track;
     stepsRef.current = route?.steps ?? [];
     destinationRef.current = destinationName;
+    signRef.current = signHeading?.venueKey === state.venueKey ? signHeading : null;
   });
   useEffect(() => {
     logField('orientation', { state: orientationState });
@@ -356,7 +361,9 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
    */
   useEffect(() => {
     if (!found) return undefined;
-    const feed = startOrientationFeed({
+    // The page's one feed: a direction from a sign scanned before this view
+    // opened is a yaw on it, and means nothing against any other.
+    const unsubscribe = sharedOrientation.subscribe({
       onReading(reading) {
         attitudeRef.current = reading;
         if (reading === null) {
@@ -367,6 +374,18 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         yawRef.current = { degrees: reading.yawDegrees, epoch: reading.epoch };
         const anchor = anchorRef.current;
         if (anchor !== null && anchor.epoch === reading.epoch) return;
+        // A sign scanned on these same readings says, approximately, which way the camera looks.
+        const sign = signRef.current;
+        if (sign !== null && sign.epoch === reading.epoch) {
+          anchorRef.current = {
+            yawDegrees: sign.yawDegrees,
+            planBearing: sign.planBearing,
+            epoch: sign.epoch,
+            source: 'sign',
+            axis: 'camera-forward',
+          };
+          return;
+        }
         // Keep a candidate bearing for the alignment UI, not a drawable pose.
         // Only an explicit alignment or the live estimator can place the route.
         const current = trackRef.current;
@@ -380,9 +399,12 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       },
       onState: setOrientationState,
     });
-    feedRef.current = feed;
+    feedRef.current = {
+      read: () => sharedOrientation.read(),
+      request: () => sharedOrientation.request(),
+    };
     return () => {
-      feed.dispose();
+      unsubscribe();
       feedRef.current = null;
       attitudeRef.current = null;
       yawRef.current = null;
@@ -569,7 +591,9 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         const toAim = planBearing([here.x, here.y], [aim.x, aim.y]);
         const halfView = (Math.atan(width / 2 / projector.focal) * 180) / Math.PI;
         const away = toAim === null ? 0 : signedHeadingDifference(toAim, facing);
-        if (toAim !== null && Math.abs(away) > halfView + 4) {
+        if (toAim !== null && Math.abs(away) > 135) {
+          hint = 'behind';
+        } else if (toAim !== null && Math.abs(away) > halfView + 4) {
           hint = away > 0 ? 'right' : 'left';
         }
       }
@@ -708,6 +732,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
         return;
       }
       setArStartProgress(tracker.read(performance.now()).progressMeters);
+      setArHeadingSource(anchorRef.current?.source ?? null);
       const handle = await startArGuidance({
         track,
         tracker,
@@ -819,12 +844,26 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
     navStatus === NAV_STATUS.ARRIVED ||
     (arActive ? snapshot?.reason === 'arrived' : (guidance?.atEnd ?? false));
   // What the session needs from the visitor, and the one control that gives it.
+  /*
+   * Placed from the direction the phone knew, the route can be beside or
+   * behind the camera. The session measures where the camera looks; the
+   * route's way on is a few metres ahead of where the tracker stands.
+   */
+  let arTurn = null;
+  if (arActive && arReport?.aligned && track && snapshot?.headingDegrees != null) {
+    const at = snapshot.progressMeters;
+    const here = positionAt(track, at);
+    const aim = positionAt(track, Math.min(track.length, at + AIM_AHEAD_METERS));
+    const toAim = planBearing([here.x, here.y], [aim.x, aim.y]);
+    if (toAim !== null) arTurn = signedHeadingDifference(toAim, snapshot.headingDegrees);
+  }
   const prompt = arActive
     ? arPrompt({
         report: arReport,
         snapshot,
         arrived: navStatus === NAV_STATUS.ARRIVED,
         floorName,
+        turnDegrees: arTurn,
       })
     : null;
   const promptKind = prompt?.kind ?? null;
@@ -847,30 +886,32 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       ? 'Position tracking is paused. Check your location on the map before following the floor route.'
       : !knownStart
         ? 'Set your location on the map or scan a check-in code before placing the route.'
-        : arAvailable && !arSession && source !== 'aligned'
-          ? 'Start AR can find the floor, but cannot yet determine the building’s direction from a sign. For manual alignment, check the map, face along the route and tap “I’m facing the corridor” first.'
-          : needsOrientation
-            ? 'This phone wants permission before it reports which way it is pointing. Enable camera orientation, then point along the corridor.'
-            : orientationState === 'requesting'
-              ? 'Asking the phone for its orientation.'
-              : orientationState === 'waiting'
-                ? 'Waiting for the first orientation reading from this phone.'
-                : orientationState === 'paused'
-                  ? 'Camera alignment paused. Return here and align again before following the route.'
-                  : orientationState === 'stale' || orientationState === 'unavailable'
-                    ? 'Orientation signal lost. The floor route is hidden until fresh readings return and you align again.'
-                    : // Nothing arriving at all is an orientation problem; a heading
-                      // the walk has measured, with no tilt behind it, is the rarer
-                      // case where only the tilt is missing, and says so.
-                      source === 'off'
-                      ? 'Waiting for the phone’s orientation. No floor route is shown without a fresh reading.'
-                      : !drawn.tilted
-                        ? 'Waiting for the phone’s tilt. The route cannot be laid on the floor without it.'
-                        : source === 'assumed'
-                          ? 'At your check-in point, face the corridor in the route’s direction, then tap “I’m facing the corridor”.'
-                          : !live
-                            ? 'Direction follows your phone; position holds until you track your walk.'
-                            : null;
+        : arAvailable && !arSession && source === 'sign'
+          ? 'Your direction comes from the sign you scanned, so it is approximate. Tap Start AR, then confirm the floor.'
+          : arAvailable && !arSession && source !== 'aligned'
+            ? 'To know which way you face, scan a check-in sign while facing it squarely. Or face along the route and tap “I’m facing the corridor”.'
+            : needsOrientation
+              ? 'This phone wants permission before it reports which way it is pointing. Enable camera orientation, then point along the corridor.'
+              : orientationState === 'requesting'
+                ? 'Asking the phone for its orientation.'
+                : orientationState === 'waiting'
+                  ? 'Waiting for the first orientation reading from this phone.'
+                  : orientationState === 'paused'
+                    ? 'Camera alignment paused. Return here and align again before following the route.'
+                    : orientationState === 'stale' || orientationState === 'unavailable'
+                      ? 'Orientation signal lost. The floor route is hidden until fresh readings return and you align again.'
+                      : // Nothing arriving at all is an orientation problem; a heading
+                        // the walk has measured, with no tilt behind it, is the rarer
+                        // case where only the tilt is missing, and says so.
+                        source === 'off'
+                        ? 'Waiting for the phone’s orientation. No floor route is shown without a fresh reading.'
+                        : !drawn.tilted
+                          ? 'Waiting for the phone’s tilt. The route cannot be laid on the floor without it.'
+                          : source === 'assumed'
+                            ? 'At your check-in point, face the corridor in the route’s direction, then tap “I’m facing the corridor”.'
+                            : !live
+                              ? 'Direction follows your phone; position holds until you track your walk.'
+                              : null;
 
   const instructionCard = copy && (
     <div className="camera-preview-instruction">
@@ -959,9 +1000,13 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
             <span>
               {arActive
                 ? arReport?.aligned
-                  ? 'Anchored to your start point'
+                  ? arHeadingSource === 'sign'
+                    ? 'Direction from the sign · approximate'
+                    : 'Direction you set'
                   : 'Waiting for placement'
-                : 'Not world-anchored'}
+                : source === 'sign'
+                  ? 'Direction from the sign · approximate'
+                  : 'Not world-anchored'}
             </span>
           </div>
           {!cameraError && (
@@ -1003,9 +1048,13 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice }) {
       {found && !cameraError && drawn.hint && !arActive && (
         <div className={`ar-offscreen is-${drawn.hint}`} role="status">
           <span className="ar-offscreen-arrow" aria-hidden="true">
-            {drawn.hint === 'right' ? '›' : '‹'}
+            {drawn.hint === 'right' ? '›' : drawn.hint === 'left' ? '‹' : '↓'}
           </span>
-          <span>Turn {drawn.hint} to find the route</span>
+          <span>
+            {drawn.hint === 'behind'
+              ? 'The route is behind you. Turn around'
+              : `Turn ${drawn.hint} to find the route`}
+          </span>
         </div>
       )}
 

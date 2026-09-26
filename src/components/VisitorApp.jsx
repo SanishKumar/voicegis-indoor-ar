@@ -5,6 +5,7 @@ import { guidanceAt, positionAt, trackForRoute } from '../navigation/routeProgre
 import CameraPreview from './CameraPreview.jsx';
 import CheckInToast from './CheckInToast.tsx';
 import FieldTestPanel from './FieldTestPanel.tsx';
+import { sharedOrientation } from '../ar/sharedOrientation';
 import Header from './Header.jsx';
 import { bannerCopy } from './journey/guidanceCopy';
 import JourneyChrome from './journey/JourneyChrome.jsx';
@@ -35,6 +36,11 @@ export default function VisitorApp() {
   const mapViewMemory = useRef(null);
   const [mapRecoveryTarget, setMapRecoveryTarget] = useState(null);
   const [voice, setVoice] = useState(false);
+  // Orientation runs from the start, so a sign scanned later lands on readings
+  // that keep going into the camera view and AR.
+  useEffect(() => {
+    sharedOrientation.start();
+  }, []);
 
   /*
    * A journey is on screen from the moment a route is asked for until it is

@@ -3,6 +3,7 @@ import { ChevronRight, QrCode, Search } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs } from '../engine/searchIndex.js';
 import QrCheckIn from './QrCheckIn.tsx';
+import { sharedOrientation } from '../ar/sharedOrientation';
 import { scanProblemText } from '../capture/scanProblemText.ts';
 
 const STEP = { DESTINATION: 0, POSITION: 1 };
@@ -174,6 +175,8 @@ export default function WelcomeScreen({ onComplete }) {
               className="onboard-pill"
               onClick={() => {
                 setScanProblem(null);
+                // Scanning a sign is what tells the app which way the visitor faces.
+                sharedOrientation.request();
                 setScanning(true);
               }}
             >

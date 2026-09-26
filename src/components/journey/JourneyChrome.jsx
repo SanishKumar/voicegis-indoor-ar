@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useNavigation, NAV_STATUS } from '../../context/NavigationContext.jsx';
 import { startPointLabel } from '../../capture/startLabel.ts';
+import { sharedOrientation } from '../../ar/sharedOrientation';
 import { guidanceAt, positionAt, trackForRoute } from '../../navigation/routeProgress';
 import { bannerCopy, formatMeters, formatMinutes, stepSummary } from './guidanceCopy';
 import ManeuverIcon from './ManeuverIcon.jsx';
@@ -271,7 +272,11 @@ export default function JourneyChrome({
     walkthrough.pause();
     tracking.start();
   };
-  const openScanner = () => setShowLocationPicker('scan');
+  const openScanner = () => {
+    // Scanning a sign is what tells the app which way the visitor faces.
+    sharedOrientation.request();
+    setShowLocationPicker('scan');
+  };
 
   return (
     <div

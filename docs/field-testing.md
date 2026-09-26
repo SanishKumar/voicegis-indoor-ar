@@ -77,6 +77,13 @@ A route and a start point first: pick a destination, then scan a check-in code
 - **Without motion access.** Refuse motion access and start AR again: the session
   must still open. Pose walking requires a confirmed floor and direction. If
   orientation is also unavailable, no direction must be invented to enable it.
+- **Direction from a sign.** Scan a check-in code while facing it squarely
+  (the laptop screen stands in for the sign), then open the camera view. It
+  should say "Direction from the sign · approximate" and, if the route leaves
+  behind the sign, "The route is behind you. Turn around". Turn around: the
+  route should appear ahead. Then Start AR and confirm the floor; the route
+  should be placed without "I'm facing the corridor". If AR stays on
+  "does not know which way you are facing", copy the Test log.
 - **Flat camera view** (phones without AR): tap **I'm facing the corridor**
   while facing along the route, then turn — the route should turn with the phone.
 
