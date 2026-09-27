@@ -10,7 +10,8 @@ import {
   ShapeGeometry,
   WebGLRenderer,
 } from 'three';
-import { signedHeadingDifference } from '../navigation/coordinateFrames';
+import { signedHeadingDifference, wrapDegrees } from '../navigation/coordinateFrames';
+import { rotatePlanVector } from '../navigation/poseHeadingCorrection';
 import type { RouteTracker } from '../navigation/liveTracker';
 import { FloorPlacement } from './floorPlacement';
 import {
@@ -107,6 +108,8 @@ export interface ArFrameReport {
   floorHits: number;
   facingDegrees: number | null;
   progressMeters: number;
+  /** The direction correction walking has taught the tracker, in degrees; 0 until then. */
+  headingCorrectionDegrees?: number;
 }
 
 export interface ArGuidanceOptions {
@@ -244,6 +247,14 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
   let chevrons: { holder: Group; along: number }[] = [];
   let builtTo = 0;
   let alignment: PlanWorldAlignment | null = null;
+  /*
+   * Measured movement is converted with the alignment it was placed with; the
+   * tracker corrects its direction as walking teaches it. The route is drawn
+   * with that correction applied, so the arrows straighten along with the
+   * marker rather than pointing into a wall the whole way.
+   */
+  let drawAlignment: PlanWorldAlignment | null = null;
+  let drawnCorrection = -1;
   let recovery: ArFrameReport['recovery'] = null;
   let placement: ArFrameReport['placement'] = null;
   let settle: { x: number; z: number; bearing: number; atMs: number } | null = null;
@@ -267,7 +278,8 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
 
   const buildRoute = (progress: number) => {
     clearRoute();
-    if (alignment === null) return;
+    const drawing = drawAlignment;
+    if (drawing === null) return;
     const run = nextVerticalRun(track, progress);
     const limit = Math.min(
       track.length,
@@ -277,11 +289,11 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     const first = Math.ceil((progress + 0.75) / CHEVRON_EVERY_METERS) * CHEVRON_EVERY_METERS;
     for (let along = first; along <= limit; along += CHEVRON_EVERY_METERS) {
       const here = positionAt(track, along);
-      const [x, , z] = planToWorld(alignment, here.x, here.y);
+      const [x, , z] = planToWorld(drawing, here.x, here.y);
       const holder = new Group();
       holder.position.set(x, 0.01, z);
       // The world turns the other way from a bearing: bearings are clockwise from above.
-      holder.rotation.y = -planBearingToWorld(alignment, bearingAt(track, along)) * DEG;
+      holder.rotation.y = -planBearingToWorld(drawing, bearingAt(track, along)) * DEG;
       const outline = new Mesh(chevron, outlineMaterial);
       outline.rotation.x = -Math.PI / 2;
       outline.scale.setScalar(1.25);
@@ -294,14 +306,14 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     }
     if (limit >= track.length) {
       const end = positionAt(track, track.length);
-      const [x, , z] = planToWorld(alignment, end.x, end.y);
+      const [x, , z] = planToWorld(drawing, end.x, end.y);
       const marker = new Mesh(ring, endMaterial);
       marker.rotation.x = -Math.PI / 2;
       marker.position.set(x, 0.015, z);
       route.add(marker);
     }
     builtTo = limit;
-    route.position.y = alignment.floorY;
+    route.position.y = drawing.floorY;
   };
 
   const align = (viewer: ViewerReading, nowMs: number) => {
@@ -315,6 +327,11 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       waitFor('heading', nowMs);
       return;
     }
+    // Re-finding the camera's room is not a new observation of venue position.
+    if (!tracker.poseRestored(nowMs)) {
+      target.visible = false;
+      return;
+    }
     alignment = alignPlanToWorld(
       { x: here.x, y: here.y, bearingDegrees: facing },
       { x: viewer.x, z: viewer.z, bearingDegrees: viewer.bearingDegrees },
@@ -323,13 +340,37 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     alignedFloor = snapshot.floorId;
     last = { x: viewer.x, z: viewer.z };
     lastAtMs = nowMs;
-    tracker.poseRestored(nowMs);
     pendingX = 0;
     pendingZ = 0;
     pendingSince = nowMs;
     tracker.facing(worldBearingToPlan(alignment, viewer.bearingDegrees), nowMs);
     target.visible = false;
+    drawAlignment = alignment;
+    drawnCorrection = tracker.poseCorrection().epoch;
     buildRoute(snapshot.progressMeters);
+  };
+
+  /** Redraw from where the corrected pose stands, facing as corrected. */
+  const followCorrection = (viewer: ViewerReading, progress: number) => {
+    if (alignment === null) return;
+    const correction = tracker.poseCorrection();
+    if (correction.epoch === drawnCorrection || correction.point === null) return;
+    drawnCorrection = correction.epoch;
+    // Movement not yet handed to the tracker is part of where the viewer is.
+    const [rawX, rawY] = worldDisplacementToPlan(alignment, pendingX, pendingZ);
+    const [dx, dy] = rotatePlanVector(rawX, rawY, -correction.biasDegrees);
+    drawAlignment = alignPlanToWorld(
+      {
+        x: correction.point.x + dx,
+        y: correction.point.y + dy,
+        bearingDegrees: wrapDegrees(
+          worldBearingToPlan(alignment, viewer.bearingDegrees) - correction.biasDegrees,
+        ),
+      },
+      { x: viewer.x, z: viewer.z, bearingDegrees: viewer.bearingDegrees },
+      alignment.floorY,
+    );
+    buildRoute(progress);
   };
 
   releaseResources = () => {
@@ -395,6 +436,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       floorHits: floor.hits,
       facingDegrees: alignment !== null ? snapshot.headingDegrees : null,
       progressMeters: snapshot.progressMeters,
+      headingCorrectionDegrees: tracker.poseCorrection().biasDegrees,
     });
   };
 
@@ -402,6 +444,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     const changed = recovery !== reason;
     recovery = reason;
     alignment = null;
+    drawAlignment = null;
     last = null;
     pendingX = 0;
     pendingZ = 0;
@@ -566,6 +609,8 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       // A storey change moves the floor under the session's feet: start again there.
       if (snapshot.floorId !== alignedFloor) {
         hold('floor-change', nowMs);
+      } else if (tracker.poseCorrection().epoch !== drawnCorrection) {
+        followCorrection(viewer, snapshot.progressMeters);
       } else if (snapshot.progressMeters + AHEAD_METERS > builtTo + 5 && builtTo < track.length) {
         buildRoute(snapshot.progressMeters);
       }
@@ -606,6 +651,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       // cannot supply the missing yaw when the provider is unavailable.
       recovery = null;
       alignment = null;
+      drawAlignment = null;
       // Placed again from a pose held still, as at the start.
       placement = null;
       settle = null;

@@ -1,5 +1,7 @@
 import { DeadReckoningIntegrator, type ImuSample } from '@voicegis/localization-core';
 import { signedHeadingDifference, wrapDegrees } from './coordinateFrames';
+import { PoseHeadingCorrector } from './poseHeadingCorrection';
+import { matchRoutePose, ROUTE_POSE_POLICY } from './routePoseMatcher';
 import {
   ARRIVAL_METERS,
   bearingAt,
@@ -23,12 +25,11 @@ import {
  * walked and resets at every scanned code. A storey change is never inferred
  * from motion; it is confirmed by a scan or by the visitor.
  *
- * The assumption is tested continuously rather than trusted: a wrong first
- * direction, a missed turn or a walk down the wrong corridor shows up as
- * strides that disagree with the route, and the tracker says so instead of
- * moving the marker. That is also why the corridor constraint makes this
- * workable where free dead reckoning would not - a route is a line, and a
- * stride either follows it or it does not.
+ * Stride direction disagreement can challenge that assumption, but does not
+ * locate someone independently. With an attached camera pose, keep the actual
+ * plan-frame displacement and project it onto a nearby reachable route leg.
+ * Do not erase lateral movement by feeding the projection back as position;
+ * incompatible or ambiguous geometry freezes until a new anchor is supplied.
  *
  * Nothing here is written to a recording. The evidence pipeline in
  * `localization-core` requires independently surveyed heading provenance for
@@ -47,7 +48,7 @@ export type TrackingReason =
   | 'uncertain'
   /** The compass says the visitor is facing away from the route as they set off. */
   | 'wrong-way'
-  /** Strides keep disagreeing with the corridor. */
+  /** Strides disagree with the corridor, or the pose no longer matches the local route. */
   | 'off-route'
   /** The gyroscope is missing or silent; strides are counted but move nothing, since their direction is unknown. */
   | 'no-heading'
@@ -197,6 +198,12 @@ export class RouteTracker {
   private lastMovedMs: number | null = null;
   private facingPlan: number | null = null;
   private headingEpoch = 0;
+  /** Unsnapped pose displacement in plan coordinates; never replaced by a projection. */
+  private posePoint: { x: number; y: number } | null = null;
+  /** Geometric loss is a position failure; swapping sensors cannot clear it. */
+  private poseRouteLost = false;
+  /** The error in the pose's direction, learned from walking along the route. */
+  private readonly poseHeading = new PoseHeadingCorrector();
 
   constructor(track: RouteTrack, options: TrackerOptions = {}) {
     this.options = { ...DEFAULTS, ...options };
@@ -215,6 +222,8 @@ export class RouteTracker {
     this.disagree = 0;
     this.backward = 0;
     this.lastAnchor = null;
+    this.posePoint = null;
+    this.poseRouteLost = false;
   }
 
   get currentTrack() {
@@ -232,6 +241,7 @@ export class RouteTracker {
       this.isAnchored &&
       this.phase !== 'floor-change' &&
       !this.poseJumped &&
+      !this.poseRouteLost &&
       this.disagree < this.options.offRouteFrozen &&
       this.sigma() < this.options.frozenSigmaMeters
     );
@@ -271,6 +281,7 @@ export class RouteTracker {
     this.progress = progress;
     this.anchorSigma = Math.max(0.1, input.sigmaMeters);
     this.poseJumped = false;
+    this.poseRouteLost = false;
     this.lastMovedMs = input.timeMs;
     this.walked = 0;
     this.displaced = 0;
@@ -282,6 +293,27 @@ export class RouteTracker {
     this.lastAnchor = { progress, strides: 0 };
     this.nowMs = Math.max(this.nowMs, input.timeMs);
     this.beginOrienting();
+    this.resetPosePoint();
+  }
+
+  /** A new pose baseline is a new placement: its direction error is learned afresh. */
+  private resetPosePoint() {
+    const here = positionAt(this.track, this.progress);
+    this.posePoint = { x: here.x, y: here.y };
+    this.poseHeading.reset(this.posePoint);
+  }
+
+  /**
+   * The direction correction learned so far and where the corrected pose
+   * stands, for a drawing of the route to follow. The epoch changes with
+   * every correction and every new placement.
+   */
+  poseCorrection(): { epoch: number; biasDegrees: number; point: { x: number; y: number } | null } {
+    return {
+      epoch: this.poseHeading.epoch,
+      biasDegrees: this.poseHeading.bias,
+      point: this.posePoint === null ? null : { ...this.posePoint },
+    };
   }
 
   private beginOrienting() {
@@ -304,6 +336,7 @@ export class RouteTracker {
     this.poseJumped = false;
     this.lastMovedMs = timeMs;
     this.facingPlan = null;
+    if (!this.poseRouteLost) this.resetPosePoint();
     if (this.phase === 'orienting') this.phase = 'following';
   }
 
@@ -319,19 +352,26 @@ export class RouteTracker {
   /**
    * The visitor has re-aligned the pose to the route after a jump. What the
    * jump claimed was never counted, so there is nothing to undo; the next
-   * movement is measured from here.
+   * movement is measured from here. Geometric route loss needs an anchor,
+   * not a camera reset; false tells the session it must not re-place the route.
    */
   poseRestored(timeMs: number) {
     this.nowMs = Math.max(this.nowMs, timeMs);
+    if (this.poseRouteLost) return false;
     this.poseJumped = false;
     this.lastMovedMs = timeMs;
+    this.resetPosePoint();
+    return true;
   }
 
   /** Which way the camera faces, as a plan bearing, while a pose is attached. */
   facing(planDegrees: number | null, timeMs: number) {
     this.nowMs = Math.max(this.nowMs, timeMs);
+    // Measured through the same placement as the steps, so it carries the same correction.
     this.facingPlan =
-      planDegrees === null || !Number.isFinite(planDegrees) ? null : wrapDegrees(planDegrees);
+      planDegrees === null || !Number.isFinite(planDegrees)
+        ? null
+        : wrapDegrees(planDegrees - this.poseHeading.bias);
   }
 
   /** One movement across the floor, in the plan frame, from the attached pose. */
@@ -361,10 +401,44 @@ export class RouteTracker {
     this.lastMovedMs = input.timeMs;
     if (this.phase === 'orienting') this.phase = 'following';
     this.displaced += meters;
-    const heading = wrapDegrees((Math.atan2(input.dxMeters, -input.dyMeters) * 180) / Math.PI);
-    // Off-route and wrong-way tallies are kept in strides, so a metre of
-    // pose movement counts for as many strides as it would have taken.
-    this.follow(meters, heading, meters / this.strideMeters);
+    if (this.poseRouteLost || this.frozenBySigma() || this.disagree >= this.options.offRouteFrozen)
+      return;
+    if (this.posePoint === null) this.resetPosePoint();
+    const point = this.posePoint!;
+    const [dx, dy] = this.poseHeading.correct(input.dxMeters, input.dyMeters);
+    point.x += dx;
+    point.y += dy;
+    const match = matchRoutePose(this.track, {
+      x: point.x,
+      y: point.y,
+      previousProgressMeters: this.progress,
+      movementMeters: meters,
+      // An approximate direction drifts sideways with distance until walking confirms it.
+      maximumDistanceMeters: this.poseHeading.tolerance(ROUTE_POSE_POLICY.maximumDistanceMeters),
+    });
+    if (match.kind === 'held') {
+      this.poseRouteLost = true;
+      return;
+    }
+    const change = match.progressMeters - this.progress;
+    this.disagree = 0;
+    if (change < -1e-6) {
+      this.backward += meters / this.strideMeters;
+      this.progress = match.progressMeters;
+    } else {
+      if (change > 1e-6) this.backward = 0;
+      this.advance(change);
+    }
+    const corrected = this.poseHeading.observe(
+      this.track,
+      { dx, dy, meters },
+      this.progress,
+      point,
+    );
+    if (corrected !== null) {
+      point.x = corrected.x;
+      point.y = corrected.y;
+    }
   }
 
   /** A compass heading already turned into a plan bearing, or null when there is none. */
@@ -468,7 +542,8 @@ export class RouteTracker {
    */
   private follow(meters: number, heading: number, weight: number) {
     // Frozen holds: nothing moves the marker until a scan gives it a new anchor.
-    if (this.frozenBySigma() || this.disagree >= this.options.offRouteFrozen) return;
+    if (this.poseRouteLost || this.frozenBySigma() || this.disagree >= this.options.offRouteFrozen)
+      return;
     const forward = bearingsNear(this.track, this.progress, this.options.turnWindowMeters);
     if (forward.length === 0) forward.push(bearingAt(this.track, this.progress));
     const ahead = Math.min(
@@ -500,7 +575,8 @@ export class RouteTracker {
   }
 
   private advance(meters: number) {
-    if (this.frozenBySigma() || this.disagree >= this.options.offRouteFrozen) return;
+    if (this.poseRouteLost || this.frozenBySigma() || this.disagree >= this.options.offRouteFrozen)
+      return;
     const run = nextVerticalRun(this.track, this.progress);
     let next = clampProgress(this.track, this.progress + meters);
     if (run !== null && next >= run.boardingMeters - 1e-6) {
@@ -526,6 +602,7 @@ export class RouteTracker {
     this.pendingRun = null;
     this.nowMs = Math.max(this.nowMs, timeMs);
     this.beginOrienting();
+    this.resetPosePoint();
   }
 
   private sigma() {
@@ -564,7 +641,11 @@ export class RouteTracker {
     let tier: TrackingTier;
     let reason: TrackingReason;
     let moving = false;
-    if (this.sensorsProblem !== null) {
+    if (this.poseRouteLost) {
+      // A camera reset or later sensor silence cannot mask a required scan.
+      tier = 'frozen';
+      reason = 'off-route';
+    } else if (this.sensorsProblem !== null) {
       tier = 'frozen';
       reason = this.sensorsProblem;
     } else if (this.phase === 'unanchored') {

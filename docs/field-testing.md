@@ -65,9 +65,11 @@ A route and a start point first: pick a destination, then scan a check-in code
   Keep fresh orientation available, then start AR and confirm the floor. If
   direction is unavailable, raise the camera slightly; otherwise leave AR.
   Turning around before confirmation must not redefine the route as straight ahead.
-  Automatic sign-derived heading is not implemented yet.
+  A scanned sign sets an approximate direction without this step (below).
 - **Walking.** Walk the route's direction; the distance left should count down
-  and the chevrons stay on the floor.
+  and the chevrons stay on the floor. If the arrows start at an angle to the
+  corridor, keep walking straight down it: after a few metres they should
+  straighten, and the Test log shows an `ar-heading-correction` entry.
 - **Lost tracking.** Cover the camera for a few seconds: the view should say it
   lost track of the room and offer Re-align. Find and confirm the floor again;
   an old floor confirmation must not survive loss of the reference frame.

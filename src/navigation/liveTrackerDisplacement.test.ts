@@ -78,6 +78,55 @@ const SOUTH: [number, number] = [0, 0.5];
 const NORTH: [number, number] = [0, -0.5];
 
 describe('movement from an attached pose', () => {
+  it('projects diagonal movement instead of spending sideways travel as route progress', () => {
+    const tracker = attached();
+    tracker.displace({ dxMeters: 0.3, dyMeters: 0.4, timeMs: 500 });
+    expect(tracker.read(500).progressMeters).toBeCloseTo(0.3, 6);
+    expect(tracker.read(500).walkedSinceAnchorMeters).toBeCloseTo(0.5, 6);
+  });
+
+  it('never rounds a corner when the visitor walks straight past it', () => {
+    const tracker = attached();
+    const t = move(tracker, 46, EAST);
+    expect(tracker.read(t).progressMeters).toBeCloseTo(20, 6);
+    expect(tracker.read(t)).toMatchObject({ tier: 'frozen', reason: 'off-route' });
+  });
+
+  it('retains lateral departure when later motion runs parallel to the route', () => {
+    const tracker = attached();
+    let t = move(tracker, 6, NORTH);
+    t = move(tracker, 10, EAST, t);
+    expect(tracker.read(t).progressMeters).toBe(0);
+    expect(tracker.read(t)).toMatchObject({
+      tier: 'frozen',
+      reason: 'off-route',
+      canStartPose: false,
+    });
+    // Changing source or re-aligning a camera is not a new position observation.
+    tracker.detachDisplacement(t);
+    tracker.resume(t);
+    t = strides(tracker, 5, t);
+    expect(tracker.read(t)).toMatchObject({
+      progressMeters: 0,
+      reason: 'off-route',
+      canStartPose: false,
+    });
+    // Even a later missing sensor must not conceal the required re-anchor.
+    tracker.sensorsLost('sensors-unavailable');
+    expect(tracker.read(t + 3000).reason).toBe('off-route');
+    t += 3000;
+    tracker.attachDisplacement(t);
+    tracker.poseRestored(t);
+    t = move(tracker, 4, EAST, t);
+    expect(tracker.read(t)).toMatchObject({
+      progressMeters: 0,
+      reason: 'off-route',
+      canStartPose: false,
+    });
+    tracker.anchor({ progressMeters: 5, sigmaMeters: 1, timeMs: t });
+    t = move(tracker, 2, EAST, t);
+    expect(tracker.read(t).progressMeters).toBeCloseTo(6, 6);
+  });
   it('moves the marker by the metres the pose reports along the corridor', () => {
     const tracker = attached();
     const t = move(tracker, 10, EAST);
@@ -98,6 +147,13 @@ describe('movement from an attached pose', () => {
     t = move(tracker, 10, SOUTH, t);
     expect(tracker.read(t).progressMeters).toBeCloseTo(25, 6);
     expect(tracker.read(t).reason).toBe('following');
+  });
+
+  it('allows a turn one metre inside the centreline without inventing a departure', () => {
+    const tracker = attached();
+    let t = move(tracker, 38, EAST); // x=19: turn just before the mapped x=20 corner.
+    t = move(tracker, 6, SOUTH, t);
+    expect(tracker.read(t)).toMatchObject({ progressMeters: 23, reason: 'following' });
   });
 
   it('ignores a phone being held still, and lets strides count for nothing', () => {
@@ -131,7 +187,9 @@ describe('movement from an attached pose', () => {
     let t = move(tracker, 10, NORTH);
     let snap = tracker.read(t);
     expect(snap.progressMeters).toBe(0);
-    expect(snap).toMatchObject({ tier: 'caution', reason: 'off-route' });
+    // Spatial inconsistency now holds immediately, rather than waiting for a
+    // stride-equivalent angle tally to accumulate after a five-metre departure.
+    expect(snap).toMatchObject({ tier: 'frozen', reason: 'off-route' });
     t = move(tracker, 10, NORTH, t);
     snap = tracker.read(t);
     expect(snap.progressMeters).toBe(0);
@@ -257,5 +315,56 @@ describe('movement from an attached pose', () => {
     expect(following.relativeHeadingDegrees).toBeCloseTo(0, 6);
     tracker.resume(t + 1);
     expect(tracker.read(t + 1).headingEpoch).toBeGreaterThan(following.headingEpoch);
+  });
+});
+
+/** Steps of half a metre along a bearing turned by a placement error, as a session measures them. */
+function heading(bearing: number, errorDegrees: number): [number, number] {
+  const radians = ((bearing + errorDegrees) * Math.PI) / 180;
+  return [0.5 * Math.sin(radians), -0.5 * Math.cos(radians)];
+}
+
+describe('a placement direction learned from walking the route', () => {
+  it.each([5, 10, 20, 30, -15])(
+    'keeps guiding down a corridor when the placement was %s degrees off',
+    (error) => {
+      // The corner route's first leg is 20 m east; walk 18 m straight down it.
+      const tracker = attached();
+      const t = move(tracker, 36, heading(90, error));
+      expect(tracker.read(t)).toMatchObject({ tier: 'tracking', reason: 'following' });
+      expect(tracker.read(t).progressMeters).toBeGreaterThan(17.5);
+      expect(tracker.poseCorrection().biasDegrees).toBeCloseTo(error, 0);
+    },
+  );
+
+  it('carries the learned direction round the corner and down the next leg', () => {
+    const tracker = attached();
+    let t = move(tracker, 40, heading(90, 15));
+    // Eight metres down the 12 m second leg: short of arriving.
+    t = move(tracker, 16, heading(180, 15), t);
+    expect(tracker.read(t)).toMatchObject({ reason: 'following' });
+    expect(tracker.read(t).progressMeters).toBeGreaterThan(27);
+  });
+
+  it('still stops a walk that leaves the corridor at an angle no placement error explains', () => {
+    const tracker = attached();
+    const t = move(tracker, 16, heading(135, 0));
+    expect(tracker.read(t)).toMatchObject({ tier: 'frozen', reason: 'off-route' });
+    expect(tracker.poseCorrection().biasDegrees).toBe(0);
+  });
+
+  it('reports the facing corrected the same way as the steps', () => {
+    const tracker = attached();
+    const t = move(tracker, 16, heading(90, 20));
+    tracker.facing(110, t);
+    expect(tracker.read(t).headingDegrees).toBeCloseTo(90, 0);
+  });
+
+  it('forgets the correction when the route is placed again', () => {
+    const tracker = attached();
+    const t = move(tracker, 16, heading(90, 20));
+    expect(tracker.poseCorrection().biasDegrees).not.toBe(0);
+    tracker.poseRestored(t);
+    expect(tracker.poseCorrection().biasDegrees).toBe(0);
   });
 });

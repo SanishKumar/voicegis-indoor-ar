@@ -163,6 +163,20 @@ describe('what the AR view asks of the visitor', () => {
     }
   });
 
+  it.each([
+    report({ aligned: false, recovery: 'pose-lost' }),
+    report({ aligned: false, recovery: 'floor-change' }),
+    report({ aligned: false, placement: 'floor-confirm' }),
+    report({ aligned: false, placement: 'heading' }),
+  ])('keeps a required position scan ahead of camera recovery: %j', (session) => {
+    expect(
+      prompt({
+        report: session,
+        snapshot: snapshot({ tier: 'frozen', reason: 'off-route', canStartPose: false }),
+      }),
+    ).toMatchObject({ kind: 'rescan', action: null, leads: 'leave' });
+  });
+
   it('names a floor change the session noticed on its own', () => {
     expect(prompt({ report: report({ aligned: false, recovery: 'floor-change' }) }).kind).toBe(
       'new-floor',

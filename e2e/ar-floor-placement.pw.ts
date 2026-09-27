@@ -21,7 +21,7 @@ for (const { surfaceDetection, manualAlignment } of [
   }, testInfo) => {
     await page.addInitScript(
       ({ surfaceDetection, manualAlignment }) => {
-        const state = { hits: false, pose: true };
+        const state = { hits: false, pose: true, walkSideways: false };
         Object.defineProperty(window, 'floorTest', { value: state });
         Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
           value: async () => new MediaStream(),
@@ -82,6 +82,7 @@ for (const { surfaceDetection, manualAlignment } of [
           environmentBlendMode = 'alpha-blend';
           renderState = {};
           ended = false;
+          lastFrameMs: number | null = null;
           reference = new EventTarget();
           constructor(private overlay: HTMLElement) {
             super();
@@ -114,6 +115,11 @@ for (const { surfaceDetection, manualAlignment } of [
           requestAnimationFrame(callback: (time: number, frame: unknown) => void) {
             return window.requestAnimationFrame((time) => {
               if (this.ended) return;
+              // A slow, continuous lateral walk, not a relocalization jump.
+              if (state.walkSideways && this.lastFrameMs !== null) {
+                matrix[12] += Math.min(0.05, (time - this.lastFrameMs) / 1000);
+              }
+              this.lastFrameMs = time;
               callback(time, {
                 getViewerPose: () =>
                   state.pose
@@ -184,7 +190,8 @@ for (const { surfaceDetection, manualAlignment } of [
         manualAlignment ? 'guiding' : 'heading',
       );
       if (!manualAlignment) {
-        await expect(overlay).toContainText('building direction is not aligned');
+        await expect(overlay).toContainText('does not know which way you are facing');
+        await expect(overlay).toContainText('scan a check-in sign');
         await expectCenterHitTarget(leave);
         await expectInsideViewport(overlay.locator('.camera-ar-overlay-note'));
         await page.screenshot({ path: testInfo.outputPath('heading-unavailable-320.png') });
@@ -202,6 +209,31 @@ for (const { surfaceDetection, manualAlignment } of [
         await overlay.getByRole('button', { name: 'Re-align', exact: true }).click();
         await expect(overlay).toHaveAttribute('data-ar-prompt', 'floor');
         await expect(confirm).toHaveCount(0);
+        await page.evaluate(() => {
+          (window as unknown as { floorTest: { hits: boolean } }).floorTest.hits = true;
+        });
+        await expect(overlay).toHaveAttribute('data-ar-prompt', 'floor-confirm');
+        await confirm.click();
+        await expect(overlay).toHaveAttribute('data-ar-prompt', 'guiding');
+        await page.evaluate(() => {
+          (window as unknown as { floorTest: { walkSideways: boolean } }).floorTest.walkSideways =
+            true;
+        });
+        await expect(overlay).toHaveAttribute('data-ar-prompt', 'rescan');
+        await expect(overlay).toContainText('movement no longer matches the route');
+        await expect(overlay.getByRole('button', { name: 'Re-align', exact: true })).toHaveCount(0);
+        // Losing the room afterwards must not replace the required scan with
+        // an ineffective camera reset or another floor-confirmation workflow.
+        await page.evaluate(() => {
+          Object.assign((window as unknown as { floorTest: object }).floorTest, {
+            pose: false,
+            walkSideways: false,
+          });
+        });
+        await expect(overlay).toHaveAttribute('data-ar-prompt', 'rescan');
+        await expectCenterHitTarget(leave);
+        await expectInsideViewport(overlay.locator('.camera-ar-overlay-note'));
+        await page.screenshot({ path: testInfo.outputPath('off-route-rescan-320.png') });
       }
     } else {
       await expect(overlay).toContainText('Surface detection is unavailable');

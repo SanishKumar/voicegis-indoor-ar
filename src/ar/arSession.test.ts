@@ -84,13 +84,13 @@ async function setup(
   confirmSurface = handle.confirmSurface;
   return { tracker, handle, report, requestSession };
 }
-function frame(z: number | null, y = 1.4) {
+function frame(z: number | null, y = 1.4, x = 0) {
   now += 50;
   gpu.loop?.(now, {
     getViewerPose: () =>
       z === null
         ? null
-        : { transform: { matrix: new Matrix4().makeTranslation(0, y, z).elements } },
+        : { transform: { matrix: new Matrix4().makeTranslation(x, y, z).elements } },
     getHitTestResults: () =>
       floorHit === null
         ? []
@@ -118,6 +118,45 @@ function place(z: number, y = 1.4) {
 const route = () => gpu.scene?.children[0];
 
 describe('immersive route pose continuity', () => {
+  it('straightens the drawn route as walking shows the placement direction was off', async () => {
+    // Placed believing the camera looked 15 degrees further round than it did.
+    const { tracker, handle } = await setup({ facing: () => 105 });
+    place(0);
+    const sideways = () =>
+      Math.max(...(route()?.children ?? []).map((child) => Math.abs(child.position.x)));
+    // The arrows ahead lean off the line the visitor is about to walk.
+    expect(sideways()).toBeGreaterThan(1);
+    // Straight down the corridor at walking pace.
+    for (let z = -0.05; z >= -8.001; z -= 0.05) frame(z);
+    expect(tracker.read(now)).toMatchObject({ reason: 'following' });
+    expect(tracker.poseCorrection().biasDegrees).toBeCloseTo(15, 0);
+    // Now drawn along the corridor actually walked, straight down -z.
+    expect(sideways()).toBeLessThan(0.4);
+    expect(route()?.visible).toBe(true);
+    await handle.end();
+  });
+
+  it('hides an off-route walk and cannot re-place it by re-confirming the floor', async () => {
+    const { tracker, handle, report } = await setup();
+    place(0);
+    // Facing east: camera-right is south on the plan. Walk two metres
+    // sideways at 1 m/s; this is a valid pose stream, not a platform jump.
+    for (let i = 1; i <= 40; i += 1) frame(0, 1.4, i * 0.05);
+    expect(tracker.read(now)).toMatchObject({
+      reason: 'off-route',
+      progressMeters: 0,
+      canStartPose: false,
+    });
+    expect(route()?.visible).toBe(false);
+    frame(null);
+    expect(tracker.read(now).reason).toBe('off-route');
+    handle.realign();
+    place(0);
+    expect(route()?.visible).toBe(false);
+    expect(report).toHaveBeenLastCalledWith(expect.objectContaining({ aligned: false }));
+    expect(tracker.read(now).reason).toBe('off-route');
+    await handle.end();
+  });
   it('reports a missing building heading after confirming a real floor', async () => {
     const { handle, report } = await setup({ facing: () => null });
     place(0);

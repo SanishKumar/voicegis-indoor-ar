@@ -62,7 +62,7 @@ test('camera alignment follows real-time attitude, expires silence and never adv
     )
     .toBe(180);
   await expect(view).toHaveAttribute('data-ribbon', '0');
-  await expect(page.getByText(/Turn (left|right) to find the route/)).toBeVisible();
+  await expect(page.getByText('The route is behind you. Turn around')).toBeVisible();
   await page.evaluate(() => {
     const attitude = (
       window as unknown as { cameraTestAttitude: { alpha: number; sending: boolean } }

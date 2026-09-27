@@ -71,6 +71,17 @@ export interface ArPromptInput {
 
 const REALIGN = { kind: 'realign', label: 'Re-align' } as const;
 
+function rescanPrompt(offRoute: boolean): ArPrompt {
+  return {
+    kind: 'rescan',
+    note: offRoute
+      ? 'Your movement no longer matches the route. Leave AR and scan a check-in code to locate yourself again.'
+      : 'Your position is too uncertain to show the route. Leave AR and scan a check-in code.',
+    action: null,
+    leads: 'leave',
+  };
+}
+
 export function arPrompt({
   report,
   snapshot,
@@ -101,6 +112,17 @@ export function arPrompt({
       action: { kind: 'confirm-arrival', label: 'I’m at my destination' },
       leads: 'action',
     };
+  }
+
+  // A floor or camera reset cannot locate someone who has left the route.
+  // Keep the useful recovery action visible even if the session also loses pose.
+  if (
+    snapshot?.tier === 'frozen' &&
+    (snapshot.reason === 'off-route' ||
+      snapshot.reason === 'uncertain' ||
+      snapshot.reason === 'no-anchor')
+  ) {
+    return rescanPrompt(snapshot.reason === 'off-route');
   }
 
   if (report?.recovery === 'pose-lost') {
@@ -160,15 +182,7 @@ export function arPrompt({
   }
 
   if (snapshot?.tier === 'frozen') {
-    return {
-      kind: 'rescan',
-      note:
-        snapshot.reason === 'off-route'
-          ? 'You seem to have left the route. Leave AR and scan a check-in code to carry on.'
-          : 'Your position is too uncertain to show the route. Leave AR and scan a check-in code.',
-      action: null,
-      leads: 'leave',
-    };
+    return rescanPrompt(snapshot.reason === 'off-route');
   }
 
   if (snapshot?.reason === 'wrong-way') {

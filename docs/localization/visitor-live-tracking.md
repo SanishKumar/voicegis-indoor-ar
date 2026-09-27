@@ -1,6 +1,6 @@
 # Visitor live tracking
 
-Updated 25 September 2026. `src/navigation/liveTracker.ts` and
+Updated 27 September 2026. `src/navigation/liveTracker.ts` and
 `src/components/journey/useLiveTracking.js` move the visitor's guidance from
 the phone's own motion sensors. This is **guidance, not evidence**: it exists so
 that a person following a route does not have to press anything, and it is
@@ -48,16 +48,73 @@ its own movement through the room, in metres, with its camera and inertial
 sensors. The tracker takes that movement through `attachDisplacement` and
 `displace` and stops moving progress for strides while it does, so the same
 walk is never counted twice; strides still count towards the stride
-calibration. Each movement is judged against the corridor exactly as a stride
-is, with its length in stride-equivalents added to the off-route and
-wrong-way tallies, and uncertainty grows at 3% of the distance moved instead
-of 8%. The session's world is lined up with the plan once, from the same
-assumption the tracker makes at a scan - the visitor is at their progress,
-looking the way the route goes - and `src/ar/planWorld.ts` holds nothing but
-that one rotation and offset. A storey change starts the alignment again on
-the new floor. Frozen holds: once twelve stride-equivalents have disagreed, or
-uncertainty has passed twelve metres, nothing moves the marker until a scan
-gives it a new anchor.
+calibration. Uncertainty grows at 3% of the distance moved instead of 8%.
+The world-to-plan transform uses the tracker's physical position and the
+available building heading (including the explicitly approximate sign heading
+or manual alignment), never the route's bearing as a substitute for a missing
+heading. `src/ar/planWorld.ts` holds that rotation and offset. Floor height
+requires a detected surface confirmed by the visitor. A storey change starts
+placement again on the new floor.
+
+`src/navigation/routePoseMatcher.ts` now matches the **unsnapped cumulative
+plan-frame position**, not just the angle and length of the latest movement:
+
+- Sideways distance adds to distance walked and uncertainty, not forward progress.
+- A missed turn holds at the corner; it cannot spend straight-line travel on
+  the next leg. Normal turns and backward travel still move the marker.
+- Candidates are confined to the current contiguous floor run and a progress
+  window of the latest movement length plus 3 m (twice the lateral guard, to
+  allow projections to change legs when rounding a corner). Distant crossings
+  and parallel return legs outside that window are excluded; a later visit
+  to the same storey cannot bypass the intervening floor changes.
+- A point further from all eligible route legs than the sideways allowance
+  (below), an unreachable projection, or similarly good non-adjacent
+  candidates freezes guidance as `off-route`.
+  Ambiguity means distances within 0.2 m and progress positions over 0.5 m apart.
+- The retained point is **never replaced with its projection** between reports.
+  Otherwise each update would erase a small sideways departure and a parallel
+  walk could appear to follow the route indefinitely.
+- This loss is latched. Stop/resume, switching to strides, leaving/re-entering
+  AR, re-aligning the camera or re-confirming a floor cannot clear it. A new
+  check-in/known-position anchor is required. AR hides the route and prioritizes
+  the scan instruction over camera/floor recovery prompts.
+
+These are provisional matching guards, not corridor boundaries or a safety
+clearance. A nearby matched point does not prove that the space between it and
+the route is walkable. An inaccurate initial position can also cause a hold.
+
+### Direction learned from walking
+
+A session is placed with an approximate direction - a scanned sign, or the
+visitor's own alignment - and every step is turned by the same error. Walking
+straight down a corridor then drifts sideways by about the error's sine per
+metre: a strict 1.5 m guard froze guidance after 17 m at 5°, 9 m at 10° and
+4.5 m at 20°. `src/navigation/poseHeadingCorrection.ts` learns that error:
+
+- Over a stretch of 3 m along one leg, at least 1 m from either end, with the
+  path at least 90% straight, the angle between the path and the leg (either
+  way along it) is taken as direction error - never more than 30° from one
+  stretch or 35° in total. Crooked paths and stretches near corners teach nothing.
+- Every step since the direction was last set or confirmed was walked with the
+  same error, so all of them are recomputed with the correction. The position
+  is not dropped onto the route line; it moves only as the corrected steps put it.
+- Until a stretch has confirmed the direction, the sideways allowance grows from
+  1.5 m by tan 20° per metre of **progress along the route**; afterwards by
+  tan 6°; never beyond 4 m. Walking straight off to the side makes no progress,
+  so it gets no more room than the fixed guard.
+- The facing reported for turn cues gets the same correction, and the AR
+  session redraws the route with it, so the arrows straighten with the marker.
+- A new placement (re-alignment, anchor, storey change) forgets the correction.
+
+Simulated walks: straight 30 m placed 5-30° off keeps guiding and learns the
+error to within a tenth of a degree; an L-shaped route placed 15-20° off keeps
+guiding through the turn. Walking 45° off the corridor still stops after 3 m,
+straight past a corner stops 2 m past it, and sideways off the route at 1.8 m.
+The thresholds are provisional software guards, not surveyed corridor widths;
+an open hall walked diagonally for 3 m could be mistaken for direction error.
+Handset runs record each correction in the field log (`ar-heading-correction`).
+The IMU-only stride estimator retains its existing direction/tally model; it
+does not gain independent XY localization from this change.
 
 Pose continuity is checked in two places. The session rejects a change over
 0.5 m when it implies more than 4 m/s or follows a frame gap over one second.
@@ -75,6 +132,9 @@ are experimental software thresholds, not device-qualified accuracy limits.
 | tracking | Strides agree with the corridor; σ under 6 m                                                                                       | Marker moves; banner counts down; map follows heading-up                                        |
 | caution  | σ over 6 m, a run of disagreeing strides, or walking back the way you came                                                         | Marker still moves; label says why; a scan is offered                                           |
 | frozen   | No anchor or stride heading, sensors silent or missing, a pose jump, twelve disagreeing strides, σ over 12 m, or waiting at a lift | Marker holds; label says what would help; re-alignment, a scan or floor confirmation is offered |
+
+In addition to the freezes above, incompatible or ambiguous pose geometry
+freezes with `off-route` and requires a new position anchor.
 
 The pill in the instruction banner carries the tier by weight - solid,
 heavier rule, broken rule - not by hue, in keeping with the rest of the
@@ -97,16 +157,16 @@ persists across a reload.
 The visitor shell owns the choice between tracking and a walk-through:
 starting tracking pauses the preview, and starting a walk-through or selecting
 an instruction to inspect stops tracking. A preview changes the guidance on screen, never the tracker's
-physical position. AR startup uses that physical position and its route
-bearing; it refuses to create an anchor from a preview. No-heading strides
+physical position. AR startup uses that physical position and an available
+building heading; it refuses to create an anchor from a preview. No-heading strides
 increase uncertainty without moving the marker, including the first stride
 before the missing-gyroscope diagnosis settles. XR displacement carries its
 own direction and does not require the stride integrator's heading.
 
-## The camera view's own sensors
+## The camera view's orientation
 
-The camera view subscribes to the phone's orientation itself rather than
-reading the tracker's, because the two want different things. The tracker
+The camera view uses the shared visitor orientation feed rather than relying
+only on the stride tracker, because the two want different things. The tracker
 wants turn rates while a walk is being followed, and only once the visitor
 has asked for that. The camera wants to know where the phone is pointing from
 the moment it opens, tracked or not, because a route drawn at a guessed
@@ -115,8 +175,10 @@ is a position, and neither is evidence.
 
 Where the tracker has learned a direction of travel, the camera prefers it:
 it is the same gyroscope, already tied to the route by a walk. Otherwise the
-camera's own yaw carries the turn and its zero is fixed by the visitor, or
-assumed from the route and labelled as an assumption.
+camera's yaw carries the turn from manual alignment or the approximate direction
+established when scanning a sign. Missing direction is reported, not silently
+replaced with the route's bearing. Orientation continuity is maintained by
+the shared visitor orientation feed across scanning and camera view.
 
 ## What it is not
 
@@ -132,3 +194,13 @@ figure that may be quoted.
 It also cannot see the building. A visitor who leaves the route is told so
 and offered a scan; the route is not re-planned from a guessed position,
 because the tracker has no trustworthy position off the route to plan from.
+
+## Regression coverage for pose matching
+
+`routePoseMatcher.test.ts` covers rotation/translation invariance, normal and
+missed corners, retreat, crossings, parallel legs, ambiguous hairpins, repeated
+vertices, floor boundaries and invalid input. `liveTrackerDisplacement.test.ts`
+checks the full stream, including loss that survives source changes and clears
+only on an anchor. `arSession.test.ts` drives rendered frames through lateral
+departure and recovery; `arPrompt.test.ts` ensures the scan action stays visible.
+These are synthetic software checks, not a claim of real-handset accuracy.

@@ -122,7 +122,10 @@ describe('independent pose-source eligibility', () => {
       }
       expect(tracker.read(walker.t).reason).toBe(failure);
       tracker.sensorsLost('sensors-unavailable');
-      expect(tracker.read(walker.t).reason).toBe('sensors-unavailable');
+      // Geometric loss keeps the required scan visible even if sensors later fail.
+      expect(tracker.read(walker.t).reason).toBe(
+        failure === 'off-route' ? 'off-route' : 'sensors-unavailable',
+      );
       expect(tracker.canStartPose).toBe(false);
       expect(tracker.read(walker.t).canStartPose).toBe(false);
     },
