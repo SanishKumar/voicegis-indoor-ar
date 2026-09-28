@@ -443,11 +443,21 @@ describe('a placement direction refined by walking that agrees with it', () => {
     },
   );
 
-  it('keeps guiding with the phone swaying from side to side at each step', () => {
+  it.each([0.1, 0.2])('keeps guiding with %s m phone sway at each step', (amplitude) => {
     const tracker = attached(long);
-    const sway = (walked: number) => 0.1 * Math.sin((2 * Math.PI * walked) / 1.3);
+    const sway = (walked: number) => amplitude * Math.sin((2 * Math.PI * walked) / 1.3);
     const t = walkPath(tracker, (walked) => [walked, sway(walked)], 55, 15);
     expect(tracker.read(t)).toMatchObject({ tier: 'tracking', reason: 'following' });
     expect(tracker.poseCorrection().biasDegrees).toBeCloseTo(15, 0);
+  });
+
+  it.each([3, 5, 8, 10])('does not refine away a settled %s degree departure', (turn) => {
+    const track = buildRouteTrack([node('a', 0, 0), node('b', 100, 0)], []);
+    const tracker = attached(track);
+    let t = move(tracker, 32, EAST); // 16 m straight: ample time to settle.
+    const before = tracker.poseCorrection().biasDegrees;
+    t = move(tracker, 128, heading(90 + turn, 0), t);
+    expect(tracker.read(t)).toMatchObject({ tier: 'frozen', reason: 'off-route' });
+    expect(tracker.poseCorrection().biasDegrees).toBeCloseTo(before, 6);
   });
 });

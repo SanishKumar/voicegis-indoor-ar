@@ -1,75 +1,49 @@
-import { planBearing, signedHeadingDifference } from './coordinateFrames';
+import { signedHeadingDifference } from './coordinateFrames';
 import { planarRouteLegs } from './routePlanarLegs';
+import { straightCourse, type WalkPoint } from './poseStraightWindow';
 import type { RouteTrack } from './routeProgress';
 
 /**
- * Learning the error in an AR session's direction from walking along the route.
+ * A bounded bootstrap under the INITIAL-CORRIDOR ASSUMPTION, not an independent
+ * heading observation. First estimate from a straight window, then at most one
+ * refinement from two consecutive agreeing windows. Once settled, never learn
+ * later departures. A turn, disagreement or exhausted settling budget also
+ * closes refinement. A new placement is required to open it again.
  *
- * A session is placed with an approximate direction - from a scanned sign, or
- * the visitor saying which way they face - and every metre walked after that
- * is turned by the same error. Walking straight down a corridor then shows up
- * as a path drifting off to one side, and a strict match against the route
- * would call that leaving it within a few metres.
- *
- * Assume the INITIAL straight walk follows the selected corridor, and estimate
- * the placement bias from it. This is not independent heading evidence: a
- * diagonal departure at startup is indistinguishable from a placement error.
- * Once a stretch has supplied an estimate (including zero bias) it is locked
- * against change of any size: a later stretch that disagrees with it by more
- * than a few degrees is never learned, so a genuine departure is not absorbed.
- *
- * A single three-metre stretch is a short baseline, though. A lane change in
- * the first metres, or the phone swaying with each step, leaves the estimate
- * a few degrees out, and a few degrees over a long corridor is enough to leave
- * the route. So later stretches that AGREE with the estimate join a baseline
- * along the same leg, and the estimate is taken again over that whole
- * baseline. Recompute the path under the bias, not by dropping it onto the
- * route. Large angles, crooked paths and stretches near corners teach nothing.
- *
- * Thresholds are provisional software guards, not surveyed corridor widths
- * or measured handset accuracy.
+ * Positions for the heading fit are unsmoothed measured positions in the
+ * original placement frame. Only the heading fit tolerates bounded phone sway;
+ * the route matcher continues to see every measured lateral displacement.
  */
 export const POSE_HEADING_POLICY = Object.freeze({
-  /** Metres of path along one leg before its direction is compared with the leg's. */
   windowMeters: 3,
-  /** Straight-line distance over path length; below this the walk was not straight. */
-  minimumStraightness: 0.9,
-  /**
-   * The two halves of a stretch may point this far apart at most. A stretch
-   * across a turn averages the two directions and can look straight.
-   */
-  maximumBendDegrees: 8,
-  /** Stretches this close to either end of a leg may be rounding a corner. */
   legEndMarginMeters: 1,
-  /** A bigger angle than this over one stretch is not taken for direction error. */
   maximumFixDegrees: 30,
-  /** How far off the direction may be before any stretch has confirmed it. */
   initialUncertaintyDegrees: 20,
-  /** Cap on the temporary allowance while learning the initial placement. */
   maximumToleranceMeters: 4,
-  /** After the initial estimate, a stretch must agree with it this closely to refine it. */
   refineAgreementDegrees: 10,
-  /** How far the estimate may still be off once a stretch has confirmed it. */
+  /** Two later windows must agree with EACH OTHER, not merely with the first estimate. */
+  settleAgreementDegrees: 5,
+  /** Net route progress after the first estimate; no indefinite later adaptation. */
+  maximumSettlingMeters: 12,
   lockedUncertaintyDegrees: 4,
-  /** And the most sideways room that leaves before the next agreeing stretch. */
   lockedMaximumToleranceMeters: 2.5,
+  /** Bound memory and reject extended shuffling without a useful baseline. */
+  maximumWindowPathMeters: 9,
+  maximumWindowSpanMeters: 6,
+  maximumWindowSamples: 256,
 });
-
+export type PoseHeadingState = 'learning' | 'settling' | 'locked';
 const DEG = Math.PI / 180;
 
-/** Turn a plan-frame vector clockwise, as a bearing turns, by this many degrees. */
 export function rotatePlanVector(dx: number, dy: number, degrees: number): [number, number] {
-  const cos = Math.cos(degrees * DEG);
-  const sin = Math.sin(degrees * DEG);
+  const cos = Math.cos(degrees * DEG),
+    sin = Math.sin(degrees * DEG);
   return [dx * cos - dy * sin, dy * cos + dx * sin];
 }
-
 interface Leg {
   index: number;
   bearing: number;
 }
-
-/** The planar leg this progress is on, away from its ends; null at a corner or a storey change. */
 function straightLegAt(track: RouteTrack, progress: number): Leg | null {
   const margin = POSE_HEADING_POLICY.legEndMarginMeters;
   for (const { startIndex, endIndex, bearing } of planarRouteLegs(track)) {
@@ -80,24 +54,14 @@ function straightLegAt(track: RouteTrack, progress: number): Leg | null {
   }
   return null;
 }
-
 interface Stretch extends Leg {
-  sumX: number;
-  sumY: number;
+  points: WalkPoint[];
   path: number;
-  /** The first half of the stretch, once walked. */
-  half: { x: number; y: number } | null;
 }
-
-/** Stretches along one leg that agreed with the estimate, as the placement measured them. */
-interface Baseline {
-  index: number;
-  bearing: number;
-  rawX: number;
-  rawY: number;
+interface Measured extends Leg {
+  points: WalkPoint[];
+  bias: number;
 }
-
-/** The bias a measured (uncorrected) direction implies, taking the leg either way along it. */
 function biasAlong(legBearing: number, rawBearing: number) {
   const forward = signedHeadingDifference(rawBearing, legBearing);
   return Math.abs(forward) <= 90 ? forward : signedHeadingDifference(rawBearing, legBearing + 180);
@@ -105,181 +69,195 @@ function biasAlong(legBearing: number, rawBearing: number) {
 
 export class PoseHeadingCorrector {
   private biasDegrees = 0;
-  private fixes = 0;
-  /** Progress along the route since the direction was last confirmed. */
+  private stage: PoseHeadingState = 'learning';
   private progressSinceFix = 0;
+  private settlingProgress = 0;
   private lastProgress: number | null = null;
-  /**
-   * Where the pose stood when the direction was last set or confirmed, and
-   * every step since: all of it was walked with the same error, so all of it
-   * is recomputed when the error is learned.
-   */
-  private origin: { x: number; y: number } | null = null;
+  private origin: WalkPoint | null = null;
   private sinceX = 0;
   private sinceY = 0;
+  private rawPoint: WalkPoint = { x: 0, y: 0 };
   private stretch: Stretch | null = null;
-  private baseline: Baseline | null = null;
-  /**
-   * An agreeing stretch waits for the next one to agree too before it refines
-   * the estimate: the first stretch into a departure can still look like the
-   * corridor, and the one after it shows that it was not.
-   */
-  private pending: Baseline | null = null;
+  private pending: Measured | null = null;
+  private firstLeg: number | null = null;
   private epochValue = 0;
 
-  /** Degrees subtracted from each measured step's bearing. */
   get bias() {
     return this.biasDegrees;
   }
-
-  /** Changes whenever the correction does, so a drawing of the route knows to follow. */
   get epoch() {
     return this.epochValue;
   }
-
-  /** A locked estimate still rests on the initial-corridor assumption. */
-  get state(): 'learning' | 'locked' {
-    return this.fixes === 0 ? 'learning' : 'locked';
+  get state(): PoseHeadingState {
+    return this.stage;
   }
 
-  /** A new placement: whatever was learned about the old one's direction no longer applies. */
-  reset(from: { x: number; y: number } | null = null) {
-    this.origin = from === null ? null : { x: from.x, y: from.y };
+  reset(from: WalkPoint | null = null) {
+    this.origin = from === null ? null : { ...from };
     this.sinceX = 0;
     this.sinceY = 0;
+    this.rawPoint = { x: 0, y: 0 };
     this.biasDegrees = 0;
-    this.fixes = 0;
+    this.stage = 'learning';
     this.progressSinceFix = 0;
+    this.settlingProgress = 0;
     this.lastProgress = null;
     this.stretch = null;
-    this.baseline = null;
     this.pending = null;
+    this.firstLeg = null;
     this.epochValue += 1;
   }
 
-  /** A measured step, turned by the correction learned so far. */
   correct(dx: number, dy: number): [number, number] {
     return this.biasDegrees === 0 ? [dx, dy] : rotatePlanVector(dx, dy, -this.biasDegrees);
   }
 
-  /**
-   * How far to the side of the route the matcher should still look: the
-   * sideways drift the remaining direction uncertainty could have caused
-   * before the initial estimate is locked. It grows with progress along the
-   * route, not with distance walked: a wrong direction drifts sideways only
-   * as the walk goes forward, so a walk straight off to the side gets no more
-   * room than the fixed guard.
-   */
   tolerance(baseMeters: number) {
-    // Once the initial error has been estimated, the room left is small and
-    // renewed only by agreeing stretches. It grows with progress, so walking
-    // on past a missed corner - which makes none - gets no more of it.
-    if (this.fixes > 0)
-      return Math.min(
-        POSE_HEADING_POLICY.lockedMaximumToleranceMeters,
-        baseMeters +
-          this.progressSinceFix * Math.tan(POSE_HEADING_POLICY.lockedUncertaintyDegrees * DEG),
-      );
+    const learning = this.stage === 'learning';
     return Math.min(
-      POSE_HEADING_POLICY.maximumToleranceMeters,
+      learning
+        ? POSE_HEADING_POLICY.maximumToleranceMeters
+        : POSE_HEADING_POLICY.lockedMaximumToleranceMeters,
       baseMeters +
-        this.progressSinceFix * Math.tan(POSE_HEADING_POLICY.initialUncertaintyDegrees * DEG),
+        this.progressSinceFix *
+          Math.tan(
+            (learning
+              ? POSE_HEADING_POLICY.initialUncertaintyDegrees
+              : POSE_HEADING_POLICY.lockedUncertaintyDegrees) * DEG,
+          ),
     );
   }
 
-  /**
-   * One corrected step, already matched to this progress, ending at this
-   * point. Returns the point recomputed under a new correction, or null.
-   */
+  private lock() {
+    this.stage = 'locked';
+    this.pending = null;
+    this.stretch = null;
+  }
+
   observe(
     track: RouteTrack,
     step: { dx: number; dy: number; meters: number },
     progress: number,
-    point: { x: number; y: number },
-  ): { x: number; y: number } | null {
-    if (this.lastProgress !== null) this.progressSinceFix += Math.abs(progress - this.lastProgress);
+    point: WalkPoint,
+  ): WalkPoint | null {
+    const progressed = this.lastProgress === null ? 0 : Math.abs(progress - this.lastProgress);
+    this.progressSinceFix += progressed;
     this.lastProgress = progress;
+    if (this.stage === 'locked') return null;
+    if (this.stage === 'settling') {
+      this.settlingProgress += progressed;
+      if (this.settlingProgress > POSE_HEADING_POLICY.maximumSettlingMeters) {
+        this.lock();
+        return null;
+      }
+    }
     if (this.origin === null) this.origin = { x: point.x - step.dx, y: point.y - step.dy };
     this.sinceX += step.dx;
     this.sinceY += step.dy;
+    const [rawX, rawY] = rotatePlanVector(step.dx, step.dy, this.biasDegrees);
+    this.rawPoint = { x: this.rawPoint.x + rawX, y: this.rawPoint.y + rawY };
     const leg = straightLegAt(track, progress);
-    // A stretch is measured from here on; what came before it is still in the path since the last fix.
+    if (this.stage === 'settling' && (leg === null || leg.index !== this.firstLeg)) {
+      this.lock();
+      return null;
+    }
     const begin = () => {
-      this.stretch = leg === null ? null : { ...leg, sumX: 0, sumY: 0, path: 0, half: null };
+      this.stretch = leg === null ? null : { ...leg, points: [{ ...this.rawPoint }], path: 0 };
     };
     const stretch = this.stretch;
     if (leg === null || stretch === null || stretch.index !== leg.index) {
-      if (leg === null || this.pending?.index !== leg.index) this.pending = null;
-      begin();
-      return null;
-    }
-    stretch.sumX += step.dx;
-    stretch.sumY += step.dy;
-    stretch.path += step.meters;
-    if (stretch.half === null && stretch.path >= POSE_HEADING_POLICY.windowMeters / 2)
-      stretch.half = { x: stretch.sumX, y: stretch.sumY };
-    if (stretch.path < POSE_HEADING_POLICY.windowMeters) return null;
-
-    // As the placement measured it, before any correction: what the bias is estimated from.
-    const [rawX, rawY] = rotatePlanVector(stretch.sumX, stretch.sumY, this.biasDegrees);
-    const raw = planBearing([0, 0], [rawX, rawY]);
-    const firstHalf =
-      stretch.half === null ? null : planBearing([0, 0], [stretch.half.x, stretch.half.y]);
-    const secondHalf =
-      stretch.half === null
-        ? null
-        : planBearing([0, 0], [stretch.sumX - stretch.half.x, stretch.sumY - stretch.half.y]);
-    if (
-      raw === null ||
-      firstHalf === null ||
-      secondHalf === null ||
-      Math.abs(signedHeadingDifference(firstHalf, secondHalf)) >
-        POSE_HEADING_POLICY.maximumBendDegrees ||
-      Math.hypot(stretch.sumX, stretch.sumY) / stretch.path <
-        POSE_HEADING_POLICY.minimumStraightness
-    ) {
-      begin();
-      return null;
-    }
-    const implied = biasAlong(stretch.bearing, raw);
-    const first = this.fixes === 0;
-    const agrees = first
-      ? Math.abs(implied) <= POSE_HEADING_POLICY.maximumFixDegrees
-      : Math.abs(signedHeadingDifference(implied, this.biasDegrees)) <=
-        POSE_HEADING_POLICY.refineAgreementDegrees;
-    if (!agrees) {
-      // Not direction error - or not one this estimate can take: a departure, a
-      // different corridor. Leave it to the route matcher, and drop what led into it.
       this.pending = null;
       begin();
       return null;
     }
-    const measured: Baseline = { index: stretch.index, bearing: stretch.bearing, rawX, rawY };
-    // The first estimate is taken at once; a refinement is the stretch before this one.
-    const confirmed = first ? measured : this.pending;
-    this.pending = first ? null : measured;
-    if (confirmed === null) {
+    if (step.meters <= 0) return null;
+    stretch.points.push({ ...this.rawPoint });
+    stretch.path += step.meters;
+    if (
+      stretch.path > POSE_HEADING_POLICY.maximumWindowPathMeters ||
+      stretch.points.length > POSE_HEADING_POLICY.maximumWindowSamples
+    ) {
+      this.pending = null;
       begin();
       return null;
     }
-    const baseline: Baseline =
-      this.baseline !== null && this.baseline.index === confirmed.index
-        ? this.baseline
-        : { index: confirmed.index, bearing: confirmed.bearing, rawX: 0, rawY: 0 };
-    baseline.rawX += confirmed.rawX;
-    baseline.rawY += confirmed.rawY;
-    this.baseline = baseline;
-    const overall = planBearing([0, 0], [baseline.rawX, baseline.rawY]);
-    const next = overall === null ? implied : biasAlong(baseline.bearing, overall);
+    const start = stretch.points[0];
+    if (
+      Math.hypot(this.rawPoint.x - start.x, this.rawPoint.y - start.y) <
+      POSE_HEADING_POLICY.windowMeters
+    )
+      return null;
+    // Endpoint sway can make chord length reach 3 m just before fitted forward
+    // span does. Keep collecting that valid short fit instead of rejecting the
+    // entire window at a sample-rate-dependent boundary.
+    const course = straightCourse(stretch.points, POSE_HEADING_POLICY.windowMeters * 0.9);
+    if (course !== null && course.spanMeters < POSE_HEADING_POLICY.windowMeters) return null;
+    if (course === null) {
+      // A sparse/noisy window can need a longer baseline. This is bounded, and
+      // does not suppress any displacement from the route/venue checks.
+      if (
+        Math.hypot(this.rawPoint.x - start.x, this.rawPoint.y - start.y) >=
+        POSE_HEADING_POLICY.maximumWindowSpanMeters
+      ) {
+        // A failed completed window breaks consecutiveness. While it is still
+        // growing, all its observations remain in the eventual combined fit.
+        this.pending = null;
+        begin();
+      }
+      return null;
+    }
+    const implied = biasAlong(stretch.bearing, course.bearing);
+    const first = this.stage === 'learning';
+    if (
+      first
+        ? Math.abs(implied) > POSE_HEADING_POLICY.maximumFixDegrees
+        : Math.abs(signedHeadingDifference(implied, this.biasDegrees)) >
+          POSE_HEADING_POLICY.refineAgreementDegrees
+    ) {
+      if (!first) this.lock();
+      else begin();
+      return null;
+    }
+    let next = implied;
+    if (!first) {
+      const previous = this.pending;
+      this.pending = { ...leg, points: stretch.points, bias: implied };
+      if (
+        previous === null ||
+        Math.abs(signedHeadingDifference(previous.bias, implied)) >
+          POSE_HEADING_POLICY.settleAgreementDegrees
+      ) {
+        begin();
+        return null;
+      }
+      const combined = straightCourse(
+        [...previous.points, ...stretch.points.slice(1)],
+        POSE_HEADING_POLICY.windowMeters * 2,
+      );
+      if (combined === null) {
+        this.pending = null;
+        begin();
+        return null;
+      }
+      next = biasAlong(stretch.bearing, combined.bearing);
+      if (
+        Math.abs(signedHeadingDifference(next, this.biasDegrees)) >
+        POSE_HEADING_POLICY.refineAgreementDegrees
+      ) {
+        this.lock();
+        return null;
+      }
+      this.lock();
+    } else {
+      this.stage = 'settling';
+      this.firstLeg = leg.index;
+      begin();
+    }
     const change = signedHeadingDifference(next, this.biasDegrees);
-    this.fixes += 1;
-    this.progressSinceFix = 0;
-    begin();
-    if (!first && Math.abs(change) < 0.05) return null;
     this.biasDegrees = next;
+    this.progressSinceFix = 0;
     this.epochValue += 1;
-    // Every step since the path was last recomputed was turned by the old
-    // estimate; turn it by the difference, from the same starting point.
+    // Recompute measured travel under the estimate, never use a route projection as a fix.
     const [dx, dy] = rotatePlanVector(this.sinceX, this.sinceY, -change);
     const corrected = { x: this.origin.x + dx, y: this.origin.y + dy };
     this.origin = corrected;

@@ -1,6 +1,6 @@
 import { DeadReckoningIntegrator, type ImuSample } from '@voicegis/localization-core';
 import { signedHeadingDifference, wrapDegrees } from './coordinateFrames';
-import { PoseHeadingCorrector } from './poseHeadingCorrection';
+import { PoseHeadingCorrector, type PoseHeadingState } from './poseHeadingCorrection';
 import { matchRoutePose, ROUTE_POSE_POLICY } from './routePoseMatcher';
 import type { VenuePoseGuard, VenuePoseAssessment } from './venuePoseGuard';
 import {
@@ -332,7 +332,7 @@ export class RouteTracker {
   poseCorrection(): {
     epoch: number;
     biasDegrees: number;
-    state: 'learning' | 'locked';
+    state: PoseHeadingState;
     point: { x: number; y: number } | null;
   } {
     return {

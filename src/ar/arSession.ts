@@ -110,8 +110,8 @@ export interface ArFrameReport {
   progressMeters: number;
   /** The direction correction walking has taught the tracker, in degrees; 0 until then. */
   headingCorrectionDegrees?: number;
-  /** Locked is an initial-corridor assumption, not independent heading validation. */
-  headingCorrectionState?: 'learning' | 'locked';
+  /** Settling allows one bounded refinement; locked never relearns. Neither validates heading independently. */
+  headingCorrectionState?: 'learning' | 'settling' | 'locked';
 }
 
 export interface ArGuidanceOptions {

@@ -119,11 +119,12 @@ walks near branches may pause. Real-venue and handset trials are still needed.
 
 ### Direction learned from walking
 
-Direction learning takes an initial estimate per placement and then locks it
-against change of any size: only later stretches that agree with it within 10°
-refine it, so a genuine departure is never learned. A zero-degree estimate locks
-too. Resetting placement starts learning again, but cannot clear an
-already-latched off-route loss.
+Direction learning is a bounded bootstrap per placement: `learning` obtains an
+initial estimate, `settling` permits at most one refinement, and `locked` never
+learns further changes. A zero-degree estimate follows the same lifecycle.
+Resetting placement starts learning again, but cannot clear an already-latched
+off-route loss. During bootstrap, a genuine departure can still be mistaken for
+direction error; this remains an assumption, not independent localization.
 
 `routePlanarLegs.ts` gives the matcher and corrector the same straight geometry:
 connected collinear edges are one leg, regardless of map-node density. Actual
@@ -143,43 +144,53 @@ straight down a corridor then drifts sideways by about the error's sine per
 metre: a strict 1.5 m guard froze guidance after 17 m at 5°, 9 m at 10° and
 4.5 m at 20°. `src/navigation/poseHeadingCorrection.ts` learns that error:
 
-- Over a stretch of 3 m along one leg, at least 1 m from either end, with the
-  path at least 90% straight, the angle between the path and the leg (either
-  way along it) is taken as the initial direction error, at most 30 degrees.
-  The estimate then locks. Crooked paths, stretches whose halves point more than
-  8° apart (a turn inside the stretch) and stretches near corners teach nothing.
-- A single 3 m stretch is a short baseline: a 0.6 m lane change in the first
-  metres locked a 7.6° error and stopped a straight walk at 16 m; 10 cm of phone
-  sway locked a 2.4° error and stopped it at 35 m. So a later stretch on the same
-  leg that agrees with the estimate within 10° joins a baseline, and the estimate
-  is taken again over the whole baseline. A stretch counts only once the next
-  one also agrees: the first stretch into a departure can still look like the
-  corridor, and the one after it shows it was not. A stretch that disagrees
-  drops the one before it. A departure of 15° or more is therefore not learned.
-- Every step since this placement's direction was set was walked with the
-  same error, so all of them are recomputed with the correction. The position
-  is not dropped onto the route line; it moves only as the corrected steps put it.
+- A window needs at least 3 m of **fitted forward span**, not total distance
+  travelled by a swaying phone. `poseStraightWindow.ts` fits an orthogonal line
+  to all measured positions. Maximum perpendicular residual is 0.35 m, RMS
+  residual 0.18 m, forward travel at least 90% of projected travel, and the fitted
+  directions in the two halves may differ by at most 8°. This classification is
+  used only for heading: route/venue matching still sees unsmoothed movement.
+- Noisy windows may grow to 6 m before being rejected. Windows are bounded by
+  9 m of measured path and 256 samples. Rejecting a completed window clears any
+  pending refinement; no turn or failed window can be silently bridged.
+- A qualifying window at least 1 m from either end of a straight leg supplies
+  the initial estimate, at most 30°. The state then becomes `settling`. Two
+  consecutive later windows must each agree with that estimate within 10° and
+  with each other within 5°. Their **combined positions**, not an average of
+  window angles, must qualify again over at least 6 m. This yields at most one
+  refinement, then locks. Using the later pair lets an initial lane change age
+  out instead of permanently contaminating the estimate.
+- Refinement also closes on a leg change, leaving a leg's interior, a disagreeing
+  qualifying window, or 12 m of route progress after the initial estimate.
+  Once locked, even a small later departure cannot rotate the learned heading.
+- At each estimate, travel since the preceding estimate is recomputed around
+  its retained origin. The position is never replaced by a route projection.
 - Until a stretch supplies the initial estimate, the sideways allowance grows
   from 1.5 m by tan(20 degrees) per metre of **progress along the route**, capped
   at 4 m. Once locked it grows only by tan(4 degrees) per metre of progress,
-  capped at 2.5 m, and each agreeing stretch renews it. Sideways-only walking,
+  capped at 2.5 m, and only the bounded refinement renews it. Sideways-only walking,
   or walking on past a missed corner, makes no progress, so it gets no more room.
 - The facing reported for turn cues gets the same correction, and the AR
   session redraws the route with it, so the arrows straighten with the marker.
 - A new placement (re-alignment, anchor, storey change) forgets the correction.
 
-Simulated walks: straight 30 m placed 5-30° off keeps guiding and learns the
-error to within a tenth of a degree; an L-shaped route placed 15-20° off keeps
-guiding through the turn; 55 m placed 15° off keeps guiding with a 0.3-0.9 m
-lane change in the first metres or 5-10 cm of phone sway. A 15° departure after
-16 m stops 8 m later with the estimate unchanged. Walking 45° off the corridor
-still stops after 3 m, straight past a corner 2 m past it, and sideways off the
-route at 1.8 m. 20 cm of side-to-side sway defeats the straightness test and
-stops a long walk: the estimate then never forms.
+Deterministic guidance replays now include a 48-case, 55 m matrix: placement
+errors -20/0/15/20°, 10/20 cm sway, 0.1/0.25/0.5 m reporting intervals at 1 m/s,
+and two sway phases. These stay guiding, settle, and estimate bias within 1° in
+those synthetic inputs. Tests also cover 0.3-0.9 m initial lane changes and later
+3/5/8/10/15/20° departures, which hold without changing a settled estimate.
+Synthetic XR frames separately exercise 20 cm sway and 3/8° departures through
+the actual frame-batching and route visibility code. Existing corners, floor
+changes, branches, wrong-way and pose-loss checks remain in place.
+
+These tests are software regressions, **not** handset accuracy measurements or
+recordings accepted by the localization evidence pipeline. A noisy estimate at
+the 30° acceptance boundary may be rejected; no tolerance was widened to promise
+that it must pass. The initial diagonal-walk ambiguity remains unresolved.
 The thresholds are provisional software guards, not surveyed corridor widths;
 an open hall walked diagonally for 3 m could be mistaken for direction error.
-Handset runs record the initial estimate and its learning/locked state in the
-field log (`ar-heading-correction`), including a locked zero-degree estimate.
+Handset runs record the estimate and its learning/settling/locked state in the
+field log (`ar-heading-correction`), including settling and locked zero-degree estimates.
 The log marks its basis as `initial-corridor-assumption`.
 The IMU-only stride estimator retains its existing direction/tally model; it
 does not gain independent XY localization from this change.

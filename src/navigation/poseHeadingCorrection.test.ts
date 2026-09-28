@@ -54,16 +54,17 @@ describe('turning a plan vector as a bearing turns', () => {
 
 describe('learning the direction error from walking along a leg', () => {
   it.each([0, 15])(
-    'locks even a %s degree initial estimate instead of learning later turns',
+    'rejects a large turn during settling from a %s degree initial estimate',
     (initial) => {
       const corrector = new PoseHeadingCorrector();
       const first = walk(corrector, 90 + initial, 5);
       const epoch = corrector.epoch;
-      expect(corrector.state).toBe('locked');
+      expect(corrector.state).toBe('settling');
       expect(corrector.bias).toBeCloseTo(initial, 6);
       walk(corrector, 110 + initial, 8, first.point);
       expect(corrector.bias).toBeCloseTo(initial, 6);
       expect(corrector.epoch).toBe(epoch);
+      expect(corrector.state).toBe('locked');
       // Locked: a little room for the estimate's remaining error, never the learning allowance.
       expect(corrector.tolerance(1.5)).toBeLessThanOrEqual(
         POSE_HEADING_POLICY.lockedMaximumToleranceMeters,
@@ -74,6 +75,24 @@ describe('learning the direction error from walking along a leg', () => {
       expect(corrector.bias).toBeCloseTo(10, 6);
     },
   );
+
+  it('settles once, then keeps its heading fixed even through small later turns', () => {
+    const corrector = new PoseHeadingCorrector();
+    const settled = walk(corrector, 105, 12);
+    expect(corrector.state).toBe('locked');
+    const epoch = corrector.epoch;
+    walk(corrector, 108, 16, settled.point);
+    expect(corrector.bias).toBeCloseTo(15, 6);
+    expect(corrector.epoch).toBe(epoch);
+  });
+
+  it('closes settling when later windows cannot agree within the finite budget', () => {
+    const corrector = new PoseHeadingCorrector();
+    let { point } = walk(corrector, 90, 5);
+    for (let i = 0; i < 6; i += 1) ({ point } = walk(corrector, i % 2 === 0 ? 97 : 83, 3.5, point));
+    expect(corrector.state).toBe('locked');
+    expect(corrector.bias).toBeCloseTo(0, 6);
+  });
   it('takes a steady angle along a straight stretch as the direction being off', () => {
     const corrector = new PoseHeadingCorrector();
     // Truly walking east; the placement thinks it is 12° further round.

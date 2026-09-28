@@ -760,8 +760,8 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
               progress: report.progressMeters,
             });
           }
-          // Include locking a zero-degree estimate: no angle change does not
-          // mean the initial-learning phase is still open.
+          // Record learning, settling and locking even for a zero-degree estimate:
+          // no angle change does not mean refinement is still allowed.
           const correction = report.headingCorrectionDegrees ?? 0;
           const correctionState = report.headingCorrectionState ?? null;
           if (Math.abs(correction - arCorrection) >= 1 || correctionState !== arCorrectionState) {

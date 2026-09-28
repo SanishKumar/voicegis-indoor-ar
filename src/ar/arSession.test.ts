@@ -120,6 +120,56 @@ function place(z: number, y = 1.4) {
 const route = () => gpu.scene?.children[0];
 
 describe('immersive route pose continuity', () => {
+  it('keeps the drawn route with 20 cm sway in real frame batching', async () => {
+    const long = buildRouteTrack(
+      [
+        { id: 'a', x: 0, y: 0, floor: 'g' },
+        { id: 'b', x: 100, y: 0, floor: 'g' },
+      ],
+      [],
+    );
+    const { tracker, handle, report } = await setup({ route: long, facing: () => 105 });
+    place(0);
+    for (let i = 1; i <= 1100; i += 1) {
+      const d = i * 0.05;
+      frame(-d, 1.4, 0.2 * Math.sin((d * 2 * Math.PI) / 1.3));
+    }
+    expect(tracker.read(now)).toMatchObject({ tier: 'tracking', reason: 'following' });
+    expect(Math.abs(tracker.poseCorrection().biasDegrees - 15)).toBeLessThan(1);
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({ headingCorrectionState: 'locked' }),
+    );
+    expect(route()?.visible).toBe(true);
+    await handle.end();
+  });
+
+  it.each([3, 8])(
+    'does not redraw a settled route to absorb a %s degree departure',
+    async (turn) => {
+      const long = buildRouteTrack(
+        [
+          { id: 'a', x: 0, y: 0, floor: 'g' },
+          { id: 'b', x: 100, y: 0, floor: 'g' },
+        ],
+        [],
+      );
+      const { tracker, handle } = await setup({ route: long });
+      place(0);
+      for (let i = 1; i <= 240; i += 1) frame(-i * 0.05);
+      expect(tracker.poseCorrection().state).toBe('locked');
+      const before = tracker.poseCorrection();
+      const angle = (turn * Math.PI) / 180;
+      for (let i = 1; i <= 1200; i += 1)
+        frame(-12 - i * 0.05 * Math.cos(angle), 1.4, i * 0.05 * Math.sin(angle));
+      expect(tracker.read(now)).toMatchObject({ tier: 'frozen', reason: 'off-route' });
+      expect(tracker.poseCorrection()).toMatchObject({
+        biasDegrees: before.biasDegrees,
+        epoch: before.epoch,
+      });
+      expect(route()?.visible).toBe(false);
+      await handle.end();
+    },
+  );
   it('hides a competing venue path and cannot recover it by replacing the floor', async () => {
     const nodes = [...track.points, { id: 'branch', x: 20, y: 7, floor: 'g' }].map((node) => ({
       ...node,
@@ -153,7 +203,7 @@ describe('immersive route pose continuity', () => {
     const bias = tracker.poseCorrection().biasDegrees;
     const epoch = tracker.poseCorrection().epoch;
     expect(report).toHaveBeenLastCalledWith(
-      expect.objectContaining({ headingCorrectionState: 'locked', headingCorrectionDegrees: 0 }),
+      expect.objectContaining({ headingCorrectionState: 'settling', headingCorrectionDegrees: 0 }),
     );
     const angle = (20 * Math.PI) / 180;
     for (let i = 1; i <= 140; i += 1) {

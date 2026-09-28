@@ -734,6 +734,7 @@ describe('the camera view follows where the phone points', () => {
         headingCorrectionDegrees: 0,
         headingCorrectionState: 'locked',
       };
+      act(() => frame({ ...locked, headingCorrectionState: 'settling' }));
       act(() => frame(locked));
       act(() => frame(locked));
       expect(
@@ -741,6 +742,7 @@ describe('the camera view follows where the phone points', () => {
           .filter(({ kind }) => kind === 'ar-heading-correction')
           .map(({ detail }) => detail),
       ).toEqual([
+        { degrees: 0, state: 'settling', basis: 'initial-corridor-assumption', progress: 0 },
         { degrees: 0, state: 'locked', basis: 'initial-corridor-assumption', progress: 0 },
       ]);
     } finally {

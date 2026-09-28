@@ -70,13 +70,18 @@ A route and a start point first: pick a destination, then scan a check-in code
   and the chevrons stay on the floor. If the arrows start at an angle to the
   corridor, use a known clear stretch, not the misplaced arrows, to choose
   where to walk. The first straight stretch supplies the initial direction
-  estimate, and later straight stretches that agree with it refine it. The
-  Test log records `ar-heading-correction`, including `state: locked` when no
-  angular change was needed. Locked still means an assumed corridor
+  estimate (`state: settling`). Two consecutive agreeing stretches may refine
+  it once; then `state: locked` means no further learning until a new placement.
+  A turn, disagreement or 12 m of settling progress closes that opportunity too.
+  The Test log records `ar-heading-correction`, even without an angular change.
+  Locked still means an assumed corridor
   direction, not surveyed heading accuracy. Later departures must not make the
   app keep rotating its idea of the corridor to follow you. The first diagonal
   walk is still ambiguous; this heuristic is not obstacle detection or a way
   to discover which corridor you are in.
+  Simulations now cover 10–20 cm of hand sway at several sampling rates/phases;
+  that is not proof of phone accuracy. The route matcher still sees the full
+  measured motion, so this does not smooth away a real sideways departure.
 - **Competing venue paths.** When another reachable path fits the measured
   movement as well as the selected route, the route must disappear and say
   "More than one venue path fits your movement". Leave AR and scan a check-in
