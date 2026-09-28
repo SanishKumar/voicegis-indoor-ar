@@ -10,7 +10,7 @@ Our differentiator should be dependable venue-specific guidance: the correct pub
 
 ## Review of “One Kernel, Three Cameras”
 
-The [proposal](https://claude.ai/code/artifact/dbab029f-5074-470f-8b9e-9e1a8488066a) has the right central idea: a shared journey, several presentations, confidence-aware guidance, and AR as an enhancement. Keep that direction, with these corrections:
+The original proposal has the right central idea: a shared journey, several presentations, confidence-aware guidance, and AR as an enhancement. Keep that direction, with these corrections:
 
 1. **Useful localization components exist, but the hard part is not finished.** `packages/localization-core` provides filtering, dead reckoning, map matching, orientation conversion, replay, and runtime quality policy. The Visitor's shared navigation context did not consume live pose estimates. Its `currentStepIndex` represented button presses. The sensor adapter records observations; it is not a field-validated live navigation service.
 2. **The current views already share some route state.** This is an evolution of the existing context, not a greenfield merger of three independent routing engines. The Visitor map already has a real Three.js scene. Inspector remains an operator tool; do not silently fold its controls into the public experience.
