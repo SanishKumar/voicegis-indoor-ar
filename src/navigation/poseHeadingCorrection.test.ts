@@ -53,6 +53,27 @@ describe('turning a plan vector as a bearing turns', () => {
 });
 
 describe('learning the direction error from walking along a leg', () => {
+  it.each([0, 15])(
+    'locks even a %s degree initial estimate instead of learning later turns',
+    (initial) => {
+      const corrector = new PoseHeadingCorrector();
+      const first = walk(corrector, 90 + initial, 5);
+      const epoch = corrector.epoch;
+      expect(corrector.state).toBe('locked');
+      expect(corrector.bias).toBeCloseTo(initial, 6);
+      walk(corrector, 110 + initial, 8, first.point);
+      expect(corrector.bias).toBeCloseTo(initial, 6);
+      expect(corrector.epoch).toBe(epoch);
+      // Locked: a little room for the estimate's remaining error, never the learning allowance.
+      expect(corrector.tolerance(1.5)).toBeLessThanOrEqual(
+        POSE_HEADING_POLICY.lockedMaximumToleranceMeters,
+      );
+      corrector.reset();
+      expect(corrector.state).toBe('learning');
+      walk(corrector, 100, 5);
+      expect(corrector.bias).toBeCloseTo(10, 6);
+    },
+  );
   it('takes a steady angle along a straight stretch as the direction being off', () => {
     const corrector = new PoseHeadingCorrector();
     // Truly walking east; the placement thinks it is 12° further round.

@@ -116,6 +116,14 @@ export function arPrompt({
 
   // A floor or camera reset cannot locate someone who has left the route.
   // Keep the useful recovery action visible even if the session also loses pose.
+  if (snapshot?.reason === 'ambiguous-position') {
+    return {
+      kind: 'rescan',
+      note: 'More than one venue path fits your movement. Leave AR and scan a check-in code to locate yourself.',
+      action: null,
+      leads: 'leave',
+    };
+  }
   if (
     snapshot?.tier === 'frozen' &&
     (snapshot.reason === 'off-route' ||

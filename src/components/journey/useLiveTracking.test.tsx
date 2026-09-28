@@ -88,6 +88,61 @@ function walkInAr(tracker: RouteTracker, reports: number) {
 }
 
 describe('live position with an immersive session attached', () => {
+  it('uses the active venue graph, freezes progress and logs an ambiguous fork', () => {
+    resetFieldTest(true);
+    try {
+      const setProgress = vi.fn();
+      const a = node('a', 0, 0);
+      const b = node('b', 20, 0);
+      const c = node('c', 20, 7);
+      const venue = {
+        routingNodes: [a, b, c],
+        routingEdges: [
+          { from: 'a', to: 'b', distance: 20 },
+          { from: 'a', to: 'c', distance: Math.hypot(20, 7) },
+        ],
+      };
+      const { result, rerender } = renderHook(() =>
+        useLiveTracking({
+          track,
+          venue,
+          locationBasis: 'qr',
+          setProgress,
+          active: true,
+        }),
+      );
+      act(() => result.current.start());
+      const tracker = result.current.tracker() as unknown as RouteTracker;
+      tracker.attachDisplacement(clock);
+      act(() => result.current.attachPose());
+      walkInAr(tracker, 1);
+      tick();
+      const published = setProgress.mock.calls.at(-1)?.[0];
+      for (let i = 0; i < 10; i += 1) {
+        clock += 250;
+        tracker.displace({ dxMeters: 0.47, dyMeters: 0.17, timeMs: clock });
+      }
+      tick();
+      expect(result.current.snapshot).toMatchObject({
+        reason: 'ambiguous-position',
+        poseGraph: 'ambiguous',
+        moving: false,
+      });
+      expect(setProgress).toHaveBeenLastCalledWith(published);
+      expect(
+        fieldEvents()
+          .filter(({ kind }) => kind === 'position')
+          .at(-1)?.detail,
+      ).toMatchObject({ reason: 'ambiguous-position', poseGraph: 'ambiguous' });
+      // A render or start tap on the same venue must not manufacture a new anchor.
+      rerender();
+      act(() => result.current.start());
+      tick();
+      expect(result.current.snapshot).toMatchObject({ reason: 'ambiguous-position' });
+    } finally {
+      resetFieldTest(null);
+    }
+  });
   it('keeps publishing progress when motion access is refused mid-session', () => {
     const { hook, setProgress } = tracking();
     act(() => hook.result.current.start());

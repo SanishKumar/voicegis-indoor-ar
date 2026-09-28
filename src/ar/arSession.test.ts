@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Matrix4, type Scene } from 'three';
 import { RouteTracker } from '../navigation/liveTracker';
 import { buildRouteTrack, type RouteTrack } from '../navigation/routeProgress';
+import { VenuePoseGuard } from '../navigation/venuePoseGuard';
 import { startArGuidance } from './arSession';
 
 const gpu = vi.hoisted(() => ({
@@ -56,6 +57,7 @@ async function setup(
     floor?: number | null;
     route?: RouteTrack;
     facing?: () => number | null;
+    venueGuard?: VenuePoseGuard;
   } = {},
 ) {
   floorHit = options.floor === undefined ? 0 : options.floor;
@@ -71,7 +73,7 @@ async function setup(
   const requestSession = vi.fn(async () => session);
   vi.stubGlobal('navigator', { xr: { requestSession } });
   if (hitTest) vi.stubGlobal('XRRay', class {});
-  const tracker = new RouteTracker(options.route ?? track);
+  const tracker = new RouteTracker(options.route ?? track, {}, options.venueGuard);
   tracker.anchor({ progressMeters: 0, sigmaMeters: 1, timeMs: now });
   const report = vi.fn();
   const handle = await startArGuidance({
@@ -118,6 +120,51 @@ function place(z: number, y = 1.4) {
 const route = () => gpu.scene?.children[0];
 
 describe('immersive route pose continuity', () => {
+  it('hides a competing venue path and cannot recover it by replacing the floor', async () => {
+    const nodes = [...track.points, { id: 'branch', x: 20, y: 7, floor: 'g' }].map((node) => ({
+      ...node,
+      type: 'junction',
+    }));
+    const venueGuard = new VenuePoseGuard(nodes, [
+      { from: 'a', to: 'b', distance: 20 },
+      { from: 'a', to: 'branch', distance: Math.hypot(20, 7) },
+    ]);
+    const { tracker, handle, report } = await setup({ venueGuard });
+    place(0);
+    for (let i = 1; i <= 80; i += 1) frame(-i * 0.047, 1.4, i * 0.01645);
+    expect(tracker.read(now)).toMatchObject({ reason: 'ambiguous-position', canStartPose: false });
+    expect(tracker.poseCorrection()).toMatchObject({ state: 'learning', biasDegrees: 0 });
+    expect(route()?.visible).toBe(false);
+    frame(null);
+    handle.realign();
+    place(0);
+    expect(route()?.visible).toBe(false);
+    expect(report).toHaveBeenLastCalledWith(expect.objectContaining({ aligned: false }));
+    expect(tracker.read(now).reason).toBe('ambiguous-position');
+    await handle.end();
+  });
+  it('does not rotate the drawn route to follow a later shallow departure', async () => {
+    const { tracker, handle, report } = await setup();
+    place(0);
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({ headingCorrectionState: 'learning' }),
+    );
+    for (let i = 1; i <= 120; i += 1) frame(-i * 0.05); // Six metres straight.
+    const bias = tracker.poseCorrection().biasDegrees;
+    const epoch = tracker.poseCorrection().epoch;
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({ headingCorrectionState: 'locked', headingCorrectionDegrees: 0 }),
+    );
+    const angle = (20 * Math.PI) / 180;
+    for (let i = 1; i <= 140; i += 1) {
+      frame(-6 - i * 0.05 * Math.cos(angle), 1.4, i * 0.05 * Math.sin(angle));
+    }
+    expect(tracker.read(now)).toMatchObject({ tier: 'frozen', reason: 'off-route' });
+    expect(tracker.poseCorrection().biasDegrees).toBeCloseTo(bias, 6);
+    expect(tracker.poseCorrection().epoch).toBe(epoch);
+    expect(route()?.visible).toBe(false);
+    await handle.end();
+  });
   it('straightens the drawn route as walking shows the placement direction was off', async () => {
     // Placed believing the camera looked 15 degrees further round than it did.
     const { tracker, handle } = await setup({ facing: () => 105 });

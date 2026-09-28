@@ -325,6 +325,41 @@ function heading(bearing: number, errorDegrees: number): [number, number] {
 }
 
 describe('a placement direction learned from walking the route', () => {
+  it.each([-20, 20])(
+    'does not learn a later %s degree departure as another placement correction',
+    (turn) => {
+      const long = buildRouteTrack([node('a', 0, 0), node('b', 100, 0)], []);
+      const tracker = attached(long);
+      let t = move(tracker, 16, EAST); // Eight straight metres establish the initial direction.
+      t = move(tracker, 30, heading(90 + turn, 0), t);
+      expect(tracker.read(t)).toMatchObject({ tier: 'frozen', reason: 'off-route' });
+      expect(tracker.poseCorrection().biasDegrees).toBeCloseTo(0, 6);
+    },
+  );
+
+  it.each([0.25, 2])('corrects the same straight corridor split into %s metre edges', (spacing) => {
+    const split = buildRouteTrack(
+      Array.from({ length: 40 / spacing + 1 }, (_, i) => node(`p${i}`, i * spacing, 0)),
+      [],
+    );
+    const tracker = attached(split);
+    const t = move(tracker, 60, heading(90, 20));
+    expect(tracker.read(t)).toMatchObject({ tier: 'tracking', reason: 'following' });
+    expect(tracker.read(t).progressMeters).toBeGreaterThan(29.5);
+    expect(tracker.poseCorrection().biasDegrees).toBeCloseTo(20, 6);
+  });
+
+  it('keeps an initial correction but rejects a later shallow departure', () => {
+    const long = buildRouteTrack([node('a', 0, 0), node('b', 100, 0)], []);
+    const tracker = attached(long);
+    let t = move(tracker, 16, heading(90, 15));
+    expect(tracker.poseCorrection().biasDegrees).toBeCloseTo(15, 6);
+    t = move(tracker, 24, heading(105, 15), t); // A genuine extra 15 degree turn.
+    expect(tracker.read(t)).toMatchObject({ tier: 'frozen', reason: 'off-route' });
+    expect(tracker.poseCorrection().biasDegrees).toBeCloseTo(15, 6);
+    expect(tracker.poseRestored(t)).toBe(false);
+  });
+
   it.each([5, 10, 20, 30, -15])(
     'keeps guiding down a corridor when the placement was %s degrees off',
     (error) => {
@@ -366,5 +401,53 @@ describe('a placement direction learned from walking the route', () => {
     expect(tracker.poseCorrection().biasDegrees).not.toBe(0);
     tracker.poseRestored(t);
     expect(tracker.poseCorrection().biasDegrees).toBe(0);
+  });
+});
+
+/** Walk a true path, as a session placed this many degrees off measures it, a quarter-metre at a time. */
+function walkPath(
+  tracker: RouteTracker,
+  path: (walked: number) => [number, number],
+  meters: number,
+  errorDegrees: number,
+) {
+  const error = (errorDegrees * Math.PI) / 180;
+  const seen = (walked: number): [number, number] => {
+    const [x, y] = path(walked);
+    return [x * Math.cos(error) - y * Math.sin(error), x * Math.sin(error) + y * Math.cos(error)];
+  };
+  let t = 0;
+  let [lastX, lastY] = seen(0);
+  for (let walked = 0.25; walked <= meters + 1e-9; walked += 0.25) {
+    const [x, y] = seen(walked);
+    t += 250;
+    tracker.displace({ dxMeters: x - lastX, dyMeters: y - lastY, timeMs: t });
+    lastX = x;
+    lastY = y;
+  }
+  return t;
+}
+
+describe('a placement direction refined by walking that agrees with it', () => {
+  const long = buildRouteTrack([node('a', 0, 0), node('b', 60, 0)], []);
+
+  it.each([0.3, 0.6, 0.9])(
+    'recovers from a %s m lane change in the first metres of a long corridor',
+    (lane) => {
+      // The lane change makes the first stretch look a few degrees further off than the placement was.
+      const tracker = attached(long);
+      const t = walkPath(tracker, (walked) => [walked, -lane * Math.min(1, walked / 3)], 55, 15);
+      expect(tracker.read(t)).toMatchObject({ tier: 'tracking', reason: 'following' });
+      expect(tracker.read(t).progressMeters).toBeGreaterThan(54);
+      expect(tracker.poseCorrection().biasDegrees).toBeCloseTo(15, 0);
+    },
+  );
+
+  it('keeps guiding with the phone swaying from side to side at each step', () => {
+    const tracker = attached(long);
+    const sway = (walked: number) => 0.1 * Math.sin((2 * Math.PI * walked) / 1.3);
+    const t = walkPath(tracker, (walked) => [walked, sway(walked)], 55, 15);
+    expect(tracker.read(t)).toMatchObject({ tier: 'tracking', reason: 'following' });
+    expect(tracker.poseCorrection().biasDegrees).toBeCloseTo(15, 0);
   });
 });

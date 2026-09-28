@@ -58,7 +58,7 @@ A route and a start point first: pick a destination, then scan a check-in code
   floor, not furniture, then tap **This is the floor**. The route must not
   appear before that confirmation. If surface detection is unavailable, leave
   AR and use the map; waiting must never place it on a guessed floor. With no
-  direction alignment, confirmation must say **building direction is not aligned**,
+  direction alignment, confirmation must say **does not know which way you are facing**,
   keep the route hidden and leave **Leave AR** reachable. Floor height is not yaw.
 - **Manual direction fallback.** Before Start AR, check the map, face along the
   route at your actual check-in point, and tap **I'm facing the corridor**.
@@ -68,8 +68,23 @@ A route and a start point first: pick a destination, then scan a check-in code
   A scanned sign sets an approximate direction without this step (below).
 - **Walking.** Walk the route's direction; the distance left should count down
   and the chevrons stay on the floor. If the arrows start at an angle to the
-  corridor, keep walking straight down it: after a few metres they should
-  straighten, and the Test log shows an `ar-heading-correction` entry.
+  corridor, use a known clear stretch, not the misplaced arrows, to choose
+  where to walk. The first straight stretch supplies the initial direction
+  estimate, and later straight stretches that agree with it refine it. The
+  Test log records `ar-heading-correction`, including `state: locked` when no
+  angular change was needed. Locked still means an assumed corridor
+  direction, not surveyed heading accuracy. Later departures must not make the
+  app keep rotating its idea of the corridor to follow you. The first diagonal
+  walk is still ambiguous; this heuristic is not obstacle detection or a way
+  to discover which corridor you are in.
+- **Competing venue paths.** When another reachable path fits the measured
+  movement as well as the selected route, the route must disappear and say
+  "More than one venue path fits your movement". Leave AR and scan a check-in
+  code. Re-aligning or switching views must not resume a guessed position.
+  The `position` log records `reason: ambiguous-position` and
+  `poseGraph: ambiguous`; `clear` means no competing candidate passed the
+  software gates, not a verified location. This needs a matching venue to judge
+  physically, and is not automatic rerouting or obstacle avoidance.
 - **Lost tracking.** Cover the camera for a few seconds: the view should say it
   lost track of the room and offer Re-align. Find and confirm the floor again;
   an old floor confirmation must not survive loss of the reference frame.

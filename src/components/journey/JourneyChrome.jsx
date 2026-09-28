@@ -212,19 +212,31 @@ export default function JourneyChrome({
   const destinationFloor = destination ? floorName(String(destination.floor)) : undefined;
   const atEnd = guidance.atEnd;
   const live = tracking?.status === 'on';
-  const snap = live ? tracking.snapshot : null;
-  const liveState = live ? describeTracking(snap, floorName) : null;
+  /*
+   * A position the tracker has lost stays lost whatever supplies movement
+   * next. Leaving AR, or motion access being refused, stops the live source;
+   * it must not replace "scan a code" with a note about sensors.
+   */
+  const lost =
+    !live &&
+    tracking != null &&
+    tracking.status !== 'off' &&
+    tracking.snapshot?.tier === 'frozen' &&
+    ['off-route', 'ambiguous-position', 'uncertain'].includes(tracking.snapshot.reason);
+  const shown = live || lost;
+  const snap = shown ? tracking.snapshot : null;
+  const liveState = shown ? describeTracking(snap, floorName) : null;
   const status = arrived
     ? 'Arrived'
-    : live
+    : shown
       ? liveState.label
       : walkthrough.playing
         ? 'Walk-through'
         : progressMeters > 0
           ? 'Preview'
           : 'Overview';
-  const statusTitle = live ? liveState.detail : statusExplanation(status);
-  const statusClass = live ? ` is-${snap?.tier ?? 'frozen'}` : '';
+  const statusTitle = shown ? liveState.detail : statusExplanation(status);
+  const statusClass = shown ? ` is-${snap?.tier ?? 'frozen'}` : '';
 
   /*
    * What the primary action should be depends on what the phone can do and
@@ -248,11 +260,12 @@ export default function JourneyChrome({
         ? 'Try tracking again'
         : 'Track my walk';
   const scanFixes =
-    live &&
+    shown &&
     [
       'no-anchor',
       'uncertain',
       'off-route',
+      'ambiguous-position',
       'wrong-way',
       'floor-change',
       'no-heading',
@@ -404,12 +417,12 @@ export default function JourneyChrome({
           <div
             className="jr-tracking"
             role="status"
-            data-tracking-state={live ? (snap?.tier ?? 'starting') : tracking.status}
+            data-tracking-state={shown ? (snap?.tier ?? 'starting') : tracking.status}
           >
             <p>
-              <strong>{live ? liveState.label : haltLabel(tracking.status)}</strong>
+              <strong>{shown ? liveState.label : haltLabel(tracking.status)}</strong>
               {' · '}
-              {live ? liveState.detail : haltDetail(tracking.status)}
+              {shown ? liveState.detail : haltDetail(tracking.status)}
             </p>
             {scanFixes && (
               <button type="button" className="jr-pill" onClick={openScanner}>
@@ -579,6 +592,12 @@ function describeTracking(snap, floorName) {
     case 'following':
       return { label: 'Tracking', detail: 'Following your steps along the route.' };
     case 'uncertain':
+      if (snap.poseGraph === 'unavailable')
+        return {
+          label: 'Position unverified',
+          detail:
+            'The venue paths could not be checked. Scan a check-in code to locate yourself again.',
+        };
       return caution
         ? { label: 'Uncertain', detail: 'Your position has drifted. Scan the next code to fix it.' }
         : {
@@ -597,6 +616,12 @@ function describeTracking(snap, floorName) {
             detail: 'Your steps don’t match the route. Head back to it, or scan the nearest code.',
           }
         : { label: 'Off route', detail: 'Tracking paused. Return to the route and scan a code.' };
+    case 'ambiguous-position':
+      return {
+        label: 'Which corridor?',
+        detail:
+          'More than one venue path fits your movement. Tracking is paused. Scan a check-in code to locate yourself.',
+      };
     case 'no-heading':
       return {
         label: 'No direction',

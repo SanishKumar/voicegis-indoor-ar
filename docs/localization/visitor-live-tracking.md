@@ -1,6 +1,6 @@
 # Visitor live tracking
 
-Updated 27 September 2026. `src/navigation/liveTracker.ts` and
+Updated 28 September 2026. `src/navigation/liveTracker.ts` and
 `src/components/journey/useLiveTracking.js` move the visitor's guidance from
 the phone's own motion sensors. This is **guidance, not evidence**: it exists so
 that a person following a route does not have to press anything, and it is
@@ -83,7 +83,59 @@ These are provisional matching guards, not corridor boundaries or a safety
 clearance. A nearby matched point does not prove that the space between it and
 the route is walkable. An inaccurate initial position can also cause a hold.
 
+### Venue alternatives before correction
+
+The visitor now passes the active venue's complete routing graph to
+`venuePoseGuard.ts`. After a successful route-only pose match, **before progress
+or heading learning changes**, this additional check looks for another planar
+path on the same floor that fits the measured position at least as well (within
+0.2 m). Its projection must be more than 0.5 m from the selected route; shared
+junctions, overlapping edges and subdivisions must not invent another location.
+
+An alternative must be reachable through the graph from this placement's origin
+within measured walking distance plus the fixed 3 m rounding allowance. Keeping
+that origin, rather than starting every check at the latest route projection,
+preserves shallow fork hypotheses while the branches separate. Disconnected
+nearby corridors, distant connecting detours and paths requiring a storey change
+do not compete. Geometric distances are used, including zero-length portal links.
+Restricted/inaccessible paths still count as physical location hypotheses; this
+does **not** authorize routing through them. Closure lists are not used to erase
+possible locations either.
+
+A competing path latches `ambiguous-position`: freeze progress, hide the AR route,
+explain that more than one venue path fits, and ask for a check-in scan. Re-align,
+sensor switching and waiting cannot clear it. No candidate becomes a new position
+or an automatic reroute. Mismatched graph/route geometry holds as `uncertain`
+with `poseGraph: unavailable`. The optional field log includes `poseGraph`:
+`not-checked`, `clear`, `ambiguous`, or `unavailable`. Stride-only guidance has
+no independently measured XY position and does not run this check.
+
+This is a conservative veto, **not** multi-hypothesis localization. It uses the
+same approximate plan-frame pose and provisional distance thresholds as the route
+matcher. A `clear` result does not prove the corridor, heading, walkable clearance
+or survey accuracy. Alternatives too close to separate, absent from the graph,
+or obscured by incorrect initial pose/heading may still be missed. Some legitimate
+walks near branches may pause. Real-venue and handset trials are still needed.
+
 ### Direction learned from walking
+
+Direction learning takes an initial estimate per placement and then locks it
+against change of any size: only later stretches that agree with it within 10°
+refine it, so a genuine departure is never learned. A zero-degree estimate locks
+too. Resetting placement starts learning again, but cannot clear an
+already-latched off-route loss.
+
+`routePlanarLegs.ts` gives the matcher and corrector the same straight geometry:
+connected collinear edges are one leg, regardless of map-node density. Actual
+bends, reversals and floor changes remain separate. Dividing a straight corridor
+into quarter-metre or two-metre edges must not prevent calibration or create
+false ambiguity between pieces of that same straight leg.
+
+The first straight walk is **assumed to follow the selected route**. These
+observations alone cannot distinguish an initial diagonal departure from a
+placement heading error. Rotating the displacement history changes the estimated
+position as well as the direction; not snapping directly to the route does not
+make that an independent position observation. No surveyed accuracy is implied.
 
 A session is placed with an approximate direction - a scanned sign, or the
 visitor's own alignment - and every step is turned by the same error. Walking
@@ -93,26 +145,42 @@ metre: a strict 1.5 m guard froze guidance after 17 m at 5°, 9 m at 10° and
 
 - Over a stretch of 3 m along one leg, at least 1 m from either end, with the
   path at least 90% straight, the angle between the path and the leg (either
-  way along it) is taken as direction error - never more than 30° from one
-  stretch or 35° in total. Crooked paths and stretches near corners teach nothing.
-- Every step since the direction was last set or confirmed was walked with the
+  way along it) is taken as the initial direction error, at most 30 degrees.
+  The estimate then locks. Crooked paths, stretches whose halves point more than
+  8° apart (a turn inside the stretch) and stretches near corners teach nothing.
+- A single 3 m stretch is a short baseline: a 0.6 m lane change in the first
+  metres locked a 7.6° error and stopped a straight walk at 16 m; 10 cm of phone
+  sway locked a 2.4° error and stopped it at 35 m. So a later stretch on the same
+  leg that agrees with the estimate within 10° joins a baseline, and the estimate
+  is taken again over the whole baseline. A stretch counts only once the next
+  one also agrees: the first stretch into a departure can still look like the
+  corridor, and the one after it shows it was not. A stretch that disagrees
+  drops the one before it. A departure of 15° or more is therefore not learned.
+- Every step since this placement's direction was set was walked with the
   same error, so all of them are recomputed with the correction. The position
   is not dropped onto the route line; it moves only as the corrected steps put it.
-- Until a stretch has confirmed the direction, the sideways allowance grows from
-  1.5 m by tan 20° per metre of **progress along the route**; afterwards by
-  tan 6°; never beyond 4 m. Walking straight off to the side makes no progress,
-  so it gets no more room than the fixed guard.
+- Until a stretch supplies the initial estimate, the sideways allowance grows
+  from 1.5 m by tan(20 degrees) per metre of **progress along the route**, capped
+  at 4 m. Once locked it grows only by tan(4 degrees) per metre of progress,
+  capped at 2.5 m, and each agreeing stretch renews it. Sideways-only walking,
+  or walking on past a missed corner, makes no progress, so it gets no more room.
 - The facing reported for turn cues gets the same correction, and the AR
   session redraws the route with it, so the arrows straighten with the marker.
 - A new placement (re-alignment, anchor, storey change) forgets the correction.
 
 Simulated walks: straight 30 m placed 5-30° off keeps guiding and learns the
 error to within a tenth of a degree; an L-shaped route placed 15-20° off keeps
-guiding through the turn. Walking 45° off the corridor still stops after 3 m,
-straight past a corner stops 2 m past it, and sideways off the route at 1.8 m.
+guiding through the turn; 55 m placed 15° off keeps guiding with a 0.3-0.9 m
+lane change in the first metres or 5-10 cm of phone sway. A 15° departure after
+16 m stops 8 m later with the estimate unchanged. Walking 45° off the corridor
+still stops after 3 m, straight past a corner 2 m past it, and sideways off the
+route at 1.8 m. 20 cm of side-to-side sway defeats the straightness test and
+stops a long walk: the estimate then never forms.
 The thresholds are provisional software guards, not surveyed corridor widths;
 an open hall walked diagonally for 3 m could be mistaken for direction error.
-Handset runs record each correction in the field log (`ar-heading-correction`).
+Handset runs record the initial estimate and its learning/locked state in the
+field log (`ar-heading-correction`), including a locked zero-degree estimate.
+The log marks its basis as `initial-corridor-assumption`.
 The IMU-only stride estimator retains its existing direction/tally model; it
 does not gain independent XY localization from this change.
 

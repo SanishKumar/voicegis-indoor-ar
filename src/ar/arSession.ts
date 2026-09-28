@@ -110,6 +110,8 @@ export interface ArFrameReport {
   progressMeters: number;
   /** The direction correction walking has taught the tracker, in degrees; 0 until then. */
   headingCorrectionDegrees?: number;
+  /** Locked is an initial-corridor assumption, not independent heading validation. */
+  headingCorrectionState?: 'learning' | 'locked';
 }
 
 export interface ArGuidanceOptions {
@@ -428,6 +430,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     if (!immediately && nowMs - lastReport < REPORT_MS) return;
     lastReport = nowMs;
     const snapshot = tracker.read(nowMs);
+    const correction = tracker.poseCorrection();
     options.onFrame?.({
       aligned: alignment !== null,
       recovery,
@@ -436,7 +439,8 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       floorHits: floor.hits,
       facingDegrees: alignment !== null ? snapshot.headingDegrees : null,
       progressMeters: snapshot.progressMeters,
-      headingCorrectionDegrees: tracker.poseCorrection().biasDegrees,
+      headingCorrectionDegrees: correction.biasDegrees,
+      headingCorrectionState: correction.state,
     });
   };
 

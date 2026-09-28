@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { headingRateDegreesPerSecond } from '@voicegis/localization-core';
 import { HANDSET_SENSOR_PROFILE } from '../../capture/handsetCapture';
 import { startHandsetSubscription } from '../../sensors/handsetSubscription';
 import { wrapDegrees } from '../../navigation/coordinateFrames';
 import { ANCHOR_SIGMA, RouteTracker } from '../../navigation/liveTracker';
+import { VenuePoseGuard } from '../../navigation/venuePoseGuard';
 import { logField } from '../../fieldTest/fieldLog';
 
 /** How often the tracker's state is read out to the screen. */
@@ -53,15 +54,29 @@ export function sensorsPlausible() {
  *
  * A new route from a scan re-anchors the tracker at its start. The tracker
  * itself survives route changes so the stride it has measured is kept.
+ *
+ * @param {object} options
+ * @param {import('../../navigation/routeProgress').RouteTrack | null} options.track
+ * @param {Pick<import('../../data/compiledBuilding').CompiledBuildingRuntime, 'routingNodes' | 'routingEdges'> | null} [options.venue]
+ * @param {string} options.locationBasis
+ * @param {number} [options.checkInDistanceMeters]
+ * @param {number} [options.northOffsetDegrees]
+ * @param {(meters: number) => void} options.setProgress
+ * @param {boolean} options.active
  */
 export function useLiveTracking({
   track,
+  venue = null,
   locationBasis,
   checkInDistanceMeters = 0,
   northOffsetDegrees = 0,
   setProgress,
   active,
 }) /** @type {LiveTracking} */ {
+  const venueGuard = useMemo(
+    () => (venue ? new VenuePoseGuard(venue.routingNodes, venue.routingEdges) : null),
+    [venue],
+  );
   // The motion subscription's own state. What the hook reports is this, or
   // 'on' while an immersive session supplies position instead.
   const [status, setStatus] = useState('off');
@@ -111,7 +126,7 @@ export function useLiveTracking({
     if (!tracker) return;
     const next = tracker.read(performance.now());
     // For a field tester's record: each change of state, and every few metres walked.
-    const logged = `${next.tier}/${next.reason}/${next.floorId}/${Math.floor(next.progressMeters / FIELD_LOG_METERS)}`;
+    const logged = `${next.tier}/${next.reason}/${next.floorId}/${next.poseGraph}/${Math.floor(next.progressMeters / FIELD_LOG_METERS)}`;
     if (logged !== fieldLoggedRef.current) {
       fieldLoggedRef.current = logged;
       logField('position', {
@@ -121,6 +136,7 @@ export function useLiveTracking({
         progress: next.progressMeters,
         sigma: next.sigmaMeters,
         pose: next.displacementAttached,
+        poseGraph: next.poseGraph,
         strides: next.stridesSinceAnchor,
       });
     }
@@ -134,6 +150,7 @@ export function useLiveTracking({
       last === null ||
       next.tier !== last.tier ||
       next.reason !== last.reason ||
+      next.poseGraph !== last.poseGraph ||
       progressMoved ||
       Math.abs(next.sigmaMeters - last.sigmaMeters) >= 0.1 ||
       next.headingDegrees !== last.headingDegrees;
@@ -188,10 +205,10 @@ export function useLiveTracking({
 
   const start = useCallback(() => {
     if (!track) return;
-    if (!trackerRef.current) trackerRef.current = new RouteTracker(track);
+    if (!trackerRef.current) trackerRef.current = new RouteTracker(track, {}, venueGuard);
     const tracker = trackerRef.current;
-    if (tracker.currentTrack !== track) {
-      tracker.rebind(track);
+    if (tracker.currentTrack !== track || tracker.currentVenueGuard !== venueGuard) {
+      tracker.rebind(track, venueGuard);
       anchorIfKnown();
     } else if (!tracker.isAnchored) {
       anchorIfKnown();
@@ -283,7 +300,7 @@ export function useLiveTracking({
       },
     });
     disposeRef.current = dispose;
-  }, [track, anchorIfKnown, northOffsetDegrees, publish]);
+  }, [track, venueGuard, anchorIfKnown, northOffsetDegrees, publish]);
 
   const confirmFloor = useCallback(() => {
     trackerRef.current?.confirmFloor(performance.now());
@@ -293,12 +310,17 @@ export function useLiveTracking({
   // A new route with the same tracker: re-anchor at its start.
   useEffect(() => {
     const tracker = trackerRef.current;
-    if (!tracker || !track || tracker.currentTrack === track) return;
-    tracker.rebind(track);
+    if (
+      !tracker ||
+      !track ||
+      (tracker.currentTrack === track && tracker.currentVenueGuard === venueGuard)
+    )
+      return;
+    tracker.rebind(track, venueGuard);
     anchorIfKnown();
     lastPublishedRef.current = null;
     publish();
-  }, [track, anchorIfKnown, publish]);
+  }, [track, venueGuard, anchorIfKnown, publish]);
 
   // Read the tracker out while listening. The same tick notices the journey
   // ending, so nothing here has to change state during a render.

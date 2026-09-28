@@ -708,6 +708,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
     const since = () => (performance.now() - startedAt) / 1000;
     let arState = null;
     let arCorrection = 0;
+    let arCorrectionState = null;
     logField('ar', { event: 'start' });
     try {
       // Sensors and the tracker come from the same tap the session needs.
@@ -759,12 +760,17 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
               progress: report.progressMeters,
             });
           }
-          // Each direction correction walking teaches: what the placement thresholds are tuned from.
+          // Include locking a zero-degree estimate: no angle change does not
+          // mean the initial-learning phase is still open.
           const correction = report.headingCorrectionDegrees ?? 0;
-          if (Math.abs(correction - arCorrection) >= 1) {
+          const correctionState = report.headingCorrectionState ?? null;
+          if (Math.abs(correction - arCorrection) >= 1 || correctionState !== arCorrectionState) {
             arCorrection = correction;
+            arCorrectionState = correctionState;
             logField('ar-heading-correction', {
               degrees: correction,
+              state: correctionState,
+              basis: 'initial-corridor-assumption',
               progress: report.progressMeters,
             });
           }

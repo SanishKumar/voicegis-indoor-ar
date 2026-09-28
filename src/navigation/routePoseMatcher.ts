@@ -1,4 +1,5 @@
 import { positionAt, type RouteTrack } from './routeProgress';
+import { planarRouteLegs } from './routePlanarLegs';
 
 /** Provisional software guards, NOT surveyed corridor widths or pose accuracy. */
 export const ROUTE_POSE_POLICY = Object.freeze({
@@ -82,14 +83,14 @@ export function matchRoutePose(
     }
     candidates.push(candidate);
   };
-  for (let i = 0; i + 1 < track.points.length; i += 1) {
-    const from = track.points[i];
-    const to = track.points[i + 1];
+  for (const { startIndex, endIndex } of planarRouteLegs(track)) {
+    const from = track.points[startIndex];
+    const to = track.points[endIndex];
     if (
       from.floor !== floor ||
       to.floor !== floor ||
-      track.at[i] < floorStart ||
-      track.at[i + 1] > floorEnd
+      track.at[startIndex] < floorStart ||
+      track.at[endIndex] > floorEnd
     )
       continue;
     const dx = to.x - from.x;
@@ -102,7 +103,7 @@ export function matchRoutePose(
     const t = Math.max(0, Math.min(1, ((x - from.x) * dx + (y - from.y) * dy) / squared));
     consider({
       segment,
-      progressMeters: track.at[i] + t * (track.at[i + 1] - track.at[i]),
+      progressMeters: track.at[startIndex] + t * (track.at[endIndex] - track.at[startIndex]),
       distanceMeters: Math.hypot(x - from.x - t * dx, y - from.y - t * dy),
     });
   }

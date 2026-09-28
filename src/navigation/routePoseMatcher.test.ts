@@ -21,6 +21,19 @@ const match = (track: RouteTrack, x: number, y: number, previous = 0, movement =
   matchRoutePose(track, { x, y, previousProgressMeters: previous, movementMeters: movement });
 
 describe('local route matching of an unsnapped pose', () => {
+  it.each([0.25, 2])(
+    'matching is unchanged by %s metre subdivisions on a straight corridor',
+    (spacing) => {
+      const split = route(Array.from({ length: 20 / spacing + 1 }, (_, i) => [i * spacing, 0]));
+      for (const [x, y, previous] of [
+        [5.1, 1.3, 4.6],
+        [5, 0, 5.5],
+        [19.5, 0.5, 19],
+      ]) {
+        expect(match(split, x, y, previous)).toEqual(match(straight, x, y, previous));
+      }
+    },
+  );
   it('projects lateral movement without counting it as forward travel', () => {
     expect(match(straight, 0.3, 0.4)).toEqual({
       kind: 'matched',

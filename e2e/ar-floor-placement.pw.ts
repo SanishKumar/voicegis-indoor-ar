@@ -220,7 +220,11 @@ for (const { surfaceDetection, manualAlignment } of [
             true;
         });
         await expect(overlay).toHaveAttribute('data-ar-prompt', 'rescan');
-        await expect(overlay).toContainText('movement no longer matches the route');
+        // At this check-in, camera-right (north) follows the unselected link
+        // from waypoint:l2-concourse:11 to portal:p-l2-family-services.
+        // The venue guard catches that branch before the route-only distance
+        // guard would call the visitor off-route. Do not weaken this to any error.
+        await expect(overlay).toContainText('More than one venue path fits your movement');
         await expect(overlay.getByRole('button', { name: 'Re-align', exact: true })).toHaveCount(0);
         // Losing the room afterwards must not replace the required scan with
         // an ineffective camera reset or another floor-confirmation workflow.
@@ -233,7 +237,7 @@ for (const { surfaceDetection, manualAlignment } of [
         await expect(overlay).toHaveAttribute('data-ar-prompt', 'rescan');
         await expectCenterHitTarget(leave);
         await expectInsideViewport(overlay.locator('.camera-ar-overlay-note'));
-        await page.screenshot({ path: testInfo.outputPath('off-route-rescan-320.png') });
+        await page.screenshot({ path: testInfo.outputPath('ambiguous-position-rescan-320.png') });
       }
     } else {
       await expect(overlay).toContainText('Surface detection is unavailable');
@@ -245,5 +249,14 @@ for (const { surfaceDetection, manualAlignment } of [
       'data-route-progress',
       '0.00',
     );
+    if (surfaceDetection && manualAlignment) {
+      await expect(page.locator('.jr')).toHaveAttribute(
+        'data-tracking-reason',
+        'ambiguous-position',
+      );
+      await expect(page.locator('.jr')).toContainText(
+        'More than one venue path fits your movement',
+      );
+    }
   });
 }

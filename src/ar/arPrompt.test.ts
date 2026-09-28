@@ -154,13 +154,27 @@ describe('what the AR view asks of the visitor', () => {
   });
 
   it('sends the visitor to scan where re-aligning cannot fix the position', () => {
-    for (const reason of ['off-route', 'uncertain'] as const) {
+    for (const reason of ['off-route', 'uncertain', 'ambiguous-position'] as const) {
       const frozen = prompt({ snapshot: snapshot({ tier: 'frozen', reason }) });
       expect(frozen.kind).toBe('rescan');
       expect(frozen.action).toBeNull();
       expect(frozen.leads).toBe('leave');
       expect(frozen.note).toMatch(/scan a check-in code/);
     }
+  });
+
+  it('explains ambiguous location instead of inviting a camera reset', () => {
+    expect(
+      prompt({
+        report: report({ aligned: false, recovery: 'pose-lost' }),
+        snapshot: snapshot({ tier: 'frozen', reason: 'ambiguous-position', canStartPose: false }),
+      }),
+    ).toMatchObject({
+      kind: 'rescan',
+      action: null,
+      leads: 'leave',
+      note: expect.stringContaining('More than one venue path'),
+    });
   });
 
   it.each([

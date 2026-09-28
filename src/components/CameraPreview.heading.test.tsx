@@ -71,7 +71,14 @@ vi.mock('../context/NavigationContext.jsx', () => ({
 }));
 
 /** Frozen reasons a new pose source cannot repair; see RouteTracker.canStartPose. */
-const POSITION_LOST = new Set(['no-anchor', 'uncertain', 'off-route', 'floor-change', 'pose-jump']);
+const POSITION_LOST = new Set([
+  'no-anchor',
+  'uncertain',
+  'off-route',
+  'ambiguous-position',
+  'floor-change',
+  'pose-jump',
+]);
 
 /** A snapshot as the tracker would publish it at the check-in point. */
 function anchored(overrides: Partial<TrackerSnapshot> = {}): TrackerSnapshot {
@@ -530,15 +537,19 @@ describe('the camera view follows where the phone points', () => {
     },
   );
 
-  it.each(['off-route', 'uncertain', 'floor-change', 'pose-jump', 'no-anchor'] as const)(
-    'does not bypass a frozen physical position (%s) by starting AR',
-    async (reason) => {
-      vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
-      render(<CameraPreview tracking={trackingLike('on', anchored({ tier: 'frozen', reason }))} />);
-      const start = await screen.findByRole('button', { name: 'Start AR' });
-      expect(start.hasAttribute('disabled')).toBe(true);
-    },
-  );
+  it.each([
+    'off-route',
+    'ambiguous-position',
+    'uncertain',
+    'floor-change',
+    'pose-jump',
+    'no-anchor',
+  ] as const)('does not bypass a frozen physical position (%s) by starting AR', async (reason) => {
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    render(<CameraPreview tracking={trackingLike('on', anchored({ tier: 'frozen', reason }))} />);
+    const start = await screen.findByRole('button', { name: 'Start AR' });
+    expect(start.hasAttribute('disabled')).toBe(true);
+  });
 
   it('offers an immersive session where motion sensors are refused or absent', async () => {
     // The session tracks the phone with its own camera; motion access is beside the point.
@@ -715,6 +726,23 @@ describe('the camera view follows where the phone points', () => {
         floorHits: 3,
         floorY: -0.1,
       });
+      // Locking a zero bias matters too, and should be logged just once.
+      const locked: arRuntime.ArFrameReport = {
+        ...steady,
+        placement: null,
+        aligned: true,
+        headingCorrectionDegrees: 0,
+        headingCorrectionState: 'locked',
+      };
+      act(() => frame(locked));
+      act(() => frame(locked));
+      expect(
+        fieldEvents()
+          .filter(({ kind }) => kind === 'ar-heading-correction')
+          .map(({ detail }) => detail),
+      ).toEqual([
+        { degrees: 0, state: 'locked', basis: 'initial-corridor-assumption', progress: 0 },
+      ]);
     } finally {
       resetFieldTest(null);
     }

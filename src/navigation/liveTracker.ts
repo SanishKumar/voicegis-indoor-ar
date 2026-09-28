@@ -2,6 +2,7 @@ import { DeadReckoningIntegrator, type ImuSample } from '@voicegis/localization-
 import { signedHeadingDifference, wrapDegrees } from './coordinateFrames';
 import { PoseHeadingCorrector } from './poseHeadingCorrection';
 import { matchRoutePose, ROUTE_POSE_POLICY } from './routePoseMatcher';
+import type { VenuePoseGuard, VenuePoseAssessment } from './venuePoseGuard';
 import {
   ARRIVAL_METERS,
   bearingAt,
@@ -50,6 +51,8 @@ export type TrackingReason =
   | 'wrong-way'
   /** Strides disagree with the corridor, or the pose no longer matches the local route. */
   | 'off-route'
+  /** A reachable unselected venue path explains the pose at least as well. */
+  | 'ambiguous-position'
   /** The gyroscope is missing or silent; strides are counted but move nothing, since their direction is unknown. */
   | 'no-heading'
   /** At a lift or stair, waiting for the storey change to be confirmed. */
@@ -77,6 +80,8 @@ export interface TrackerSnapshot {
   displacementAttached: boolean;
   /** Position is suitable for an independent pose source, regardless of IMU availability. */
   canStartPose: boolean;
+  /** Last venue-graph veto check. Not an independent position fix. */
+  poseGraph?: VenuePoseAssessment | 'not-checked';
   walkedSinceAnchorMeters: number;
   stridesSinceAnchor: number;
   strideMeters: number;
@@ -201,19 +206,27 @@ export class RouteTracker {
   /** Unsnapped pose displacement in plan coordinates; never replaced by a projection. */
   private posePoint: { x: number; y: number } | null = null;
   /** Geometric loss is a position failure; swapping sensors cannot clear it. */
-  private poseRouteLost = false;
+  private poseRouteLost: 'off-route' | 'ambiguous-position' | 'uncertain' | null = null;
+  private poseGraph: VenuePoseAssessment | 'not-checked' = 'not-checked';
+  private poseOriginProgress = 0;
+  private poseWalked = 0;
   /** The error in the pose's direction, learned from walking along the route. */
   private readonly poseHeading = new PoseHeadingCorrector();
 
-  constructor(track: RouteTrack, options: TrackerOptions = {}) {
+  constructor(
+    track: RouteTrack,
+    options: TrackerOptions = {},
+    private venueGuard: VenuePoseGuard | null = null,
+  ) {
     this.options = { ...DEFAULTS, ...options };
     this.strideMeters = this.options.strideMeters;
     this.track = track;
   }
 
   /** A new route from the same walk: keep the stride calibration, forget the rest. */
-  rebind(track: RouteTrack) {
+  rebind(track: RouteTrack, venueGuard = this.venueGuard) {
     this.track = track;
+    this.venueGuard = venueGuard;
     this.phase = 'unanchored';
     this.progress = 0;
     this.pendingRun = null;
@@ -223,11 +236,16 @@ export class RouteTracker {
     this.backward = 0;
     this.lastAnchor = null;
     this.posePoint = null;
-    this.poseRouteLost = false;
+    this.poseRouteLost = null;
+    this.poseGraph = 'not-checked';
   }
 
   get currentTrack() {
     return this.track;
+  }
+
+  get currentVenueGuard() {
+    return this.venueGuard;
   }
 
   /** Whether a known point on this route has been established. */
@@ -281,7 +299,7 @@ export class RouteTracker {
     this.progress = progress;
     this.anchorSigma = Math.max(0.1, input.sigmaMeters);
     this.poseJumped = false;
-    this.poseRouteLost = false;
+    this.poseRouteLost = null;
     this.lastMovedMs = input.timeMs;
     this.walked = 0;
     this.displaced = 0;
@@ -298,6 +316,9 @@ export class RouteTracker {
 
   /** A new pose baseline is a new placement: its direction error is learned afresh. */
   private resetPosePoint() {
+    this.poseOriginProgress = this.progress;
+    this.poseWalked = 0;
+    this.poseGraph = 'not-checked';
     const here = positionAt(this.track, this.progress);
     this.posePoint = { x: here.x, y: here.y };
     this.poseHeading.reset(this.posePoint);
@@ -308,10 +329,16 @@ export class RouteTracker {
    * stands, for a drawing of the route to follow. The epoch changes with
    * every correction and every new placement.
    */
-  poseCorrection(): { epoch: number; biasDegrees: number; point: { x: number; y: number } | null } {
+  poseCorrection(): {
+    epoch: number;
+    biasDegrees: number;
+    state: 'learning' | 'locked';
+    point: { x: number; y: number } | null;
+  } {
     return {
       epoch: this.poseHeading.epoch,
       biasDegrees: this.poseHeading.bias,
+      state: this.poseHeading.state,
       point: this.posePoint === null ? null : { ...this.posePoint },
     };
   }
@@ -408,17 +435,36 @@ export class RouteTracker {
     const [dx, dy] = this.poseHeading.correct(input.dxMeters, input.dyMeters);
     point.x += dx;
     point.y += dy;
+    this.poseWalked += meters;
+    const maximumDistanceMeters = this.poseHeading.tolerance(
+      ROUTE_POSE_POLICY.maximumDistanceMeters,
+    );
     const match = matchRoutePose(this.track, {
       x: point.x,
       y: point.y,
       previousProgressMeters: this.progress,
       movementMeters: meters,
       // An approximate direction drifts sideways with distance until walking confirms it.
-      maximumDistanceMeters: this.poseHeading.tolerance(ROUTE_POSE_POLICY.maximumDistanceMeters),
+      maximumDistanceMeters,
     });
     if (match.kind === 'held') {
-      this.poseRouteLost = true;
+      this.poseRouteLost = 'off-route';
       return;
+    }
+    // Challenge the selected-route hypothesis BEFORE it advances progress or
+    // teaches a heading correction. Never turn a competing path into a position fix.
+    if (this.venueGuard !== null) {
+      this.poseGraph = this.venueGuard.assess(this.track, {
+        ...point,
+        originProgressMeters: this.poseOriginProgress,
+        walkedMeters: this.poseWalked,
+        routeDistanceMeters: match.distanceMeters,
+        maximumDistanceMeters,
+      });
+      if (this.poseGraph !== 'clear') {
+        this.poseRouteLost = this.poseGraph === 'ambiguous' ? 'ambiguous-position' : 'uncertain';
+        return;
+      }
     }
     const change = match.progressMeters - this.progress;
     this.disagree = 0;
@@ -644,7 +690,7 @@ export class RouteTracker {
     if (this.poseRouteLost) {
       // A camera reset or later sensor silence cannot mask a required scan.
       tier = 'frozen';
-      reason = 'off-route';
+      reason = this.poseRouteLost;
     } else if (this.sensorsProblem !== null) {
       tier = 'frozen';
       reason = this.sensorsProblem;
@@ -710,6 +756,7 @@ export class RouteTracker {
       headingEpoch: this.headingEpoch,
       displacementAttached: this.displacement,
       canStartPose: this.canStartPose,
+      poseGraph: this.poseGraph,
       walkedSinceAnchorMeters: this.walked + this.displaced,
       stridesSinceAnchor: this.strides,
       strideMeters: this.strideMeters,

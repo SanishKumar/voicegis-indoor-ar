@@ -62,6 +62,7 @@ export default function VisitorApp() {
    */
   const tracking = useLiveTracking({
     track,
+    venue,
     locationBasis: state.locationBasis,
     checkInDistanceMeters: checkIn?.distanceMeters ?? 0,
     northOffsetDegrees: venue.buildingPackage.building?.coordinateSystem?.northOffsetDegrees ?? 0,
