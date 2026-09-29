@@ -220,7 +220,6 @@ export default function JourneyChrome({
   const lost =
     !live &&
     tracking != null &&
-    tracking.status !== 'off' &&
     tracking.snapshot?.tier === 'frozen' &&
     ['off-route', 'ambiguous-position', 'uncertain'].includes(tracking.snapshot.reason);
   const shown = live || lost;
@@ -413,7 +412,7 @@ export default function JourneyChrome({
           </button>
         </div>
 
-        {tracking && tracking.status !== 'off' && (
+        {tracking && (tracking.status !== 'off' || lost) && (
           <div
             className="jr-tracking"
             role="status"
@@ -626,7 +625,7 @@ function describeTracking(snap, floorName) {
       return {
         label: 'No direction',
         detail:
-          'This phone is not reporting turns, so your walk cannot be followed. Step through the route, or scan a code where you are.',
+          'Direction is unavailable or its alignment was lost. Scan a sign where you are standing before continuing your walk.',
       };
     case 'pose-jump':
       return {

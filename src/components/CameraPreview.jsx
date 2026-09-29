@@ -305,9 +305,6 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
     signRef.current = signHeading?.venueKey === state.venueKey ? signHeading : null;
   });
   useEffect(() => {
-    logField('orientation', { state: orientationState });
-  }, [orientationState]);
-  useEffect(() => {
     logField('camera-view', { facing: drawn.source, tilted: drawn.tilted });
   }, [drawn.source, drawn.tilted]);
   useEffect(() => {
@@ -368,7 +365,6 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
         attitudeRef.current = reading;
         if (reading === null) {
           yawRef.current = null;
-          anchorRef.current = null;
           return;
         }
         yawRef.current = { degrees: reading.yawDegrees, epoch: reading.epoch };
@@ -538,6 +534,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
         source !== 'assumed' &&
         knownStart &&
         !here.vertical &&
+        reading.snapshot?.canStartPose !== false &&
         (!live || reading.snapshot?.tier !== 'frozen');
       const pose = {
         x: here.x,
@@ -819,7 +816,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
     actions.setView(VIEW_TYPE.MAP);
   };
 
-  const snapshot = live ? tracking.snapshot : null;
+  const snapshot = tracking?.snapshot ?? null;
   // Published by the draw loop, because the phone's yaw is read there.
   const source = arSession ? (arReport?.aligned ? 'ar' : 'off') : drawn.source;
   const needsOrientation = orientationState === 'needs-permission' || orientationState === 'denied';
@@ -898,36 +895,38 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
    */
   const note = arProblem
     ? arProblem
-    : live && snapshot?.tier === 'frozen'
-      ? 'Position tracking is paused. Check your location on the map before following the floor route.'
-      : !knownStart
-        ? 'Set your location on the map or scan a check-in code before placing the route.'
-        : arAvailable && !arSession && source === 'sign'
-          ? 'Your direction comes from the sign you scanned, so it is approximate. Tap Start AR, then confirm the floor.'
-          : arAvailable && !arSession && source !== 'aligned'
-            ? 'To know which way you face, scan a check-in sign while facing it squarely. Or face along the route and tap “I’m facing the corridor”.'
-            : needsOrientation
-              ? 'This phone wants permission before it reports which way it is pointing. Enable camera orientation, then point along the corridor.'
-              : orientationState === 'requesting'
-                ? 'Asking the phone for its orientation.'
-                : orientationState === 'waiting'
-                  ? 'Waiting for the first orientation reading from this phone.'
-                  : orientationState === 'paused'
-                    ? 'Camera alignment paused. Return here and align again before following the route.'
-                    : orientationState === 'stale' || orientationState === 'unavailable'
-                      ? 'Orientation signal lost. The floor route is hidden until fresh readings return and you align again.'
-                      : // Nothing arriving at all is an orientation problem; a heading
-                        // the walk has measured, with no tilt behind it, is the rarer
-                        // case where only the tilt is missing, and says so.
-                        source === 'off'
-                        ? 'Waiting for the phone’s orientation. No floor route is shown without a fresh reading.'
-                        : !drawn.tilted
-                          ? 'Waiting for the phone’s tilt. The route cannot be laid on the floor without it.'
-                          : source === 'assumed'
-                            ? 'At your check-in point, face the corridor in the route’s direction, then tap “I’m facing the corridor”.'
-                            : !live
-                              ? 'Direction follows your phone; position holds until you track your walk.'
-                              : null;
+    : snapshot?.canStartPose === false
+      ? 'Location needs a new check-in. Exit to plan and scan a sign where you are standing before starting AR. Stopping tracking does not recover your location.'
+      : live && snapshot?.tier === 'frozen'
+        ? 'Position tracking is paused. Check your location on the map before following the floor route.'
+        : !knownStart
+          ? 'Set your location on the map or scan a check-in code before placing the route.'
+          : arAvailable && !arSession && source === 'sign'
+            ? 'Your direction comes from the sign you scanned, so it is approximate. Tap Start AR, then confirm the floor.'
+            : arAvailable && !arSession && source !== 'aligned'
+              ? 'To know which way you face, scan a check-in sign while facing it squarely. Or face along the route and tap “I’m facing the corridor”.'
+              : needsOrientation
+                ? 'This phone wants permission before it reports which way it is pointing. Enable camera orientation, then point along the corridor.'
+                : orientationState === 'requesting'
+                  ? 'Asking the phone for its orientation.'
+                  : orientationState === 'waiting'
+                    ? 'Waiting for the first orientation reading from this phone.'
+                    : orientationState === 'paused'
+                      ? 'Camera alignment paused. Return here and align again before following the route.'
+                      : orientationState === 'stale' || orientationState === 'unavailable'
+                        ? 'Orientation signal lost. The route is hidden until fresh readings return; align again if the sensor reference was lost.'
+                        : // Nothing arriving at all is an orientation problem; a heading
+                          // the walk has measured, with no tilt behind it, is the rarer
+                          // case where only the tilt is missing, and says so.
+                          source === 'off'
+                          ? 'Waiting for the phone’s orientation. No floor route is shown without a fresh reading.'
+                          : !drawn.tilted
+                            ? 'Waiting for the phone’s tilt. The route cannot be laid on the floor without it.'
+                            : source === 'assumed'
+                              ? 'At your check-in point, face the corridor in the route’s direction, then tap “I’m facing the corridor”.'
+                              : !live
+                                ? 'Direction follows your phone; position holds until you track your walk.'
+                                : null;
 
   const instructionCard = copy && (
     <div className="camera-preview-instruction">
@@ -1037,7 +1036,13 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
               <div className={live ? undefined : 'not-ready'}>
                 <LocateFixed size={12} />
                 <span>Position</span>
-                <strong>{live ? tierLabel(snapshot) : 'Not tracked'}</strong>
+                <strong>
+                  {snapshot?.canStartPose === false
+                    ? 'Check-in needed'
+                    : live
+                      ? tierLabel(snapshot)
+                      : 'Not tracked'}
+                </strong>
               </div>
               <div className={source === 'assumed' || source === 'off' ? 'not-ready' : undefined}>
                 <Compass size={12} />
@@ -1056,6 +1061,12 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
           {!cameraError && note && (
             <p className="camera-preview-note" role="status">
               {note}
+            </p>
+          )}
+          {!cameraError && !arActive && (
+            <p className="camera-preview-note">
+              Camera preview · floor height is estimated, not detected.
+              {arAvailable && ' Start AR to place the route on a confirmed floor.'}
             </p>
           )}
         </header>

@@ -1,6 +1,6 @@
 # Visitor live tracking
 
-Updated 28 September 2026. `src/navigation/liveTracker.ts` and
+Updated 29 September 2026. `src/navigation/liveTracker.ts` and
 `src/components/journey/useLiveTracking.js` move the visitor's guidance from
 the phone's own motion sensors. This is **guidance, not evidence**: it exists so
 that a person following a route does not have to press anything, and it is
@@ -12,7 +12,13 @@ contracts remain exactly as documented in the other files in this directory.
 The tracker answers one question - how far along the route is the visitor, and
 how sure are we - under one stated assumption: **after a check-in, the visitor
 sets off along the route they asked for.** Everything else follows from
-testing that assumption against what the sensors report:
+testing that assumption against what the sensors report. A camera scan that
+also captures the sign's approximate direction now supplies map walking with
+that independent-of-route bearing. Its orientation epoch must remain valid;
+missing direction holds strides rather than learning a new departure from the
+route. This is still a phone-facing-as-walking-direction assumption: hold the
+phone facing forward. It is not an independent measurement of body motion.
+Without sign direction, the legacy departure assumption below still applies:
 
 - A stride is a footfall detected by the existing `DeadReckoningIntegrator`
   (peak over the gravity baseline, falling edge, refractory period).
@@ -252,12 +258,28 @@ the moment it opens, tracked or not, because a route drawn at a guessed
 heading and a guessed tilt sits in a fixed place on the glass. Neither feed
 is a position, and neither is evidence.
 
-Where the tracker has learned a direction of travel, the camera prefers it:
-it is the same gyroscope, already tied to the route by a walk. Otherwise the
-camera's yaw carries the turn from manual alignment or the approximate direction
+The camera prefers an explicit manual/sign alignment over a direction of
+travel learned by the tracker: the camera can turn independently of walking.
+Its yaw carries the turn from manual alignment or the approximate direction
 established when scanning a sign. Missing direction is reported, not silently
 replaced with the route's bearing. Orientation continuity is maintained by
 the shared visitor orientation feed across scanning and camera view.
+
+Orientation events are change-driven, not guaranteed periodic heartbeats.
+An unchanged attitude may now be corroborated by complete, continuous motion
+samples: at most 250 ms between samples, rate magnitude at most 1°/s, and at
+most 1° cumulative possible rotation since the actual orientation event. The
+corroborated time and original observation time remain separate. A missing
+rate, meaningful turn, gap or visibility boundary cannot keep old attitude
+alive. These conservative limits are provisional, not handset calibration.
+Delivery silence alone hides stale attitude but does not redefine the source's
+reference frame. Fresh events on that same reference recover alignment. A
+visibility/restart or unavailable-sensor boundary invalidates the calibration,
+even when the displayed attitude had already expired. Sample history is never
+used to match a scan across a stale interval.
+The walking hook uses this corroborated tilt too, avoiding a needless heading
+reset merely because the phone was still. Position uncertainty is preserved
+after Stop tracking and still blocks camera placement until a new check-in.
 
 ## What it is not
 

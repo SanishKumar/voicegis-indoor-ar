@@ -1,5 +1,6 @@
 import type { DeviceAttitude } from './deviceAttitude';
 import { startOrientationFeed } from './orientationFeed';
+import { logField } from '../fieldTest/fieldLog';
 
 /**
  * One orientation feed for the whole page.
@@ -7,18 +8,23 @@ import { startOrientationFeed } from './orientationFeed';
  * A yaw's zero is the platform's, arbitrary but fixed only while its sensor
  * keeps running. A direction learned when a sign is scanned is a yaw at that
  * moment; for it to mean anything in the camera view or an AR session later,
- * the same readings have to be arriving the whole time in between. A feed
+ * the source must keep the same reference frame in between. A feed
  * started and stopped by each view broke that, and two feeds each counting
  * their own epochs from 1 could not tell each other's readings apart. Here
- * there is one, its epoch changes whenever continuity is lost - the page is
- * hidden, readings go stale - and every view reads the same one.
+ * there is one, its epoch changes on reference/lifecycle loss (page hidden,
+ * sensor unavailable), and every view reads the same one. Mere delivery
+ * silence expires the display reading, not the source's reference frame.
  */
 
 export interface OrientationReading extends DeviceAttitude {
   epoch: number;
-  /** On the page clock, the event's own timestamp. */
+  /** On the page clock: observed or subsequently corroborated attitude time. */
   timeMs: number;
   absolute: boolean;
+  /** Last actual orientation event; timeMs may be corroborated by quiet motion. */
+  observedTimeMs?: number;
+  betaDegrees?: number;
+  gammaDegrees?: number;
 }
 
 export type OrientationState =
@@ -70,7 +76,11 @@ function ensure(): Feed {
     },
     onState(next: OrientationState) {
       state = next;
+      logField('orientation', { state: next });
       for (const listener of listeners) listener.onState?.(next);
+    },
+    onDiagnostic(detail: Record<string, string | number | boolean | null>) {
+      logField('orientation-detail', detail);
     },
   }) as Feed;
   return feed;

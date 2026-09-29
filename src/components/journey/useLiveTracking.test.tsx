@@ -6,6 +6,8 @@ import type { RouteTracker, TrackerSnapshot } from '../../navigation/liveTracker
 import { buildRouteTrack } from '../../navigation/routeProgress';
 import { fieldEvents, resetFieldTest } from '../../fieldTest/fieldLog';
 import { useLiveTracking } from './useLiveTracking.js';
+import { sharedOrientation, resetSharedOrientation } from '../../ar/sharedOrientation';
+import type { MotionEventLike, OrientationEventLike } from '../../capture/handsetCapture';
 
 /*
  * Only the motion subscription is replaced, so a test can say what the
@@ -15,11 +17,19 @@ import { useLiveTracking } from './useLiveTracking.js';
 type State = 'requesting' | 'listening' | 'denied' | 'unsupported' | 'insecure' | 'hidden';
 const subscription = vi.hoisted(() => ({
   onState: null as null | ((state: State) => void),
+  onMotion: null as null | ((event: MotionEventLike) => void),
+  onOrientation: null as null | ((event: OrientationEventLike) => void),
   dispose: () => {},
 }));
 vi.mock('../../sensors/handsetSubscription', () => ({
-  startHandsetSubscription: (callbacks: { onState: (state: State) => void }) => {
+  startHandsetSubscription: (callbacks: {
+    onState: (state: State) => void;
+    onMotion: (event: MotionEventLike) => void;
+    onOrientation: (event: OrientationEventLike) => void;
+  }) => {
     subscription.onState = callbacks.onState;
+    subscription.onMotion = callbacks.onMotion;
+    subscription.onOrientation = callbacks.onOrientation;
     return subscription.dispose;
   },
 }));
@@ -47,14 +57,17 @@ const track = buildRouteTrack(
 let clock = 1_000;
 beforeEach(() => {
   clock = 1_000;
+  resetSharedOrientation();
   subscription.onState = null;
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
   vi.spyOn(performance, 'now').mockImplementation(() => clock);
 });
 afterEach(() => {
   cleanup();
+  resetSharedOrientation();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function tracking(setProgress = vi.fn()) {
@@ -88,6 +101,88 @@ function walkInAr(tracker: RouteTracker, reports: number) {
 }
 
 describe('live position with an immersive session attached', () => {
+  it('uses the scan direction for map steps and holds still orientation across a quiet walk', () => {
+    vi.stubGlobal('isSecureContext', true);
+    vi.stubGlobal('DeviceOrientationEvent', class {});
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    sharedOrientation.start();
+    const orient = (alpha: number) => {
+      const event = new Event('deviceorientation');
+      Object.entries({ alpha, beta: 90, gamma: 0, timeStamp: clock, absolute: false }).forEach(
+        ([key, value]) => Object.defineProperty(event, key, { value }),
+      );
+      window.dispatchEvent(event);
+      subscription.onOrientation?.(event as unknown as OrientationEventLike);
+    };
+    orient(0);
+    const scanned = sharedOrientation.read()!;
+    const { result } = renderHook(() =>
+      useLiveTracking({
+        track,
+        locationBasis: 'qr',
+        setProgress: vi.fn(),
+        active: true,
+        signHeading: {
+          source: 'sign',
+          anchorId: 'east',
+          venueKey: 'test',
+          planBearing: 270,
+          yawDegrees: scanned.yawDegrees,
+          epoch: scanned.epoch,
+          timeMs: scanned.timeMs,
+        },
+      }),
+    );
+    act(() => {
+      result.current.start();
+      subscription.onState?.('listening');
+    });
+    const sample = (magnitude: number) => {
+      clock += 20;
+      const fields = {
+        timeStamp: clock,
+        accelerationIncludingGravity: { x: 0, y: magnitude, z: 0 },
+        rotationRate: { alpha: 0, beta: 0, gamma: 0 },
+      };
+      const event = new Event('devicemotion');
+      Object.entries(fields).forEach(([key, value]) =>
+        Object.defineProperty(event, key, { value }),
+      );
+      window.dispatchEvent(event);
+      subscription.onMotion?.(fields);
+    };
+    const walk = (steps: number) => {
+      for (let i = 0; i < steps; i += 1)
+        for (let s = 0; s < 25; s += 1) sample(s < 4 ? 12.81 : 9.81);
+    };
+    for (let i = 0; i < 10; i += 1) sample(9.81);
+    walk(3);
+    const tracker = result.current.tracker() as unknown as RouteTracker;
+    expect(tracker.read(clock)).toMatchObject({ progressMeters: 0, reason: 'wrong-way' });
+    // One change event for a turnaround, not a continuous synthetic stream.
+    orient(180);
+    walk(12);
+    expect(tracker.read(clock)).toMatchObject({ reason: 'following', headingDegrees: 90 });
+    expect(tracker.read(clock).progressMeters).toBeCloseTo(8.64);
+    expect(sharedOrientation.read()!.epoch).toBe(scanned.epoch);
+    orient(0);
+    walk(4);
+    expect(tracker.read(clock)).toMatchObject({ reason: 'wrong-way', headingDegrees: 270 });
+    expect(tracker.read(clock).progressMeters).toBeCloseTo(5.76);
+  });
+
+  it('keeps a lost-position snapshot after Stop tracking', () => {
+    const { hook } = tracking();
+    act(() => hook.result.current.start());
+    const tracker = hook.result.current.tracker() as unknown as RouteTracker;
+    tracker.anchor({ progressMeters: 5, sigmaMeters: 20, timeMs: clock });
+    act(() => subscription.onState?.('listening'));
+    act(() => hook.result.current.stop());
+    expect(hook.result.current.snapshot).toMatchObject({
+      canStartPose: false,
+      reason: 'uncertain',
+    });
+  });
   it('uses the active venue graph, freezes progress and logs an ambiguous fork', () => {
     resetFieldTest(true);
     try {

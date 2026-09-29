@@ -6,6 +6,7 @@ import { wrapDegrees } from '../../navigation/coordinateFrames';
 import { ANCHOR_SIGMA, RouteTracker } from '../../navigation/liveTracker';
 import { VenuePoseGuard } from '../../navigation/venuePoseGuard';
 import { logField } from '../../fieldTest/fieldLog';
+import { sharedOrientation } from '../../ar/sharedOrientation';
 
 /** How often the tracker's state is read out to the screen. */
 const PUBLISH_MS = 200;
@@ -61,6 +62,7 @@ export function sensorsPlausible() {
  * @param {string} options.locationBasis
  * @param {number} [options.checkInDistanceMeters]
  * @param {number} [options.northOffsetDegrees]
+ * @param {import('../../ar/signHeading').SignHeading | null} [options.signHeading]
  * @param {(meters: number) => void} options.setProgress
  * @param {boolean} options.active
  */
@@ -70,6 +72,7 @@ export function useLiveTracking({
   locationBasis,
   checkInDistanceMeters = 0,
   northOffsetDegrees = 0,
+  signHeading = null,
   setProgress,
   active,
 }) /** @type {LiveTracking} */ {
@@ -90,14 +93,17 @@ export function useLiveTracking({
   const incompleteRef = useRef(0);
   const lastPublishedRef = useRef(null);
   const fieldLoggedRef = useRef('');
+  const fieldMotionRef = useRef(-Infinity);
   const anchorRef = useRef({ locationBasis, checkInDistanceMeters });
   const setProgressRef = useRef(setProgress);
   const activeRef = useRef(active);
+  const signRef = useRef(signHeading);
   // Callbacks read these later, so a commit's worth of lag is fine.
   useEffect(() => {
     anchorRef.current = { locationBasis, checkInDistanceMeters };
     setProgressRef.current = setProgress;
     activeRef.current = active;
+    signRef.current = signHeading;
   });
 
   const anchorIfKnown = useCallback(() => {
@@ -138,6 +144,13 @@ export function useLiveTracking({
         pose: next.displacementAttached,
         poseGraph: next.poseGraph,
         strides: next.stridesSinceAnchor,
+        heading: next.headingDegrees,
+        headingEpoch: next.headingEpoch,
+        headingBasis: next.displacementAttached
+          ? 'xr'
+          : signRef.current
+            ? 'sign'
+            : 'departure-assumption',
       });
     }
     const last = lastPublishedRef.current;
@@ -205,6 +218,7 @@ export function useLiveTracking({
 
   const start = useCallback(() => {
     if (!track) return;
+    sharedOrientation.start(); // The handset subscription below requests both permissions in this tap.
     if (!trackerRef.current) trackerRef.current = new RouteTracker(track, {}, venueGuard);
     const tracker = trackerRef.current;
     if (tracker.currentTrack !== track || tracker.currentVenueGuard !== venueGuard) {
@@ -259,7 +273,27 @@ export function useLiveTracking({
         gravityRef.current = { x: acceleration.x, y: acceleration.y, z: acceleration.z };
         const magnitude = Math.hypot(acceleration.x, acceleration.y, acceleration.z);
         const rotation = event.rotationRate;
-        const tilt = tiltRef.current;
+        const orientation = sharedOrientation.read();
+        const sign = signRef.current;
+        if (sign) {
+          const paired = orientation && orientation.epoch === sign.epoch;
+          tracker.measuredPlanBearing(
+            paired
+              ? wrapDegrees(sign.planBearing + orientation.yawDegrees - sign.yawDegrees)
+              : null,
+            paired ? orientation.timeMs : event.timeStamp,
+          );
+        }
+        // The shared feed can corroborate quiet tilt with continuous gyro
+        // samples. A still phone need not emit new change-driven tilt events.
+        const tilt =
+          orientation && finite(orientation.betaDegrees) && finite(orientation.gammaDegrees)
+            ? {
+                beta: orientation.betaDegrees,
+                gamma: orientation.gammaDegrees,
+                at: orientation.timeMs,
+              }
+            : tiltRef.current;
         let rate = null;
         if (
           rotation &&
@@ -282,6 +316,16 @@ export function useLiveTracking({
           accelerationMagnitude: magnitude,
           headingRateDegreesPerSecond: rate,
         });
+        if (event.timeStamp - fieldMotionRef.current >= 5000) {
+          fieldMotionRef.current = event.timeStamp;
+          logField('motion-signal', {
+            tiltAgeMs: tilt ? event.timeStamp - tilt.at : null,
+            orientationAgeMs: orientation ? event.timeStamp - orientation.timeMs : null,
+            orientationEpoch: orientation?.epoch ?? null,
+            rateAvailable: rate !== null,
+            headingBasis: sign ? 'sign' : 'departure-assumption',
+          });
+        }
       },
       onState(state) {
         if (state === 'listening') {
@@ -347,7 +391,8 @@ export function useLiveTracking({
 
   return {
     status: reported,
-    snapshot: reported === 'off' ? null : snapshot,
+    // Stopping a sensor cannot make a lost physical position valid again.
+    snapshot,
     start,
     stop,
     confirmFloor,

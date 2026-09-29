@@ -201,12 +201,12 @@ test('an immersive session is offered where the browser has one, and a refusal i
   await expect(view).toHaveAttribute('data-ar', 'available');
   const start = page.getByRole('button', { name: 'Start AR' });
   // Nothing from the flat view's orientation feed is needed first: the
-  // session tracks the phone itself, and the tap is the visitor facing the
-  // corridor. Requiring an alignment first left this button dead on a phone.
+  // session tracks the phone itself. Direction is required at placement,
+  // not to request the session; this test exercises the permission refusal.
   await expect(start).toBeEnabled();
   await expectCenterHitTarget(start);
   await start.click();
-  await expect(page.locator('.camera-preview-note')).toContainText(
+  await expect(page.locator('.camera-preview-note[role="status"]')).toContainText(
     'The immersive session was not allowed.',
   );
   await expect(view).toHaveAttribute('data-ar', 'available');

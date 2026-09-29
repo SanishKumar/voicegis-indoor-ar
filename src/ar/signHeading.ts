@@ -14,8 +14,8 @@ import type { OrientationReading } from './sharedOrientation';
  * code's corners is the separate, precise path (docs/localization/visual-marker-heading.md).
  *
  * It is the platform's yaw at the scan paired with that bearing, so it means
- * something only while the same orientation readings keep arriving: every
- * use checks its epoch against the live feed's.
+ * something only on that same orientation reference: every use checks its
+ * epoch against the live feed's and needs a current/corroborated attitude.
  */
 export interface SignHeading {
   source: 'sign';

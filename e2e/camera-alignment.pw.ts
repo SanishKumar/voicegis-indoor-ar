@@ -14,7 +14,14 @@ test('camera alignment follows real-time attitude, expires silence and never adv
       value: async () => new MediaStream(),
     });
     Object.defineProperty(window, 'DeviceOrientationEvent', { value: class {} });
-    const attitude = { alpha: 0, beta: 75, gamma: 0, sending: true };
+    const attitude = {
+      alpha: 0,
+      beta: 75,
+      gamma: 0,
+      sending: true,
+      quietMotion: false,
+      quietTicks: 0,
+    };
     Object.defineProperty(window, 'cameraTestAttitude', { value: attitude });
     for (const type of ['deviceorientation', 'deviceorientationabsolute']) {
       window.addEventListener(
@@ -26,6 +33,15 @@ test('camera alignment follows real-time attitude, expires silence and never adv
       );
     }
     setInterval(() => {
+      if (attitude.quietMotion) {
+        const motion = new Event('devicemotion');
+        Object.defineProperties(motion, {
+          timeStamp: { value: performance.now() },
+          rotationRate: { value: { alpha: 0, beta: 0, gamma: 0 } },
+        });
+        window.dispatchEvent(motion);
+        attitude.quietTicks += 1;
+      }
       if (!attitude.sending) return;
       const event = new Event('deviceorientation');
       Object.entries({ ...attitude, absolute: false, timeStamp: performance.now() }).forEach(
@@ -46,6 +62,34 @@ test('camera alignment follows real-time attitude, expires silence and never adv
   await expect(view).toHaveAttribute('data-heading-source', 'aligned');
   await expect.poll(async () => Number(await view.getAttribute('data-ribbon'))).toBeGreaterThan(5);
   const facing = Number(await view.getAttribute('data-facing'));
+  // Like a phone held still to scan a sign: orientation emits on change,
+  // while the complete, quiet motion stream continues. Do not lose alignment.
+  await page.evaluate(() => {
+    const attitude = (
+      window as unknown as { cameraTestAttitude: { quietMotion: boolean; sending: boolean } }
+    ).cameraTestAttitude;
+    attitude.quietMotion = true;
+    attitude.sending = false;
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { cameraTestAttitude: { quietTicks: number } }).cameraTestAttitude
+            .quietTicks,
+      ),
+    )
+    .toBeGreaterThan(40);
+  await expect(view).toHaveAttribute('data-heading-source', 'aligned');
+  await expect(view).toHaveAttribute('data-orientation', 'listening');
+  await expect(page.getByText(/floor height is estimated, not detected/)).toBeVisible();
+  await page.evaluate(() => {
+    const attitude = (
+      window as unknown as { cameraTestAttitude: { quietMotion: boolean; sending: boolean } }
+    ).cameraTestAttitude;
+    attitude.sending = true;
+    attitude.quietMotion = false;
+  });
   await page.setViewportSize({ width: 320, height: 700 });
   await expectCenterHitTarget(page.getByRole('button', { name: 'Re-align', exact: true }));
   await expectInsideViewport(page.getByRole('button', { name: 'Exit to plan' }));
@@ -77,9 +121,7 @@ test('camera alignment follows real-time attitude, expires silence and never adv
     (window as unknown as { cameraTestAttitude: { sending: boolean } }).cameraTestAttitude.sending =
       true;
   });
-  await expect(align).toBeVisible();
-  await expect(view).toHaveAttribute('data-ribbon', '0');
-  await align.click();
+  await expect(view).toHaveAttribute('data-heading-source', 'aligned');
   await expect.poll(async () => Number(await view.getAttribute('data-ribbon'))).toBeGreaterThan(5);
   await page.getByRole('button', { name: 'Exit to plan' }).click();
   await expect(page.locator('.jr-banner-text')).toHaveText(before);

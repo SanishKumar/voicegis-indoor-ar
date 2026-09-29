@@ -65,6 +65,7 @@ export default function VisitorApp() {
     venue,
     locationBasis: state.locationBasis,
     checkInDistanceMeters: checkIn?.distanceMeters ?? 0,
+    signHeading: checkIn?.signHeading?.venueKey === state.venueKey ? checkIn.signHeading : null,
     northOffsetDegrees: venue.buildingPackage.building?.coordinateSystem?.northOffsetDegrees ?? 0,
     setProgress: actions.setProgress,
     active: track !== null && state.navStatus === NAV_STATUS.NAVIGATING,

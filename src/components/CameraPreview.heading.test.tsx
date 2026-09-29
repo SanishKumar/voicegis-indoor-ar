@@ -231,6 +231,22 @@ const facing = () => Number(view().getAttribute('data-facing'));
 const note = () => document.querySelector('.camera-preview-note')?.textContent ?? '';
 
 describe('the camera view follows where the phone points', () => {
+  it('does not restore a lost position by switching tracking off', async () => {
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    const snapshot = anchored({ tier: 'frozen', reason: 'uncertain', sigmaMeters: 12 });
+    render(<CameraPreview tracking={trackingLike('off', snapshot)} />);
+    upright(0);
+    runFrames(1);
+    fireEvent.click(screen.getByRole('button', { name: 'I’m facing the corridor' }));
+    upright(0);
+    runFrames(1);
+    expect(view().getAttribute('data-ribbon')).toBe('0');
+    expect(note()).toContain('Location needs a new check-in');
+    expect(panel().textContent).toContain('Check-in needed');
+    const start = await screen.findByRole('button', { name: 'Start AR' });
+    expect((start as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/floor height is estimated, not detected/)).toBeTruthy();
+  });
   it('does not paint a fictitious floor route before the phone reports its attitude', () => {
     render(<CameraPreview tracking={trackingLike('off')} />);
     runFrames();
@@ -818,7 +834,7 @@ describe('the camera view follows where the phone points', () => {
     expect(tracking.stop).not.toHaveBeenCalled();
   });
 
-  it('hides a stale projection and requires alignment again after fresh input returns', () => {
+  it('hides stale projection but restores alignment on fresh input from the same reference', () => {
     render(<CameraPreview tracking={trackingLike('off')} />);
     upright(0);
     runFrames(1);
@@ -831,6 +847,13 @@ describe('the camera view follows where the phone points', () => {
     expect(Number(view().getAttribute('data-ribbon'))).toBe(0);
     expect(Number(view().getAttribute('data-callouts'))).toBe(0);
     expect(note()).toContain('Orientation signal lost');
+    upright(30);
+    runFrames(1);
+    expect(view().getAttribute('data-heading-source')).toBe('aligned');
+    // A lifecycle boundary, unlike a delivery gap, really does discard alignment.
+    act(() => window.dispatchEvent(new Event('pagehide')));
+    clock += 20;
+    act(() => window.dispatchEvent(new Event('pageshow')));
     upright(30);
     runFrames(1);
     expect(view().getAttribute('data-heading-source')).toBe('assumed');

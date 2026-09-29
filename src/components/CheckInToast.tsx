@@ -23,7 +23,7 @@ import type { CheckInFailure } from '../capture/anchorCheckIn';
 
 interface NavigationBinding {
   checkInToastVisible: boolean;
-  checkIn: (CheckInRecord & { scannedAt: number }) | null;
+  checkIn: (CheckInRecord & { scannedAt: number; signHeadingRefusal?: string | null }) | null;
   checkInProblem: { reason: CheckInFailure; venueName: string } | null;
   actions: { dismissCheckIn: () => void };
   venue: {
@@ -80,6 +80,12 @@ export default function CheckInToast() {
       <span className="checkin-toast-body">
         <strong>Checked in at {label.place}</strong>
         <span className="checkin-toast-detail">{label.detail}</span>
+        {checkIn.signHeadingRefusal && checkIn.signHeadingRefusal !== 'no-frame' && (
+          <span className="checkin-toast-detail">
+            Location checked in, but direction was not captured. Scan again facing the sign
+            squarely; gently turn the phone first if orientation is waiting.
+          </span>
+        )}
       </span>
       <button type="button" className="checkin-toast-close" onClick={dismiss} aria-label="Dismiss">
         <X size={15} />

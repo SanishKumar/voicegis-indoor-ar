@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { createQrDecoder, type QrFrameObservation } from '../capture/qrDecoder';
 import { initialScanGate, shouldSubmitScan } from '../capture/scanGate';
 import { useDialogFocus } from './useDialogFocus';
+import { sharedOrientation, type OrientationState } from '../ar/sharedOrientation';
 
 /**
  * The camera half of a check-in: read a QR code, hand back its payload.
@@ -43,6 +44,8 @@ export default function QrCheckIn({
   hint?: string | null;
 }) {
   const [state, setState] = useState<ScannerState>({ kind: 'starting' });
+  const [orientationState, setOrientationState] = useState<OrientationState>('starting');
+  useEffect(() => sharedOrientation.subscribe({ onState: setOrientationState }), []);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   // A detection fires while the loop is still scheduled, so without this the
   // same code resolves several times and the modal closes over itself. Settling
@@ -198,12 +201,24 @@ export default function QrCheckIn({
 
         <p className="qr-checkin-status" role="status">
           {state.kind === 'starting' && 'Opening the camera…'}
-          {state.kind === 'scanning' &&
-            'Face the sign squarely and point the camera at its code. That also tells the app which way you are facing.'}
+          {state.kind === 'scanning' && 'Face the sign squarely and point the camera at its code.'}
           {state.kind === 'denied' &&
             'Camera access was refused. The camera also needs a secure connection — https, not http.'}
           {state.kind === 'failed' && `The camera could not be opened (${state.detail}).`}
         </p>
+
+        {state.kind === 'scanning' && (
+          <p className="qr-checkin-hint">
+            {orientationState === 'listening'
+              ? 'Direction sensor ready. Keep facing the sign while it scans.'
+              : 'The code can set your location, but direction is not ready. Gently turn the phone, then face the sign again.'}
+          </p>
+        )}
+        {(orientationState === 'needs-permission' || orientationState === 'denied') && (
+          <button type="button" className="lp-scan-cta" onClick={() => sharedOrientation.request()}>
+            Enable direction sensor
+          </button>
+        )}
 
         {hint && (
           <p className="qr-checkin-hint" role="alert">

@@ -379,6 +379,7 @@ export function NavigationProvider({ children, venue }) {
           performance.now(),
         ),
         signHeading: sign.heading,
+        signHeadingRefusal: sign.refusal,
       });
       if (destinationNodeId) {
         void requestRoute(

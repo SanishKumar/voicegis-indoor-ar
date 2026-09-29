@@ -49,6 +49,48 @@ It is a diagnostic of the guidance, not evidence, and nothing reads it back.
 
 ## 3. What to try
 
+### Short re-test after the V29e report (29 September 2026)
+
+The reported `ce0eebe` walk detected 61 strides; it did not have a dead motion
+sensor. It rejected sign direction (`no-orientation`), reached an estimated
+18.72 m, then retreated and froze at high uncertainty. Those entries do not
+establish the visitor's actual path. No `ar event=start/running` occurred, so
+that report tested the estimated camera overlay, not WebXR floor placement.
+
+Do these as **separate attempts**, returning physically to the displayed sign
+and scanning again before each. Clearing the log does not reset location.
+Walking back without a fresh scan is not a new check-in. Do not follow the
+sample hospital route through a different building's walls or obstacles.
+
+1. **Scan and direction only:** face the `g/east` sign squarely and scan. If
+   the scanner says direction is waiting, gently turn the phone and face the
+   sign again; allow the direction sensor if prompted. The check-in now says
+   explicitly if only location was captured. Open Camera view **without
+   starting Track my walk**, and check for “Direction from the sign · approximate”.
+   With Civic Plaza Entrance selected, the route should initially be behind
+   you. Turn around and copy the log. A quiet complete gyroscope stream now
+   corroborates an unchanged orientation; missing or turning samples cannot.
+   A brief delivery gap hides the route until a fresh reading arrives on the
+   same reference; it no longer silently erases the sign calibration. Putting
+   the page in the background or losing the sensor reference still invalidates it.
+2. **AR before any walking:** return to the sign and scan again. Open Camera
+   view → Start AR → confirm a green floor ring. Only this mode detects a
+   floor. The ordinary camera view explicitly labels its floor height as an
+   estimate. Copy the report even if placement fails; it must include an AR
+   start/running/failure entry. Stop here if direction or floor is missing.
+3. **Map walk separately:** return to the sign and scan again; Track my walk,
+   turn away from the sign, walk 5–10 m with the phone held facing your walking
+   direction, pause, then turn back and walk a few metres. Copy the log. With
+   a captured sign direction, the map now uses it too; it does not infer a new
+   forward direction from the route after a signal dropout. Without a captured
+   sign, the older route-departure assumption is still a limitation.
+
+If location freezes, stopping tracking must **not** make the route trustworthy
+again: both the map and camera retain the need for a fresh check-in. The log
+now includes orientation diagnostics from before the scan and motion/heading
+availability, not only events recorded after opening the camera. These fixes
+have synthetic coverage, not a completed handset validation.
+
 A route and a start point first: pick a destination, then scan a check-in code
 (`/check-in-codes.html` on the computer's screen) or pick a landmark.
 

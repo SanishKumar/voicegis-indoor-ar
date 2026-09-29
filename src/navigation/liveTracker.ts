@@ -203,6 +203,9 @@ export class RouteTracker {
   private lastMovedMs: number | null = null;
   private facingPlan: number | null = null;
   private headingEpoch = 0;
+  /** An approximate sign-to-phone alignment, distinct from route-assumed departure. */
+  private measuredHeading: { degrees: number; timeMs: number } | null = null;
+  private usesMeasuredHeading = false;
   /** Unsnapped pose displacement in plan coordinates; never replaced by a projection. */
   private posePoint: { x: number; y: number } | null = null;
   /** Geometric loss is a position failure; swapping sensors cannot clear it. */
@@ -225,6 +228,8 @@ export class RouteTracker {
 
   /** A new route from the same walk: keep the stride calibration, forget the rest. */
   rebind(track: RouteTrack, venueGuard = this.venueGuard) {
+    this.measuredHeading = null;
+    this.usesMeasuredHeading = false;
     this.track = track;
     this.venueGuard = venueGuard;
     this.phase = 'unanchored';
@@ -495,6 +500,25 @@ export class RouteTracker {
         : { planDegrees: wrapDegrees(degrees), atMs: timeMs };
   }
 
+  /** Opt into sign-aligned orientation. A dropout must hold, not silently
+   * re-learn "forward" from the requested route. This never changes position. */
+  measuredPlanBearing(degrees: number | null, timeMs: number) {
+    if (!Number.isFinite(timeMs) || timeMs < 0) return;
+    if (this.measuredHeading && timeMs < this.measuredHeading.timeMs) return;
+    this.usesMeasuredHeading = true;
+    this.measuredHeading =
+      degrees !== null && Number.isFinite(degrees)
+        ? { degrees: wrapDegrees(degrees), timeMs }
+        : null;
+  }
+
+  private currentMeasuredHeading() {
+    const heading = this.measuredHeading;
+    return heading && this.nowMs >= heading.timeMs && this.nowMs - heading.timeMs <= 500
+      ? heading.degrees
+      : null;
+  }
+
   sensorsLost(reason: 'sensors-unavailable' | 'sensors-silent' | null) {
     this.sensorsProblem = reason === 'sensors-unavailable' ? reason : null;
   }
@@ -525,11 +549,16 @@ export class RouteTracker {
     // Heading continuity was lost - a gap, a dropout, or the very first
     // sample. Relative integration restarts from here and direction of travel
     // is re-established from the next strides; progress is kept.
-    if (!rateMissing && this.integrator.heading === null) {
+    if (!this.usesMeasuredHeading && !rateMissing && this.integrator.heading === null) {
       this.integrator.syncHeading(0);
       this.headingEpoch += 1;
       if (this.phase === 'following') this.beginOrienting();
-    } else if (wasMissing && !this.gyroMissing && this.phase === 'following') {
+    } else if (
+      !this.usesMeasuredHeading &&
+      wasMissing &&
+      !this.gyroMissing &&
+      this.phase === 'following'
+    ) {
       this.beginOrienting();
     }
 
@@ -545,6 +574,14 @@ export class RouteTracker {
     // calibration and moves nothing: the same walk is not counted twice.
     if (this.displacement) return;
     this.walked += this.strideMeters;
+
+    if (this.usesMeasuredHeading) {
+      const heading = this.currentMeasuredHeading();
+      if (heading === null) return;
+      this.phase = 'following';
+      this.follow(this.strideMeters, heading, 1);
+      return;
+    }
 
     if (this.gyroMissing) {
       /*
@@ -680,9 +717,11 @@ export class RouteTracker {
       this.progress >= this.track.length - this.options.arrivalMeters;
     const heading = this.displacement
       ? this.facingPlan
-      : this.phase === 'following' && this.alignment !== null && this.integrator.heading !== null
-        ? wrapDegrees(this.alignment + this.integrator.heading)
-        : null;
+      : this.usesMeasuredHeading
+        ? this.currentMeasuredHeading()
+        : this.phase === 'following' && this.alignment !== null && this.integrator.heading !== null
+          ? wrapDegrees(this.alignment + this.integrator.heading)
+          : null;
 
     let tier: TrackingTier;
     let reason: TrackingReason;
@@ -719,7 +758,10 @@ export class RouteTracker {
     } else if (this.wrongWay) {
       tier = 'caution';
       reason = 'wrong-way';
-    } else if (this.gyroMissing && !this.displacement) {
+    } else if (
+      !this.displacement &&
+      (this.usesMeasuredHeading ? heading === null : this.gyroMissing)
+    ) {
       // An attached pose carries its own direction; only strides need a gyroscope.
       tier = 'frozen';
       reason = 'no-heading';

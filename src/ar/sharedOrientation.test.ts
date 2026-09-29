@@ -63,15 +63,37 @@ describe('the page’s one orientation feed', () => {
     expect(sharedOrientation.readNear(1_300, 30)).toBeNull();
   });
 
-  it('forgets every reading once continuity is lost', () => {
+  it('pairs a still sign frame after five seconds using quiet-motion corroboration', () => {
+    sharedOrientation.start();
+    emit(30);
+    const epoch = sharedOrientation.read()!.epoch;
+    for (let i = 0; i <= 250; i += 1) {
+      const event = new Event('devicemotion');
+      Object.defineProperties(event, {
+        timeStamp: { value: now },
+        rotationRate: { value: { alpha: 0, beta: 0, gamma: 0 } },
+      });
+      window.dispatchEvent(event);
+      now += 20;
+    }
+    expect(sharedOrientation.readNear(now, 150)).toMatchObject({ epoch, observedTimeMs: 1000 });
+    expect(sharedOrientation.readNear(now, 150)!.yawDegrees).toBeCloseTo(330);
+  });
+
+  it('forgets stale samples but keeps the reference until an explicit boundary', () => {
     sharedOrientation.start();
     emit(0);
     const before = sharedOrientation.read()!;
-    // Silence past the feed's freshness window is a gap in continuity.
+    // Silence hides the display and discards old sample-pairing history.
     now += 2_000;
     expect(sharedOrientation.read()).toBeNull();
     expect(sharedOrientation.readNear(before.timeMs, 50)).toBeNull();
     emit(5);
+    expect(sharedOrientation.read()!.epoch).toBe(before.epoch);
+    window.dispatchEvent(new Event('pagehide'));
+    now += 20;
+    window.dispatchEvent(new Event('pageshow'));
+    emit(10);
     expect(sharedOrientation.read()!.epoch).not.toBe(before.epoch);
   });
 });

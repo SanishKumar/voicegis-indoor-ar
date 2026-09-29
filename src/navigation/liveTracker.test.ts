@@ -133,6 +133,61 @@ describe('independent pose-source eligibility', () => {
 });
 
 describe('route tracker', () => {
+  it('uses sign-aligned direction from the first step and preserves turns without gyro integration', () => {
+    const tracker = new RouteTracker(corner);
+    const walker = new Walker(tracker, false);
+    tracker.anchor({ progressMeters: 0, sigmaMeters: 1, timeMs: 0 });
+    walker.still(400);
+    const walkAt = (bearing: number, steps: number) => {
+      for (let i = 0; i < steps; i += 1) {
+        tracker.measuredPlanBearing(bearing, walker.t);
+        walker.steps(1);
+      }
+    };
+    // Starting facing the sign, away from the requested eastbound corridor.
+    walkAt(270, 3);
+    expect(walker.read()).toMatchObject({
+      reason: 'wrong-way',
+      progressMeters: 0,
+      headingDegrees: 270,
+    });
+    walkAt(90, 12);
+    expect(walker.read().progressMeters).toBeCloseTo(8.64);
+    // A real turnaround is backwards, never "new departure along the route".
+    walkAt(270, 4);
+    expect(walker.read()).toMatchObject({ reason: 'wrong-way', headingDegrees: 270 });
+    expect(walker.read().progressMeters).toBeCloseTo(5.76);
+  });
+
+  it('holds sign-aligned strides through direction loss instead of learning the route again', () => {
+    const { tracker, walker } = anchored();
+    tracker.measuredPlanBearing(90, walker.t);
+    walker.steps(1);
+    const before = walker.read().progressMeters;
+    tracker.measuredPlanBearing(null, walker.t);
+    walker.turn(180);
+    walker.steps(4);
+    expect(walker.read()).toMatchObject({
+      reason: 'no-heading',
+      progressMeters: before,
+      headingDegrees: null,
+    });
+    tracker.measuredPlanBearing(270, walker.t);
+    walker.steps(1);
+    expect(walker.read().progressMeters).toBeLessThan(before);
+  });
+
+  it('does not let a fresh sign direction clear an already lost position', () => {
+    const { tracker, walker } = anchored();
+    tracker.anchor({ progressMeters: 5, sigmaMeters: 20, timeMs: walker.t });
+    tracker.measuredPlanBearing(90, walker.t);
+    walker.steps(1);
+    expect(walker.read()).toMatchObject({
+      reason: 'uncertain',
+      progressMeters: 5,
+      canStartPose: false,
+    });
+  });
   it('does nothing without an anchor', () => {
     const tracker = new RouteTracker(corner);
     const walker = new Walker(tracker);

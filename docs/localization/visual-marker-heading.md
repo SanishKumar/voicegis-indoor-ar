@@ -62,18 +62,23 @@ Agreed as an interim step before the calibrated solver below. It is
   40° of level) is paired with the sign's facing reversed: that is the camera's
   approximate plan bearing at that yaw. A link, a missing reading or a steep
   camera sets no direction. It lives in memory with the check-in only.
-- One orientation feed runs for the page, from app start, so the scan and the
-  camera view and AR read the same yaw zero. Any loss of continuity (hidden page,
-  readings stale for 500 ms) starts a new epoch and the sign direction is
-  dropped; the visitor scans again or aligns by hand.
+- One orientation feed runs for the page, from app start, so the scan, map
+  walking, camera view and AR read the same yaw zero. Hidden-page and unavailable
+  sensor boundaries start a new epoch and invalidate the sign direction.
+  As of 29 September, delivery silence alone expires the display attitude,
+  not its reference-frame identity. Fresh readings on the same source can
+  recover the calibration. Quiet continuous gyroscope samples may corroborate
+  unchanged attitude within bounded rotation/gap limits (see visitor-live-tracking).
+  A stale scan frame still cannot acquire a direction.
 - The camera view draws from it as source `sign` and says "Direction from the
   sign · approximate"; a manual "I'm facing the corridor" overrides it. AR is
   placed from it at floor confirmation, whichever way the phone points, and
   then gives broad turn cues (left, right, turn around) from the session's own
   camera heading. No corridor snapping and no claim of precise alignment.
 - Untested on a handset: whether orientation readings continue while Chrome
-  starts an immersive session. A pause over 500 ms would drop the direction at
-  placement; the field test log records it.
+  starts an immersive session. Placement waits for fresh/corroborated attitude;
+  if the sensor reference itself was lost, the visitor must re-align. The field
+  test log distinguishes delivery staleness from lifecycle/reference loss.
 
 ## Remaining implementation order
 

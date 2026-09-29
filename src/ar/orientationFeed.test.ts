@@ -33,6 +33,83 @@ function setup() {
   return { feed, readings, state };
 }
 
+function motion(rate: number | null = 0) {
+  const event = new Event('devicemotion');
+  Object.defineProperties(event, {
+    timeStamp: { value: now },
+    rotationRate: { value: { alpha: rate, beta: rate === null ? null : 0, gamma: 0 } },
+  });
+  window.dispatchEvent(event);
+}
+
+describe('change-driven orientation while scanning a still sign', () => {
+  it('keeps a quiet attitude current only with continuous, complete motion corroboration', () => {
+    const { feed, state } = setup();
+    emit(20);
+    const epoch = feed.read()!.epoch;
+    motion();
+    for (let i = 0; i < 250; i += 1) {
+      now += 20;
+      motion();
+      expect(feed.read()).toMatchObject({ epoch, timeMs: now, observedTimeMs: 1000 });
+    }
+    expect(state).not.toHaveBeenCalledWith('stale');
+    now += 20;
+    emit(200);
+    expect(feed.read()).toMatchObject({ epoch });
+    expect(feed.read()!.yawDegrees).toBeCloseTo(160);
+  });
+
+  it.each([null, 10])('cannot hold an old angle after missing rates or a turn (%s)', (rate) => {
+    const { feed } = setup();
+    emit();
+    now += 20;
+    motion(rate);
+    for (let i = 0; i < 30; i += 1) {
+      now += 20;
+      motion();
+    }
+    expect(feed.read()).toBeNull();
+  });
+
+  it('bounds accumulated unobserved rotation rather than treating slow turning as still', () => {
+    const { feed } = setup();
+    emit();
+    for (let i = 0; i < 150; i += 1) {
+      now += 20;
+      motion(0.8);
+    }
+    expect(feed.read()).toBeNull();
+  });
+
+  it('does not let an old queued event destroy a fresher attitude', () => {
+    const { feed } = setup();
+    emit(20);
+    now += 20;
+    emit(200, 'deviceorientation', 100);
+    expect(feed.read()!.yawDegrees).toBeCloseTo(340);
+  });
+
+  it('does not hold across missing motion or a background boundary', () => {
+    const { feed } = setup();
+    emit();
+    now += 20;
+    motion();
+    now += 20;
+    motion();
+    now += 300;
+    motion();
+    now += 600;
+    motion();
+    expect(feed.read()).toBeNull();
+    emit();
+    window.dispatchEvent(new Event('pagehide'));
+    now += 20;
+    motion();
+    expect(feed.read()).toBeNull();
+  });
+});
+
 /** A platform that advertises the permission gate, as iOS does. */
 function gatedBy(permission: string | Promise<string>) {
   const requestPermission = vi.fn(() => Promise.resolve(permission));
@@ -101,7 +178,7 @@ describe('a platform that asks before it reports orientation', () => {
 });
 
 describe('camera orientation ownership', () => {
-  it('expires silence without sensor callbacks and starts a new alignment epoch', () => {
+  it('expires silence without redefining the reference frame of the next fresh reading', () => {
     const { feed, state } = setup();
     emit();
     const epoch = feed.read()?.epoch;
@@ -109,7 +186,7 @@ describe('camera orientation ownership', () => {
     expect(feed.read()).toBeNull();
     expect(state).toHaveBeenLastCalledWith('stale');
     emit(30);
-    expect(feed.read()?.epoch).toBeGreaterThan(epoch!);
+    expect(feed.read()?.epoch).toBe(epoch);
   });
 
   it('ignores queued and duplicate events without renewing the occurrence clock', () => {
