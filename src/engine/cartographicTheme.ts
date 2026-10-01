@@ -37,21 +37,21 @@ export interface WallSurface {
 }
 
 const SPACE_SURFACES: Record<SpaceType, SpaceSurface> = {
-  // Dark plates on a black canvas: walkable space is the lightest, and the
-  // one hue that is not a cool grey marks what a visitor may not enter.
-  entrance: { fill: '#3a4a5f', outline: '#8ea0b6', surface: '#3a4a5f' },
-  room: { fill: '#171c24', outline: '#5d6b7c', surface: '#1b212b' },
-  corridor: { fill: '#28323f', outline: '#6f7f92', surface: '#28323f' },
-  lobby: { fill: '#2f3b4b', outline: '#7d8da1', surface: '#2f3b4b' },
-  service: { fill: '#141a1f', outline: '#4b5766', surface: '#161c22' },
-  restricted: { fill: '#2a1d20', outline: '#7a4a52', surface: '#2a1d20' },
-  'vertical-circulation': { fill: '#426188', outline: '#8fa9c8', surface: '#426188' },
+  // A white model in the sky: walkable space is pure white, rooms step down
+  // through pale blues, and the one warm tone marks what a visitor may not enter.
+  entrance: { fill: '#f4f9ff', outline: '#9fb9da', surface: '#f4f9ff' },
+  room: { fill: '#dce8f8', outline: '#9fb5d2', surface: '#dce8f8' },
+  corridor: { fill: '#ffffff', outline: '#b5c8e2', surface: '#ffffff' },
+  lobby: { fill: '#f8fbff', outline: '#a9c0de', surface: '#f8fbff' },
+  service: { fill: '#c8d8ee', outline: '#8ea6c6', surface: '#c8d8ee' },
+  restricted: { fill: '#f0d6da', outline: '#c98b96', surface: '#f0d6da' },
+  'vertical-circulation': { fill: '#8fb8f0', outline: '#5f8fd6', surface: '#8fb8f0' },
 };
 
 const WALL_SURFACES: Record<WallSurfaceClass, WallSurface> = {
   // Exterior envelope reads heaviest and stands full height.
   exterior: {
-    color: '#b9c4d2',
+    color: '#ffffff',
     roughness: 0.78,
     metalness: 0.02,
     heightScale: 1,
@@ -61,7 +61,7 @@ const WALL_SURFACES: Record<WallSurfaceClass, WallSurface> = {
   // Interior partitions sit slightly lower and lighter so the envelope still
   // reads as the building edge from above.
   interior: {
-    color: '#8794a5',
+    color: '#e9f1fb',
     roughness: 0.72,
     metalness: 0.02,
     heightScale: 0.94,
@@ -69,7 +69,7 @@ const WALL_SURFACES: Record<WallSurfaceClass, WallSurface> = {
     opacity: 1,
   },
   restricted: {
-    color: '#7a4a52',
+    color: '#e2a9b3',
     roughness: 0.68,
     metalness: 0.04,
     heightScale: 0.96,
@@ -77,7 +77,7 @@ const WALL_SURFACES: Record<WallSurfaceClass, WallSurface> = {
     opacity: 1,
   },
   glazed: {
-    color: '#a9c4dc',
+    color: '#bfe2f4',
     roughness: 0.08,
     metalness: 0.08,
     heightScale: 0.9,
@@ -89,14 +89,14 @@ const WALL_SURFACES: Record<WallSurfaceClass, WallSurface> = {
 export const CARTOGRAPHIC_THEME = {
   wallThicknessMeters: 0.12,
   plan: {
-    paper: '#000000',
-    floor: '#0c0f14',
-    background: '#000000',
+    paper: '#ffffff',
+    floor: '#eef3fa',
+    background: 'transparent',
   },
   accent: {
-    accessible: '#8fb4c9',
-    restricted: '#7a4a52',
-    standard: '#c2a36b',
+    accessible: '#7fd3e6',
+    restricted: '#e2a9b3',
+    standard: '#f0cf8a',
   },
 } as const;
 

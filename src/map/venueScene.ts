@@ -55,25 +55,40 @@ import {
  * One authored scene, seen from a top-down plan or an orbitable 3D camera.
  * Neither presentation owns or advances the journey.
  *
- * The model sits on the dark canvas like a piece of smoked glass: floor plates
- * in a narrow range of cool, dark tones, walls drawn light so the plan reads,
- * and one saturated colour - the route. The interface around it is black,
- * white and that same blue, so the two never compete.
+ * The model floats in the sky behind the interface, so it is drawn as frosted
+ * glass catching daylight: floor plates are translucent and the sky shows
+ * through them, walls are white, shadows fall blue, and there is one
+ * saturated thing on it - the route. The canvas itself is transparent; what
+ * is behind the building is the sky.
  */
 
 type Coordinate = [number, number];
 
 const SPACE_FILL: Record<string, number> = {
-  // Walkable space is the lightest, so a route across it has somewhere to sit.
-  entrance: 0x3a4a5f,
-  lobby: 0x2f3b4b,
-  corridor: 0x28323f,
-  room: 0x171c24,
-  service: 0x141a1f,
-  restricted: 0x101214,
-  // The ways between floors take the palette's heading blue: found at a glance, not shouted.
-  'vertical-circulation': 0x426188,
+  entrance: 0xffffff,
+  lobby: 0xffffff,
+  corridor: 0xffffff,
+  room: 0xeaf2fd,
+  service: 0xdbe7f8,
+  restricted: 0xbccbe2,
+  // The ways between floors are a clear sky blue: found at a glance, not shouted.
+  'vertical-circulation': 0x7fb0f5,
 };
+/*
+ * How much of the sky each kind of space lets through. Walkable space is the
+ * most solid, so a route across it has something to sit on; a room is thinner
+ * glass, and somewhere a visitor may not go is the thinnest.
+ */
+const SPACE_OPACITY: Record<string, number> = {
+  entrance: 0.84,
+  lobby: 0.84,
+  corridor: 0.88,
+  room: 0.5,
+  service: 0.42,
+  restricted: 0.3,
+  'vertical-circulation': 0.92,
+};
+const SLAB_OPACITY = 0.3;
 const SPACE_PRIORITY: Record<string, number> = {
   entrance: 8,
   lobby: 6,
@@ -99,9 +114,9 @@ const SPACE_MIN_SCALE: Record<string, number> = {
   restricted: 1.25,
   corridor: 1.8,
 };
-const WALL_FILL = 0xb9c4d2;
-const SLAB_TOP = 0x0c0f14;
-const SLAB_SIDE = 0x06080b;
+const WALL_FILL = 0xffffff;
+const SLAB_TOP = 0xffffff;
+const SLAB_SIDE = 0xdce8f8;
 /*
  * The route is the one thing on the model a visitor is actually following, so
  * it carries the accent the rest of the product uses for the thing you act on.
@@ -113,10 +128,10 @@ const SLAB_SIDE = 0x06080b;
  */
 const ROUTE_COLOR = 0x2b7fff;
 /** Route already covered: still legible, clearly behind you. */
-const TRAVELLED_COLOR = 0x5d6b7c;
+const TRAVELLED_COLOR = 0x9db1cc;
 /** A walk-through marker stays this many CSS pixels across at any zoom. */
 const PUCK_PIXELS = 30;
-const SHAFT_COLOR = 0x33455c;
+const SHAFT_COLOR = 0x8fb2e6;
 const SELECTED_FILL = 0x2b7fff;
 
 const WALL_THICKNESS = 0.22;
@@ -261,6 +276,14 @@ function surface(color: number, extra: Record<string, unknown> = {}) {
   });
 }
 
+/** A translucent plate. A storey fading out multiplies this, it does not replace it. */
+function glass(color: number, opacity: number, extra: Record<string, unknown> = {}) {
+  const material = surface(color, { transparent: true, opacity, ...extra });
+  material.userData.alwaysTransparent = true;
+  material.userData.baseOpacity = opacity;
+  return material;
+}
+
 export function createVenueScene(
   canvas: HTMLCanvasElement,
   labelLayer: HTMLElement,
@@ -299,6 +322,9 @@ export function createVenueScene(
   renderer.shadowMap.enabled = graphics.profile(window.devicePixelRatio).shadows;
   renderer.shadowMap.type = PCFShadowMap;
   renderer.toneMapping = ACESFilmicToneMapping;
+  // The film curve rolls white off to a light grey. The model is meant to read
+  // as white against the sky, so it is exposed up to where its lit faces are.
+  renderer.toneMappingExposure = 1.3;
 
   const scene = new Scene();
   const cameraRig = createVisitorCamera(span, initialView);
@@ -334,10 +360,11 @@ export function createVenueScene(
   canvas.addEventListener('webglcontextrestored', onContextRestored);
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-  // Cool light from above and almost none from below: the plates stay dark
-  // and the wall tops catch enough to draw the plan.
-  scene.add(new HemisphereLight(0xdfe8f5, 0x141a22, 1.5));
-  const key = new DirectionalLight(0xffffff, 1.8);
+  // Daylight: the sky's own blue from every side and a warm sun on top of it.
+  // Together they make white; where a wall blocks the sun only the blue is
+  // left, so shadows fall blue instead of grey.
+  scene.add(new HemisphereLight(0xc4d9ff, 0x9bb8e2, 1.25));
+  const key = new DirectionalLight(0xffeed8, 2.0);
   key.position.set(span * 0.55, span * 1.2, span * 0.45);
   key.castShadow = renderer.shadowMap.enabled;
   key.shadow.mapSize.set(2048, 2048);
@@ -357,7 +384,7 @@ export function createVenueScene(
   });
   key.shadow.camera.updateProjectionMatrix();
   scene.add(key);
-  scene.add(new AmbientLight(0xffffff, 0.24));
+  scene.add(new AmbientLight(0xffffff, 0.34));
 
   /*
    * The building's own shadow on the page beneath it. It is a shadow and
@@ -365,7 +392,7 @@ export function createVenueScene(
    * sit on a surface rather than float in front of one. Only the tilted view
    * has an underneath; the plan looks straight down and has nowhere for it.
    */
-  const groundMaterial = new ShadowMaterial({ color: 0x000000, opacity: 0, transparent: true });
+  const groundMaterial = new ShadowMaterial({ color: 0x12306a, opacity: 0, transparent: true });
   const ground = new Mesh(new PlaneGeometry(span * 4, span * 4), groundMaterial);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
@@ -573,7 +600,10 @@ export function createVenueScene(
     // rotateX sends the extrusion to -Y, so the slab already hangs below zero
     // with its top face at zero. Lifting it would bury everything on it.
     slab.rotateX(Math.PI / 2);
-    const slabMesh = new Mesh(slab, [track(surface(SLAB_TOP)), track(surface(SLAB_SIDE))]);
+    const slabMesh = new Mesh(slab, [
+      track(glass(SLAB_TOP, SLAB_OPACITY)),
+      track(glass(SLAB_SIDE, SLAB_OPACITY + 0.2)),
+    ]);
     slabMesh.receiveShadow = true;
     group.add(slabMesh);
 
@@ -585,7 +615,13 @@ export function createVenueScene(
       geometry.translate(0, 0.24, 0);
       const mesh = new Mesh(
         geometry,
-        track(surface(SPACE_FILL[space.type] ?? SPACE_FILL.room, { side: DoubleSide })),
+        track(
+          glass(
+            SPACE_FILL[space.type] ?? SPACE_FILL.room,
+            SPACE_OPACITY[space.type] ?? SPACE_OPACITY.room,
+            { side: DoubleSide },
+          ),
+        ),
       );
       mesh.receiveShadow = true;
       mesh.userData.spaceId = space.id;
@@ -686,17 +722,17 @@ export function createVenueScene(
      * looking like an empty diagram, quiet enough that the only saturated
      * things on the model are the route and the destinations.
      */
-    addInstances(new BoxGeometry(1.5, 0.42, 0.6), surface(0x45505f), seats, (object, point) => {
+    addInstances(new BoxGeometry(1.5, 0.42, 0.6), surface(0xb9cce6), seats, (object, point) => {
       object.position.copy(vec(point, 0.24));
       object.rotation.set(0, random() > 0.5 ? 0 : Math.PI / 2, 0);
     });
     addInstances(
       new CylinderGeometry(0.22, 0.26, 0.46, 10),
-      surface(0x3b4552),
+      surface(0xc9d8ec),
       planters,
       (object, point) => object.position.copy(vec(point, 0.23)),
     );
-    addInstances(new IcosahedronGeometry(0.3, 0), surface(0x55616f), planters, (object, point) => {
+    addInstances(new IcosahedronGeometry(0.3, 0), surface(0x9fc3b4), planters, (object, point) => {
       object.position.copy(vec(point, 0.62));
       object.scale.set(1, 1.15, 1);
       object.rotation.set(0, random() * Math.PI, 0);
@@ -1046,7 +1082,7 @@ export function createVenueScene(
     });
   const puckDiscs = new Group();
   puckDiscs.rotation.x = -Math.PI / 2;
-  const puckShadow = new Mesh(new CircleGeometry(0.6, 40), overlay(0x000000, 0.4));
+  const puckShadow = new Mesh(new CircleGeometry(0.6, 40), overlay(0x0f2147, 0.28));
   puckShadow.position.set(0.03, -0.05, 0);
   const puckRim = new Mesh(new CircleGeometry(0.54, 40), overlay(0xffffff));
   const puckCore = new Mesh(new CircleGeometry(0.42, 40), overlay(ROUTE_COLOR));
@@ -1507,7 +1543,7 @@ export function createVenueScene(
       );
       const dot = new Mesh(
         new CylinderGeometry(0.59, 0.59, 0.17, 32),
-        new MeshStandardMaterial({ color: location.basis === 'qr' ? 0x2b7fff : 0x5d6b7c }),
+        new MeshStandardMaterial({ color: location.basis === 'qr' ? 0x2b7fff : 0x7f93b0 }),
       );
       dot.position.y = 0.1;
       locationGroup.add(rim, dot);
@@ -1648,7 +1684,7 @@ export function createVenueScene(
         view.group.position.y = y;
         const ghosted = opacity < 0.995;
         for (const material of view.materials) {
-          material.opacity = opacity;
+          material.opacity = opacity * ((material.userData.baseOpacity as number | undefined) ?? 1);
           material.transparent = material.userData.alwaysTransparent === true || ghosted;
           material.depthWrite = opacity > 0.6;
         }

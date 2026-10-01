@@ -25,14 +25,16 @@ const CANVAS_PADDING = 54;
 const GRID_METERS = 1;
 
 const SPACE_COLORS: Record<SpaceType, string> = {
-  // The same dark plates as the visitor's model: walkable space lightest.
-  entrance: '#3a4a5f',
-  room: '#171c24',
-  corridor: '#28323f',
-  lobby: '#2f3b4b',
-  service: '#141a1f',
-  restricted: '#101214',
-  'vertical-circulation': '#426188',
+  // Glass plates on a clear ground, like the visitor's model: walkable space
+  // is the most solid, a room is thinner, and nothing is so light that the
+  // white names drawn over it stop reading.
+  entrance: 'rgba(255, 255, 255, 0.3)',
+  room: 'rgba(255, 255, 255, 0.14)',
+  corridor: 'rgba(255, 255, 255, 0.34)',
+  lobby: 'rgba(255, 255, 255, 0.3)',
+  service: 'rgba(255, 255, 255, 0.1)',
+  restricted: 'rgba(255, 255, 255, 0.05)',
+  'vertical-circulation': 'rgba(127, 176, 245, 0.6)',
 };
 
 function polygonCentre(polygon: Coordinate2D[]): Coordinate2D {
@@ -214,7 +216,11 @@ export default function BuildingSourceFloorCanvas({
           }}
         >
           <Layer>
-            <Rect width={dimensions.width} height={dimensions.height} fill="#000000" />
+            <Rect
+              width={dimensions.width}
+              height={dimensions.height}
+              fill="rgba(8, 22, 54, 0.38)"
+            />
 
             {gridX.map((x) => {
               const [canvasX] = toCanvas([x, bounds.minY]);
@@ -222,7 +228,7 @@ export default function BuildingSourceFloorCanvas({
                 <Line
                   key={`grid-x-${x}`}
                   points={[canvasX, offsetY, canvasX, offsetY + drawnHeight]}
-                  stroke="rgba(255, 255, 255, 0.08)"
+                  stroke="rgba(255, 255, 255, 0.1)"
                   strokeWidth={1}
                   listening={false}
                 />
@@ -234,7 +240,7 @@ export default function BuildingSourceFloorCanvas({
                 <Line
                   key={`grid-y-${y}`}
                   points={[offsetX, canvasY, offsetX + drawnWidth, canvasY]}
-                  stroke="rgba(255, 255, 255, 0.08)"
+                  stroke="rgba(255, 255, 255, 0.1)"
                   strokeWidth={1}
                   listening={false}
                 />
@@ -244,8 +250,8 @@ export default function BuildingSourceFloorCanvas({
             <Line
               points={flatPoints(activeFloor.outline)}
               closed
-              fill="#0c0f14"
-              stroke="#b9c4d2"
+              fill="rgba(255, 255, 255, 0.08)"
+              stroke="#ffffff"
               strokeWidth={3}
               lineJoin="round"
               listening={false}
@@ -260,7 +266,11 @@ export default function BuildingSourceFloorCanvas({
                   closed
                   fill={SPACE_COLORS[space.type]}
                   stroke={
-                    selected ? '#2b7fff' : space.public ? 'rgba(255, 255, 255, 0.32)' : '#b9c4d2'
+                    selected
+                      ? '#ffffff'
+                      : space.public
+                        ? 'rgba(255, 255, 255, 0.5)'
+                        : 'rgba(255, 255, 255, 0.85)'
                   }
                   strokeWidth={selected ? 3 : 1.35}
                   lineJoin="round"
@@ -285,7 +295,7 @@ export default function BuildingSourceFloorCanvas({
                   x={point[0]}
                   y={point[1]}
                   radius={4}
-                  fill="#000000"
+                  fill="#0f2147"
                   stroke="#ffffff"
                   strokeWidth={2}
                   listening={false}
@@ -301,7 +311,7 @@ export default function BuildingSourceFloorCanvas({
                   y={point[1]}
                   radius={3.5}
                   fill="#2b7fff"
-                  stroke="#000000"
+                  stroke="#ffffff"
                   strokeWidth={1.5}
                   listening={false}
                 />

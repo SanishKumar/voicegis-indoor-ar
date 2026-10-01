@@ -115,9 +115,9 @@ function FloorGeometry({ floor, bounds, exploded }: FloorGeometryProps) {
     <group>
       <mesh position={[0, elevation - 0.16, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <extrudeGeometry args={[shape, { depth: 0.16, bevelEnabled: false }]} />
-        <meshStandardMaterial color="#34363a" metalness={0.08} roughness={0.8} />
+        <meshStandardMaterial color="#e8f0fa" metalness={0} roughness={0.9} />
       </mesh>
-      <Line points={outline} color="#e6e2d9" lineWidth={1.3} transparent opacity={0.62} />
+      <Line points={outline} color="#ffffff" lineWidth={1.3} transparent opacity={0.9} />
     </group>
   );
 }
@@ -724,7 +724,7 @@ function ActiveRouteOverlay({
         <group key={`${segment.node.id}-${index}`}>
           <Line
             points={segment.points}
-            color="#000000"
+            color="#ffffff"
             lineWidth={11}
             depthTest={false}
             renderOrder={20}
@@ -906,10 +906,9 @@ function TwinScene({
 
   return (
     <>
-      <color attach="background" args={['#000000']} />
-      <fog attach="fog" args={['#000000', 90, 180]} />
-      <ambientLight intensity={0.92} />
-      <hemisphereLight args={['#dfe8f5', '#141a22', 1.35]} />
+      {/* No background and no fog: the canvas is clear and the sky is behind the model. */}
+      <ambientLight intensity={0.7} />
+      <hemisphereLight args={['#c4d9ff', '#9bb8e2', 1.2]} />
       <directionalLight
         position={[18, 28, 13]}
         intensity={2.2}
@@ -918,7 +917,12 @@ function TwinScene({
       />
       <directionalLight position={[-12, 14, -16]} intensity={0.48} color="#c7d6ea" />
 
-      <gridHelper args={[104, 104, '#2a2f37', '#15181d']} position={[0, -0.18, 0]} />
+      <gridHelper
+        args={[104, 104, '#ffffff', '#ffffff']}
+        position={[0, -0.18, 0]}
+        material-transparent
+        material-opacity={0.14}
+      />
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.19, 0]}
@@ -926,7 +930,8 @@ function TwinScene({
         receiveShadow
       >
         <planeGeometry args={[104, 104]} />
-        <meshStandardMaterial color="#06080b" roughness={0.86} />
+        {/* Still there to take the click that clears a selection; it draws nothing. */}
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
       {visibleFloors.map((floor) => (
