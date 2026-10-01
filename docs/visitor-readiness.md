@@ -30,13 +30,15 @@ entries in the experience plan are historical slice reports.
   project-subfolder delivery, view/context failure recovery, deferred map and
   camera modules, a public startup-JavaScript budget, and opt-in in-memory
   field reports. No report is uploaded automatically.
-  Activation reverifies the replacement cache before retiring earlier bytes;
-  failed verification retains those bytes, not the previous active worker.
 - Activation reverifies or repairs the current worker's exact cache bytes
   before retiring earlier release caches. Failed verification retains earlier
   bytes, while the current worker still activates and claims clients; this is
   not automatic worker rollback. The offline-worker unit file passes 15 cases,
   including eight activation cases. See [deployment semantics](deployment.md).
+- Manual publication depends on the shared Quality workflow, including the
+  full production browser command. Validation and the Pages build check out
+  the same selected commit. Failed, cancelled or skipped quality checks block
+  the publication build. See [the publication gate](deployment.md#publishing-to-github-pages).
 - Visitor map graphics modes: Automatic, Full detail and Low detail. Low
   detail caps DPR at 1 and disables shadows, without simplifying route,
   label or location geometry. Automatic selection uses conservative optional
@@ -113,9 +115,13 @@ activates and claims clients: retaining earlier bytes does not restore the
 previous active worker. Eight deterministic activation cases cover the guard
 within the offline-worker unit file's 15 passing cases.
 
+The publication gate now reruns code and browser checks for the selected
+commit before building its Pages artifact. The local reusable Quality workflow
+and every checkout use that revision, so a later branch update cannot change
+what is built. This remains a manually started publication workflow.
+
 Remaining targets include changed-release upgrade/rollback coverage with
-multiple clients and a browser gate tied to the exact revision selected for
-publishing. Neither is completed by the cache-retirement guard.
+multiple clients. Retaining cache bytes alone does not complete that work.
 The complete 162-case operator suite was measured with CI's one-worker settings:
 14.6 minutes for a green run, after an initial 15.8-minute review run exposed
 narrow-screen defects. The aggregate Playwright budget is now 20 minutes and

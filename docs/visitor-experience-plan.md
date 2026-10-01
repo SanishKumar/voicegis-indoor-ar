@@ -1087,3 +1087,19 @@ qualification or a deployment. The user authorized committing and pushing the
 verified work; the manually triggered visitor publishing workflow is separate.
 Software scope and substantial unimplemented features remain explicit in
 [visitor readiness](visitor-readiness.md).
+
+### Publication requires quality checks for the selected commit — 1 October 2026
+
+The manual publishing workflow now calls the same Quality workflow used for
+pushes and pull requests. Its code and production-browser jobs must succeed
+before the Pages build and artifact upload can run. Every quality/build checkout
+uses the run's selected commit SHA, and the local reusable workflow comes from
+that same revision. A later branch update cannot change the source being built.
+Validation is repeated for a publication, even if a previous push was green.
+
+The workflow graph passes actionlint 1.7.12, formatting and whitespace checks.
+This slice changes workflow configuration and documentation only; application
+logic, test commands and test thresholds are unchanged. Publishing remains
+manually triggered, and no deployment was started to validate these changes.
+Changed-release offline recovery with multiple clients is the next bounded
+release-safeguard task.

@@ -115,13 +115,29 @@ repository's project site and deploys it. It runs **only when started by hand**
 (Actions → Publish visitor build → Run workflow); pushing never publishes.
 
 1. Once, in the repository: Settings → Pages → Source: **GitHub Actions**.
-2. Publish from a commit whose Quality run, including the browser smoke, has
-   passed. The workflow repeats `npm run check` but not the browser suites.
+2. Start the workflow from the branch or tag to publish. Its selected commit
+   is fixed for that run. The **Validate selected revision** job calls the same
+   Quality workflow used by pushes and pull requests, running `npm run check`
+   and the complete production browser command, including public offline and
+   project-subfolder tests.
 3. The site appears at `https://<owner>.github.io/<repository>/`, for example
    `https://sanishkumar.github.io/voicegis-indoor-ar/#/visitor`.
 
-The workflow does not yet enforce a successful browser gate for the exact
-revision selected for publishing; that safeguard remains future work.
+The quality jobs and the Pages build explicitly check out `github.sha`, the
+commit selected for that run. The reusable Quality workflow also comes from
+that commit. Moving the branch while a run is checking cannot change the source
+built for publication. A failed, cancelled or skipped quality job prevents the
+build and upload; deployment then depends on that successful build. Browser
+diagnostics remain available when a check fails. Publishing therefore repeats
+validation even if an earlier Quality run was green. Allow time for the full
+browser suite before the Pages build starts.
+
+This dependency uses GitHub's [reusable-workflow commit binding](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#calling-a-reusable-workflow)
+and [job dependency rules](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds).
+It validates the selected source revision. The final Pages artifact is rebuilt
+for the project path after those checks; it is not an artifact reused from an
+earlier run. Older commits that predate this workflow change keep their earlier
+publishing behavior, so start new releases from a revision containing this gate.
 
 Pages chooses its own response headers (currently a ten-minute `max-age` on
 everything) and does not honour the table above. The worker is registered with

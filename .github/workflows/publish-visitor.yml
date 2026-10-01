@@ -14,13 +14,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # A local reusable workflow comes from the same commit as this workflow.
+  # Both quality jobs must succeed before a Pages artifact can be built.
+  quality:
+    name: Validate selected revision
+    uses: ./.github/workflows/quality.yml
+
   build:
+    needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -30,9 +39,6 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci
-
-      - name: Run quality gate
-        run: npm run check
 
       # A project site is served under /<repository>/, not at the domain root.
       - name: Build the visitor app for the project site
