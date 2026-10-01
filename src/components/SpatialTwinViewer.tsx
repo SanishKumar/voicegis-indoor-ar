@@ -724,14 +724,14 @@ function ActiveRouteOverlay({
         <group key={`${segment.node.id}-${index}`}>
           <Line
             points={segment.points}
-            color="#151619"
+            color="#000000"
             lineWidth={11}
             depthTest={false}
             renderOrder={20}
           />
           <Line
             points={segment.points}
-            color={segment.vertical ? '#8d80ff' : '#ff4f2a'}
+            color={segment.vertical ? '#8fa9c8' : '#2b7fff'}
             lineWidth={6.5}
             depthTest={false}
             renderOrder={21}
@@ -773,7 +773,7 @@ function ActiveRouteOverlay({
           <mesh key={`decision-${node.id}-${index}`} position={point} renderOrder={22}>
             <sphereGeometry args={[0.13, 12, 12]} />
             <meshBasicMaterial
-              color={node.id === currentNodeId ? '#ffffff' : '#ffb5a4'}
+              color={node.id === currentNodeId ? '#ffffff' : '#9cc2ff'}
               depthTest={false}
             />
           </mesh>
@@ -790,7 +790,7 @@ function ActiveRouteOverlay({
             </mesh>
             <mesh position={[0, 0.14, 0]}>
               <sphereGeometry args={[0.18, 16, 16]} />
-              <meshBasicMaterial color="#5b4ee6" depthTest={false} />
+              <meshBasicMaterial color="#2b7fff" depthTest={false} />
             </mesh>
           </group>
         );
@@ -805,7 +805,7 @@ function ActiveRouteOverlay({
         <group position={destinationPoint}>
           <mesh rotation={[-Math.PI / 2, 0, 0]}>
             <torusGeometry args={[0.34, 0.11, 12, 28]} />
-            <meshBasicMaterial color="#ff4f2a" depthTest={false} />
+            <meshBasicMaterial color="#2b7fff" depthTest={false} />
           </mesh>
           <Html position={[0, 0.75, 0]} center distanceFactor={18}>
             <div className="twin-route-label">Destination</div>
@@ -906,19 +906,19 @@ function TwinScene({
 
   return (
     <>
-      <color attach="background" args={['#18191c']} />
-      <fog attach="fog" args={['#18191c', 90, 180]} />
+      <color attach="background" args={['#000000']} />
+      <fog attach="fog" args={['#000000', 90, 180]} />
       <ambientLight intensity={0.92} />
-      <hemisphereLight args={['#f5f1e7', '#292a2e', 1.35]} />
+      <hemisphereLight args={['#dfe8f5', '#141a22', 1.35]} />
       <directionalLight
         position={[18, 28, 13]}
         intensity={2.2}
         castShadow
         shadow-mapSize={[2048, 2048]}
       />
-      <directionalLight position={[-12, 14, -16]} intensity={0.48} color="#bdb7ff" />
+      <directionalLight position={[-12, 14, -16]} intensity={0.48} color="#c7d6ea" />
 
-      <gridHelper args={[104, 104, '#414247', '#28292d']} position={[0, -0.18, 0]} />
+      <gridHelper args={[104, 104, '#2a2f37', '#15181d']} position={[0, -0.18, 0]} />
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.19, 0]}
@@ -926,7 +926,7 @@ function TwinScene({
         receiveShadow
       >
         <planeGeometry args={[104, 104]} />
-        <meshStandardMaterial color="#1d1e21" roughness={0.86} />
+        <meshStandardMaterial color="#06080b" roughness={0.86} />
       </mesh>
 
       {visibleFloors.map((floor) => (

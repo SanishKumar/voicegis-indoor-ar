@@ -57,9 +57,9 @@ import {
  * neither action establishes the building's direction independently.
  */
 
-const ROUTE_COLOR = 0x0a65db;
-const INK = 0x000609;
-const CREAM = 0xfff9f0;
+const ROUTE_COLOR = 0x2b7fff;
+const INK = 0x000000;
+const CREAM = 0xffffff;
 const DEG = Math.PI / 180;
 const CHEVRON_EVERY_METERS = 1.5;
 const AHEAD_METERS = 30;
@@ -262,7 +262,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     depthTest: false,
   });
   const targetGeometry = new RingGeometry(0.12, 0.17, 40);
-  const targetMaterial = new MeshBasicMaterial({ color: 0xffc857, side: DoubleSide });
+  const targetMaterial = new MeshBasicMaterial({ color: 0xffffff, side: DoubleSide });
   const target = new Mesh(targetGeometry, targetMaterial);
   target.rotation.x = -Math.PI / 2;
   target.visible = false;
@@ -612,7 +612,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       target.visible = candidate !== null;
       if (candidate !== null) {
         target.position.set(candidate.x, candidate.y + 0.005, candidate.z);
-        targetMaterial.color.setHex(candidate.ready ? 0x37d6a1 : 0xffc857);
+        targetMaterial.color.setHex(candidate.ready ? 0x2b7fff : 0xffffff);
       }
     }
 
@@ -693,7 +693,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
         return false;
       const nowMs = performance.now();
       if (floor.confirm(nowMs)) return true;
-      // A stalled frame loop must not leave a green, tappable but stale target.
+      // A stalled frame loop must not leave a ready-looking, tappable but stale target.
       floor.reset();
       target.visible = false;
       waitFor('floor', nowMs);

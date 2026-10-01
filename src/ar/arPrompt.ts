@@ -171,7 +171,7 @@ export function arPrompt({
     if (placement === 'floor-confirm') {
       return {
         kind: placement,
-        note: 'Check that the green ring sits on the floor, not furniture. Confirm only if it does.',
+        note: 'Check that the blue ring sits on the floor, not furniture. Confirm only if it does.',
         action: { kind: 'confirm-surface', label: 'This is the floor' },
         leads: 'action',
       };
@@ -180,7 +180,7 @@ export function arPrompt({
       kind: placement,
       note:
         placement === 'floor'
-          ? 'Point the phone at the floor nearby. Hold the ring still until it turns green; the route stays hidden until you confirm the floor.'
+          ? 'Point the phone at the floor nearby. Hold the ring still until it turns blue; the route stays hidden until you confirm the floor.'
           : placement === 'steady'
             ? 'Hold the phone still. This stabilizes placement, not the building’s direction.'
             : 'Finding the room. Move the phone gently to look around.',

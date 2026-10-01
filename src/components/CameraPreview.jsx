@@ -53,7 +53,7 @@ import {
   ROUTE_CLEARANCE_MESSAGE,
 } from '../engine/routeClearance';
 
-const GLOW = '#8ec5ff';
+const ROUTE_BLUE = '#2b7fff';
 /** How often the drawn state is written out for the readiness chips and tests. */
 const REPORT_MS = 200;
 /** How often the world labels are recomputed from progress. */
@@ -1336,9 +1336,9 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
 }
 
 /**
- * The projected route as a lit ribbon on the floor - a translucent blue bed,
- * bright edges that glow, big chevrons that recede with it - and a ring at
- * the end. Footprints are projected in metres before painting; glow is decoration.
+ * The projected route as a flat ribbon on the floor - a translucent blue bed,
+ * white chevrons that recede with it - and a ring at the end. Footprints are
+ * projected in metres before painting. Nothing glows: the one blue does the work.
  */
 function paintProjection(context, viewport, projection, fadeFrom) {
   context.save();
@@ -1352,29 +1352,21 @@ function paintProjection(context, viewport, projection, fadeFrom) {
   };
   for (const tile of projection.floorTiles) {
     polygon(tile);
-    context.fillStyle = 'rgba(10, 101, 219, 0.42)';
+    context.fillStyle = 'rgba(43, 127, 255, 0.55)';
     context.fill();
   }
   for (const chevron of projection.floorChevrons) {
-    context.save();
     polygon(chevron);
-    context.shadowColor = 'rgba(142, 197, 255, 0.9)';
-    context.shadowBlur = 12;
-    context.fillStyle = 'rgba(223, 240, 255, 0.95)';
+    context.fillStyle = 'rgba(255, 255, 255, 0.95)';
     context.fill();
-    context.restore();
   }
   if (projection.floorDestination.length) {
-    context.save();
-    context.shadowColor = 'rgba(142, 197, 255, 0.9)';
-    context.shadowBlur = 18;
     polygon(projection.floorDestination);
-    context.strokeStyle = GLOW;
+    context.strokeStyle = ROUTE_BLUE;
     context.lineWidth = 4;
     context.stroke();
-    context.fillStyle = 'rgba(142, 197, 255, 0.35)';
+    context.fillStyle = 'rgba(43, 127, 255, 0.35)';
     context.fill();
-    context.restore();
   }
   // The near end of the ribbon would run under the sheet: let it go before it gets there.
   if (fadeFrom !== null && fadeFrom < viewport.height) {

@@ -25,13 +25,14 @@ const CANVAS_PADDING = 54;
 const GRID_METERS = 1;
 
 const SPACE_COLORS: Record<SpaceType, string> = {
-  entrance: '#dceff0',
-  room: '#f3efe7',
-  corridor: '#ffffff',
-  lobby: '#eaf1eb',
-  service: '#e5edf1',
-  restricted: '#f3e1e3',
-  'vertical-circulation': '#e0e9e5',
+  // The same dark plates as the visitor's model: walkable space lightest.
+  entrance: '#3a4a5f',
+  room: '#171c24',
+  corridor: '#28323f',
+  lobby: '#2f3b4b',
+  service: '#141a1f',
+  restricted: '#101214',
+  'vertical-circulation': '#426188',
 };
 
 function polygonCentre(polygon: Coordinate2D[]): Coordinate2D {
@@ -213,7 +214,7 @@ export default function BuildingSourceFloorCanvas({
           }}
         >
           <Layer>
-            <Rect width={dimensions.width} height={dimensions.height} fill="#fff9f0" />
+            <Rect width={dimensions.width} height={dimensions.height} fill="#000000" />
 
             {gridX.map((x) => {
               const [canvasX] = toCanvas([x, bounds.minY]);
@@ -221,7 +222,7 @@ export default function BuildingSourceFloorCanvas({
                 <Line
                   key={`grid-x-${x}`}
                   points={[canvasX, offsetY, canvasX, offsetY + drawnHeight]}
-                  stroke="rgba(0, 6, 9, 0.10)"
+                  stroke="rgba(255, 255, 255, 0.08)"
                   strokeWidth={1}
                   listening={false}
                 />
@@ -233,7 +234,7 @@ export default function BuildingSourceFloorCanvas({
                 <Line
                   key={`grid-y-${y}`}
                   points={[offsetX, canvasY, offsetX + drawnWidth, canvasY]}
-                  stroke="rgba(0, 6, 9, 0.10)"
+                  stroke="rgba(255, 255, 255, 0.08)"
                   strokeWidth={1}
                   listening={false}
                 />
@@ -243,8 +244,8 @@ export default function BuildingSourceFloorCanvas({
             <Line
               points={flatPoints(activeFloor.outline)}
               closed
-              fill="#fff9f0"
-              stroke="#000609"
+              fill="#0c0f14"
+              stroke="#b9c4d2"
               strokeWidth={3}
               lineJoin="round"
               listening={false}
@@ -258,7 +259,9 @@ export default function BuildingSourceFloorCanvas({
                   points={flatPoints(space.polygon)}
                   closed
                   fill={SPACE_COLORS[space.type]}
-                  stroke={selected ? '#0a65db' : space.public ? 'rgba(0, 6, 9, 0.28)' : '#000609'}
+                  stroke={
+                    selected ? '#2b7fff' : space.public ? 'rgba(255, 255, 255, 0.32)' : '#b9c4d2'
+                  }
                   strokeWidth={selected ? 3 : 1.35}
                   lineJoin="round"
                   onClick={() => setSelectedSpaceId(space.id)}
@@ -282,8 +285,8 @@ export default function BuildingSourceFloorCanvas({
                   x={point[0]}
                   y={point[1]}
                   radius={4}
-                  fill="#fff9f0"
-                  stroke="#000609"
+                  fill="#000000"
+                  stroke="#ffffff"
                   strokeWidth={2}
                   listening={false}
                 />
@@ -297,8 +300,8 @@ export default function BuildingSourceFloorCanvas({
                   x={point[0]}
                   y={point[1]}
                   radius={3.5}
-                  fill="#0a65db"
-                  stroke="#fff9f0"
+                  fill="#2b7fff"
+                  stroke="#000000"
                   strokeWidth={1.5}
                   listening={false}
                 />
@@ -352,7 +355,7 @@ export default function BuildingSourceFloorCanvas({
                   fontSize={fontSize}
                   lineHeight={1.15}
                   fontStyle={selected ? 'bold' : 'normal'}
-                  fill="#000609"
+                  fill="#ffffff"
                   ellipsis
                   wrap="word"
                   listening={false}
@@ -368,8 +371,8 @@ export default function BuildingSourceFloorCanvas({
                   x={canvasPoint[0]}
                   y={canvasPoint[1]}
                   radius={7}
-                  fill="#fff9f0"
-                  stroke="#0a65db"
+                  fill="#ffffff"
+                  stroke="#2b7fff"
                   strokeWidth={3}
                   draggable
                   hitStrokeWidth={12}

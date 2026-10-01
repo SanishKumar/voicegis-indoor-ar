@@ -5,17 +5,17 @@
  * every frame, which the map's own renderer is far too heavy for.
  */
 
-const ROUTE = '#8ec5ff';
-const TRAVELLED = 'rgba(255, 249, 240, 0.42)';
-const OUTLINE = 'rgba(255, 249, 240, 0.4)';
+const ROUTE = '#2b7fff';
+const TRAVELLED = 'rgba(255, 255, 255, 0.42)';
+const OUTLINE = 'rgba(255, 255, 255, 0.4)';
 const FILLS = {
-  room: 'rgba(255, 249, 240, 0.16)',
-  corridor: 'rgba(255, 249, 240, 0.07)',
-  lobby: 'rgba(255, 249, 240, 0.1)',
-  entrance: 'rgba(255, 249, 240, 0.1)',
-  service: 'rgba(255, 249, 240, 0.12)',
-  restricted: 'rgba(255, 249, 240, 0.1)',
-  'vertical-circulation': 'rgba(142, 197, 255, 0.28)',
+  room: 'rgba(255, 255, 255, 0.16)',
+  corridor: 'rgba(255, 255, 255, 0.07)',
+  lobby: 'rgba(255, 255, 255, 0.1)',
+  entrance: 'rgba(255, 255, 255, 0.1)',
+  service: 'rgba(255, 255, 255, 0.12)',
+  restricted: 'rgba(255, 255, 255, 0.1)',
+  'vertical-circulation': 'rgba(66, 97, 136, 0.7)',
 };
 /** Metres across the whole inset. */
 const SPAN_METERS = 64;
@@ -114,8 +114,8 @@ export function drawMiniMap(canvas, prepared, view) {
   context.save();
   context.translate(centreX, centreY);
   const cone = context.createLinearGradient(0, 0, 0, -size * 0.34);
-  cone.addColorStop(0, 'rgba(142, 197, 255, 0.5)');
-  cone.addColorStop(1, 'rgba(142, 197, 255, 0)');
+  cone.addColorStop(0, 'rgba(43, 127, 255, 0.5)');
+  cone.addColorStop(1, 'rgba(43, 127, 255, 0)');
   context.beginPath();
   context.moveTo(0, 0);
   context.lineTo(-size * 0.17, -size * 0.34);
@@ -125,11 +125,11 @@ export function drawMiniMap(canvas, prepared, view) {
   context.fill();
   context.beginPath();
   context.arc(0, 0, size * 0.055, 0, Math.PI * 2);
-  context.fillStyle = '#fff9f0';
+  context.fillStyle = '#ffffff';
   context.fill();
   context.beginPath();
   context.arc(0, 0, size * 0.038, 0, Math.PI * 2);
-  context.fillStyle = '#0a65db';
+  context.fillStyle = '#2b7fff';
   context.fill();
   context.restore();
 }

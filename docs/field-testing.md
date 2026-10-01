@@ -74,7 +74,7 @@ sample hospital route through a different building's walls or obstacles.
    same reference; it no longer silently erases the sign calibration. Putting
    the page in the background or losing the sensor reference still invalidates it.
 2. **AR before any walking:** return to the sign and scan again. Open Camera
-   view → Start AR → confirm a green floor ring. Only this mode detects a
+   view → Start AR → confirm a blue floor ring. Only this mode detects a
    floor. The ordinary camera view explicitly labels its floor height as an
    estimate. Copy the report even if placement fails; it must include an AR
    start/running/failure entry. Stop here if direction or floor is missing.
@@ -96,7 +96,7 @@ A route and a start point first: pick a destination, then scan a check-in code
 
 - **AR with no direction alignment.** Camera view → **Start AR**, then aim at
   clear floor nearby. A ring marks an observed
-  surface: amber while settling, green when stable. Check that it is on the
+  surface: white while settling, blue when stable. Check that it is on the
   floor, not furniture, then tap **This is the floor**. The route must not
   appear before that confirmation. If surface detection is unavailable, leave
   AR and use the map; waiting must never place it on a guessed floor. With no
