@@ -9,10 +9,10 @@
   gap: 6px;
   min-height: 36px;
   padding: 6px 10px;
-  border: 1px solid var(--color-hairline-strong);
+  border: 1px solid var(--glass-line);
   border-radius: var(--radius-buttons);
   color: var(--color-whiteout);
-  background: var(--color-scrim);
+  background: var(--glass-fill-chip);
   font: 500 12px/1 var(--font-control);
   transform: translateY(-50%);
 }
@@ -25,6 +25,8 @@
   align-items: flex-end;
   justify-content: center;
   background: var(--color-scrim);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
 }
 
 .field-test-sheet {
@@ -35,9 +37,14 @@
   max-height: 88dvh;
   padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
     max(16px, env(safe-area-inset-left));
+  border: 1px solid var(--glass-line);
+  border-bottom: 0;
   border-radius: var(--radius-cards) var(--radius-cards) 0 0;
-  color: var(--color-ink);
-  background: var(--surface-haze-card);
+  color: var(--color-whiteout);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   font-family: var(--font-control);
 }
 
@@ -59,16 +66,16 @@
   place-items: center;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--color-ink);
+  border: 1px solid var(--color-hairline-strong);
   border-radius: var(--radius-buttons);
   color: inherit;
-  background: transparent;
+  background: var(--glass-fill-control);
 }
 
 .field-test-note {
   margin: 0;
   font-size: var(--text-caption);
-  color: var(--color-ink-soft);
+  color: var(--color-whiteout-soft);
 }
 
 .field-test-text {
@@ -76,10 +83,10 @@
   min-height: 240px;
   width: 100%;
   padding: 10px;
-  border: 1px solid var(--color-ink-hairline);
-  border-radius: var(--radius-inputs);
-  color: var(--color-ink);
-  background: var(--surface-whiteout);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-buttons);
+  color: var(--color-whiteout);
+  background: rgba(8, 22, 54, 0.4);
   font:
     11px/1.45 ui-monospace,
     'SFMono-Regular',
@@ -98,14 +105,16 @@
 .field-test-action {
   flex: 1;
   min-height: 44px;
-  border: 1px solid var(--color-ink);
+  border: 1px solid var(--color-hairline-strong);
   border-radius: var(--radius-buttons);
-  color: var(--color-ink);
-  background: transparent;
+  color: var(--color-whiteout);
+  background: var(--glass-fill-control);
   font: 500 14px/1 var(--font-control);
 }
 
 .field-test-action.is-primary {
+  border-color: var(--surface-whiteout);
+  color: var(--color-ink);
   background: var(--surface-whiteout);
 }
 

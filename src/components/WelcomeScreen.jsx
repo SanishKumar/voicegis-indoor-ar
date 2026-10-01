@@ -125,34 +125,37 @@ export default function WelcomeScreen({ onComplete }) {
             </h2>
             <p className="onboard-sub">Search, or pick from the list.</p>
 
-            <div className="onboard-field">
-              <Search size={18} strokeWidth={2} aria-hidden="true" />
-              <input
-                type="text"
-                placeholder="Search rooms, clinics and services"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                aria-label="Search destination rooms"
-              />
+            {/* One pane of glass holds everything there is to read or press. */}
+            <div className="onboard-pane">
+              <div className="onboard-field">
+                <Search size={18} strokeWidth={2} aria-hidden="true" />
+                <input
+                  type="text"
+                  placeholder="Search rooms, clinics and services"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  aria-label="Search destination rooms"
+                />
+              </div>
+
+              <p className="onboard-label">{query ? 'Results' : 'Destinations'}</p>
+              {suggestions.length > 0 ? (
+                <ul className="onboard-list">
+                  {suggestions.map(({ node }) =>
+                    destinationRow(node, `${node.poi.name}, ${floorNameFor(node)}`, () =>
+                      chooseDestination(node),
+                    ),
+                  )}
+                </ul>
+              ) : (
+                <p className="onboard-empty">Nothing here matches that. Try a shorter word.</p>
+              )}
+
+              <button type="button" className="onboard-ghost" onClick={onComplete}>
+                Browse the map instead
+                <span className="onboard-ghost-mark" aria-hidden="true" />
+              </button>
             </div>
-
-            <p className="onboard-label">{query ? 'Results' : 'Destinations'}</p>
-            {suggestions.length > 0 ? (
-              <ul className="onboard-list">
-                {suggestions.map(({ node }) =>
-                  destinationRow(node, `${node.poi.name}, ${floorNameFor(node)}`, () =>
-                    chooseDestination(node),
-                  ),
-                )}
-              </ul>
-            ) : (
-              <p className="onboard-empty">Nothing here matches that. Try a shorter word.</p>
-            )}
-
-            <button type="button" className="onboard-ghost" onClick={onComplete}>
-              Browse the map instead
-              <span className="onboard-ghost-mark" aria-hidden="true" />
-            </button>
           </section>
         )}
 
@@ -170,19 +173,39 @@ export default function WelcomeScreen({ onComplete }) {
             </h2>
             <p className="onboard-sub">A code gives your exact spot. It is the accurate way.</p>
 
-            <button
-              type="button"
-              className="onboard-pill"
-              onClick={() => {
-                setScanProblem(null);
-                // Scanning a sign is what tells the app which way the visitor faces.
-                sharedOrientation.request();
-                setScanning(true);
-              }}
-            >
-              <QrCode size={18} strokeWidth={2} aria-hidden="true" />
-              Scan a check-in code
-            </button>
+            <div className="onboard-pane">
+              <button
+                type="button"
+                className="onboard-pill"
+                onClick={() => {
+                  setScanProblem(null);
+                  // Scanning a sign is what tells the app which way the visitor faces.
+                  sharedOrientation.request();
+                  setScanning(true);
+                }}
+              >
+                <QrCode size={18} strokeWidth={2} aria-hidden="true" />
+                Scan a check-in code
+              </button>
+
+              <p className="onboard-label">Or start from a landmark</p>
+              <ul className="onboard-list">
+                {landmarks.map((node) =>
+                  destinationRow(node, `Start from ${node.poi.name}, ${floorNameFor(node)}`, () =>
+                    startFrom(node.id),
+                  ),
+                )}
+              </ul>
+
+              <button
+                type="button"
+                className="onboard-ghost"
+                onClick={() => setStep(STEP.DESTINATION)}
+              >
+                Back
+                <span className="onboard-ghost-mark" aria-hidden="true" />
+              </button>
+            </div>
 
             {scanning && (
               <QrCheckIn
@@ -191,24 +214,6 @@ export default function WelcomeScreen({ onComplete }) {
                 hint={scanProblem}
               />
             )}
-
-            <p className="onboard-label">Or start from a landmark</p>
-            <ul className="onboard-list">
-              {landmarks.map((node) =>
-                destinationRow(node, `Start from ${node.poi.name}, ${floorNameFor(node)}`, () =>
-                  startFrom(node.id),
-                ),
-              )}
-            </ul>
-
-            <button
-              type="button"
-              className="onboard-ghost"
-              onClick={() => setStep(STEP.DESTINATION)}
-            >
-              Back
-              <span className="onboard-ghost-mark" aria-hidden="true" />
-            </button>
           </section>
         )}
       </div>

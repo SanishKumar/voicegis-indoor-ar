@@ -121,14 +121,6 @@ export default function LocationPicker({ isOpen, onClose }) {
           <span>Scan a check-in code</span>
         </button>
 
-        {scanning && (
-          <QrCheckIn
-            onPayload={handleScannedPayload}
-            onClose={() => setScanning(false)}
-            hint={scanProblem}
-          />
-        )}
-
         {/* Search */}
         <div className="lp-search">
           <Search size={18} className="lp-search-icon" />
@@ -181,6 +173,19 @@ export default function LocationPicker({ isOpen, onClose }) {
           })}
         </div>
       </div>
+
+      {/*
+       * Beside the picker, not inside it. The picker is a blurred pane, and a
+       * blurred element becomes the box its fixed-position descendants are
+       * laid out in - the scanner would fill the picker instead of the screen.
+       */}
+      {scanning && (
+        <QrCheckIn
+          onPayload={handleScannedPayload}
+          onClose={() => setScanning(false)}
+          hint={scanProblem}
+        />
+      )}
     </div>
   );
 }

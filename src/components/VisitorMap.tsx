@@ -40,6 +40,14 @@ const sameRects = (a: Rect[], b: Rect[]) =>
       rect.height === b[index].height,
   );
 
+/*
+ * The panes over the map float a little way in from its edges rather than
+ * touching them, so "at the top" means within this many pixels of the top.
+ * The strip between a pane and the edge is too thin to be useful map, and the
+ * inset runs from the edge to the pane's far side.
+ */
+const EDGE_REACH = 32;
+
 function useMapInsets(mapRef: RefObject<HTMLDivElement | null>, enabled: boolean) {
   const [insets, setInsets] = useState<MapInsets>(NO_INSETS);
   const [controls, setControls] = useState<Rect[]>([]);
@@ -58,14 +66,14 @@ function useMapInsets(mapRef: RefObject<HTMLDivElement | null>, enabled: boolean
           if (rect.width === 0 || rect.height === 0) continue;
           const wide = rect.width >= bounds.width * 0.6;
           const tall = rect.height >= bounds.height * 0.6;
-          if (wide && rect.top <= bounds.top + 4) {
+          if (wide && rect.top <= bounds.top + EDGE_REACH) {
             next.top = Math.max(next.top, rect.bottom - bounds.top);
-          } else if (wide && rect.bottom >= bounds.bottom - 4) {
+          } else if (wide && rect.bottom >= bounds.bottom - EDGE_REACH) {
             next.bottom = Math.max(next.bottom, bounds.bottom - rect.top);
           }
-          if (tall && rect.left <= bounds.left + 4) {
+          if (tall && rect.left <= bounds.left + EDGE_REACH) {
             next.left = Math.max(next.left, rect.right - bounds.left);
-          } else if (tall && rect.right >= bounds.right - 4) {
+          } else if (tall && rect.right >= bounds.right - EDGE_REACH) {
             next.right = Math.max(next.right, bounds.right - rect.left);
           }
         }

@@ -13,10 +13,13 @@
   width: 100%;
   max-width: 360px;
   padding: var(--card-padding);
-  border: 0;
+  border: 1px solid var(--glass-line);
   border-radius: var(--radius-cards);
-  background: var(--surface-haze-card);
-  color: var(--color-ink);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: var(--color-whiteout);
   font: 500 14px/1.5 var(--font-control);
 }
 
@@ -39,7 +42,7 @@
   min-height: 44px;
   margin-top: 10px;
   padding: 8px 12px;
-  border: 1px solid var(--color-ink);
+  border: 1px solid var(--surface-whiteout);
   border-radius: var(--radius-buttons);
   background: var(--surface-whiteout);
   color: var(--color-ink);
@@ -53,6 +56,6 @@
 }
 
 .visitor-view-status button:focus-visible {
-  outline: 2px solid var(--color-ink);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-whiteout);
+  outline-offset: 3px;
 }

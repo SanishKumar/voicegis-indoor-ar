@@ -1,36 +1,73 @@
 /* ==========================================================================
    VoiceGIS Indoor Navigation
-   The "Air" system: a dark canvas, light haze islands, one sans at a medium
-   weight, thin borders and no elevation. The tokens below are the system;
-   the older names further down are mapped onto them so every surface reads
-   from one palette.
+   --------------------------------------------------------------------------
+   A sky with the interface floating in it. Behind everything is a blue sky
+   that warms towards the horizon, with a bank of cloud low down. On top of it
+   the interface is glass: near-transparent panes with a thin light edge and
+   white type, so the sky and the building model show through. The one solid
+   thing is the white button for the next step.
+
+   The tokens below are the system. The older names further down are mapped
+   onto them, so every surface reads from one palette.
    ========================================================================== */
 
 :root {
-  /* ---- Colour ---- */
-  --color-whiteout: #ffffff; /* text, borders and hairlines on dark */
-  --color-haze: #f5f5f5; /* cards, inputs and the light button on dark */
-  --color-ink: #1b1b1b; /* text and borders on light */
-  --color-black-void: #000000; /* the canvas */
-  --color-twilight-blue: #426188; /* headings on dark: the only chromatic text */
-  --color-signal-blue: #2b7fff; /* links, tags, the route: never a button fill */
+  /* ---- Sky: zenith to horizon ---- */
+  --sky-zenith: #23539f;
+  --sky-high: #3f77c6;
+  --sky-mid: #6f9fda;
+  --sky-low: #a9c6e8;
+  --sky-haze: #e0dcea;
+  --sky-glow: rgba(255, 192, 152, 0.9); /* the warm light low on the horizon */
 
-  /* Whiteout at reduced strength: secondary copy and hairlines on the canvas. */
-  --color-whiteout-soft: rgba(255, 255, 255, 0.68);
-  --color-whiteout-faint: rgba(255, 255, 255, 0.5);
+  /* ---- Colour ---- */
+  --color-whiteout: #ffffff; /* type, icons and edges on glass */
+  --color-ink: #0f2147; /* type on a white fill: the sky's blue after dark */
+  --color-signal-blue: #2b7fff; /* the route and the visitor's own position */
+  --color-sky-tint: #eef5ff; /* a link or a marked phrase on glass: almost white, and underlined */
+
+  --color-whiteout-soft: rgba(255, 255, 255, 0.92);
+  --color-whiteout-faint: rgba(255, 255, 255, 0.8);
   --color-hairline: rgba(255, 255, 255, 0.2);
-  --color-hairline-strong: rgba(255, 255, 255, 0.42);
-  /* A near-transparent surface over the canvas or the camera. */
-  --color-veil: rgba(255, 255, 255, 0.08);
-  --color-scrim: rgba(0, 0, 0, 0.72);
-  /* Ink at reduced strength, for secondary copy on haze. */
-  --color-ink-soft: rgba(27, 27, 27, 0.66);
-  --color-ink-hairline: rgba(0, 0, 0, 0.1);
+  --color-hairline-strong: rgba(255, 255, 255, 0.4);
+  --color-veil: rgba(255, 255, 255, 0.12);
+  /* Fog laid over the scene behind a dialog. */
+  --color-scrim: rgba(12, 30, 70, 0.3);
+  --color-ink-soft: rgba(15, 33, 71, 0.72);
+  --color-ink-hairline: rgba(15, 33, 71, 0.16);
+
+  /* ---- Glass ----
+     A pane is a blue tint so white type holds against a bright sky, a sheen
+     that is lighter at the top edge, a thin light border, and a blur of
+     whatever is behind it.
+
+     There are two weights. The light pane is only for the top of the screen
+     with nothing but sky behind it: the sky there is deep, so most of it can
+     show through. The strong pane is for everything else - anything that can
+     have white cloud or the white model behind it. Its tint is the least that
+     keeps the soft secondary text at 4.5:1 with pure white behind the pane,
+     which is measured, not guessed; see docs/design-system.md. */
+  --glass-fill:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04)),
+    rgba(22, 50, 104, 0.34);
+  --glass-fill-strong:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(16, 38, 86, 0.7);
+  /* A control or a field set into a pane. It is marked by its edge: a fill
+     much lighter than this takes the text on it below 4.5:1. */
+  --glass-fill-control: rgba(255, 255, 255, 0.06);
+  --glass-fill-control-hover: rgba(255, 255, 255, 0.14);
+  /* A small label laid on the model. There are many and they move with the
+     camera, so they are tinted, not blurred. */
+  --glass-fill-chip: rgba(16, 38, 86, 0.74);
+  --glass-line: rgba(255, 255, 255, 0.36);
+  --glass-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  --glass-blur: blur(22px) saturate(1.15);
+  --glass-blur-light: blur(12px);
 
   /* ---- Surfaces ---- */
-  --surface-dark-canvas: #000000;
-  --surface-haze-card: #f5f5f5;
-  --surface-whiteout: #ffffff;
+  --surface-clear: transparent; /* nothing: the pane or the sky behind shows */
+  --surface-whiteout: #ffffff; /* the primary button and a pressed toggle */
 
   /* ---- Type ---- */
   --font-control:
@@ -38,6 +75,10 @@
   --font-control-compressed: 'Anton', 'Arial Narrow', ui-sans-serif, system-ui, sans-serif;
   --font-control-cursive: 'Caveat', 'Segoe Script', 'Bradley Hand', cursive;
   --font-control-tnt: var(--font-control);
+  /* Two names older rules ask for. They were never defined, which made the
+     declarations using them invalid and left that text in whatever it inherited. */
+  --font-sans: var(--font-control);
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 
   /* In rem, so the scale follows the text size a visitor has set for
      themselves: 13, 14, 16, 20, 32 and 56px at the browser default. */
@@ -76,12 +117,28 @@
   --card-padding: 20px;
   --element-gap: 8px;
 
-  /* ---- Shape: four radii and no others ---- */
-  --radius-inputs: 4px;
-  --radius-buttons: 8px;
-  --radius-images: 11px;
-  --radius-cards: 12px;
+  /* ---- Shape ---- */
+  --radius-inputs: 6px;
+  --radius-buttons: 10px;
+  --radius-images: 12px;
+  --radius-cards: 16px;
   --radius-pills: 9999px; /* toggles and filter chips only */
+}
+
+/* Someone who has asked for less transparency, or more contrast, gets solid
+   panes and no picture behind them. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root {
+    --glass-fill: #1b3f80;
+    --glass-fill-strong: #122c60;
+    --glass-fill-control: rgba(255, 255, 255, 0.16);
+    --glass-line: rgba(255, 255, 255, 0.7);
+    --glass-blur: none;
+    --glass-blur-light: none;
+    --color-scrim: rgba(8, 20, 48, 0.72);
+    --color-whiteout-soft: #ffffff;
+    --color-whiteout-faint: rgba(255, 255, 255, 0.86);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -167,18 +224,17 @@
   --search-panel-max-height: 70vh;
 }
 
-/* ---- The older surface names, on the dark canvas ----
-   There is one theme. The canvas is black and anything that used to be a
-   raised panel is the canvas with a hairline, since nothing here casts a
-   shadow. */
+/* ---- The older surface names ----
+   There is one theme. A "background" is nothing at all - the pane it sits in,
+   or the sky, shows through - and only a named pane is glass. */
 :root,
 :root[data-theme="dark"] {
-  --color-bg-primary: var(--surface-dark-canvas);
-  --color-bg-secondary: var(--surface-dark-canvas);
-  --color-bg-tertiary: var(--color-veil);
-  --color-bg-card: var(--surface-dark-canvas);
-  --color-bg-glass: var(--surface-dark-canvas);
-  --color-bg-glass-light: var(--color-veil);
+  --color-bg-primary: var(--surface-clear);
+  --color-bg-secondary: var(--surface-clear);
+  --color-bg-tertiary: var(--glass-fill-control);
+  --color-bg-card: var(--surface-clear);
+  --color-bg-glass: var(--glass-fill);
+  --color-bg-glass-light: var(--glass-fill-control);
 
   --color-text-primary: var(--color-whiteout);
   --color-text-secondary: var(--color-whiteout-soft);
@@ -195,13 +251,13 @@
   --shadow-glow-blue: none;
   --shadow-glow-green: none;
 
-  --map-bg: var(--surface-dark-canvas);
-  --map-grid: rgba(255, 255, 255, 0.04);
-  --map-corridor: #0d0d0d;
-  --map-wall-color: rgba(255, 255, 255, 0.42);
-  --map-room-fill: #141414;
-  --map-room-hover: #1f1f1f;
-  --map-room-stroke: rgba(255, 255, 255, 0.28);
+  --map-bg: var(--surface-clear);
+  --map-grid: rgba(255, 255, 255, 0.08);
+  --map-corridor: rgba(255, 255, 255, 0.5);
+  --map-wall-color: rgba(255, 255, 255, 0.9);
+  --map-room-fill: rgba(255, 255, 255, 0.24);
+  --map-room-hover: rgba(255, 255, 255, 0.36);
+  --map-room-stroke: rgba(255, 255, 255, 0.6);
   --map-room-selected-fill: rgba(43, 127, 255, 0.18);
   --map-text-primary: var(--color-whiteout);
   --map-text-muted: var(--color-whiteout-soft);
@@ -211,7 +267,14 @@
    Reset & Base
    -------------------------------------------------------------------------- */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-html { font-size: 16px; -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  /* What shows for the instant before the sky is painted, and around it if
+     the page is ever overscrolled. */
+  background: var(--sky-mid);
+}
 
 body {
   font-family: var(--font-family);
@@ -219,14 +282,44 @@ body {
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-normal);
   color: var(--color-text-primary);
-  background: var(--color-bg-primary);
+  background: transparent;
   overflow: hidden;
   height: 100dvh;
   width: 100vw;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color var(--transition-normal), color var(--transition-normal);
 }
+
+/* The sky. One fixed picture behind every surface: generated cloud over a
+   gradient, with a warm light low down. It never moves, so the panes blurring
+   it are painted once and not on every frame. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    url('./styles/sky-clouds.webp') center bottom / cover no-repeat,
+    radial-gradient(120% 50% at 70% 110%, var(--sky-glow) 0%, rgba(255, 192, 152, 0) 64%),
+    linear-gradient(
+      180deg,
+      var(--sky-zenith) 0%,
+      var(--sky-zenith) 12%,
+      var(--sky-high) 40%,
+      var(--sky-mid) 64%,
+      var(--sky-low) 84%,
+      var(--sky-haze) 100%
+    );
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  body::before {
+    background: #173a78;
+  }
+}
+
+
 
 #root { height: 100%; width: 100%; display: flex; flex-direction: column; position: relative; }
 a { color: var(--ed-ink-soft); text-decoration: none; }
@@ -271,7 +364,7 @@ img, svg { display: block; max-width: 100%; }
 .header-brand { display: flex; align-items: center; gap: var(--space-3); }
 .header-logo {
   width: 32px; height: 32px; border-radius: var(--radius-sm);
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   color: var(--color-ink); display: flex; align-items: center; justify-content: center; font-size: 1rem;
   box-shadow: var(--shadow-sm);
 }
@@ -313,8 +406,8 @@ img, svg { display: block; max-width: 100%; }
 }
 .header-route-profile.active {
   color: var(--color-ink);
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
 }
 
 .view-toggle {
@@ -324,7 +417,7 @@ img, svg { display: block; max-width: 100%; }
   padding: 6px 14px; border-radius: var(--radius-full); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold);
   color: var(--color-text-muted); transition: all var(--transition-fast); display: flex; align-items: center; gap: var(--space-1); white-space: nowrap;
 }
-.view-toggle-btn.active { background: var(--surface-haze-card); color: var(--color-ink); box-shadow: var(--shadow-sm); }
+.view-toggle-btn.active { background: var(--surface-whiteout); color: var(--color-ink); box-shadow: var(--shadow-sm); }
 .view-toggle-btn:not(.active):hover { color: var(--color-text-primary); }
 
 /* --------------------------------------------------------------------------
@@ -578,9 +671,9 @@ img, svg { display: block; max-width: 100%; }
   padding: var(--space-3) var(--space-5); border-radius: var(--radius-full); font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold); transition: all var(--transition-fast); line-height: 1; cursor: pointer;
 }
-.btn-primary { background: var(--surface-haze-card); color: var(--color-ink); box-shadow: var(--shadow-md); }
+.btn-primary { background: var(--surface-whiteout); color: var(--color-ink); box-shadow: var(--shadow-md); }
 .btn-primary:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg), var(--shadow-glow-blue); }
-.btn-success { background: var(--surface-haze-card); color: var(--color-ink); box-shadow: var(--shadow-md); }
+.btn-success { background: var(--surface-whiteout); color: var(--color-ink); box-shadow: var(--shadow-md); }
 .btn-success:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg), var(--shadow-glow-green); }
 
 .animate-fade-in { animation: fade-in var(--transition-normal) ease-out; }
@@ -810,7 +903,22 @@ img, svg { display: block; max-width: 100%; }
   }
 }
 
+/* The app's own high-contrast setting: solid panes, full-strength type and
+   edges, and a plain ground instead of the sky. */
 [data-contrast="high"] {
+  --glass-fill: #0c2150;
+  --glass-fill-strong: #0a1b42;
+  --glass-fill-control: rgba(255, 255, 255, 0.1);
+  --glass-fill-control-hover: rgba(255, 255, 255, 0.2);
+  --glass-fill-chip: #0a1b42;
+  --glass-line: #ffffff;
+  --glass-blur: none;
+  --glass-blur-light: none;
+  --color-scrim: rgba(4, 12, 32, 0.8);
+  --color-whiteout-soft: #ffffff;
+  --color-whiteout-faint: #ffffff;
+  --color-hairline: rgba(255, 255, 255, 0.6);
+  --color-hairline-strong: #ffffff;
   --color-bg-primary: #000000;
   --color-bg-secondary: #000000;
   --color-text-primary: #ffffff;
@@ -832,7 +940,7 @@ img, svg { display: block; max-width: 100%; }
   min-height: 0;
   display: flex;
   flex-direction: column;
-  color: var(--ed-cream);
+  color: var(--color-ink);
   background: var(--ed-cream);
 }
 
@@ -930,10 +1038,10 @@ img, svg { display: block; max-width: 100%; }
   font-weight: var(--font-weight-semibold);
   transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
 }
-.twin-toggle:hover { color: var(--ed-cream); border-color: var(--color-whiteout); }
+.twin-toggle:hover { color: var(--color-ink); border-color: var(--color-whiteout); }
 .twin-toggle.active {
-  color: var(--ed-cream);
-  border-color: var(--surface-haze-card);
+  color: var(--color-ink);
+  border-color: var(--surface-whiteout);
   background: var(--ed-cream);
 }
 
@@ -974,7 +1082,7 @@ img, svg { display: block; max-width: 100%; }
   padding: 5px 8px;
   border: 1px solid var(--color-hairline-strong);
   border-radius: var(--radius-inputs);
-  color: var(--ed-cream);
+  color: var(--color-ink);
   background: var(--ed-cream);
   box-shadow: none;
   font: 500 12px/1.1 Inter, system-ui, sans-serif;
@@ -1021,7 +1129,7 @@ img, svg { display: block; max-width: 100%; }
   padding: 8px 34px 8px 10px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-inputs);
-  color: var(--ed-cream);
+  color: var(--color-ink);
   background: var(--ed-cream);
   font: inherit;
 }
@@ -1065,14 +1173,14 @@ img, svg { display: block; max-width: 100%; }
   background: var(--ed-cream);
 }
 .twin-property-grid dt { color: var(--ed-ink-soft); font-size: 0.75rem; text-transform: none; letter-spacing: 0; }
-.twin-property-grid dd { margin-top: 3px; color: var(--ed-cream); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); }
+.twin-property-grid dd { margin-top: 3px; color: var(--color-ink); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); }
 .twin-related-data h3 { margin-bottom: var(--space-2); color: var(--ed-ink-soft); font-size: var(--font-size-xs); text-transform: none; letter-spacing: 0; }
 .twin-related-data p { margin-top: 3px; color: var(--ed-ink-soft); font-size: var(--font-size-sm); }
 .twin-tag-list { display: flex; gap: var(--space-1); flex-wrap: wrap; margin-top: var(--space-3); }
 .twin-tag-list span {
   padding: 4px 7px;
   border-radius: var(--radius-full);
-  color: var(--ed-cream);
+  color: var(--color-ink);
   background: var(--ed-cream);
   font-size: 0.75rem;
 }
@@ -1084,7 +1192,7 @@ img, svg { display: block; max-width: 100%; }
   align-items: flex-start;
   color: var(--ed-ink-soft);
 }
-.twin-empty-inspector h2 { margin: var(--space-3) 0 var(--space-2); color: var(--ed-cream); font-size: var(--font-size-lg); }
+.twin-empty-inspector h2 { margin: var(--space-3) 0 var(--space-2); color: var(--color-ink); font-size: var(--font-size-lg); }
 .twin-empty-inspector p { max-width: 240px; color: var(--ed-ink-soft); font-size: var(--font-size-sm); line-height: var(--line-height-relaxed); }
 .twin-package-facts {
   display: grid;
@@ -1112,12 +1220,12 @@ img, svg { display: block; max-width: 100%; }
 .twin-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .twin-legend strong { margin-left: auto; color: var(--ed-ink-soft); font-weight: var(--font-weight-semibold); }
 .legend-swatch { width: 9px; height: 9px; border-radius: 2px; }
-.legend-swatch.public { background: #3a4a5f; }
-.legend-swatch.restricted { background: #7a4a52; }
+.legend-swatch.public { background: #ffffff; }
+.legend-swatch.restricted { background: #e2a9b3; }
 .legend-line { width: 14px; height: 2px; }
-.legend-line.accessible { background: #8fb4c9; }
-.legend-line.inaccessible { background: #c2a36b; }
-.legend-anchor { width: 8px; height: 8px; background: #a79cc4; transform: rotate(45deg); }
+.legend-line.accessible { background: #7fd3e6; }
+.legend-line.inaccessible { background: #f0cf8a; }
+.legend-anchor { width: 8px; height: 8px; background: #cbbcf5; transform: rotate(45deg); }
 
 @media (max-width: 900px) {
   .twin-toolbar { align-items: flex-start; flex-direction: column; gap: var(--space-3); }
@@ -1185,7 +1293,7 @@ img, svg { display: block; max-width: 100%; }
   font-weight: var(--font-weight-medium);
   white-space: nowrap;
 }
-.compiled-floor-switcher button.active { color: var(--color-ink); background: var(--surface-haze-card); }
+.compiled-floor-switcher button.active { color: var(--color-ink); background: var(--surface-whiteout); }
 .compiled-floor-switcher button.active small { color: rgba(255, 255, 255, 0.75); }
 .compiled-floor-switcher button[data-route-floor="true"]:not(.active) {
   box-shadow: inset 0 -2px 0 var(--ed-ink);
@@ -1250,8 +1358,8 @@ img, svg { display: block; max-width: 100%; }
 }
 .compiled-route-floor-chain button.active {
   color: var(--color-ink);
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
 }
 .compiled-route-connector {
   min-width: 0;
@@ -1337,7 +1445,7 @@ body {
   border: 1px solid var(--color-ink-hairline);
   border-radius: 5px;
   color: var(--color-ink);
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   box-shadow: none;
 }
 
@@ -1402,7 +1510,7 @@ body {
 
 .view-toggle-btn.active {
   color: var(--color-ink);
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   box-shadow: none;
 }
 
@@ -1489,7 +1597,7 @@ body {
 .btn-primary,
 .btn-success {
   color: var(--color-ink);
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   box-shadow: none;
 }
 
@@ -1611,7 +1719,7 @@ body {
 /* Spatial model uses the same restrained operations-console language. */
 .spatial-twin,
 .twin-loading {
-  color: var(--ed-cream);
+  color: var(--color-ink);
   background: var(--ed-cream);
 }
 
@@ -1668,13 +1776,13 @@ body {
 }
 
 .twin-toggle:hover {
-  color: var(--ed-cream);
+  color: var(--color-ink);
   border-color: var(--ed-ink);
 }
 
 .twin-toggle.active {
-  color: var(--ed-cream);
-  border-color: var(--surface-haze-card);
+  color: var(--color-ink);
+  border-color: var(--surface-whiteout);
   background: var(--ed-cream);
 }
 
@@ -1705,7 +1813,7 @@ body {
 .twin-route-label {
   border-color: var(--ed-ink-soft);
   border-radius: var(--radius-inputs);
-  color: var(--ed-cream);
+  color: var(--color-ink);
   background: var(--ed-cream);
   box-shadow: none;
   font-family: Inter, "Segoe UI", sans-serif;
@@ -1714,7 +1822,7 @@ body {
 .twin-route-label {
   padding: 5px 8px;
   border-color: var(--ed-line);
-  color: var(--ed-cream);
+  color: var(--color-ink);
   font-size: 0.75rem;
   font-weight: 500;
   white-space: nowrap;
@@ -1725,7 +1833,7 @@ body {
   padding: 7px 9px;
   border: 1px solid var(--ed-line);
   border-radius: var(--radius-inputs);
-  color: var(--ed-cream);
+  color: var(--color-ink);
   background: var(--ed-cream);
   box-shadow: none;
   text-align: left;
@@ -1761,13 +1869,13 @@ body {
 
 .twin-tag-list span {
   border-radius: var(--radius-inputs);
-  color: var(--ed-cream);
+  color: var(--color-ink);
   background: var(--ed-cream);
 }
 
 .twin-route-inspector h2 {
   margin: 8px 0 6px;
-  color: var(--ed-cream);
+  color: var(--color-ink);
   font-size: var(--font-size-xl);
   line-height: 1.25;
 }
@@ -1802,7 +1910,7 @@ body {
 }
 
 .twin-route-current strong {
-  color: var(--ed-cream);
+  color: var(--color-ink);
   font-size: var(--font-size-sm);
   line-height: 1.4;
 }
@@ -1854,7 +1962,7 @@ body {
   padding: 16px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-cards);
-  color: var(--ed-cream);
+  color: var(--color-ink);
   background: var(--ed-cream);
   box-shadow: none;
 }
@@ -1888,7 +1996,7 @@ body {
   gap: 5px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-buttons);
-  color: var(--ed-cream);
+  color: var(--color-ink);
   background: var(--ed-cream);
 }
 
@@ -1947,8 +2055,8 @@ body {
 }
 
 .venue-package-catalog button.active {
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
 }
 
@@ -2037,7 +2145,7 @@ body {
   --visitor-route: var(--color-signal-blue);
   --visitor-destination: var(--color-signal-blue);
   --visitor-ink: var(--color-whiteout);
-  --visitor-panel: var(--surface-dark-canvas);
+  --visitor-panel: var(--surface-clear);
   --visitor-line: var(--color-hairline);
   width: 100%;
   flex: 1;
@@ -2051,7 +2159,7 @@ body {
 
 .visitor-map-stage {
   isolation: isolate;
-  background: var(--surface-dark-canvas);
+  background: var(--surface-clear);
 }
 
 .visitor-shell .compiled-floor-switcher {
@@ -2112,7 +2220,7 @@ body {
 
 .visitor-shell .compiled-floor-switcher button.active {
   color: var(--color-ink);
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   box-shadow: none;
 }
 
@@ -2137,8 +2245,8 @@ body {
 }
 
 .visitor-shell .compiled-route-floor-chain button.active {
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
 }
 
@@ -2184,7 +2292,7 @@ body {
   place-items: center;
   border-radius: 12px;
   color: var(--color-ink);
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
 }
 
 .search-trigger-copy {
@@ -2318,8 +2426,8 @@ body {
 
 .visitor-shell .category-chip.active {
   color: var(--color-ink);
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
 }
 
 .visitor-shell .search-results {
@@ -2361,7 +2469,7 @@ body {
   padding: 0 10px;
   border-radius: 9px;
   color: var(--color-ink);
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   font-size: 0.75rem;
   font-weight: 500;
 }
@@ -2386,7 +2494,7 @@ body {
 [data-contrast="high"] .visitor-shell {
   --visitor-accent: var(--color-whiteout);
   --visitor-accent-strong: var(--color-whiteout);
-  --visitor-accent-soft: var(--surface-dark-canvas);
+  --visitor-accent-soft: var(--surface-clear);
   --visitor-route: var(--color-signal-blue);
   --visitor-line: var(--color-whiteout);
 }
@@ -2896,7 +3004,7 @@ body {
   border-radius: var(--radius-inputs);
   color: var(--studio-ink);
   background: var(--ed-cream);
-  font: 500 0.625rem var(--font-sans);
+  font: 500 0.75rem var(--font-sans);
 }
 
 .studio-layer-source select {
@@ -2992,7 +3100,7 @@ body {
   padding: 0 12px;
   border-radius: var(--radius-buttons);
   color: var(--color-ink);
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   font-size: 0.75rem;
   font-weight: 500;
 }
@@ -3120,8 +3228,8 @@ body {
 
 .studio-editor-modebar button.active {
   color: var(--color-ink);
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
   box-shadow: none;
 }
 
@@ -3211,8 +3319,8 @@ body {
 .studio-canvas-toolbar button:hover:not(:disabled),
 .studio-canvas-toolbar button.active {
   color: var(--color-ink);
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
 }
 
 .studio-canvas-toolbar button:disabled {
@@ -3299,7 +3407,7 @@ body {
 .studio-canvas-legend .studio-legend-portal {
   border: 2px solid var(--color-whiteout);
   border-radius: 50%;
-  background: var(--surface-dark-canvas);
+  background: var(--surface-clear);
 }
 
 .studio-canvas-empty {
@@ -3321,7 +3429,7 @@ body {
   border: 0;
   border-radius: var(--radius-inputs);
   outline: none;
-  color: var(--ed-cream);
+  color: var(--color-ink);
   background: var(--ed-ink);
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   font-size: 0.75rem;
@@ -3398,7 +3506,7 @@ body {
 }
 
 .studio-validation-icon svg {
-  color: var(--ed-cream);
+  color: var(--color-ink);
 }
 
 .studio-validation-hero span {
@@ -3494,7 +3602,7 @@ body {
   padding: 0 11px;
   border-radius: var(--radius-buttons);
   color: var(--color-ink);
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   font-size: 0.75rem;
   font-weight: 500;
 }
@@ -3660,7 +3768,7 @@ body {
   gap: 7px;
   border-radius: var(--radius-buttons);
   color: var(--color-ink);
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   font-size: 0.75rem;
   font-weight: 500;
 }
@@ -3732,7 +3840,7 @@ body {
 
 .studio-artifact-meta strong {
   overflow: hidden;
-  color: var(--ed-cream);
+  color: var(--color-ink);
   font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3954,8 +4062,8 @@ body {
 
 .studio-activation-confirm button.confirm {
   color: var(--color-ink);
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
 }
 
 .studio-runtime-error {
@@ -4315,7 +4423,7 @@ body {
   gap: 7px;
   border-radius: var(--radius-buttons);
   color: var(--color-ink);
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   font-size: 0.75rem;
   font-weight: 500;
 }
@@ -4589,8 +4697,8 @@ body {
 
 .studio-publish-simulator-actions button:first-child {
   color: var(--color-ink);
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
 }
 
 .studio-publish-simulator-actions button:nth-child(2) {
@@ -5092,14 +5200,14 @@ body {
 }
 
 .walk-recorder-start {
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
 }
 
 .walk-recorder-stop {
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
 }
 
@@ -5206,7 +5314,7 @@ body {
 }
 
 .walk-recorder-live-bad {
-  border-color: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
   background: var(--color-veil);
   display: block;
   color: var(--color-ink);
@@ -5250,19 +5358,23 @@ body {
   justify-content: center;
   padding: 20px;
   background: var(--color-scrim);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
 }
 
-/* A haze card holding the camera: the one light island over the scrim. */
+/* A pane of glass holding the camera. */
 .qr-checkin {
   position: relative;
   width: 100%;
   max-width: 420px;
   padding: var(--card-padding);
-  border: 0;
   border-radius: var(--radius-cards);
-  background: var(--surface-haze-card);
-  color: var(--color-ink);
-  box-shadow: none;
+  border: 1px solid var(--glass-line);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: var(--color-whiteout);
 }
 
 .qr-checkin-close {
@@ -5274,9 +5386,9 @@ body {
   place-items: center;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--color-hairline-strong);
+  border: 1px solid var(--glass-line);
   border-radius: var(--radius-buttons);
-  background: var(--color-scrim);
+  background: var(--glass-fill-chip);
   color: var(--color-whiteout);
   cursor: pointer;
 }
@@ -5291,7 +5403,7 @@ body {
   overflow: hidden;
   aspect-ratio: 1 / 1;
   border-radius: var(--radius-images);
-  background: var(--surface-dark-canvas);
+  background: #0c1d44;
 }
 
 .qr-checkin-video {
@@ -5311,7 +5423,7 @@ body {
 
 .qr-checkin-status {
   margin: var(--spacing-12) 0 0;
-  color: var(--color-ink);
+  color: var(--color-whiteout);
   font-size: var(--text-control);
   line-height: 1.5;
   text-align: center;
@@ -5321,9 +5433,10 @@ body {
 .qr-checkin-hint {
   margin: var(--spacing-8) 0 0;
   padding: var(--spacing-8) var(--spacing-12);
-  border: 2px solid var(--color-ink);
-  border-radius: var(--radius-inputs);
-  color: var(--color-ink);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-buttons);
+  background: var(--glass-fill-control);
+  color: var(--color-whiteout);
   font-size: var(--text-caption);
   line-height: 1.5;
   text-align: center;
@@ -5337,9 +5450,9 @@ body {
   width: 100%;
   margin: 0 0 14px;
   padding: 12px 16px;
-  border: 1px solid var(--surface-haze-card);
+  border: 1px solid var(--surface-whiteout);
   border-radius: 12px;
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
   font-size: 16px;
   font-weight: 500;
@@ -5353,20 +5466,22 @@ body {
 .checkin-toast {
   position: fixed;
   z-index: 1400;
-  top: calc(var(--visitor-header-height, 74px) + 12px);
+  top: calc(var(--visitor-header-height, 74px) + 20px);
   left: 50%;
   display: flex;
   gap: 11px;
   align-items: center;
   max-width: min(420px, calc(100vw - 32px));
   padding: 11px 13px;
-  border: 1px solid var(--surface-haze-card);
-  border-radius: 12px;
-  background: var(--color-veil);
-  box-shadow: var(--shadow-md, 0 10px 30px rgba(0, 0, 0, 0.35));
+  border-radius: var(--radius-cards);
+  border: 1px solid var(--glass-line);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   transform: translateX(-50%);
   animation: checkin-toast-in 220ms ease-out;
-  color: var(--color-ink);
+  color: var(--color-whiteout);
 }
 
 .checkin-toast-icon {
@@ -5376,7 +5491,7 @@ body {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
 }
 
@@ -5420,13 +5535,13 @@ body {
 }
 
 .checkin-toast-problem {
-  border-color: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
   background: var(--color-veil);
   color: var(--color-ink);
 }
 
 .checkin-toast-problem .checkin-toast-icon {
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
 }
 
@@ -5480,8 +5595,8 @@ body {
 }
 
 .venue-bootstrap-retry {
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
 }
 
@@ -5511,9 +5626,9 @@ body {
 :root {
   /* The visitor layer was written against a surface, a text colour and one
      accent. Those are now the canvas, whiteout and signal blue. */
-  --ed-cream: var(--surface-dark-canvas);
+  --ed-cream: var(--surface-clear);
   --ed-ink: var(--color-whiteout);
-  --ed-blue: var(--color-signal-blue);
+  --ed-blue: var(--color-sky-tint);
   --ed-ink-soft: var(--color-whiteout-soft);
   /* The line a control or a divider is drawn with. */
   --ed-line: var(--color-hairline-strong);
@@ -5543,7 +5658,7 @@ body {
   align-items: flex-start;
   justify-content: center;
   overflow-y: auto;
-  background: var(--surface-dark-canvas);
+  background: var(--surface-clear);
   color: var(--color-whiteout);
   font-family: var(--font-control);
 }
@@ -5554,7 +5669,7 @@ body {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: var(--surface-dark-canvas);
+  background: var(--surface-clear);
 }
 
 .onboard-content {
@@ -5563,7 +5678,28 @@ body {
   width: 100%;
   max-width: 560px;
   margin: auto;
-  padding: var(--spacing-64) var(--spacing-24) var(--spacing-48);
+  padding: var(--spacing-52) var(--spacing-16) var(--spacing-24);
+}
+
+/* The headline stands in the open sky; everything to read or press below it
+   is on one pane of glass, where white type holds whatever is behind. */
+.onboard-eyebrow,
+.onboard-title,
+.onboard-sub,
+.onboard-chip {
+  margin-inline: var(--spacing-8);
+}
+
+.onboard-pane {
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-16);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius-cards);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 
 .onboard-step {
@@ -5608,39 +5744,42 @@ body {
 }
 
 .onboard-sub {
-  margin: 0 0 var(--spacing-32);
+  margin: 0 0 var(--spacing-24);
   max-width: 480px;
   font-size: var(--text-body);
   font-weight: var(--font-weight-regular);
   line-height: var(--leading-body);
-  color: var(--color-whiteout-soft);
+  /* Set straight onto the sky, so at full strength. */
+  color: var(--color-whiteout);
 }
 
-/* A tag: signal blue text and nothing else. */
+/* A tag: a small pane of its own. */
 .onboard-chip {
   align-self: flex-start;
-  margin: 0 0 var(--spacing-24);
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--color-signal-blue);
-  font-size: var(--text-subheading);
+  margin-top: 0;
+  margin-bottom: var(--spacing-24);
+  padding: var(--spacing-4) var(--spacing-12);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius-buttons);
+  background: var(--glass-fill-strong);
+  color: var(--color-whiteout);
+  font-size: var(--text-body);
   font-weight: var(--font-weight-medium);
-  line-height: var(--leading-subheading);
+  line-height: var(--leading-body);
 }
 
-/* A text input: haze on the canvas, defined by its fill rather than its border. */
+/* A text input: a lighter pane set into the one around it. */
 .onboard-field {
   display: flex;
   align-items: center;
   gap: var(--spacing-12);
   min-height: 52px;
-  margin-bottom: var(--spacing-48);
+  margin-bottom: var(--spacing-20);
   padding: 10px var(--spacing-16);
-  border: 1px solid var(--color-ink-hairline);
-  border-radius: var(--radius-inputs);
-  background: var(--surface-haze-card);
-  color: var(--color-ink-soft);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-buttons);
+  background: var(--glass-fill-control);
+  color: var(--color-whiteout-soft);
 }
 
 .onboard-field:focus-within {
@@ -5654,29 +5793,28 @@ body {
   border: none;
   background: none;
   outline: none;
-  color: var(--color-ink);
+  color: var(--color-whiteout);
   font: inherit;
   font-size: var(--text-body);
   font-weight: var(--font-weight-medium);
 }
 
 .onboard-field input::placeholder {
-  color: var(--color-ink-soft);
+  color: var(--color-whiteout-faint);
 }
 
 .onboard-label {
-  margin: 0 0 var(--spacing-12);
-  font-size: var(--text-subheading);
+  margin: 0 0 var(--spacing-4);
+  font-size: var(--text-caption);
   font-weight: var(--font-weight-medium);
-  line-height: var(--leading-subheading);
-  color: var(--color-whiteout);
+  line-height: var(--leading-caption);
+  color: var(--color-whiteout-soft);
 }
 
 .onboard-list {
-  margin: 0 0 var(--spacing-32);
+  margin: 0 0 var(--spacing-8);
   padding: 0;
   list-style: none;
-  border-top: 1px solid var(--color-hairline);
 }
 
 .onboard-row {
@@ -5684,8 +5822,8 @@ body {
   align-items: center;
   gap: var(--spacing-16);
   width: 100%;
-  min-height: 64px;
-  padding: var(--spacing-16) 0;
+  min-height: 60px;
+  padding: var(--spacing-12) 0;
   border: none;
   border-bottom: 1px solid var(--color-hairline);
   background: none;
@@ -5700,7 +5838,11 @@ body {
 }
 
 .onboard-row:hover .onboard-row-name {
-  color: var(--color-signal-blue);
+  color: var(--color-sky-tint);
+}
+
+.onboard-list li:last-child .onboard-row {
+  border-bottom: 0;
 }
 
 .onboard-row:focus-visible {
@@ -5717,9 +5859,9 @@ body {
 }
 
 .onboard-row-name {
-  font-size: var(--text-subheading);
+  font-size: 1.0625rem;
   font-weight: var(--font-weight-medium);
-  line-height: var(--leading-subheading);
+  line-height: 1.35;
 }
 
 .onboard-row-meta {
@@ -5729,18 +5871,18 @@ body {
   color: var(--color-whiteout-soft);
 }
 
-/* The one filled control on the canvas: the haze button. */
+/* The one solid control on the screen: the white button. */
 .onboard-pill {
-  align-self: flex-start;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--spacing-12);
-  min-height: 48px;
-  margin-bottom: var(--spacing-48);
+  min-height: 52px;
+  margin-bottom: var(--spacing-20);
   padding: var(--spacing-12) var(--spacing-20);
-  border: 1px solid var(--color-ink);
+  border: 1px solid var(--surface-whiteout);
   border-radius: var(--radius-buttons);
-  background: var(--surface-haze-card);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
   font: inherit;
   font-size: var(--text-body);
@@ -5749,7 +5891,7 @@ body {
 }
 
 .onboard-pill:hover {
-  background: var(--surface-whiteout);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .onboard-pill:focus-visible {
@@ -5767,12 +5909,12 @@ body {
   padding: 0;
   border: none;
   background: none;
-  color: var(--color-signal-blue);
+  color: var(--color-sky-tint);
   font: inherit;
-  font-size: var(--text-body);
+  font-size: var(--text-control);
   font-weight: var(--font-weight-medium);
   text-decoration: underline;
-  text-decoration-thickness: 2px;
+  text-decoration-thickness: 1.5px;
   text-underline-offset: 5px;
   cursor: pointer;
 }
@@ -5797,7 +5939,7 @@ body {
 }
 
 .onboard-empty {
-  margin: 0 0 var(--spacing-32);
+  margin: var(--spacing-8) 0 var(--spacing-16);
   font-size: var(--text-body);
   font-weight: var(--font-weight-regular);
   line-height: var(--leading-body);
@@ -5824,9 +5966,14 @@ body {
   flex-wrap: wrap;
   gap: 12px var(--ed-16);
   height: auto;
+  margin: 8px 8px 0;
   padding: 12px var(--ed-16);
-  border-bottom: 1px solid var(--ed-line);
-  background: var(--ed-cream);
+  border-radius: var(--radius-cards);
+  border: 1px solid var(--glass-line);
+  background: var(--glass-fill);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   color: var(--ed-ink);
   font-family: var(--ed-body);
 }
@@ -5904,7 +6051,7 @@ body {
   padding: 8px 18px;
   border: 1px solid var(--ed-line);
   border-radius: var(--radius-buttons);
-  background: var(--ed-cream);
+  background: var(--glass-fill-control);
   color: var(--ed-ink);
   font: inherit;
   font-size: var(--ed-16);
@@ -5944,11 +6091,17 @@ body {
 
 .visitor-location-control:hover,
 .visitor-heading-check:hover,
-.visitor-access-profile:hover,
-.visitor-access-profile.active {
-  border-color: var(--surface-haze-card);
+.visitor-access-profile:hover {
+  border-color: var(--color-whiteout);
+  background: var(--glass-fill-control-hover);
+}
+
+/* On is the solid white; off is glass. */
+.visitor-access-profile.active,
+.visitor-access-profile.active:hover {
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
-  background: var(--surface-haze-card);
 }
 
 .visitor-utility-actions {
@@ -5967,13 +6120,14 @@ body {
   padding: 0;
   border: 1px solid var(--ed-line);
   border-radius: var(--radius-buttons);
-  background: var(--ed-cream);
+  background: var(--glass-fill-control);
   color: var(--ed-ink);
   cursor: pointer;
 }
 
 .visitor-utility-actions button:hover {
   border-color: var(--ed-ink);
+  background: var(--glass-fill-control-hover);
 }
 
 .visitor-location-control:focus-visible,
@@ -5994,9 +6148,14 @@ body {
   gap: 6px var(--ed-20);
   height: auto;
   min-height: 44px;
+  margin: 8px;
   padding: 8px var(--ed-16);
-  border-top: 1px solid var(--ed-line);
-  background: var(--ed-cream);
+  border-radius: var(--radius-cards);
+  border: 1px solid var(--glass-line);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   color: var(--ed-ink);
   font-family: var(--ed-body);
 }
@@ -6029,7 +6188,7 @@ body {
 
 .visitor-status-bar .status-dot.navigating,
 .visitor-status-bar .status-dot.active {
-  background: var(--ed-blue);
+  background: var(--color-whiteout);
 }
 
 /* Pushed to the end and never allowed to shrink: the browser suite measures
@@ -6217,7 +6376,7 @@ body {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 3px var(--ed-16);
   padding: 12px 14px;
-  border-left: 3px solid var(--surface-haze-card);
+  border-left: 3px solid var(--surface-whiteout);
   background: var(--color-veil);
   color: var(--color-ink);
 }
@@ -6362,7 +6521,7 @@ body {
 .nav-leg.is-current .nav-leg-mark {
   border-color: var(--ed-ink);
   background: var(--ed-ink);
-  color: var(--ed-cream);
+  color: var(--color-ink);
 }
 
 .nav-leg.is-current .nav-leg-headline {
@@ -6473,9 +6632,9 @@ body {
 /* ==========================================================================
    Visitor map
    --------------------------------------------------------------------------
-   The model carries the picture and the interface stays out of its way: the
-   dark canvas behind it, thin light borders on the controls, and no chrome
-   laid over the artwork except the labels it needs to be readable.
+   The model floats in the sky and the interface stays out of its way: the
+   stage is clear, the controls are small panes of glass, and nothing is laid
+   over the artwork except the labels it needs to be readable.
    ========================================================================== */
 .compiled-map {
   position: relative;
@@ -6507,9 +6666,9 @@ body {
   top: 0;
   left: 0;
   padding: 3px 9px;
-  border: 1px solid var(--color-hairline-strong);
+  border: 1px solid var(--glass-line);
   border-radius: var(--radius-inputs);
-  background: var(--color-scrim);
+  background: var(--glass-fill-chip);
   color: var(--color-whiteout);
   font-family: var(--font-control);
   font-size: var(--text-caption);
@@ -6525,11 +6684,11 @@ body {
   border-color: var(--color-whiteout);
   color: var(--color-whiteout);
 }
-/* The destination is the one label being hunted for: the light island, always placed. */
+/* The destination is the one label being hunted for: solid white, always placed. */
 .map-pill-destination,
 .map-pill-poi.map-pill-destination {
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--color-ink-hairline);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
 }
 
@@ -6556,9 +6715,12 @@ body {
   width: 44px;
   height: 44px;
   padding: 0;
-  border: 1px solid var(--color-hairline-strong);
+  border: 1px solid var(--glass-line);
   border-radius: var(--radius-buttons);
-  background: var(--color-scrim);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  backdrop-filter: var(--glass-blur-light);
   color: var(--color-whiteout);
   font-family: var(--font-control);
   font-size: var(--text-control);
@@ -6571,8 +6733,8 @@ body {
 }
 
 .compiled-map-floor.active {
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
 }
 
@@ -6607,28 +6769,8 @@ body {
    originals. Radius and shadow are tokens too, so flattening the system is a
    token change rather than thirty-six separate edits.
    ========================================================================== */
-/* A light island on the dark canvas: a card of haze with its own ink. The
-   older names below are computed where they are declared, so the islands are
-   listed with the shell to have them worked out again from the island's palette. */
-.visitor-shell .search-panel,
-.visitor-shell .location-picker,
-.visitor-shell .poi-card,
-.visitor-shell .checkin-toast {
-  --ed-cream: var(--surface-haze-card);
-  --ed-ink: var(--color-ink);
-  --ed-ink-soft: var(--color-ink-soft);
-  /* Signal blue is too faint for small text on haze; emphasis there is ink. */
-  --ed-blue: var(--color-ink);
-  --ed-line: rgba(27, 27, 27, 0.26);
-  color: var(--color-ink);
-}
-
-.visitor-shell,
-.visitor-shell .search-panel,
-.visitor-shell .location-picker,
-.visitor-shell .poi-card,
-.visitor-shell .checkin-toast {
-  /* Surfaces: one canvas, no tints, no glass. */
+.visitor-shell {
+  /* Surfaces: every older "background" is clear. Only a named pane is glass. */
   --color-bg-primary: var(--ed-cream);
   --color-bg-secondary: var(--ed-cream);
   --color-bg-tertiary: var(--ed-cream);
@@ -6641,8 +6783,8 @@ body {
   --color-text-muted: var(--ed-ink-soft);
   --color-text-inverse: var(--ed-cream);
 
-  --color-border: var(--ed-ink);
-  --color-border-focus: var(--ed-blue);
+  --color-border: var(--ed-line);
+  --color-border-focus: var(--ed-ink);
 
   /* One chromatic functional colour. The accents that carried meaning by hue -
      green for success, amber for caution, red for refusal - carry it in words
@@ -6690,20 +6832,27 @@ body {
   background: var(--ed-cream);
 }
 
-/* No frosted glass over the model. */
+/* Each dialog is one pane of glass over the model. */
 .visitor-shell .search-panel,
 .visitor-shell .location-picker,
 .visitor-shell .poi-card,
 .visitor-shell .checkin-toast {
-  backdrop-filter: none;
-  border: 0;
+  border: 1px solid var(--glass-line);
   border-radius: var(--radius-cards);
-  background: var(--surface-haze-card);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: var(--color-whiteout);
 }
 
-.visitor-shell .location-picker-overlay {
+/* Fog over the scene while a dialog is open. */
+.visitor-shell .location-picker-overlay,
+.visitor-shell .search-overlay,
+.visitor-shell .poi-card-overlay {
   background: var(--color-scrim);
-  backdrop-filter: none;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
 }
 
 /* Grab handles belonged to a sheet that slid; these are panels. */
@@ -6761,20 +6910,22 @@ body {
   gap: 8px;
   min-height: 48px;
   padding: 10px 16px;
-  border: 1px solid var(--color-ink);
+  border: 1px solid var(--color-hairline-strong);
   border-radius: var(--radius-buttons);
-  background: var(--surface-haze-card);
-  color: var(--color-ink);
+  background: var(--glass-fill-control);
+  color: var(--color-whiteout);
   font: inherit;
   font-size: var(--text-body);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
 }
 
-/* The action a card exists for sits on white, a step above the haze around it. */
+/* The action a card exists for is the one solid thing on it. */
 .visitor-shell .lp-scan-cta,
 .visitor-shell .poi-card-primary {
+  border-color: var(--surface-whiteout);
   background: var(--surface-whiteout);
+  color: var(--color-ink);
 }
 
 /* Inset like everything else in the card, not run out to its edges. */
@@ -6783,7 +6934,7 @@ body {
   margin: 0 var(--spacing-20) var(--spacing-12);
 }
 
-/* The way into search: one haze field on the canvas, reading as the input it opens. */
+/* The way into search: one pane on the map, reading as the input it opens. */
 .visitor-shell .search-trigger {
   border: 0;
   background: none;
@@ -6793,17 +6944,19 @@ body {
   min-height: 56px;
   gap: var(--spacing-12);
   padding: var(--spacing-8) var(--spacing-16);
-  border: 1px solid var(--color-ink-hairline);
-  border-radius: var(--radius-buttons);
-  background: var(--surface-haze-card);
-  color: var(--color-ink);
-  box-shadow: none;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius-cards);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: var(--color-whiteout);
 }
 
 .visitor-shell .search-trigger-pill:hover {
-  border-color: var(--color-ink-hairline);
-  background: var(--surface-whiteout);
-  box-shadow: none;
+  border-color: var(--color-whiteout);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
   transform: none;
 }
 
@@ -6814,31 +6967,34 @@ body {
   border: 0;
   border-radius: 0;
   background: none;
-  color: var(--color-ink-soft);
+  color: var(--color-whiteout-soft);
 }
 
 .visitor-shell .search-trigger-copy strong {
   font-size: var(--text-body);
   font-weight: var(--font-weight-medium);
-  color: var(--color-ink);
+  color: var(--color-whiteout);
 }
 
 .visitor-shell .search-trigger-copy small {
   font-size: var(--text-caption);
-  color: var(--color-ink-soft);
+  color: var(--color-whiteout-soft);
 }
 
 .visitor-shell .search-trigger-action {
   font-size: var(--text-caption);
   font-weight: var(--font-weight-medium);
-  color: var(--color-ink-soft);
+  color: var(--color-whiteout-soft);
+}
+
+.visitor-shell .poi-card-secondary:hover {
+  border-color: var(--color-whiteout);
+  background: var(--glass-fill-control-hover);
 }
 
 .visitor-shell .lp-scan-cta:hover,
-.visitor-shell .poi-card-primary:hover,
-.visitor-shell .poi-card-secondary:hover {
-  background: var(--surface-whiteout);
-  border-color: var(--color-ink);
+.visitor-shell .poi-card-primary:hover {
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .visitor-shell .lp-scan-cta:focus-visible,
@@ -6863,7 +7019,7 @@ body {
 .visitor-shell .lp-result-item {
   min-height: 56px;
   border: none;
-  border-bottom: 1px solid var(--ed-line);
+  border-bottom: 1px solid var(--color-hairline);
   border-radius: 0;
   background: none;
 }
@@ -6878,7 +7034,7 @@ body {
 .visitor-shell .checkin-toast-icon {
   border: 1px solid var(--ed-line);
   border-radius: var(--radius-buttons);
-  background: transparent !important;
+  background: var(--glass-fill-control) !important;
   color: var(--ed-ink) !important;
 }
 
@@ -6955,27 +7111,33 @@ body {
   color: var(--ed-ink-soft);
 }
 
+/* A field is a lighter pane set into the dialog. */
 .visitor-shell .search-input-wrapper,
 .visitor-shell .lp-search {
-  border: 1px solid var(--color-ink-hairline);
-  border-radius: var(--radius-inputs);
-  background: var(--surface-whiteout);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-buttons);
+  background: var(--glass-fill-control);
 }
 
 .visitor-shell .search-input,
 .visitor-shell .lp-search-input {
   font-size: var(--text-body);
   font-weight: var(--font-weight-medium);
-  color: var(--color-ink);
+  color: var(--color-whiteout);
+}
+
+.visitor-shell .search-input::placeholder,
+.visitor-shell .lp-search-input::placeholder {
+  color: var(--color-whiteout-faint);
 }
 
 /* The field shows focus once, around itself, not again around the text inside it. */
 .visitor-shell .search-input-wrapper:focus-within,
 .visitor-shell .lp-search:focus-within {
-  border-color: var(--color-ink-hairline);
-  background: var(--surface-whiteout);
+  border-color: var(--color-whiteout);
+  background: var(--glass-fill-control-hover);
   box-shadow: none;
-  outline: 2px solid var(--color-ink);
+  outline: 2px solid var(--color-whiteout);
   outline-offset: 2px;
 }
 
@@ -6986,29 +7148,30 @@ body {
 
 .visitor-shell .search-input-wrapper > svg,
 .visitor-shell .lp-search > svg {
-  color: var(--color-ink-soft);
+  color: var(--color-whiteout-soft);
 }
 
 .visitor-shell .search-panel-heading span {
   font-size: var(--text-caption);
-  color: var(--color-ink-soft);
+  color: var(--color-whiteout-soft);
 }
 
 .visitor-shell .category-chips button,
 .visitor-shell .lp-categories button,
 .visitor-shell .lp-chip {
-  border: 1px solid transparent !important;
+  border: 1px solid var(--color-hairline-strong) !important;
   border-radius: var(--radius-pills);
-  background: rgba(0, 0, 0, 0.08) !important;
-  color: var(--color-ink) !important;
+  background: var(--glass-fill-control) !important;
+  color: var(--color-whiteout) !important;
   font-size: var(--text-control);
   font-weight: var(--font-weight-medium);
 }
 
 .visitor-shell .lp-chip.active,
 .visitor-shell .category-chips button.active {
-  background: var(--color-ink) !important;
-  color: var(--surface-haze-card) !important;
+  border-color: var(--surface-whiteout) !important;
+  background: var(--surface-whiteout) !important;
+  color: var(--color-ink) !important;
 }
 
 .visitor-shell .search-clear-btn,
@@ -7021,7 +7184,7 @@ body {
   height: 44px;
   border: 1px solid var(--ed-line);
   border-radius: var(--radius-buttons);
-  background: var(--ed-cream);
+  background: var(--glass-fill-control);
   color: var(--ed-ink);
   cursor: pointer;
 }
@@ -7054,24 +7217,25 @@ body {
 /* A refusal is not a different colour, it is different words - but it still
    earns a heavier rule than a confirmation. */
 .visitor-shell .checkin-toast-problem {
-  border: 2px solid var(--color-ink);
+  border: 2px solid var(--color-whiteout);
 }
 
-/* The route action was a filled blue block. Nothing in this system is a filled
-   coloured button - the border is the button - and it needs a real target. */
+/* One of these per result, so it is an outline. The solid white button is
+   kept for the single next step on a screen. */
 .visitor-shell .search-route-button {
   min-height: 44px;
   padding: 0 16px;
-  border: 1px solid var(--color-ink);
+  border: 1px solid var(--color-hairline-strong);
   border-radius: var(--radius-buttons);
-  background: var(--surface-whiteout);
-  color: var(--color-ink);
+  background: var(--glass-fill-control);
+  color: var(--color-whiteout);
   font-size: var(--text-control);
   font-weight: var(--font-weight-medium);
 }
 
 .visitor-shell .search-route-button:hover {
-  background: var(--surface-haze-card);
+  border-color: var(--color-whiteout);
+  background: var(--glass-fill-control-hover);
 }
 
 .visitor-shell .search-route-button:focus-visible {
@@ -7099,7 +7263,7 @@ body {
   flex: none;
   border: 1px solid var(--ed-line);
   border-radius: var(--radius-buttons);
-  background: var(--ed-cream);
+  background: var(--glass-fill-control);
   color: var(--ed-ink);
   cursor: pointer;
 }
@@ -7130,9 +7294,12 @@ body {
   width: 44px;
   height: 44px;
   padding: 0;
-  border: 1px solid var(--color-hairline-strong);
+  border: 1px solid var(--glass-line);
   border-radius: var(--radius-buttons);
-  background: var(--color-scrim);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  backdrop-filter: var(--glass-blur-light);
   color: var(--color-whiteout);
   cursor: pointer;
 }
@@ -7266,15 +7433,16 @@ body {
    three different controls over three changes, because an overlay that
    negotiates its own position has to be right about every layout it will ever
    sit above. It is part of the layout now: it takes a row between the header
-   and the map, pushes the map down, and cannot cover anything.
+   and the map, pushes the map down, and cannot cover anything. Like the
+   header above it, it is a pane standing a little way in from the edges.
    -------------------------------------------------------------------------- */
 .visitor-shell .checkin-toast {
   position: static;
   z-index: auto;
   transform: none;
   max-width: none;
-  width: 100%;
-  border-width: 0 0 1px;
+  width: auto;
+  margin: 8px 8px 0;
   animation: none;
 }
 
@@ -7306,12 +7474,12 @@ body {
   font-family: var(--ed-body);
 }
 
-/* The border is the button here too. */
+/* A button is a lighter pane set into the one it sits on. */
 .studio-surface button,
 .walk-recorder button {
   border-radius: var(--radius-buttons);
   border: 1px solid var(--ed-line);
-  background: var(--ed-cream);
+  background: var(--glass-fill-control);
   color: var(--ed-ink);
   font-family: var(--ed-body);
   font-weight: 500;
@@ -7339,12 +7507,13 @@ body {
 .walk-recorder input,
 .walk-recorder select,
 .walk-recorder textarea {
-  /* A field is a light island: haze with ink on it, and the fill is the edge. */
-  border-radius: var(--radius-inputs);
-  border: 1px solid var(--color-ink-hairline);
-  background: var(--surface-haze-card);
-  color: var(--color-ink);
-  color-scheme: light;
+  /* A field is a lighter pane set into its panel. The list a select opens
+     is drawn by the system, so it is asked for its dark one. */
+  border-radius: var(--radius-buttons);
+  border: 1px solid var(--color-hairline-strong);
+  background: var(--glass-fill-control);
+  color: var(--color-whiteout);
+  color-scheme: dark;
   font-family: var(--ed-body);
 }
 
@@ -7352,7 +7521,7 @@ body {
 .studio-surface textarea::placeholder,
 .walk-recorder input::placeholder,
 .walk-recorder textarea::placeholder {
-  color: var(--color-ink-soft);
+  color: var(--color-whiteout-faint);
 }
 
 .studio-surface input:focus-visible,
@@ -7414,9 +7583,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--ed-20);
-  padding: var(--ed-20) 12px;
-  border-right: 1px solid var(--ed-line);
-  background: var(--ed-cream);
+  margin: 12px 0 12px 12px;
+  padding: var(--ed-20) 8px;
+  border-radius: var(--radius-cards);
+  border: 1px solid var(--glass-line);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   color: var(--ed-ink);
   font-family: var(--ed-body);
 }
@@ -7484,7 +7658,8 @@ body {
 }
 
 .surface-nav a:hover {
-  border-color: var(--ed-ink);
+  border-color: var(--ed-line);
+  background: var(--glass-fill-control);
 }
 
 .surface-nav a:focus-visible {
@@ -7493,9 +7668,9 @@ body {
 }
 
 .surface-nav a[aria-current='page'] {
-  border-color: var(--ed-ink);
-  background: var(--ed-ink);
-  color: var(--ed-cream);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
+  color: var(--color-ink);
 }
 
 @media (max-width: 720px) {
@@ -7512,9 +7687,8 @@ body {
     grid-row: 2;
     flex-direction: row;
     gap: 0;
-    padding: 5px 6px calc(5px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--ed-line);
-    border-right: 0;
+    margin: 0 8px calc(8px + env(safe-area-inset-bottom));
+    padding: 5px 6px;
   }
 
   .surface-nav-brand {
@@ -7595,11 +7769,11 @@ body {
 .studio-surface .studio-compile-button {
   border: 1px solid var(--ed-line);
   background: var(--ed-ink);
-  color: var(--ed-cream);
+  color: var(--color-ink);
 }
 
 .studio-surface .studio-compile-button:hover:not(:disabled) {
-  border-color: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
   background: var(--surface-whiteout);
   color: var(--color-ink);
 }
@@ -7650,8 +7824,8 @@ body {
 
 .twin-toggle.active,
 .inspector-surface button[aria-pressed='true'] {
-  border-color: var(--surface-haze-card);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
 }
 
@@ -7663,11 +7837,12 @@ body {
 
 .inspector-surface select,
 .inspector-surface input {
-  border-radius: var(--radius-inputs);
-  border: 1px solid var(--color-ink-hairline);
-  background: var(--surface-haze-card);
-  color: var(--color-ink);
-  color-scheme: light;
+  border-radius: var(--radius-buttons);
+  border: 1px solid var(--color-hairline-strong);
+  background: var(--glass-fill-control);
+  color: var(--color-whiteout);
+  /* The list a select opens is drawn by the system: ask for its dark one. */
+  color-scheme: dark;
   font-family: var(--ed-body);
 }
 
@@ -7753,20 +7928,24 @@ body {
    where the destination, the next corner and the places nearby actually are,
    a small plan in the corner turned the way the visitor faces, and a sheet at
    the bottom with what is left and the few controls. Over live video the
-   cards are near-transparent dark surfaces with a thin light border and white
-   type; the one accent is the route's blue.
+   cards are panes of glass - a blue tint, a thin light border, white type -
+   and the one accent is the route's blue. Where there is no camera the sky
+   is behind them instead.
    ========================================================================== */
 .camera-preview {
-  /* This view was written dark-first: its "ink" is the surface and its "cream"
-     the text. On the dark canvas those are the canvas and whiteout. */
-  --ed-ink: var(--surface-dark-canvas);
+  /* This view was written the other way round: its "ink" is the surface and
+     its "cream" the text. Here those are nothing at all, and white. */
+  --ed-ink: var(--surface-clear);
   --ed-cream: var(--color-whiteout);
   --ed-ink-soft: var(--color-whiteout-soft);
+  /* Glass over video is blurred lightly: it is repainted on every frame. */
+  --camera-pane: rgba(14, 34, 78, 0.74);
+  --camera-chip: rgba(14, 34, 78, 0.78);
   position: absolute;
   inset: 0;
   z-index: var(--z-camera-preview);
   overflow: hidden;
-  background: var(--surface-dark-canvas);
+  background: var(--surface-clear);
   color: var(--color-whiteout);
   font-family: var(--font-control);
 }
@@ -7804,7 +7983,7 @@ body {
   padding: 6px 11px;
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: var(--radius-buttons);
-  background: rgba(0, 0, 0, 0.68);
+  background: var(--camera-chip);
   color: var(--color-whiteout);
   font-size: 12px;
   line-height: 1.25;
@@ -7827,7 +8006,7 @@ body {
   height: 12px;
   border-right: 1px solid rgba(255, 255, 255, 0.24);
   border-bottom: 1px solid rgba(255, 255, 255, 0.24);
-  background: rgba(0, 0, 0, 0.68);
+  background: var(--camera-chip);
   transform: translateX(-50%) rotate(45deg);
 }
 
@@ -7842,7 +8021,7 @@ body {
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--color-signal-blue);
+  color: var(--color-sky-tint);
 }
 
 .ar-callout strong {
@@ -7857,7 +8036,7 @@ body {
 .ar-callout-arrow {
   font-size: 18px;
   line-height: 1;
-  color: var(--color-signal-blue);
+  color: var(--color-sky-tint);
 }
 
 .ar-callout-pin {
@@ -7903,9 +8082,12 @@ body {
   display: flex;
   align-items: stretch;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--glass-line);
   border-radius: var(--radius-cards);
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--camera-pane);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  backdrop-filter: var(--glass-blur-light);
   color: var(--color-whiteout);
 }
 
@@ -7944,7 +8126,7 @@ body {
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--color-signal-blue);
+  color: var(--color-sky-tint);
 }
 
 /* One place name, big enough to read at arm's length and clipped rather
@@ -7975,7 +8157,7 @@ body {
   padding: 5px 11px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: var(--radius-inputs);
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--camera-chip);
   font-size: 12px;
   font-weight: 500;
 }
@@ -8002,14 +8184,14 @@ body {
   padding: 4px 9px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-inputs);
-  background: rgba(0, 0, 0, 0.56);
+  background: var(--camera-chip);
   font-size: 12px;
   color: rgba(255, 255, 255, 0.75);
 }
 
 .camera-preview-telemetry > div svg {
   flex: none;
-  color: var(--color-signal-blue);
+  color: var(--color-sky-tint);
 }
 
 .camera-preview-telemetry span {
@@ -8032,7 +8214,7 @@ body {
   padding: 7px 12px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: var(--radius-cards);
-  background: rgba(0, 0, 0, 0.68);
+  background: var(--camera-chip);
   color: var(--color-whiteout);
   font-size: 13px;
   line-height: 1.35;
@@ -8050,7 +8232,7 @@ body {
   padding: 8px 14px;
   border: 1px solid rgba(43, 127, 255, 0.55);
   border-radius: var(--radius-buttons);
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--camera-pane);
   color: var(--color-whiteout);
   font-size: 13px;
   font-weight: 500;
@@ -8074,35 +8256,39 @@ body {
 .ar-offscreen-arrow {
   font-size: 26px;
   line-height: 0.7;
-  color: var(--color-signal-blue);
+  color: var(--color-sky-tint);
 }
 
 /* ------------------------------------------------------------ inset map */
 .ar-minimap {
   position: absolute;
   left: 12px;
-  bottom: calc(var(--ar-sheet-height, 120px) + 12px);
+  bottom: calc(var(--ar-sheet-height, 120px) + 20px + env(safe-area-inset-bottom, 0px));
   z-index: 12;
   width: 112px;
   height: 112px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: var(--radius-buttons);
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--camera-pane);
 }
 
 /* ----------------------------------------------------------------- sheet */
 .ar-sheet {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  right: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  left: 8px;
   z-index: 12;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(0, 0, 0, 0.74);
+  padding: 14px;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius-cards);
+  background: var(--camera-pane);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  backdrop-filter: var(--glass-blur-light);
 }
 
 /* The whole instruction, where there is room for a sentence. */
@@ -8147,7 +8333,7 @@ body {
   padding: 0 14px;
   border: 1px solid var(--color-hairline-strong);
   border-radius: var(--radius-buttons);
-  background: transparent;
+  background: var(--glass-fill-control);
   color: var(--color-whiteout);
   font: inherit;
   font-size: var(--text-control);
@@ -8158,7 +8344,7 @@ body {
 
 .camera-preview-control:hover:not(:disabled):not(.is-primary) {
   border-color: var(--color-whiteout);
-  background: var(--color-veil);
+  background: var(--glass-fill-control-hover);
 }
 
 .camera-preview-control:disabled {
@@ -8171,10 +8357,10 @@ body {
   outline-offset: 2px;
 }
 
-/* The next thing to do is the haze button; everything else is an outline. */
+/* The next thing to do is the white button; everything else is glass. */
 .camera-preview-control.is-primary {
-  border-color: var(--color-ink);
-  background: var(--surface-haze-card);
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
   color: var(--color-ink);
 }
 
@@ -8191,7 +8377,7 @@ body {
   gap: 10px;
   padding: 24px;
   text-align: center;
-  background: var(--surface-dark-canvas);
+  background: var(--surface-clear);
   color: var(--color-whiteout);
 }
 
@@ -8227,9 +8413,12 @@ body {
   position: static;
 }
 
-.camera-ar-overlay .ar-sheet.is-overlay {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: var(--radius-cards);
+/* Inside an immersive session nothing may blur: the compositor there does
+     not support it and would draw the pane opaque. */
+.camera-ar-overlay .ar-sheet.is-overlay,
+.camera-ar-overlay .camera-preview-instruction {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .camera-ar-overlay-note {
@@ -8237,7 +8426,7 @@ body {
   padding: 8px 12px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: var(--radius-cards);
-  background: rgba(0, 0, 0, 0.68);
+  background: var(--camera-chip);
   color: var(--color-whiteout);
   font-size: 13px;
   line-height: 1.4;
@@ -8256,8 +8445,6 @@ body {
     bottom: 16px;
     left: 16px;
     width: 440px;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: var(--radius-cards);
   }
 
   .ar-minimap {
@@ -8269,3 +8456,191 @@ body {
   }
 }
 
+/* ==========================================================================
+   Operator workbench: panes
+   --------------------------------------------------------------------------
+   The workbench is built from the same glass as the visitor's side. Its
+   surfaces were laid out as bordered regions of one sheet; each region that
+   holds something to read is now a pane, with the sky between them, and the
+   two drawings - the inspector's model and the Studio's plan - sit on clear
+   ground so the sky is behind them too.
+
+   These come last and carry the surface's class, so they hold against the
+   older region rules without restating them.
+   ========================================================================== */
+
+/* ---- Inspector ---- */
+.inspector-surface .spatial-twin {
+  gap: 8px;
+  padding: 12px;
+}
+
+.inspector-surface .twin-stage {
+  gap: 8px;
+}
+
+.inspector-surface .twin-toolbar,
+.inspector-surface .twin-inspector,
+.inspector-surface .twin-legend {
+  border-radius: var(--radius-cards);
+  border: 1px solid var(--glass-line);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+/* The toolbar is at the top of the sky, where the light pane holds. */
+.inspector-surface .twin-toolbar {
+  background: var(--glass-fill);
+}
+
+.inspector-surface .twin-toggle:not(.active),
+.inspector-surface button:not([aria-pressed='true']):not(.active) {
+  background: var(--glass-fill-control);
+  color: var(--color-whiteout);
+}
+
+.inspector-surface .twin-toggle:not(.active):hover,
+.inspector-surface button:not([aria-pressed='true']):not(.active):hover:not(:disabled) {
+  border-color: var(--color-whiteout);
+  background: var(--glass-fill-control-hover);
+  color: var(--color-whiteout);
+}
+
+/* Labels on the model: many, and they move with the camera, so tinted rather
+   than blurred. */
+.inspector-surface .twin-poi-label,
+.inspector-surface .twin-route-label,
+.inspector-surface .twin-connector-label,
+.inspector-surface .twin-viewport-status span {
+  border: 1px solid var(--glass-line);
+  background: var(--glass-fill-chip);
+  color: var(--color-whiteout);
+}
+
+.inspector-surface .twin-poi-label::after {
+  background: var(--color-whiteout);
+}
+
+.inspector-surface .twin-tag-list span,
+.inspector-surface .twin-property-grid div {
+  border-color: var(--color-hairline);
+  background: var(--glass-fill-control);
+  color: var(--color-whiteout);
+}
+
+.venue-package-manager {
+  border-radius: var(--radius-cards);
+  border: 1px solid var(--glass-line);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: var(--color-whiteout);
+}
+
+.venue-package-manager .venue-package-manager-toggle,
+.venue-package-manager .venue-package-facts span,
+.venue-package-manager .venue-package-facts code,
+.venue-package-manager .venue-package-catalog button:not(.active),
+.venue-package-manager .venue-artifact-actions label,
+.venue-package-manager .venue-artifact-actions button,
+.venue-package-manager .venue-package-url input,
+.venue-package-manager .venue-package-url button {
+  border-color: var(--color-hairline-strong);
+  background: var(--glass-fill-control);
+  color: var(--color-whiteout);
+}
+
+/* ---- Studio ---- */
+.studio-surface .studio-header {
+  border-bottom: 0;
+}
+
+.studio-surface .studio-boundary-note,
+.studio-surface .studio-editor-panel,
+.studio-surface .studio-validation-panel {
+  border-radius: var(--radius-cards);
+  border: 1px solid var(--glass-line);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+.studio-surface .studio-boundary-note {
+  background: var(--glass-fill);
+}
+
+/* The cards in the right-hand column are set into its pane, not panes themselves. */
+.studio-surface .studio-validation-panel > * {
+  border-color: var(--color-hairline);
+  background-color: rgba(255, 255, 255, 0.07);
+}
+
+/* The plan is drawn on a darker well so its white lines hold. */
+.studio-surface .studio-canvas-instructions,
+.studio-surface .studio-canvas-legend {
+  border: 1px solid var(--glass-line);
+  background: var(--glass-fill-chip);
+  color: var(--color-whiteout);
+}
+
+.studio-surface .studio-validation-icon {
+  background: var(--glass-fill-control);
+  color: var(--color-whiteout);
+}
+
+/* ---- Recorder ---- */
+.walk-recorder .walk-recorder-warning,
+.walk-recorder .walk-recorder-error,
+.walk-recorder .walk-recorder-idle,
+.walk-recorder .walk-recorder-stats,
+.walk-recorder .walk-recorder-live,
+.walk-recorder .session-harness {
+  border-radius: var(--radius-cards);
+  border: 1px solid var(--glass-line);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: var(--color-whiteout);
+}
+
+.walk-recorder .walk-recorder-idle {
+  color: var(--color-whiteout-soft);
+}
+
+/* A caution earns a heavier edge, not a different colour. */
+.walk-recorder .walk-recorder-warning,
+.walk-recorder .walk-recorder-error,
+.walk-recorder .walk-recorder-live-bad {
+  border-width: 2px;
+  border-color: var(--color-whiteout);
+}
+
+/* On a phone the inspector's controls scroll sideways in one row. They must
+   keep their width there: left to shrink, each fell to its 44px floor and its
+   label ran out over its neighbour. */
+.inspector-surface .twin-controls > *,
+.inspector-surface .twin-control-group > * {
+  flex: none;
+}
+
+/* Starting and stopping a capture is what this surface is for. */
+.walk-recorder .walk-recorder-start,
+.walk-recorder .walk-recorder-stop {
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
+  color: var(--color-ink);
+}
+
+.walk-recorder .walk-recorder-start:hover:not(:disabled),
+.walk-recorder .walk-recorder-stop:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+[data-contrast="high"] body::before {
+  background: #071636;
+}

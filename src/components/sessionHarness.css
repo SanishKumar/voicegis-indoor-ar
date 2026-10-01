@@ -28,8 +28,9 @@
   font-size: 13px;
   padding: 8px 12px;
   border-radius: var(--radius-buttons);
-  background: var(--surface-haze-card);
-  color: var(--color-ink);
+  border: 1px solid var(--color-hairline-strong);
+  background: var(--glass-fill-control);
+  color: var(--color-whiteout);
 }
 .session-harness p {
   line-height: 1.6;
