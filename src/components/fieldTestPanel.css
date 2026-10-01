@@ -9,11 +9,11 @@
   gap: 6px;
   min-height: 36px;
   padding: 6px 10px;
-  border: 1px solid var(--ed-ink);
-  border-radius: 999px;
-  color: var(--ed-ink);
-  background: rgba(255, 249, 240, 0.9);
-  font: 600 12px/1 var(--ed-body);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-buttons);
+  color: var(--color-whiteout);
+  background: var(--color-scrim);
+  font: 500 12px/1 var(--font-control);
   transform: translateY(-50%);
 }
 
@@ -24,7 +24,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(0, 6, 9, 0.45);
+  background: var(--color-scrim);
 }
 
 .field-test-sheet {
@@ -35,10 +35,10 @@
   max-height: 88dvh;
   padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
     max(16px, env(safe-area-inset-left));
-  border-radius: 16px 16px 0 0;
-  color: var(--ed-ink);
-  background: var(--ed-cream);
-  font-family: var(--ed-body);
+  border-radius: var(--radius-cards) var(--radius-cards) 0 0;
+  color: var(--color-ink);
+  background: var(--surface-haze-card);
+  font-family: var(--font-control);
 }
 
 .field-test-header {
@@ -50,24 +50,25 @@
 
 .field-test-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--text-subheading);
+  font-weight: var(--font-weight-medium);
 }
 
 .field-test-close {
   display: inline-grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--ed-ink);
-  border-radius: 999px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-buttons);
   color: inherit;
   background: transparent;
 }
 
 .field-test-note {
   margin: 0;
-  font-size: 13px;
-  color: var(--ed-ink-soft);
+  font-size: var(--text-caption);
+  color: var(--color-ink-soft);
 }
 
 .field-test-text {
@@ -75,10 +76,10 @@
   min-height: 240px;
   width: 100%;
   padding: 10px;
-  border: 1px solid rgba(0, 6, 9, 0.25);
-  border-radius: 10px;
-  color: var(--ed-ink);
-  background: #fff;
+  border: 1px solid var(--color-ink-hairline);
+  border-radius: var(--radius-inputs);
+  color: var(--color-ink);
+  background: var(--surface-whiteout);
   font:
     11px/1.45 ui-monospace,
     'SFMono-Regular',
@@ -97,16 +98,15 @@
 .field-test-action {
   flex: 1;
   min-height: 44px;
-  border: 1px solid var(--ed-ink);
-  border-radius: 999px;
-  color: var(--ed-ink);
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-buttons);
+  color: var(--color-ink);
   background: transparent;
-  font: 600 14px/1 var(--ed-body);
+  font: 500 14px/1 var(--font-control);
 }
 
 .field-test-action.is-primary {
-  color: var(--ed-cream);
-  background: var(--ed-ink);
+  background: var(--surface-whiteout);
 }
 
 .field-test-action:disabled {

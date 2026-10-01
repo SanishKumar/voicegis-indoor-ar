@@ -35,12 +35,13 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 14px 14px 14px 16px;
-  background: var(--ed-ink);
-  color: var(--ed-cream);
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--surface-dark-canvas);
+  color: var(--color-whiteout);
 }
 
 .jr-banner:focus-visible {
-  outline: 2px solid var(--ed-cream);
+  outline: 2px solid var(--color-whiteout);
   outline-offset: -4px;
 }
 
@@ -56,21 +57,21 @@
 .jr-banner-icon {
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 54px;
-  border-radius: 9999px;
-  background: var(--ed-blue);
-  color: var(--ed-cream);
+  width: 52px;
+  height: 52px;
+  /* An outlined tile, not a filled one: nothing on the canvas is a block of colour. */
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-buttons);
+  background: transparent;
+  color: var(--color-whiteout);
 }
 
-.jr-banner.is-arriving .jr-banner-icon {
-  background: var(--ed-cream);
-  color: var(--ed-ink);
-}
-
+/* The two moments that need noticing take the one light fill there is. */
+.jr-banner.is-arriving .jr-banner-icon,
 .jr-banner.is-problem .jr-banner-icon {
-  background: var(--ed-cream);
-  color: var(--ed-ink);
+  border-color: var(--surface-haze-card);
+  background: var(--surface-haze-card);
+  color: var(--color-ink);
 }
 
 .jr-banner-copy {
@@ -83,42 +84,42 @@
   flex-wrap: wrap;
   gap: 4px 10px;
   margin: 0 0 2px;
-  font-family: var(--ed-body);
-  font-size: 0.875rem;
-  font-weight: 700;
+  font-family: var(--font-control);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-medium);
   line-height: 1.3;
-  color: rgba(255, 249, 240, 0.78);
+  color: var(--color-whiteout-soft);
   font-variant-numeric: tabular-nums;
 }
 
+/* A tag. Its border carries the tracking confidence below; at rest it is a hairline. */
 .jr-banner-status {
   padding: 1px 8px;
-  border: 1px solid rgba(255, 249, 240, 0.38);
-  border-radius: 9999px;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 249, 240, 0.72);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-inputs);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0;
+  color: var(--color-whiteout-soft);
 }
 
 .jr-banner-text {
   display: block;
   margin: 0;
-  font-family: var(--ed-display);
-  font-size: 1.3125rem;
-  font-weight: 700;
-  line-height: 1.18;
-  letter-spacing: 0.006em;
-  color: var(--ed-cream);
+  font-family: var(--font-control);
+  font-size: var(--text-subheading);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+  letter-spacing: 0;
+  color: var(--color-whiteout);
   text-wrap: balance;
 }
 
 .jr-banner-then {
   margin: 5px 0 0;
-  font-size: 0.875rem;
-  line-height: 1.35;
-  color: rgba(255, 249, 240, 0.78);
+  font-size: var(--text-control);
+  line-height: 1.4;
+  color: var(--color-whiteout-soft);
 }
 
 .jr-banner-voice {
@@ -126,17 +127,17 @@
   place-items: center;
   width: 44px;
   height: 44px;
-  border: 1px solid rgba(255, 249, 240, 0.38);
-  border-radius: 9999px;
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-buttons);
   background: transparent;
-  color: var(--ed-cream);
+  color: var(--color-whiteout);
   cursor: pointer;
 }
 
 .jr-banner-voice[aria-pressed='true'] {
-  border-color: var(--ed-cream);
-  background: var(--ed-cream);
-  color: var(--ed-ink);
+  border-color: var(--surface-haze-card);
+  background: var(--surface-haze-card);
+  color: var(--color-ink);
 }
 
 /* A narrow phone gives the instruction more width, without reducing the
@@ -149,8 +150,8 @@
   }
 
   .jr-banner-icon {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
   }
 
   .jr-banner-text {
@@ -182,15 +183,15 @@
   overscroll-behavior: contain;
   scroll-padding-block: 12px;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid var(--ed-ink);
-  background: var(--ed-cream);
-  color: var(--ed-ink);
-  font-family: var(--ed-body);
+  border-top: 1px solid var(--color-hairline);
+  background: var(--surface-dark-canvas);
+  color: var(--color-whiteout);
+  font-family: var(--font-control);
   outline: none;
 }
 
 .jr-sheet:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--ed-blue);
+  box-shadow: inset 0 0 0 2px var(--color-whiteout);
 }
 
 .jr-sheet p {
@@ -219,32 +220,35 @@
 }
 
 .jr-trip-title {
-  font-size: 0.9375rem;
-  font-weight: 700;
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-medium);
 }
 
+/* The one large figure on the sheet: how long and how far. */
 .jr-trip-time {
   display: block;
-  font-family: var(--ed-display);
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1.15;
+  font-family: var(--font-control-tnt);
+  font-size: clamp(1.5rem, 7.6vw, var(--text-heading));
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-heading);
   font-variant-numeric: tabular-nums;
 }
 
 .jr-trip-to {
-  font-size: 0.875rem;
+  margin-top: 4px;
+  font-size: var(--text-control);
   line-height: 1.4;
   overflow-wrap: anywhere;
-  color: var(--ed-ink-soft);
+  color: var(--color-whiteout-soft);
 }
 
 .jr-trip-to strong {
-  color: var(--ed-ink);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-whiteout);
 }
 
 .jr-destination-context {
-  font-size: 0.875rem;
+  font-size: var(--text-control);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -252,17 +256,17 @@
 .jr-destination-context summary {
   min-height: 44px;
   padding: 10px 0;
-  font-weight: 700;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .jr-destination-context[open] {
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--ed-ink-soft);
+  border-bottom: 1px solid var(--color-hairline);
 }
 
 .jr-destination-context summary:focus-visible {
-  outline: 2px solid var(--ed-blue);
+  outline: 2px solid var(--color-whiteout);
   outline-offset: 2px;
 }
 
@@ -276,8 +280,8 @@
   flex-wrap: wrap;
   gap: 10px;
   padding: 8px 0;
-  border-top: 1px solid rgba(0, 6, 9, 0.14);
-  border-bottom: 1px solid rgba(0, 6, 9, 0.14);
+  border-top: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-hairline);
 }
 
 .jr-meta-copy {
@@ -337,14 +341,16 @@
   padding: 4px;
   border: 0;
   background: none;
-  color: var(--ed-blue);
+  color: var(--color-signal-blue);
   font: inherit;
-  font-weight: 700;
+  font-weight: var(--font-weight-medium);
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
   cursor: pointer;
 }
 
+/* Ghost by default: transparent on the canvas, with a thin light border. */
 .jr-chip,
 .jr-pill,
 .jr-primary,
@@ -352,33 +358,34 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   min-height: 44px;
-  border: 1px solid var(--ed-ink);
-  border-radius: 9999px;
-  background: var(--ed-cream);
-  color: var(--ed-ink);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-buttons);
+  background: transparent;
+  color: var(--color-whiteout);
   font: inherit;
-  font-weight: 700;
+  font-size: var(--text-control);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
 }
 
+/* A filter, so it is the one shape here that is a pill. */
 .jr-chip {
   flex: none;
-  padding: 0 14px;
-  font-size: 0.8125rem;
+  padding: 0 16px;
+  border-radius: var(--radius-pills);
 }
 
 .jr-chip.is-on {
-  border-color: var(--ed-blue);
-  background: var(--ed-blue);
-  color: var(--ed-cream);
+  border-color: var(--surface-haze-card);
+  background: var(--surface-haze-card);
+  color: var(--color-ink);
 }
 
 .jr-pill {
   max-width: 100%;
-  padding: 8px 18px;
-  font-size: 0.875rem;
+  padding: 10px 16px;
   overflow-wrap: anywhere;
 }
 
@@ -388,21 +395,25 @@
   padding: 0;
 }
 
+/* The main action is the haze button: the only filled control on the sheet. */
 .jr-primary {
   flex: 1;
   min-width: 0;
-  padding: 8px 18px;
-  border-color: var(--ed-ink);
-  background: var(--ed-ink);
-  color: var(--ed-cream);
-  font-size: 0.9375rem;
+  min-height: 48px;
+  padding: 10px 16px;
+  border-color: var(--color-ink);
+  background: var(--surface-haze-card);
+  color: var(--color-ink);
+  font-size: var(--text-body);
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
+/* While it is running, the same control is an outline: on, not a call to act. */
 .jr-primary[aria-pressed='true'] {
-  border-color: var(--ed-blue);
-  background: var(--ed-blue);
+  border-color: var(--color-whiteout);
+  background: transparent;
+  color: var(--color-whiteout);
 }
 
 @media (max-width: 360px) {
@@ -413,14 +424,14 @@
 
 .jr-chip:hover:not(:disabled):not(.is-on),
 .jr-pill:hover:not(:disabled),
-.jr-icon-button:hover:not(:disabled) {
-  border-color: var(--ed-blue);
-  color: var(--ed-blue);
+.jr-icon-button:hover:not(:disabled),
+.jr-primary[aria-pressed='true']:hover:not(:disabled) {
+  border-color: var(--color-whiteout);
+  background: var(--color-veil);
 }
 
-.jr-primary:hover:not(:disabled) {
-  border-color: var(--ed-blue);
-  background: var(--ed-blue);
+.jr-primary:hover:not(:disabled):not([aria-pressed='true']) {
+  background: var(--surface-whiteout);
 }
 
 .jr-chip:focus-visible,
@@ -430,7 +441,7 @@
 .jr-link:focus-visible,
 .jr-banner-voice:focus-visible,
 .jr-step button:focus-visible {
-  outline: 2px solid var(--ed-blue);
+  outline: 2px solid var(--color-whiteout);
   outline-offset: 2px;
 }
 
@@ -464,16 +475,16 @@
     bottom: 0;
     z-index: 1;
     padding-top: 8px;
-    border-top: 1px solid var(--ed-ink-soft);
-    background: var(--ed-cream);
-    box-shadow: 0 12px 0 var(--ed-cream);
+    border-top: 1px solid var(--color-hairline);
+    background: var(--surface-dark-canvas);
+    box-shadow: none;
   }
 }
 
 .jr-note {
-  font-size: 0.8125rem;
-  line-height: 1.5;
-  color: var(--ed-ink-soft);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+  color: var(--color-whiteout-soft);
 }
 
 /* ------------------------------------------------------------ step list */
@@ -495,7 +506,7 @@
 }
 
 .jr-step + .jr-step {
-  border-top: 1px solid rgba(0, 6, 9, 0.12);
+  border-top: 1px solid var(--color-hairline);
 }
 
 .jr-step button {
@@ -507,7 +518,7 @@
   padding: 8px 4px;
   border: 0;
   background: none;
-  color: var(--ed-ink);
+  color: var(--color-whiteout);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -519,8 +530,8 @@
   place-items: center;
   width: 36px;
   height: 36px;
-  border: 1px solid var(--ed-ink);
-  border-radius: 9999px;
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-buttons);
 }
 
 .jr-step-copy {
@@ -529,14 +540,14 @@
 }
 
 .jr-step-text {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  line-height: 1.3;
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.35;
 }
 
 .jr-step small {
-  font-size: 0.8125rem;
-  color: var(--ed-ink-soft);
+  font-size: var(--text-caption);
+  color: var(--color-whiteout-soft);
 }
 
 .jr-step.is-done .jr-step-copy,
@@ -544,14 +555,15 @@
   opacity: 0.45;
 }
 
+/* The step being walked: the light tile, and the one accent for its words. */
 .jr-step.is-next .jr-step-icon {
-  border-color: var(--ed-blue);
-  background: var(--ed-blue);
-  color: var(--ed-cream);
+  border-color: var(--surface-haze-card);
+  background: var(--surface-haze-card);
+  color: var(--color-ink);
 }
 
 .jr-step.is-next .jr-step-text {
-  color: var(--ed-blue);
+  color: var(--color-signal-blue);
 }
 
 .jr-spin {
@@ -608,8 +620,8 @@
     display: flex;
     flex-direction: column;
     width: 400px;
-    border-right: 1px solid var(--ed-ink);
-    background: var(--ed-cream);
+    border-right: 1px solid var(--color-hairline);
+    background: var(--surface-dark-canvas);
   }
 
   .jr-banner,
@@ -625,7 +637,7 @@
   }
 
   .jr-banner-text {
-    font-size: 1.4375rem;
+    font-size: 1.375rem;
   }
 
   .jr-sheet {
@@ -638,11 +650,10 @@
 
   .jr-venue {
     display: block;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ed-ink-soft);
+    font-size: var(--text-caption);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0;
+    color: var(--color-whiteout-soft);
   }
 
   /* There is room for the whole list; hiding it behind a toggle is a phone economy. */
@@ -670,21 +681,21 @@
 /* Confidence is carried by the pill's weight, not a hue: solid while
    tracking, a heavier rule for caution, a broken rule when frozen. */
 .jr-banner-status.is-tracking {
-  border-color: var(--ed-cream);
-  background: var(--ed-cream);
-  color: var(--ed-ink);
+  border-color: var(--surface-haze-card);
+  background: var(--surface-haze-card);
+  color: var(--color-ink);
 }
 
 .jr-banner-status.is-caution {
   border-width: 2px;
-  border-color: var(--ed-cream);
-  color: var(--ed-cream);
+  border-color: var(--color-whiteout);
+  color: var(--color-whiteout);
 }
 
 .jr-banner-status.is-frozen {
   border-style: dashed;
-  border-color: var(--ed-cream);
-  color: var(--ed-cream);
+  border-color: var(--color-whiteout);
+  color: var(--color-whiteout);
 }
 
 .jr-tracking {
@@ -692,9 +703,9 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
-  font-size: 0.8125rem;
-  line-height: 1.45;
-  color: var(--ed-ink-soft);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+  color: var(--color-whiteout-soft);
 }
 
 .jr-tracking p {
@@ -703,7 +714,8 @@
 }
 
 .jr-tracking strong {
-  color: var(--ed-ink);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-whiteout);
 }
 
 .jr-secondary {
@@ -711,16 +723,17 @@
   padding: 4px;
   border: 0;
   background: none;
-  color: var(--ed-ink);
+  color: var(--color-signal-blue);
   font: inherit;
-  font-weight: 700;
+  font-weight: var(--font-weight-medium);
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
   cursor: pointer;
 }
 
 .jr-secondary:focus-visible {
-  outline: 2px solid var(--ed-blue);
+  outline: 2px solid var(--color-whiteout);
   outline-offset: 2px;
 }
 

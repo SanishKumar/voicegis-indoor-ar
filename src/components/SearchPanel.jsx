@@ -328,7 +328,6 @@ export default function SearchPanel() {
             <>
               <ul className="search-result-list" aria-label="Destination results">
                 {visibleResults.map(({ node }) => {
-                  const cat = venue.getCategory(node.poi.category);
                   const routePreview = routePreviews.get(node.id);
                   return (
                     <li
@@ -343,11 +342,7 @@ export default function SearchPanel() {
                         aria-label={`View details for ${node.poi.name}`}
                         aria-describedby={`search-meta-${node.id}`}
                       >
-                        <div
-                          className="search-result-icon"
-                          style={{ background: cat?.bgColor, color: cat?.color }}
-                          aria-hidden="true"
-                        >
+                        <div className="search-result-icon" aria-hidden="true">
                           {node.poi.icon}
                         </div>
                         <div className="search-result-info">

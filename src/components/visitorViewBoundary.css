@@ -12,17 +12,17 @@
 .visitor-view-status {
   width: 100%;
   max-width: 360px;
-  padding: 16px;
-  border: 1px solid var(--ed-ink-soft);
-  border-radius: 12px;
-  background: var(--ed-cream);
-  color: var(--ed-ink);
-  font: 14px/1.5 var(--ed-body);
+  padding: var(--card-padding);
+  border: 0;
+  border-radius: var(--radius-cards);
+  background: var(--surface-haze-card);
+  color: var(--color-ink);
+  font: 500 14px/1.5 var(--font-control);
 }
 
 .visitor-view-status h2 {
   margin: 0 0 8px;
-  font: 700 20px/1.3 var(--ed-display);
+  font: 500 20px/1.3 var(--font-control);
 }
 
 .visitor-view-status p {
@@ -39,16 +39,20 @@
   min-height: 44px;
   margin-top: 10px;
   padding: 8px 12px;
-  border: 1px solid var(--ed-ink);
-  border-radius: 8px;
-  background: var(--ed-ink);
-  color: var(--ed-cream);
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-buttons);
+  background: var(--surface-whiteout);
+  color: var(--color-ink);
   font: inherit;
   cursor: pointer;
 }
 
-.visitor-view-status:focus-visible,
-.visitor-view-status button:focus-visible {
-  outline: 3px solid var(--ed-blue);
+.visitor-view-status:focus-visible {
+  outline: 2px solid var(--color-whiteout);
   outline-offset: 3px;
+}
+
+.visitor-view-status button:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
 }

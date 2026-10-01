@@ -21,14 +21,15 @@
 }
 .session-harness-heading span {
   font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  text-transform: none;
+  letter-spacing: 0;
 }
 .session-harness-gate {
   font-size: 13px;
   padding: 8px 12px;
-  border-radius: 999px;
-  background: #e6edf3;
+  border-radius: var(--radius-buttons);
+  background: var(--surface-haze-card);
+  color: var(--color-ink);
 }
 .session-harness p {
   line-height: 1.6;
@@ -36,8 +37,8 @@
 }
 .session-harness-note {
   padding: 12px;
-  border-left: 3px solid #0756bb;
-  background: #0756bb08;
+  border-left: 3px solid var(--color-whiteout);
+  background: var(--color-veil);
 }
 .session-harness-facts {
   display: grid;
@@ -76,7 +77,7 @@
 }
 .session-harness button:focus-visible,
 .session-harness input:focus-visible {
-  outline: 2px solid #0756bb;
+  outline: 2px solid var(--color-whiteout);
   outline-offset: 3px;
 }
 .session-harness form {
@@ -108,7 +109,7 @@
 }
 .session-harness-input-state {
   margin: 16px 0;
-  font-weight: 600;
+  font-weight: 500;
 }
 @media (max-width: 560px) {
   .session-harness form {

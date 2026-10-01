@@ -11,10 +11,10 @@
   height: 44px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--ed-ink);
-  border-radius: 50%;
-  background: var(--ed-cream);
-  color: var(--ed-ink);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-buttons);
+  background: var(--color-scrim);
+  color: var(--color-whiteout);
   cursor: pointer;
 }
 .visitor-map-return {
@@ -24,17 +24,17 @@
   width: 96px;
   min-height: 44px;
   padding: 5px 8px;
-  border: 1px solid var(--ed-ink);
-  border-radius: 12px;
-  background: var(--ed-ink);
-  color: var(--ed-cream);
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-buttons);
+  background: var(--surface-haze-card);
+  color: var(--color-ink);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-caption);
   cursor: pointer;
 }
 .visitor-map-return:focus-visible,
 .nav-expand-map:focus-visible {
-  outline: 2px solid var(--ed-blue);
+  outline: 2px solid var(--color-whiteout);
   outline-offset: 3px;
 }
 .visitor-shell .nav-panel.journey-panel {
@@ -96,7 +96,7 @@
   position: sticky;
   bottom: 0;
   flex-shrink: 0;
-  background: var(--ed-cream);
+  background: var(--surface-dark-canvas);
 }
 
 .journey-location-note {
@@ -104,7 +104,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 5px 12px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -120,13 +120,13 @@
 }
 
 .journey-arrival-button {
-  border: 0;
-  border-radius: 8px;
-  padding: 12px;
-  background: #0756bb;
-  color: white;
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-buttons);
+  padding: 12px 16px;
+  background: var(--surface-haze-card);
+  color: var(--color-ink);
   font: inherit;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
 }
 
@@ -136,18 +136,19 @@
   left: 16px;
   max-width: min(280px, calc(100% - 88px));
   padding: 8px 12px;
-  border: 1px solid #b9c9dc;
-  border-radius: 8px;
-  background: #f8fbff;
-  color: #17334f;
-  font-size: 12px;
-  line-height: 1.5;
+  border: 0;
+  border-radius: var(--radius-buttons);
+  background: var(--surface-haze-card);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
   pointer-events: none;
 }
 
 .compiled-map-location span {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
+  color: var(--color-ink-soft);
 }
 
 .compiled-map-presentation {
@@ -161,33 +162,36 @@
   align-items: flex-end;
   gap: 8px;
 }
+/* The view switch is a segmented toggle: the one pill among the map controls. */
 .compiled-map-modes {
   display: flex;
   padding: 3px;
-  border: 1px solid #a8adb1;
-  border-radius: 999px;
-  background: var(--ed-cream);
-  box-shadow: 0 3px 12px #17334f12;
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-pills);
+  background: var(--color-scrim);
+  box-shadow: none;
 }
 .compiled-map-presentation button {
   min-width: 44px;
   min-height: 44px;
   border: 0;
-  border-radius: 999px;
-  background: var(--ed-cream);
-  color: var(--ed-ink);
+  border-radius: var(--radius-pills);
+  background: transparent;
+  color: var(--color-whiteout);
   font: inherit;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--text-control);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
 }
 .compiled-map-presentation button[aria-pressed='true'] {
-  background: var(--ed-ink);
-  color: var(--ed-cream);
+  background: var(--surface-haze-card);
+  color: var(--color-ink);
 }
 .compiled-map-presentation .compiled-map-overview {
   padding: 0 14px;
-  border: 1px solid #a8adb1;
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-buttons);
+  background: var(--color-scrim);
 }
 .compiled-map-graphics {
   width: 196px;
@@ -195,20 +199,23 @@
   display: grid;
   gap: 4px;
   padding: 8px;
-  border: 1px solid #a8adb1;
-  border-radius: 14px;
-  background: var(--ed-cream);
-  box-shadow: 0 3px 12px #17334f12;
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-cards);
+  background: var(--surface-dark-canvas);
+  box-shadow: none;
+}
+.compiled-map-graphics button {
+  border-radius: var(--radius-buttons);
 }
 .compiled-map-graphics p {
   margin: 5px 4px 2px;
-  color: var(--ed-ink);
-  font-size: 12px;
+  color: var(--color-whiteout-soft);
+  font-size: var(--text-caption);
   line-height: 1.4;
 }
 .compiled-map-presentation button:focus-visible,
 .compiled-map-fallback button:focus-visible {
-  outline: 2px solid var(--ed-blue);
+  outline: 2px solid var(--color-whiteout);
   outline-offset: 3px;
 }
 .compiled-map-presentation button:disabled {
@@ -224,10 +231,11 @@
   display: grid;
   gap: 8px;
   padding: 14px;
-  border: 1px solid #a8adb1;
-  border-radius: 12px;
-  background: var(--ed-cream);
-  font-size: 13px;
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-cards);
+  background: var(--surface-dark-canvas);
+  color: var(--color-whiteout);
+  font-size: var(--text-caption);
 }
 .compiled-map-fallback button {
   min-height: 44px;
@@ -271,7 +279,7 @@
   .compiled-map-presentation .compiled-map-overview {
     width: 96px;
     padding: 0 5px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .compiled-map-canvas,
   .compiled-map-labels {
@@ -324,7 +332,7 @@
     font-size: 16px;
   }
   .journey-panel .nav-journey-facts dt {
-    font-size: 10px;
+    font-size: 12px;
   }
   .journey-panel .nav-current-instruction strong {
     font-size: 16px;

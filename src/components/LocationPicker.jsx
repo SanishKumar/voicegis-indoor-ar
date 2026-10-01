@@ -153,11 +153,6 @@ export default function LocationPicker({ isOpen, onClose }) {
                 className={`lp-chip ${activeCategory === cat.id ? 'active' : ''}`}
                 onClick={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
                 aria-pressed={activeCategory === cat.id}
-                style={
-                  activeCategory === cat.id
-                    ? { background: cat.bgColor, color: cat.color, borderColor: cat.color }
-                    : {}
-                }
               >
                 {cat.icon} {cat.label}
               </button>
@@ -173,15 +168,9 @@ export default function LocationPicker({ isOpen, onClose }) {
             </div>
           )}
           {filteredPOIs.map((node) => {
-            const cat = venue.getCategory(node.poi.category);
             return (
               <button key={node.id} className="lp-result-item" onClick={() => handleSelect(node)}>
-                <div
-                  className="lp-result-icon"
-                  style={{ background: cat?.bgColor, color: cat?.color }}
-                >
-                  {node.poi.icon}
-                </div>
+                <div className="lp-result-icon">{node.poi.icon}</div>
                 <div className="lp-result-info">
                   <div className="lp-result-name">{node.poi.name}</div>
                   <div className="lp-result-desc">{node.poi.description}</div>

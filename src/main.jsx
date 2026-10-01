@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '#voicegis-app';
+import './styles/fonts.css';
 import './index.css';
 import { registerOfflineWorker } from './offline/offlineAvailability.ts';
 

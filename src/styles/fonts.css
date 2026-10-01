@@ -1,0 +1,37 @@
+/*
+ * The three faces of the interface, shipped with the app.
+ *
+ * A request to a font host would break the cold-offline promise the service
+ * worker exists to make, so the files come from the build itself and are
+ * precached with the rest of the assets. Latin only: about 118 kB for all three.
+ * All are under the SIL Open Font License.
+ *
+ * Inter carries everything; Anton is the compressed display cut, used rarely;
+ * Caveat is the one cursive word inside an otherwise upright headline.
+ */
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Anton';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../../node_modules/@fontsource/anton/files/anton-latin-400-normal.woff2')
+    format('woff2');
+}
+
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('../../node_modules/@fontsource/caveat/files/caveat-latin-500-normal.woff2')
+    format('woff2');
+}
