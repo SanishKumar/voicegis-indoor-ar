@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import liftClosureJson from '../../buildings/asterion-medical-center/operations/all-public-lifts-closed.overlay.json';
 import { ASTERION_RUNTIME } from '../test/venueFixtures';
-import { calculateCompiledRoute, type RoutingProfile } from './compiledRoutePolicy';
+import {
+  calculateCompiledRoute,
+  type ExplainedRouteResult,
+  type RoutingProfile,
+} from './compiledRoutePolicy';
 import type { OperationalOverlay } from './operationalOverlay';
 
 const publicPois = ASTERION_RUNTIME.getPOIs();
@@ -16,16 +20,7 @@ const edgesByPair = new Map(
   ASTERION_RUNTIME.routingEdges.map((edge) => [edgeKey(edge.from, edge.to), edge] as const),
 );
 
-function routeIssues(
-  fromId: string,
-  toId: string,
-  profile: RoutingProfile,
-  options: Parameters<typeof calculateCompiledRoute>[3] = {},
-) {
-  const result = calculateCompiledRoute(ASTERION_RUNTIME, fromId, toId, {
-    ...options,
-    profile,
-  });
+function routeIssues(result: ExplainedRouteResult, profile: RoutingProfile) {
   if (!result.found) return [result.error];
 
   const issues: string[] = [];
@@ -62,15 +57,17 @@ describe('public destination route matrix', () => {
         const to = publicPois[toIndex];
 
         for (const profile of ['standard', 'wheelchair'] as const) {
-          const forwardIssues = routeIssues(from.id, to.id, profile);
-          const reverseIssues = routeIssues(to.id, from.id, profile);
+          // Inspect the same geometry-checked results used for symmetry.
+          // Recalculating identical routes only added timing noise.
+          const forward = calculateCompiledRoute(ASTERION_RUNTIME, from.id, to.id, { profile });
+          const reverse = calculateCompiledRoute(ASTERION_RUNTIME, to.id, from.id, { profile });
+          const forwardIssues = routeIssues(forward, profile);
+          const reverseIssues = routeIssues(reverse, profile);
           failures.push(
             ...forwardIssues.map((issue) => `${profile} ${from.id} -> ${to.id}: ${issue}`),
             ...reverseIssues.map((issue) => `${profile} ${to.id} -> ${from.id}: ${issue}`),
           );
 
-          const forward = calculateCompiledRoute(ASTERION_RUNTIME, from.id, to.id, { profile });
-          const reverse = calculateCompiledRoute(ASTERION_RUNTIME, to.id, from.id, { profile });
           if (
             forward.found &&
             reverse.found &&
@@ -110,10 +107,10 @@ describe('public destination route matrix', () => {
         if (sameFloor) {
           sameFloorPairs += 1;
           failures.push(
-            ...routeIssues(from.id, to.id, 'standard', options).map(
+            ...routeIssues(standard, 'standard').map(
               (issue) => `same-floor standard ${from.id} -> ${to.id}: ${issue}`,
             ),
-            ...routeIssues(from.id, to.id, 'wheelchair', options).map(
+            ...routeIssues(wheelchair, 'wheelchair').map(
               (issue) => `same-floor wheelchair ${from.id} -> ${to.id}: ${issue}`,
             ),
           );

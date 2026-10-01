@@ -354,4 +354,32 @@ describe('operator checkpoint session UI', () => {
     expect(screen.queryByRole('button', { name: 'Start checkpoint diagnostic' })).toBeNull();
     expect(prepareDiagnosticSession).not.toHaveBeenCalled();
   });
+
+  it('rechecks the accepted receipt time, not the earlier policy import time', async () => {
+    const evaluatedAt = '2026-07-22T12:01:00.000Z';
+    const route = calculateCompiledRoute(
+      ASTERION_RUNTIME,
+      'poi:poi-main-entrance',
+      'poi:poi-cardiology',
+      {
+        operationalOverlay: liftClosure as OperationalOverlay,
+        evaluatedAt,
+      },
+    );
+    expect(route.found).toBe(true);
+    navigation.mockReturnValue({
+      venue: ASTERION_RUNTIME,
+      state: { route },
+      accessibleRouting: false,
+      operationalOverlay: liftClosure,
+      operationalEvaluatedAt: '2026-07-22T12:00:00.000Z',
+    });
+    render(<SessionHarness />);
+    await start();
+    expect(prepareDiagnosticSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        policy: { profile: 'standard', operationalOverlay: liftClosure, evaluatedAt },
+      }),
+    );
+  });
 });

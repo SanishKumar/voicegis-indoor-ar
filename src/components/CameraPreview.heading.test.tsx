@@ -38,20 +38,27 @@ const route = {
 const setView = vi.fn();
 const confirmArrival = vi.fn();
 /** How far along the guidance on screen is: a walk-through can move it without anyone walking. */
-const guidance = vi.hoisted(() => ({ progress: 0, sign: null as SignHeading | null }));
+const guidance = vi.hoisted(() => ({
+  progress: 0,
+  sign: null as SignHeading | null,
+  graphicsWithheld: false,
+  navStatus: 'navigating',
+}));
 vi.mock('../context/NavigationContext.jsx', () => ({
   VIEW_TYPE: { MAP: 'map', CAMERA_PREVIEW: 'camera-preview' },
   NAV_STATUS: { NAVIGATING: 'navigating', ARRIVED: 'arrived' },
   useNavigation: () => ({
     state: {
       activeView: 'camera-preview',
-      navStatus: 'navigating',
+      navStatus: guidance.navStatus,
       progressMeters: guidance.progress,
       previewStepIndex: 0,
       venueKey: 'synthetic-venue',
       locationBasis: 'qr',
       destinationNodeId: 'poi:desk',
-      route,
+      route: guidance.graphicsWithheld
+        ? { ...route, displayClearance: { status: 'withheld' } }
+        : route,
     },
     // Deliberately tempting anchor data. It must never become the drawn facing.
     checkIn: { anchorId: 'test-anchor', headingDegrees: 90, signHeading: guidance.sign },
@@ -172,6 +179,7 @@ function runFrames(count = 2) {
 }
 
 beforeEach(() => {
+  guidance.graphicsWithheld = false;
   painted.length = 0;
   frames = [];
   guidance.progress = 0;
@@ -231,6 +239,60 @@ const facing = () => Number(view().getAttribute('data-facing'));
 const note = () => document.querySelector('.camera-preview-note')?.textContent ?? '';
 
 describe('the camera view follows where the phone points', () => {
+  it('does not claim arrival when the plain camera opens at the end of a preview', async () => {
+    guidance.progress = 20;
+    render(<CameraPreview tracking={trackingLike('off', anchored())} />);
+    await waitFor(() =>
+      expect(document.querySelector('.ar-sheet-facts')?.textContent).toContain('End of route'),
+    );
+    expect(document.querySelector('.ar-sheet-facts')?.textContent).toContain('Not yet confirmed');
+    expect(view().textContent).not.toContain('You are here');
+    expect(confirmArrival).not.toHaveBeenCalled();
+  });
+
+  it('names only proximity when physical tracking reports the destination radius', async () => {
+    render(
+      <CameraPreview
+        tracking={trackingLike('on', anchored({ tier: 'tracking', reason: 'arrived' }))}
+      />,
+    );
+    await waitFor(() =>
+      expect(document.querySelector('.ar-sheet-facts')?.textContent).toContain('Near destination'),
+    );
+    expect(document.querySelector('.ar-sheet-facts')?.textContent).toContain('Not yet confirmed');
+    expect(view().textContent).not.toContain('You are here');
+    expect(confirmArrival).not.toHaveBeenCalled();
+  });
+
+  it('shows confirmed arrival only after the journey records the explicit confirmation', async () => {
+    guidance.navStatus = 'arrived';
+    try {
+      render(<CameraPreview tracking={trackingLike('off', anchored())} />);
+      await waitFor(() =>
+        expect(document.querySelector('.ar-sheet-facts')?.textContent).toContain(
+          'Arrival confirmed',
+        ),
+      );
+      expect(document.querySelector('.ar-sheet-facts')?.textContent).toContain('Confirmed by you');
+    } finally {
+      guidance.navStatus = 'navigating';
+    }
+  });
+
+  it('explains withheld graphics, cannot start AR and still offers an exit to written directions', async () => {
+    guidance.graphicsWithheld = true;
+    vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
+    const start = vi.spyOn(arRuntime, 'startArGuidance');
+    render(<CameraPreview tracking={trackingLike('off', anchored())} />);
+    const button = await screen.findByRole('button', { name: 'Start AR' });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(button);
+    expect(start).not.toHaveBeenCalled();
+    expect(note()).toContain('mapped walls or openings');
+    expect(view().getAttribute('data-route-clearance')).toBe('withheld');
+    fireEvent.click(screen.getByRole('button', { name: 'Exit to plan' }));
+    expect(setView).toHaveBeenCalledWith('map');
+  });
   it('does not restore a lost position by switching tracking off', async () => {
     vi.spyOn(arRuntime, 'immersiveArSupported').mockResolvedValue(true);
     const snapshot = anchored({ tier: 'frozen', reason: 'uncertain', sigmaMeters: 12 });
@@ -691,6 +753,11 @@ describe('the camera view follows where the phone points', () => {
     render(<CameraPreview tracking={tracking} />);
     const start = await screen.findByRole('button', { name: 'Start AR' });
     await act(async () => fireEvent.click(start));
+    expect(document.querySelector('.camera-ar-overlay')?.textContent).toContain('Near destination');
+    expect(document.querySelector('.camera-ar-overlay')?.textContent).toContain(
+      'Not yet confirmed',
+    );
+    expect(document.querySelector('.camera-ar-overlay')?.textContent).not.toContain('You are here');
     fireEvent.click(screen.getByRole('button', { name: 'I’m at my destination' }));
     expect(confirmArrival).toHaveBeenCalledTimes(1);
   });

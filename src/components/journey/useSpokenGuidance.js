@@ -19,7 +19,7 @@ export function useSpokenGuidance(copy, enabled) {
       spokenRef.current = '';
       return;
     }
-    const key = `${copy.text}|${copy.lead === 'Now' ? 'now' : ''}`;
+    const key = copy.announcementKey ?? `${copy.text}|${copy.lead === 'Now' ? 'now' : ''}`;
     if (key === spokenRef.current) return;
     spokenRef.current = key;
     const utterance = new SpeechSynthesisUtterance(copy.speech);

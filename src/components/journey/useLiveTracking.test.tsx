@@ -183,6 +183,40 @@ describe('live position with an immersive session attached', () => {
       reason: 'uncertain',
     });
   });
+
+  it('keeps the scan instruction through restart and clears it on a new check-in route', () => {
+    const { result, rerender } = renderHook(
+      ({ currentTrack }) =>
+        useLiveTracking({
+          track: currentTrack,
+          locationBasis: 'qr',
+          setProgress: vi.fn(),
+          active: true,
+        }),
+      { initialProps: { currentTrack: track } },
+    );
+    act(() => result.current.start());
+    const tracker = result.current.tracker() as unknown as RouteTracker;
+    tracker.motion({ timeMs: clock, accelerationMagnitude: 9.81, headingRateDegreesPerSecond: 0 });
+    tracker.anchor({ progressMeters: 5, sigmaMeters: 20, timeMs: clock });
+    act(() => subscription.onState?.('listening'));
+    act(() => result.current.stop());
+    tick(2_000);
+    act(() => {
+      result.current.start();
+      subscription.onState?.('listening');
+    });
+    expect(result.current.snapshot).toMatchObject({
+      reason: 'uncertain',
+      canStartPose: false,
+      progressMeters: 5,
+    });
+    act(() => subscription.onState?.('denied'));
+    expect(result.current.snapshot).toMatchObject({ reason: 'uncertain', canStartPose: false });
+    // The provider computes a new route after a physical rescan, even at the same sign.
+    rerender({ currentTrack: { ...track } });
+    expect(result.current.snapshot).toMatchObject({ progressMeters: 0, canStartPose: true });
+  });
   it('uses the active venue graph, freezes progress and logs an ambiguous fork', () => {
     resetFieldTest(true);
     try {

@@ -172,6 +172,21 @@ test('a fresh page can check in and route after the connection is removed', asyn
     .fill('Outpatient Pharmacy');
   await offlinePage.getByRole('button', { name: 'Navigate to Outpatient Pharmacy' }).click();
   await expect(offlinePage.getByLabel('Fastest available route')).toBeVisible();
+
+  // The camera module was never opened online. Its lazy chunk must still be
+  // in the verified precache after a fresh page and empty HTTP cache.
+  const cameraResponses: boolean[] = [];
+  offlinePage.on('response', (response) => {
+    if (/\/assets\/CameraPreview-[^/]+\.js$/.test(new URL(response.url()).pathname)) {
+      cameraResponses.push(response.fromServiceWorker());
+    }
+  });
+  const before = await offlinePage.locator('.jr-banner-text').innerText();
+  await offlinePage.getByRole('button', { name: 'Camera view', exact: true }).click();
+  await expect(offlinePage.locator('.camera-preview')).toBeVisible();
+  expect(cameraResponses).toEqual([true]);
+  await offlinePage.getByRole('button', { name: 'Exit to plan' }).click();
+  await expect(offlinePage.locator('.jr-banner-text')).toHaveText(before);
 });
 
 test('evicted precache bytes are reported unavailable and repaired only from exact build bytes', async ({

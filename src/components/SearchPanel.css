@@ -1,0 +1,199 @@
+/* Search-specific recovery and result semantics. The map remains unchanged. */
+#search-panel .search-results {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+#search-panel .search-panel-heading > div {
+  display: contents;
+}
+
+#search-panel .search-panel-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+#search-panel .search-panel-heading h2 {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  font-size: 1.25rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+#search-panel .search-panel-heading span {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 0.625rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#search-panel .search-section-label,
+#search-panel .category-chip,
+#search-panel .search-route-button,
+#search-panel .search-result-desc,
+#search-panel .search-result-distance {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+#search-panel .search-result-name {
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+#search-panel .search-panel-heading > button {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 44px;
+  min-height: 44px;
+  flex: none;
+}
+
+#search-panel .search-result-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#search-panel .search-results-summary {
+  flex: none;
+  margin: 0;
+  padding: 0 20px 10px;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--ed-ink-soft, var(--color-text-secondary));
+  overflow-wrap: anywhere;
+}
+
+#search-panel .search-section-label {
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 8px;
+}
+
+#search-panel .search-reset-filters,
+#search-panel .search-more-results,
+#search-panel .search-empty-actions button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--ed-ink, var(--color-border));
+  border-radius: 999px;
+  background: var(--ed-cream, var(--color-bg-secondary));
+  color: var(--ed-ink, var(--color-text-primary));
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+#search-panel .search-reset-filters {
+  padding-block: 6px;
+}
+
+#search-panel .search-more-results {
+  display: block;
+  max-width: 100%;
+  margin: 12px auto 0;
+}
+
+#search-panel .search-empty {
+  padding: 12px 8px 20px;
+  text-align: center;
+}
+
+#search-panel .search-empty h3 {
+  margin: 8px 0;
+  font-size: 1rem;
+  color: var(--ed-ink, var(--color-text-primary));
+}
+
+#search-panel .search-empty p {
+  margin: 0 0 12px;
+  line-height: 1.5;
+  color: var(--ed-ink-soft, var(--color-text-secondary));
+  overflow-wrap: anywhere;
+}
+
+#search-panel .search-empty-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#search-panel .search-result-select,
+#search-panel .search-route-button,
+#search-panel .search-clear-btn {
+  min-height: 44px;
+}
+
+#search-panel .search-route-button {
+  flex: none;
+  padding: 8px 12px;
+}
+
+#search-panel .category-chip {
+  min-height: 44px;
+}
+
+#search-panel .search-clear-btn {
+  min-width: 44px;
+  flex: none;
+}
+
+#search-panel .search-input {
+  min-width: 0;
+  /* Avoid involuntary mobile browser zoom when the input receives focus. */
+  font-size: 1rem;
+}
+
+#search-panel button:focus-visible {
+  outline: 2px solid var(--ed-blue, var(--color-accent-blue));
+  outline-offset: 2px;
+}
+
+@media (max-width: 420px) {
+  #search-panel .search-result-item {
+    align-items: start;
+    gap: 8px;
+  }
+
+  #search-panel .search-result-select {
+    gap: 8px;
+  }
+
+  #search-panel .search-result-icon {
+    display: none;
+  }
+
+  #search-panel .search-result-name,
+  #search-panel .search-result-desc {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* On short screens (including a software keyboard or enlarged text), scroll
+   the whole dialog rather than squeezing its results to a zero-height box. */
+@media (max-height: 700px) {
+  #search-panel {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  #search-panel > * {
+    flex-shrink: 0;
+  }
+
+  #search-panel .search-results {
+    flex: none;
+    overflow-y: visible;
+  }
+}

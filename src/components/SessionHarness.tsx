@@ -36,14 +36,15 @@ export default function SessionHarness() {
         <p>No camera or motion sensors are accessed by this diagnostic.</p>
       </section>
     );
+  // Replay the accepted decision, not the earlier policy import time. This
+  // diagnostic is historical and grants no Visitor guidance authority.
+  const evaluatedAt = state.route.receipt?.evaluatedAt ?? operationalEvaluatedAt ?? '';
   const request = {
     buildingPackage: venue.buildingPackage,
     route: state.route,
     policy: {
       profile: accessibleRouting ? ('wheelchair' as const) : ('standard' as const),
-      ...(operationalOverlay
-        ? { operationalOverlay, evaluatedAt: operationalEvaluatedAt ?? '' }
-        : {}),
+      ...(operationalOverlay ? { operationalOverlay, evaluatedAt } : {}),
     },
   };
   // A changed journey/policy owns a new component: cleanup retires pending hash

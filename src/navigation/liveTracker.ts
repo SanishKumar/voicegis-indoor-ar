@@ -730,15 +730,9 @@ export class RouteTracker {
       // A camera reset or later sensor silence cannot mask a required scan.
       tier = 'frozen';
       reason = this.poseRouteLost;
-    } else if (this.sensorsProblem !== null) {
-      tier = 'frozen';
-      reason = this.sensorsProblem;
     } else if (this.phase === 'unanchored') {
       tier = 'frozen';
       reason = 'no-anchor';
-    } else if (this.silent(this.nowMs)) {
-      tier = 'frozen';
-      reason = 'sensors-silent';
     } else if (this.poseJumped) {
       tier = 'frozen';
       reason = 'pose-jump';
@@ -751,6 +745,14 @@ export class RouteTracker {
     } else if (sigma >= this.options.frozenSigmaMeters) {
       tier = 'frozen';
       reason = 'uncertain';
+    } else if (this.sensorsProblem !== null) {
+      // Sensor recovery cannot repair position. Keep the physical recovery
+      // instruction above these transient warnings, including IMU-only loss.
+      tier = 'frozen';
+      reason = this.sensorsProblem;
+    } else if (this.silent(this.nowMs)) {
+      tier = 'frozen';
+      reason = 'sensors-silent';
     } else if (arrivedNow) {
       tier = sigma >= this.options.cautionSigmaMeters ? 'caution' : 'tracking';
       reason = 'arrived';

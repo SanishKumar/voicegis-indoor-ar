@@ -154,12 +154,19 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
-    const names = await caches.keys();
-    await Promise.all(
-      names
-        .filter((name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME)
-        .map((name) => caches.delete(name)),
-    );
+    // Installation may have completed long before activation. Retire old
+    // bytes only after this release is still complete, or repaired from its
+    // exact revisions. Keeping old caches is not a rollback to the old worker:
+    // this worker still activates and reports any incomplete cache honestly.
+    const complete = await ensureOfflineCache().catch(() => false);
+    if (complete) {
+      const names = await caches.keys();
+      await Promise.all(
+        names
+          .filter((name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME)
+          .map((name) => caches.delete(name)),
+      );
+    }
     await self.clients.claim();
   })());
 });
@@ -249,7 +256,9 @@ export function offlineServiceWorkerPlugin(enabled) {
         throw new Error(`Public build imported operator modules: ${leaked.join(', ')}`);
       }
     },
-    async closeBundle() {
+    async writeBundle() {
+      // Run only after a successful write. closeBundle also runs on failure
+      // and can mask a compiler/budget error or attempt to cache stale bytes.
       if (!enabled) return;
       if (outputDirectory === undefined) throw new Error('Vite output directory was not resolved.');
       await assertVisitorOnlyBundle(outputDirectory);

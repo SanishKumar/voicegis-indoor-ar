@@ -91,6 +91,37 @@ function anchored(track = corner, options = {}) {
 }
 
 describe('independent pose-source eligibility', () => {
+  it.each(['uncertain', 'off-route'] as const)(
+    'keeps the required scan visible after inertial %s loss, silence and restart',
+    (reason) => {
+      const { tracker, walker } = anchored();
+      if (reason === 'uncertain') {
+        tracker.anchor({ progressMeters: 5, sigmaMeters: 20, timeMs: walker.t });
+      } else {
+        walker.steps(5);
+        walker.turn(-90);
+        walker.steps(12);
+      }
+      const before = walker.read();
+      expect(before).toMatchObject({ reason, tier: 'frozen', canStartPose: false });
+      walker.t += 2_000;
+      expect(walker.read()).toMatchObject({ reason, canStartPose: false });
+      tracker.sensorsLost('sensors-unavailable');
+      expect(walker.read()).toMatchObject({ reason, canStartPose: false });
+      tracker.resume(walker.t);
+      walker.steps(4);
+      expect(walker.read()).toMatchObject({
+        reason,
+        progressMeters: before.progressMeters,
+        canStartPose: false,
+      });
+      // Only a new physical check-in clears the position failure.
+      tracker.anchor({ progressMeters: 0, sigmaMeters: ANCHOR_SIGMA.scan, timeMs: walker.t });
+      walker.still(100);
+      expect(walker.read()).toMatchObject({ reason: 'awaiting-departure', canStartPose: true });
+    },
+  );
+
   it('permits a pose source when only the inertial source is missing', () => {
     const { tracker, walker } = anchored();
     tracker.sensorsLost('sensors-unavailable');
@@ -122,10 +153,9 @@ describe('independent pose-source eligibility', () => {
       }
       expect(tracker.read(walker.t).reason).toBe(failure);
       tracker.sensorsLost('sensors-unavailable');
-      // Geometric loss keeps the required scan visible even if sensors later fail.
-      expect(tracker.read(walker.t).reason).toBe(
-        failure === 'off-route' ? 'off-route' : 'sensors-unavailable',
-      );
+      // Keep the physical recovery instruction, not just the AR eligibility bit.
+      expect(tracker.read(walker.t).reason).toBe(failure);
+      expect(tracker.read(walker.t + 2_000).reason).toBe(failure);
       expect(tracker.canStartPose).toBe(false);
       expect(tracker.read(walker.t).canStartPose).toBe(false);
     },

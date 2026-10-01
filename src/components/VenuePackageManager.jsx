@@ -3,10 +3,12 @@ import { ChevronDown, Database, FileUp, Link2, ShieldCheck, X } from 'lucide-rea
 import { useVenue } from '../context/VenueContext.jsx';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { resolveOperationalOverlay } from '../engine/operationalOverlay';
+import { operationalProblem } from '../navigation/operationalLease';
 
 export default function VenuePackageManager() {
   const { catalog, status, activateFromFile, activateFromUrl } = useVenue();
-  const { venue, operationalOverlay, setOperationalOverlay } = useNavigation();
+  const { venue, operationalOverlay, operationalFreshness, setOperationalOverlay } =
+    useNavigation();
   const [packageUrl, setPackageUrl] = useState('');
   const [operationMessage, setOperationMessage] = useState(null);
   const [expanded, setExpanded] = useState(false);
@@ -46,7 +48,7 @@ export default function VenuePackageManager() {
         );
       }
       setOperationalOverlay(value, evaluatedAt);
-      setOperationMessage(`${file.name} is active for route evaluation.`);
+      setOperationMessage(`${file.name} was imported for route evaluation.`);
     } catch (error) {
       setOperationMessage(error instanceof Error ? error.message : 'Overlay activation failed.');
     } finally {
@@ -146,6 +148,11 @@ export default function VenuePackageManager() {
           <p className={status.error || operationMessage ? 'venue-runtime-message' : undefined}>
             {operationMessage ?? status.error ?? status.detail}
           </p>
+          {operationalFreshness?.status === 'unavailable' && (
+            <p className="venue-runtime-message" role="status">
+              {operationalProblem(operationalFreshness.reason)}
+            </p>
+          )}
         </div>
       )}
     </aside>

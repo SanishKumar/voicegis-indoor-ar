@@ -41,6 +41,13 @@ Without sign direction, the legacy departure assumption below still applies:
   visitor to say they have arrived there. Only then does progress continue,
   with extra uncertainty for the ride.
 
+Physical recovery instructions take priority over later sensor warnings. An
+inertial off-route or high-uncertainty freeze still asks for a check-in after
+sensor silence, permission refusal, or stop/resume; starting the sensors again
+cannot repair the position. Missing anchors, pose jumps and floor-change holds
+likewise retain their own recovery instruction. Sensor-only failures remain
+separate and do not by themselves block an independent AR pose source.
+
 Where the platform offers a compass (`webkitCompassHeading`, or absolute
 orientation), it is consulted for one purpose only: to notice, in the first
 strides, that the visitor is setting off away from the route. The venue's

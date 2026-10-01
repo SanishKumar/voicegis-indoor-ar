@@ -3,7 +3,24 @@
 Deliberately unfinished work, recorded so it is not rediscovered as a bug. Each
 entry says what is incomplete, why it was left, and what finishing it involves.
 
-## Visitor AR floor placement is explicit; automatic sign heading remains unfinished
+Current Visitor checkpoint and prioritized software work:
+[visitor readiness](../visitor-readiness.md), updated 1 October 2026.
+
+## Imported closure expiry is guarded; live policy delivery is unfinished
+
+Visitor route decisions no longer reuse the import's historical clock. Active
+trips pause at policy expiry/replacement, stale worker/XR work is retired, and
+destination/profile survive until a fresh policy and newly confirmed start
+are available. Removing an imported policy is not an all-clear. Offline maps
+do not prove paths are open. See the [lifetime contract](../operational-policy-lifetime.md).
+
+This is a local import/expiry boundary, not authenticated publication, a
+trusted clock, ordered live revision delivery or rollback prevention across
+reloads. The public build has no production closure feed. Those backend
+contracts remain open. Authored graphic clearance now has a conservative
+wall/opening check; physical mobility clearance remains unqualified.
+
+## Visitor AR floor placement is explicit; surveyed visual pose remains unfinished
 
 As of 26 September 2026, immersive AR no longer places a route on an estimated
 `local-floor` zero, after a timeout, or from a single hit. It qualifies a nearby,
@@ -23,14 +40,16 @@ A missing heading now has an explicit placement state after floor confirmation.
 The remaining manual fallback requires a deliberate camera alignment and fresh
 same-feed orientation; it is not a surveyed visual pose. The approved
 [sign-heading work](../localization/visual-marker-heading.md) now preserves QR
-frame geometry as unqualified, venue-bound metadata. The calibrated pose solver,
+frame geometry as unqualified, venue-bound metadata. Approximate sign-derived
+heading is now implemented using the authored sign direction and a fresh
+same-epoch orientation reading; it is not a corner-based pose estimate. The calibrated pose solver,
 survey metadata and synchronized sensor/XR bridge are still to be implemented.
 QR payload check-in alone remains location-only.
 The ordinary camera overlay still assumes camera height and FOV, and the live
-tracker remains route-constrained. The user's stationary-marker handset report
-still needs acquisition/pose diagnostics. Dynamic obstacle avoidance is absent.
+tracker remains route-constrained. Handset positioning accuracy still requires
+fresh acquisition/pose diagnostics. Dynamic obstacle avoidance is absent.
 
-## Visitor localization is not ready for automatic guidance
+## Visitor localization is wired but not field-qualified
 
 The first motion-safety slice (processor 0.3.0, 11 September 2026) removes
 constant-velocity extrapolation from the filter's position mean. Each observed
@@ -38,7 +57,8 @@ stride is counted once; heading/floor updates cannot keep a stopped visitor
 moving, and a long observation gap does not become accumulated travel. The
 existing uncertainty-aging model remains deliberately unchanged and uncalibrated.
 
-This does **not** finish the localization contract:
+This does **not** finish the recording/evidence localization contract. The
+following are historical substrate slices, not the separate Visitor tracker:
 
 - Slice B now defines a tested Visitor plan/filter reflection and heading
   reference boundary (`src/navigation/coordinateFrames.ts`). It is not connected
@@ -75,8 +95,13 @@ See [route-matching safety](../localization/route-matching-safety.md) for the
 pending-floor state, single-use anchor pair and deliberate refusal to infer a
 stairs/lift traversal from confidence or route geometry alone.
 
-Keep Visitor tracking checkpoint-only until these gates and device/venue tests
-are satisfied. The remaining sequence is in
+The earlier substrate/recording slices above have stricter evidence contracts;
+they are not a description of the current Visitor hook. Visitor now has opt-in
+live motion/XR guidance, single-owner progress, freshness/recovery holds,
+whole-venue alternative-path checks and bounded walking-based direction
+refinement. This does not satisfy device/venue qualification or promote Visitor
+estimates into recorded accuracy evidence. The current implementation is in
+[Visitor live tracking](../localization/visitor-live-tracking.md); the historical sequence is in
 [the visitor plan](../visitor-experience-plan.md#2-establish-the-localization-contract-and-replay-safety).
 
 ## Visitor 2D/3D switching is presentation, not tracking
@@ -90,10 +115,15 @@ reloads and does not restore a pose from another venue. Inspector stays separate
 
 The renderer no longer smooths route corners or joins separate visits to the
 same floor. Centre lines follow adjacent graph edges; the width of a rendered
-line is not a certified clearance envelope. Context-loss recovery and a written
+line is checked against authored walls/used openings, but is not a certified
+physical-clearance envelope. Full glyphs are also checked before camera/XR
+drawing; estimated camera projection and real-world registration remain
+unqualified. See [the graphic clearance contract](../route-graphic-clearance.md).
+Context-loss recovery and a written
 directions fallback are covered in Chromium, not yet on physical iOS/Android
-devices. There is no adaptive GPU quality tier or handset performance budget
-yet. The compact route sheet still needs the broader cartographic/UX refinement
+devices. Automatic/manual low-detail map rendering and a public startup byte
+budget are implemented; handset GPU/frame-time/battery qualification is not.
+See [performance](../visitor-performance.md). The compact route sheet still needs the broader cartographic/UX refinement
 in phase 4; an explicit Expand map action gives the model the available screen.
 
 Continuity, bounded matching/floor safety and the shared live-session substrate
@@ -130,7 +160,7 @@ byte-identical.
 The manifest precommits every claim eligibility reads — the surveyed position
 and floor, the survey method, the expected accuracy, and independence from
 anchors — and sealing refuses a capture that disagrees with any of them. Those
-claims live in the capture, which is written *after* the walk, so leaving them
+claims live in the capture, which is written _after_ the walk, so leaving them
 unpinned meant a mark that came out badly could be rescued by upgrading its
 declared survey or dropped by downgrading it. Manifest version 0.2.0.
 
@@ -138,7 +168,7 @@ A walk that falls short of its manifest now seals rather than being refused.
 Refusing suppressed the failure outright: the walk that missed a predeclared
 mark produced no artifact at all, so only the walks that went well left a
 record. It seals with `manifest-not-satisfied` and a `missingScoredCount` that
-says how far short it fell. A missing *diagnostic* mark blocks nothing, because
+says how far short it fell. A missing _diagnostic_ mark blocks nothing, because
 it never counted toward anything.
 
 Duplicate checkpoint ids are refused at sealing rather than by the capture
@@ -156,7 +186,7 @@ eligibility yields `manifest-not-satisfied` instead of a figure over whatever
 survived.
 
 What remains is provenance in time. The manifest is authored by the same person
-who runs the walk, and nothing establishes that it existed *before* the capture
+who runs the walk, and nothing establishes that it existed _before_ the capture
 did. The hash proves which manifest produced a figure, not when it was written,
 so a manifest edited after a disappointing walk and re-sealed is visible as a
 different artifact but not as a later one. Closing that needs something outside
@@ -316,7 +346,7 @@ rule is now uniform:
   have rejected — was copied element by element into a real array, moving a
   median from 3.688 m to 22.688 m. The same hole existed one level up, in the
   anchors collection itself: 3.688 m to 18.688 m.
-- Treating an unreadable *optional* field as absent fixed a prototype injecting
+- Treating an unreadable _optional_ field as absent fixed a prototype injecting
   `device.model`, then created the mirror-image bug: a scan declaring
   `permission-denied` through a getter had that failure discarded, resolved
   against the anchors instead, and published `ok` from a reset the device had
@@ -341,7 +371,7 @@ permanently unable to produce a contiguous stream.
 
 ### Where authoring stops trying
 
-The line is drawn by *ownership*, not by mechanism:
+The line is drawn by _ownership_, not by mechanism:
 
 - **The realm is trusted.** Standard intrinsics behave as the language says.
 - **Caller-owned data shapes are not.** Objects and arrays handed to the
@@ -374,28 +404,28 @@ not already concede.
 **A Proxy that lies coherently** — one whose `ownKeys` and property descriptors
 agree with each other while disagreeing with a hidden target. Authoring reads
 each field once through its own descriptor, and every defect closed here was an
-*incoherence*: a value that changed between two reads, or a shape the descriptors
+_incoherence_: a value that changed between two reads, or a shape the descriptors
 themselves disclosed. A Proxy that answers consistently is not lying in any
-detectable sense — its reflected view simply *is* the object it supplied. No
+detectable sense — its reflected view simply _is_ the object it supplied. No
 `JSON.parse` result or handset adapter produces one, and what actually closes
 this class is the sealed evidence artifact, which hashes the stream as recorded.
 Provenance answers "is this the capture that was walked"; no amount of
 authoring-time reflection substitutes for it.
 
 The hostile shapes that motivated the rules above — accessors, prototypes, hidden
-and non-enumerable fields, changing lengths — all *can* arise from ordinary
+and non-enumerable fields, changing lengths — all _can_ arise from ordinary
 object graphs, which is why they were worth closing and these two are not.
 
 `Object.prototype` pollution falls on the trusted side but still must not break
 honest recording. Authoring ignores the ambient builtin prototypes when deciding
 whether a field was inherited, so a polluted realm cannot make honest captures
 unrecordable, and snapshots copy only own keys so nothing ambient is carried into
-a stream. Snapshot objects themselves are ordinary objects and still *inherit*
+a stream. Snapshot objects themselves are ordinary objects and still _inherit_
 from a polluted `Object.prototype`; that is invisible to serialisation and to
 validation, both of which read own keys only.
 
 Sequence contiguity is worth stating precisely, because it is easy to overread.
-Requiring `0..n-1` detects an event *dropped* from an otherwise untouched
+Requiring `0..n-1` detects an event _dropped_ from an otherwise untouched
 recorder stream, and requiring a terminal `session-end` extends that to the tail,
 which contiguity alone can never cover. Neither detects delete-and-renumber:
 anyone willing to rewrite the remaining sequences produces a stream that is
@@ -404,7 +434,7 @@ indistinguishable from a shorter honest walk.
 An earlier version of this paragraph said the sealed artifact closes that. It
 does not, and the distinction matters. Sealing binds a figure to one exact
 capture and makes any later change to either one detectable — but it seals
-whatever it is given, so a stream edited *before* sealing is sealed in its
+whatever it is given, so a stream edited _before_ sealing is sealed in its
 edited form and verifies perfectly. What the artifact provides is that the
 window for undetectable editing ends at the seal; narrowing that window to
 nothing is a field-protocol requirement (seal at the end of the walk, keep the
@@ -447,7 +477,7 @@ An earlier version of this file claimed the chronology holes could not alter
 reported accuracy. That was wrong and was disproved by review: an interruption
 was shown to move a published checkpoint error from 2.828 m to 0.776 m, and a
 backdated scan moved a published error by reordering the anchor reset a mark was
-scored against. Excluding ineligible checkpoints bounds *which* marks are
+scored against. Excluding ineligible checkpoints bounds _which_ marks are
 scored; it does not bound the correctness of the estimate they are scored
 against.
 
@@ -483,7 +513,7 @@ were previously unstated are now defined, because the defect was as much
 vagueness as arithmetic:
 
 - the declared `world` frame is North-East-Down, so a right-handed rate about
-  its third axis *is* the rate at which compass heading increases;
+  its third axis _is_ the rate at which compass heading increases;
 - the reduced scalar is named `headingRateDegreesPerSecond` rather than
   `yawRateDegreesPerSecond`, because the old name committed to neither a frame
   nor a sign and every value it produced looked plausible.

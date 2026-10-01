@@ -1,5 +1,6 @@
 import type { CompiledBuildingRuntime } from '../data/compiledBuilding';
 import { describeWithLandmarks, landmarksFrom } from './routeLandmarks';
+import { createRouteGraphicGuard, type RouteDisplayClearance } from './routeClearance';
 import {
   calculateRoute,
   type RouteFailure,
@@ -53,7 +54,10 @@ export interface RouteReceipt {
   overlayIssues: OverlayIssue[];
 }
 
-export type ExplainedRouteResult = (RouteSuccess | RouteFailure) & { receipt: RouteReceipt };
+export type ExplainedRouteResult = (RouteSuccess | RouteFailure) & {
+  receipt: RouteReceipt;
+  displayClearance?: RouteDisplayClearance;
+};
 
 function pairKey(a: string, b: string) {
   return a < b ? `${a}::${b}` : `${b}::${a}`;
@@ -138,6 +142,26 @@ export function calculateCompiledRoute(
     allowRestricted: options.allowRestricted,
     closedEdgeIds: overlayResolution?.closedEdgeIds,
   });
+  const displayClearance = computed.found
+    ? createRouteGraphicGuard(buildingPackage, computed.path, {
+        profile,
+        allowRestricted: options.allowRestricted,
+      }).assessment
+    : undefined;
+  if (displayClearance && !displayClearance.centerlineValid) {
+    return {
+      found: false,
+      error:
+        'The mapped route geometry is inconsistent. Choose another destination or ask venue staff for directions.',
+      displayClearance,
+      receipt: {
+        ...baseReceipt,
+        status: 'rejected',
+        totalDistanceMeters: null,
+        selectedConnectors: [],
+      },
+    };
+  }
   // The graph gives distances and corridor names; the package's own places
   // turn those into directions a person can follow indoors.
   const route = computed.found
@@ -148,6 +172,7 @@ export function calculateCompiledRoute(
     : computed;
   return {
     ...route,
+    ...(displayClearance ? { displayClearance } : {}),
     receipt: {
       ...baseReceipt,
       status: route.found ? 'routed' : 'unroutable',

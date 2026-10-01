@@ -14,6 +14,7 @@ export const NAV_STATUS = {
   ROUTING: 'routing',
   NAVIGATING: 'navigating',
   ARRIVED: 'arrived',
+  PAUSED: 'paused',
 } as const;
 
 export type LocationBasis = 'default' | 'selected' | 'qr';
@@ -43,6 +44,7 @@ export interface VisitorJourneyState {
   progressMeters: number;
   navStatus: (typeof NAV_STATUS)[keyof typeof NAV_STATUS];
   arrivalSource: 'user-confirmed' | null;
+  policyPause?: { reason: string } | null;
 }
 
 export const JOURNEY_ACTION = {
@@ -60,9 +62,11 @@ export const JOURNEY_ACTION = {
   PREVIEW_STEP: 'PREVIEW_STEP',
   SET_PROGRESS: 'SET_PROGRESS',
   CONFIRM_ARRIVAL: 'CONFIRM_ARRIVAL',
+  PAUSE_POLICY: 'PAUSE_POLICY',
 } as const;
 
 type JourneyAction =
+  | { type: 'PAUSE_POLICY'; payload: { reason: string; destinationNodeId: string } }
   | {
       type: 'SET_START';
       payload: { nodeId: string; floorId?: string; locationBasis?: LocationBasis };
@@ -81,6 +85,18 @@ export function visitorJourneyReducer(
   action: JourneyAction,
 ): VisitorJourneyState {
   switch (action.type) {
+    case 'PAUSE_POLICY':
+      return {
+        ...state,
+        destinationNodeId: action.payload.destinationNodeId,
+        route: null,
+        navStatus: NAV_STATUS.PAUSED,
+        policyPause: { reason: action.payload.reason },
+        activeView: 'map',
+        selectedPOI: null,
+        // Retain preview distance as historical state, never a recovered pose.
+        arrivalSource: null,
+      };
     case 'SET_START': {
       const floorId = action.payload.floorId ?? state.locationFloorId;
       return {
@@ -91,6 +107,7 @@ export function visitorJourneyReducer(
         locationFloorId: floorId,
         locationBasis: action.payload.locationBasis ?? 'selected',
         route: null,
+        policyPause: null,
         previewStepIndex: 0,
         progressMeters: 0,
         navStatus: NAV_STATUS.IDLE,
@@ -113,6 +130,7 @@ export function visitorJourneyReducer(
         previewStepIndex: 0,
         progressMeters: 0,
         navStatus: NAV_STATUS.ROUTING,
+        policyPause: null,
         arrivalSource: null,
         selectedPOI: null,
       };
@@ -134,6 +152,7 @@ export function visitorJourneyReducer(
         previewStepIndex: 0,
         progressMeters: 0,
         navStatus: NAV_STATUS.IDLE,
+        policyPause: null,
         arrivalSource: null,
       };
     case 'SET_VIEW':

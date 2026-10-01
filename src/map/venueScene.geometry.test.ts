@@ -8,6 +8,7 @@ import {
   CylinderGeometry,
   MeshStandardMaterial,
   DirectionalLight,
+  WebGLRenderTarget,
 } from 'three';
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import referencePackage from '../../buildings/reference-medical-centre/compiled/building.package.json';
@@ -15,15 +16,30 @@ import { createVenueScene, type VenueScene } from './venueScene';
 
 // Only the GPU is replaced. The scene, transforms and route geometries are real
 // Three objects; these tests make no jsdom layout/visibility claims.
-const observed = vi.hoisted(() => ({ scene: null as Scene | null }));
+const observed = vi.hoisted(() => ({
+  scene: null as Scene | null,
+  pixelRatio: 1,
+  shadowMap: {} as { enabled?: boolean },
+}));
 vi.mock('three', async (importOriginal) => {
   const actual = await importOriginal<typeof import('three')>();
   return {
     ...actual,
     WebGLRenderer: class {
-      shadowMap = {};
-      setPixelRatio() {}
-      setSize() {}
+      shadowMap = observed.shadowMap;
+      canvas: HTMLCanvasElement;
+      ratio = 1;
+      constructor({ canvas }: { canvas: HTMLCanvasElement }) {
+        this.canvas = canvas;
+      }
+      setPixelRatio(ratio: number) {
+        this.ratio = ratio;
+        observed.pixelRatio = ratio;
+      }
+      setSize(width: number, height: number) {
+        this.canvas.width = Math.floor(width * this.ratio);
+        this.canvas.height = Math.floor(height * this.ratio);
+      }
       dispose() {}
       render(scene: Scene) {
         scene.updateMatrixWorld(true);
@@ -36,6 +52,8 @@ vi.mock('three', async (importOriginal) => {
 let scene: VenueScene;
 let canvas: HTMLCanvasElement;
 beforeEach(() => {
+  observed.shadowMap = {};
+  vi.spyOn(window, 'devicePixelRatio', 'get').mockReturnValue(2);
   vi.stubGlobal('matchMedia', () => ({ matches: true }));
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     isContextLost: () => false,
@@ -74,6 +92,107 @@ function routeCentreLines(): Vector3[][] {
 }
 
 describe('visitor route geometry', () => {
+  it('observes drawn frames, not idle RAFs, and publishes one automatic downshift', () => {
+    // jsdom has no font layout. Nonzero sizes let the scene cache labels instead
+    // of deliberately retrying their pending layout on every frame.
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(80);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(24);
+    // Use no device hint, so this isolates feedback from actual drawn frames.
+    scene.dispose();
+    vi.spyOn(navigator, 'hardwareConcurrency', 'get').mockReturnValue(8);
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      referencePackage as CompiledBuildingPackage,
+    );
+    let clock = performance.now();
+    vi.spyOn(performance, 'now').mockImplementation(() => clock);
+    scene.frame();
+    const idleDraws = canvas.dataset.draws;
+    for (let i = 0; i < 100; i++) {
+      clock += 50;
+      scene.frame();
+    }
+    expect(canvas.dataset.draws).toBe(idleDraws);
+    expect(scene.getGraphics().level).toBe('full');
+    const changed = vi.fn();
+    scene.onGraphicsChange(changed);
+    for (let i = 0; i < 40; i++) {
+      clock += 50;
+      scene.setPuck({ x: 4 + i / 10, y: 4, floorId: 'g', heading: [1, 0] });
+      scene.frame();
+    }
+    expect(scene.getGraphics()).toEqual({ setting: 'auto', level: 'low', reason: 'slow-frames' });
+    expect(canvas.dataset.graphicsDetail).toBe('low');
+    expect(canvas.width).toBe(800);
+    expect(changed).toHaveBeenCalledOnce();
+  });
+  it('changes only render detail, preserves geometry/camera/progress and releases shadow targets', () => {
+    scene.setGraphics('full');
+    scene.setMode('3d');
+    scene.setRoute([
+      { x: 4, y: 4, floor: 'g' },
+      { x: 10, y: 4, floor: 'g' },
+    ]);
+    scene.setProgress(2);
+    const lines = routeCentreLines();
+    const view = scene.getView();
+    const light = observed.scene!.children.find(
+      (o) => o instanceof DirectionalLight,
+    ) as DirectionalLight;
+    const target = new WebGLRenderTarget(4, 4);
+    const pass = new WebGLRenderTarget(4, 4);
+    light.shadow.map = target;
+    light.shadow.mapPass = pass;
+    const dispose = vi.spyOn(target, 'dispose');
+    const disposePass = vi.spyOn(pass, 'dispose');
+    const changed = vi.fn();
+    const unsubscribe = scene.onGraphicsChange(changed);
+    scene.setGraphics('low');
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(disposePass).toHaveBeenCalledOnce();
+    expect(light.shadow.map).toBeNull();
+    expect(light.shadow.mapPass).toBeNull();
+    expect(light.castShadow).toBe(false);
+    expect(observed.shadowMap.enabled).toBe(false);
+    expect(observed.pixelRatio).toBe(1);
+    expect(routeCentreLines()).toEqual(lines);
+    expect(scene.getView()).toEqual(view);
+    expect(canvas.dataset.routeProgress).toBe('2.00');
+    expect(changed).toHaveBeenCalledWith({ setting: 'low', level: 'low', reason: 'manual' });
+    scene.setGraphics('full');
+    expect(light.castShadow).toBe(true);
+    expect(observed.shadowMap.enabled).toBe(true);
+    expect(observed.pixelRatio).toBe(2);
+    expect(routeCentreLines()).toEqual(lines);
+    unsubscribe();
+    changed.mockClear();
+    scene.setGraphics('low');
+    expect(changed).not.toHaveBeenCalled();
+  });
+  it('restores an auto-downshift before the first draw', () => {
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      referencePackage as CompiledBuildingPackage,
+      undefined,
+      { setting: 'auto', level: 'low', reason: 'slow-frames' },
+    );
+    expect(scene.getGraphics()).toEqual({ setting: 'auto', level: 'low', reason: 'slow-frames' });
+    expect(canvas.dataset.graphicsPixelRatio).toBe('1');
+    expect(observed.shadowMap.enabled).toBe(false);
+  });
+  it('resizes for changed device-pixel ratio without changing graphics choice', () => {
+    scene.setGraphics('full');
+    const view = scene.getView();
+    vi.spyOn(window, 'devicePixelRatio', 'get').mockReturnValue(1.5);
+    scene.frame();
+    expect(observed.pixelRatio).toBe(1.5);
+    expect(canvas.dataset.graphicsPixelRatio).toBe('1.5');
+    expect(scene.getGraphics().setting).toBe('full');
+    expect(scene.getView()).toEqual(view);
+  });
   it('releases shadow render targets as well as scene meshes', () => {
     scene.frame();
     const light = observed.scene!.children.find(

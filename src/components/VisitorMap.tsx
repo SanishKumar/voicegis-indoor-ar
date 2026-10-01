@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react';
+import { useEffect, useId, useRef, useState, type MutableRefObject, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, LocateFixed, Maximize, Minus, Plus } from 'lucide-react';
+import { Camera, LocateFixed, Maximize, Minus, Plus, SlidersHorizontal } from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
 import { createVenueScene, type VenueScene } from '../map/venueScene';
+import type { MapGraphicsSetting, MapGraphicsSnapshot } from '../map/visitorRenderQuality';
+import { logField } from '../fieldTest/fieldLog';
 import { resolveVisitorLocation } from '../navigation/visitorLocation';
 import type { LocationBasis } from '../navigation/visitorJourney';
 import type { CheckInRecord } from '../capture/anchorCheckIn';
 import type { GraphNode, RouteStep } from '../engine/routingCore';
+import type { RouteDisplayClearance } from '../engine/routeClearance';
 import { positionShownOn, trackForRoute, walkedFloors } from '../navigation/routeProgress';
 import {
   NO_INSETS,
@@ -140,6 +143,7 @@ export interface MapMemory {
   view: VisitorMapView;
   framedRoute: unknown;
   userMoved: boolean;
+  graphics?: MapGraphicsSnapshot;
 }
 
 interface NavigationValue {
@@ -150,8 +154,13 @@ interface NavigationValue {
     activeFloorId: string;
     selectedPOI?: { poi?: { spaceId?: string } } | null;
     route?:
-      | { found: true; path: GraphNode[]; steps: RouteStep[] }
-      | { found: false; path?: undefined }
+      | {
+          found: true;
+          path: GraphNode[];
+          steps: RouteStep[];
+          displayClearance?: RouteDisplayClearance;
+        }
+      | { found: false; path?: undefined; displayClearance?: RouteDisplayClearance }
       | null;
     progressMeters: number;
   };
@@ -205,6 +214,27 @@ export default function VisitorMap({
     'loading',
   );
   const [attempt, setAttempt] = useState(0);
+  const [graphics, setGraphics] = useState<MapGraphicsSnapshot | null>(null);
+  const [graphicsOpen, setGraphicsOpen] = useState(false);
+  const graphicsButtonRef = useRef<HTMLButtonElement>(null);
+  const graphicsPanelRef = useRef<HTMLDivElement>(null);
+  const graphicsId = useId();
+
+  useEffect(() => {
+    if (!graphicsOpen) return undefined;
+    const dismissOutside = (event: PointerEvent) => {
+      if (!(event.target instanceof Node)) return;
+      if (
+        graphicsButtonRef.current?.contains(event.target) ||
+        graphicsPanelRef.current?.contains(event.target)
+      )
+        return;
+      // Do not steal focus from the control the visitor is actually using.
+      setGraphicsOpen(false);
+    };
+    document.addEventListener('pointerdown', dismissOutside);
+    return () => document.removeEventListener('pointerdown', dismissOutside);
+  }, [graphicsOpen]);
 
   const buildingPackage = venue.buildingPackage;
   const venueHash = buildingPackage.manifest.contentHash;
@@ -242,6 +272,7 @@ export default function VisitorMap({
     let scene: VenueScene | null = null;
     let frame = 0;
     let contextLost = false;
+    let unsubscribeGraphics: (() => void) | undefined;
     const onLost = (event: Event) => {
       event.preventDefault();
       contextLost = true;
@@ -260,15 +291,30 @@ export default function VisitorMap({
     const tick = () => {
       if (!scene) {
         try {
-          const saved =
-            viewMemory.current?.venueHash === venueHash ? viewMemory.current.view : undefined;
-          scene = createVenueScene(canvas, labelLayer, buildingPackage, saved);
+          const saved = viewMemory.current?.venueHash === venueHash ? viewMemory.current : null;
+          scene = createVenueScene(
+            canvas,
+            labelLayer,
+            buildingPackage,
+            saved?.view,
+            saved?.graphics,
+          );
         } catch {
           setRenderStatus('unavailable');
           setReady(false);
           return;
         }
         sceneRef.current = scene;
+        const publishGraphics = (snapshot: MapGraphicsSnapshot) => {
+          setGraphics(snapshot);
+          logField('map-graphics', {
+            setting: snapshot.setting,
+            level: snapshot.level,
+            reason: snapshot.reason,
+          });
+        };
+        publishGraphics(scene.getGraphics());
+        unsubscribeGraphics = scene.onGraphicsChange(publishGraphics);
         const remembered = viewMemory.current?.venueHash === venueHash ? viewMemory.current : null;
         if (remembered) {
           framedRouteRef.current = remembered.framedRoute;
@@ -305,9 +351,11 @@ export default function VisitorMap({
           view: scene.getView(),
           framedRoute: framedRouteRef.current,
           userMoved: scene.wasMovedByUser(),
+          graphics: scene.getGraphics(),
         };
       }
       sceneRef.current = null;
+      unsubscribeGraphics?.();
       setReady(false);
       scene?.dispose();
     };
@@ -319,7 +367,7 @@ export default function VisitorMap({
     // The route is redrawn with the floor, because only the part of it on this
     // floor belongs on this floor.
     sceneRef.current?.setRoute(
-      state.route?.found
+      state.route?.found && state.route.displayClearance?.status !== 'withheld'
         ? state.route.path.map((point) => ({ x: point.x, y: point.y, floor: String(point.floor) }))
         : [],
     );
@@ -438,6 +486,14 @@ export default function VisitorMap({
     sceneRef.current?.setMode(mode);
     if (sceneRef.current) setPresentation(sceneRef.current.getView());
   };
+  const closeGraphics = () => {
+    setGraphicsOpen(false);
+    graphicsButtonRef.current?.focus();
+  };
+  const changeGraphics = (setting: MapGraphicsSetting) => {
+    sceneRef.current?.setGraphics(setting);
+    closeGraphics();
+  };
 
   const recovery = (renderStatus === 'lost' || renderStatus === 'unavailable') && (
     <div className="compiled-map-fallback" role="status">
@@ -460,6 +516,7 @@ export default function VisitorMap({
     <div
       ref={mapRef}
       className="compiled-map"
+      data-route-clearance={state.route?.displayClearance?.status ?? 'not-checked'}
       data-route-floors={routeFloorCount}
       data-camera-owner={userMoved ? 'visitor' : 'guidance'}
       data-location-floor={locationFloor}
@@ -479,7 +536,18 @@ export default function VisitorMap({
         aria-label={`${presentation.mode === '2d' ? '2D plan' : '3D model'} of ${floors.find((floor) => floor.id === state.activeFloorId)?.name ?? 'the venue'}`}
       />
       <div ref={labelRef} className="compiled-map-labels" aria-hidden="true" />
-      <div className="compiled-map-presentation" role="group" aria-label="Map presentation">
+      <div
+        className="compiled-map-presentation"
+        role="group"
+        aria-label="Map presentation"
+        onKeyDown={(event) => {
+          if (graphicsOpen && event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            closeGraphics();
+          }
+        }}
+      >
         <div className="compiled-map-modes">
           <button
             type="button"
@@ -510,7 +578,58 @@ export default function VisitorMap({
               <Camera size={16} strokeWidth={2} aria-hidden="true" />
             </button>
           )}
+          <button
+            ref={graphicsButtonRef}
+            type="button"
+            aria-label="Graphics detail"
+            title="Map graphics detail"
+            aria-expanded={graphicsOpen}
+            aria-controls={graphicsId}
+            disabled={renderStatus !== 'ready'}
+            onClick={() => setGraphicsOpen((open) => !open)}
+          >
+            <SlidersHorizontal size={16} strokeWidth={2} aria-hidden="true" />
+          </button>
         </div>
+        {graphicsOpen && graphics && (
+          <div
+            ref={graphicsPanelRef}
+            id={graphicsId}
+            className="compiled-map-graphics"
+            role="group"
+            aria-label="Map graphics detail"
+          >
+            {(
+              [
+                ['auto', 'Automatic'],
+                ['full', 'Full detail'],
+                ['low', 'Low detail'],
+              ] as const
+            ).map(([setting, label]) => (
+              <button
+                key={setting}
+                type="button"
+                aria-pressed={graphics.setting === setting}
+                disabled={renderStatus !== 'ready'}
+                onClick={() => changeGraphics(setting)}
+              >
+                {label}
+              </button>
+            ))}
+            <p role="status">
+              {graphics.setting === 'auto'
+                ? graphics.level === 'low'
+                  ? graphics.reason === 'slow-frames'
+                    ? 'Using low detail after slow map frames.'
+                    : 'Using low detail for this device.'
+                  : 'Using full detail. Switches down if map frames stay slow.'
+                : graphics.level === 'low'
+                  ? 'Lower resolution, no shadows.'
+                  : 'Higher resolution with shadows.'}{' '}
+              Your route and location are unchanged.
+            </p>
+          </div>
+        )}
         {presentation.mode === '3d' && routeFloorCount > 1 && (
           <button
             className="compiled-map-overview"

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { runInNewContext } from 'node:vm';
@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   assertVisitorOnlyBundle,
   collectOfflineEntries,
+  OFFLINE_CACHE_PREFIX,
+  offlineServiceWorkerPlugin,
   operatorModulesIn,
   renderOfflineWorker,
 } from './offlineServiceWorkerPlugin.js';
@@ -31,6 +33,112 @@ async function fixture() {
   return root;
 }
 
+function activationFixture({
+  cachedCamera = 'current camera',
+  networkCamera = 'current camera',
+}: {
+  cachedCamera?: string | null;
+  networkCamera?: string | Error;
+} = {}) {
+  const shellBytes = '<main>current release</main>';
+  const cameraBytes = 'current camera';
+  const entries = [
+    { url: '/index.html', revision: createHash('sha256').update(shellBytes).digest('hex') },
+    { url: '/assets/camera.js', revision: createHash('sha256').update(cameraBytes).digest('hex') },
+  ];
+  const worker = renderOfflineWorker(entries);
+  const cacheNameMatch = worker.match(/^const CACHE_NAME = ("[^"]+");$/m);
+  if (!cacheNameMatch) throw new Error('The generated worker has no cache identity.');
+  const cacheName = JSON.parse(cacheNameMatch[1]) as string;
+  const previousName = `${OFFLINE_CACHE_PREFIX}previous-release`;
+  const unrelatedName = 'another-app-cache';
+  const previousShell = new Response('<main>previous release</main>');
+  const currentEntries = new Map<string, Response>([['/index.html', new Response(shellBytes)]]);
+  if (cachedCamera !== null) currentEntries.set('/assets/camera.js', new Response(cachedCamera));
+  const storedCaches = new Map([
+    [cacheName, currentEntries],
+    [previousName, new Map([['/index.html', previousShell]])],
+    [unrelatedName, new Map<string, Response>()],
+  ]);
+  const operations: string[] = [];
+  const match = vi.fn(async (url: string) => currentEntries.get(url)?.clone());
+  const put = vi.fn(async (url: string, response: Response) => {
+    operations.push(`put:${url}`);
+    currentEntries.set(url, response.clone());
+  });
+  const removeCache = vi.fn(async (name: string) => {
+    operations.push(`delete:${name}`);
+    return storedCaches.delete(name);
+  });
+  const networkFetch = vi.fn(async () => {
+    operations.push('fetch:camera');
+    if (networkCamera instanceof Error) throw networkCamera;
+    return new Response(networkCamera);
+  });
+  const claim = vi.fn(async () => {
+    operations.push('claim');
+  });
+  const listeners = new Map<string, (event: unknown) => void>();
+  runInNewContext(worker, {
+    caches: {
+      keys: vi.fn(async () => [...storedCaches.keys()]),
+      open: vi.fn(async () => ({ match, put })),
+      delete: removeCache,
+    },
+    crypto: globalThis.crypto,
+    fetch: networkFetch,
+    self: {
+      clients: { claim },
+      location: { origin: 'https://visitor.example' },
+      addEventListener(type: string, listener: (event: unknown) => void) {
+        listeners.set(type, listener);
+      },
+    },
+    Map,
+    Set,
+    Uint8Array,
+    URL,
+  });
+  const activate = async () => {
+    let completion: Promise<unknown> | undefined;
+    listeners.get('activate')?.({
+      waitUntil(result: Promise<unknown>) {
+        completion = result;
+      },
+    });
+    if (!completion) throw new Error('Activation did not extend its lifetime.');
+    await completion;
+  };
+  const verifyAvailability = async () => {
+    const reply = vi.fn();
+    let completion: Promise<unknown> | undefined;
+    listeners.get('message')?.({
+      data: { type: 'voicegis:verify-offline-cache' },
+      ports: [{ postMessage: reply }],
+      waitUntil(result: Promise<unknown>) {
+        completion = result;
+      },
+    });
+    if (!completion) throw new Error('Verification did not extend its lifetime.');
+    await completion;
+    return reply;
+  };
+  return {
+    activate,
+    verifyAvailability,
+    currentEntries,
+    storedCaches,
+    previousName,
+    unrelatedName,
+    operations,
+    match,
+    put,
+    removeCache,
+    networkFetch,
+    claim,
+  };
+}
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories
@@ -40,6 +148,18 @@ afterEach(async () => {
 });
 
 describe('public offline build', () => {
+  it('generates the worker from successfully written assets and the resolved base', async () => {
+    const root = await fixture();
+    const plugin = offlineServiceWorkerPlugin(true);
+    plugin.configResolved({ build: { outDir: root }, base: '/visitor/' });
+    await plugin.writeBundle();
+    const worker = await readFile(path.join(root, 'sw.js'), 'utf8');
+    expect(worker).toBe(
+      renderOfflineWorker(await collectOfflineEntries(root, '/visitor/'), '/visitor/'),
+    );
+    expect(worker).not.toContain('/visitor/check-in-codes.html');
+  });
+
   it('precaches the visitor shell and venues but not maps, print sheets, or itself', async () => {
     const root = await fixture();
     const entries = await collectOfflineEntries(root);
@@ -74,6 +194,96 @@ describe('public offline build', () => {
     expect(firstWorker).toContain("crypto.subtle.digest('SHA-256'");
     expect(firstWorker).not.toContain('skipWaiting');
     expect(firstWorker).not.toContain("cache.put('/venues/");
+  });
+
+  it('retires previous release caches only after reverifying a complete waiting cache', async () => {
+    const worker = activationFixture();
+    await worker.activate();
+
+    expect(worker.match.mock.calls.map(([url]) => url)).toEqual([
+      '/index.html',
+      '/assets/camera.js',
+    ]);
+    expect(worker.networkFetch).not.toHaveBeenCalled();
+    expect(worker.removeCache).toHaveBeenCalledExactlyOnceWith(worker.previousName);
+    expect(worker.storedCaches.has(worker.previousName)).toBe(false);
+    expect(worker.storedCaches.has(worker.unrelatedName)).toBe(true);
+    expect(worker.operations).toEqual([`delete:${worker.previousName}`, 'claim']);
+  });
+
+  it.each([null, 'corrupt camera'])(
+    'repairs an evicted or corrupt waiting entry (%s) before retiring old caches',
+    async (cachedCamera) => {
+      const worker = activationFixture({ cachedCamera });
+      await worker.activate();
+
+      expect(worker.networkFetch).toHaveBeenCalledExactlyOnceWith('/assets/camera.js', {
+        cache: 'no-cache',
+      });
+      expect(await worker.currentEntries.get('/assets/camera.js')?.clone().text()).toBe(
+        'current camera',
+      );
+      expect(worker.operations).toEqual([
+        'fetch:camera',
+        'put:/assets/camera.js',
+        `delete:${worker.previousName}`,
+        'claim',
+      ]);
+    },
+  );
+
+  it.each([
+    { name: 'evicted and offline', cachedCamera: null, networkCamera: new Error('offline') },
+    {
+      name: 'corrupt and offline',
+      cachedCamera: 'corrupt camera',
+      networkCamera: new Error('offline'),
+    },
+    {
+      name: 'evicted with a newer network release',
+      cachedCamera: null,
+      networkCamera: 'newer camera',
+    },
+    {
+      name: 'corrupt with a newer network release',
+      cachedCamera: 'corrupt camera',
+      networkCamera: 'newer camera',
+    },
+  ])(
+    'retains old caches when the waiting cache is $name',
+    async ({ cachedCamera, networkCamera }) => {
+      const worker = activationFixture({ cachedCamera, networkCamera });
+      await worker.activate();
+
+      expect(worker.removeCache).not.toHaveBeenCalled();
+      expect(worker.storedCaches.has(worker.previousName)).toBe(true);
+      expect(
+        await worker.storedCaches.get(worker.previousName)?.get('/index.html')?.clone().text(),
+      ).toBe('<main>previous release</main>');
+      // Mismatched network bytes are never written under the current identity.
+      expect(worker.put).not.toHaveBeenCalled();
+      expect(await worker.currentEntries.get('/assets/camera.js')?.clone().text()).toBe(
+        cachedCamera ?? undefined,
+      );
+      // Activation still claims this worker; retained bytes alone do not restore
+      // the previous worker or establish availability for the current release.
+      expect(worker.claim).toHaveBeenCalledOnce();
+      const reply = await worker.verifyAvailability();
+      expect(reply).toHaveBeenCalledExactlyOnceWith({
+        type: 'voicegis:offline-cache-status',
+        complete: false,
+      });
+    },
+  );
+
+  it('retains old caches when activation cannot read the current cache', async () => {
+    const worker = activationFixture();
+    worker.match.mockRejectedValueOnce(new Error('cache storage unavailable'));
+    await worker.activate();
+
+    expect(worker.removeCache).not.toHaveBeenCalled();
+    expect(worker.storedCaches.has(worker.previousName)).toBe(true);
+    expect(worker.claim).toHaveBeenCalledOnce();
   });
 
   it('serves a project site from under its base, and nothing outside it', async () => {

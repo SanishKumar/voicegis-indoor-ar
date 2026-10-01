@@ -19,6 +19,45 @@ export interface BannerCopy {
   step: RouteStep;
   /** The same guidance phrased to be read aloud. */
   speech: string;
+  /** A semantic milestone must be spoken even if the destination text repeats. */
+  announcementKey?: string;
+}
+
+/** Arrival is a journey fact, not a consequence of previewing the final step. */
+export function withArrivalState(
+  copy: BannerCopy | null,
+  destinationName: string,
+  state: { confirmed: boolean; nearDestination: boolean; atEnd: boolean },
+): BannerCopy | null {
+  if (!copy) return null;
+  const phase = state.confirmed
+    ? 'confirmed'
+    : state.nearDestination
+      ? 'near'
+      : state.atEnd
+        ? 'route-end'
+        : null;
+  if (!phase) return copy;
+  const lead =
+    phase === 'confirmed'
+      ? 'Arrival confirmed'
+      : phase === 'near'
+        ? 'Near destination'
+        : 'End of route';
+  const then =
+    phase === 'confirmed'
+      ? `Arrival confirmed by you at ${destinationName}.`
+      : phase === 'near'
+        ? 'Check the destination sign, then confirm when you’re there.'
+        : 'The displayed route has ended; your arrival is not confirmed.';
+  return {
+    ...copy,
+    lead,
+    text: destinationName,
+    then,
+    speech: `${lead}. ${destinationName}. ${then}`,
+    announcementKey: `${phase}:${destinationName}`,
+  };
 }
 
 /** Manoeuvres closer than this to the one before are announced together. */

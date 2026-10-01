@@ -4,7 +4,7 @@ import { Matrix4, type Scene } from 'three';
 import { RouteTracker } from '../navigation/liveTracker';
 import { buildRouteTrack, type RouteTrack } from '../navigation/routeProgress';
 import { VenuePoseGuard } from '../navigation/venuePoseGuard';
-import { startArGuidance } from './arSession';
+import { startArGuidance, type ArGuidanceOptions } from './arSession';
 
 const gpu = vi.hoisted(() => ({
   loop: null as ((time: number, frame: XRFrame) => void) | null,
@@ -58,6 +58,8 @@ async function setup(
     route?: RouteTrack;
     facing?: () => number | null;
     venueGuard?: VenuePoseGuard;
+    isRouteCurrent?: () => boolean;
+    graphicAllowed?: ArGuidanceOptions['graphicAllowed'];
   } = {},
 ) {
   floorHit = options.floor === undefined ? 0 : options.floor;
@@ -82,9 +84,11 @@ async function setup(
     overlay: document.createElement('div'),
     facingDegrees: options.facing ?? (() => 90),
     onFrame: report,
+    isRouteCurrent: options.isRouteCurrent,
+    graphicAllowed: options.graphicAllowed,
   });
   confirmSurface = handle.confirmSurface;
-  return { tracker, handle, report, requestSession };
+  return { tracker, handle, report, requestSession, session };
 }
 function frame(z: number | null, y = 1.4, x = 0) {
   now += 50;
@@ -120,6 +124,85 @@ function place(z: number, y = 1.4) {
 const route = () => gpu.scene?.children[0];
 
 describe('immersive route pose continuity', () => {
+  it('withholds rejected full glyphs and the destination disc while preserving physical tracking', async () => {
+    const allowed = vi.fn<NonNullable<ArGuidanceOptions['graphicAllowed']>>(
+      (point, _bearing, kind) => kind === 'chevron' && point.x < 5,
+    );
+    const { tracker, report } = await setup({ graphicAllowed: allowed });
+    place(0);
+    expect(allowed).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 1.5, floor: 'g' }),
+      90,
+      'chevron',
+    );
+    expect(allowed).toHaveBeenCalledWith(expect.objectContaining({ x: 20 }), 90, 'destination');
+    expect(route()?.children).toHaveLength(3);
+    expect(report.mock.lastCall?.[0].withheldGraphics).toBeGreaterThan(0);
+    expect(tracker.read(now).progressMeters).toBe(0);
+    expect(tracker.read(now).displacementAttached).toBe(true);
+    frame(-0.1);
+    frame(-0.2);
+    frame(-0.3);
+    expect(tracker.read(now).progressMeters).toBeGreaterThan(0);
+  });
+  it('retires a stale policy before drawing or counting its next pose frame', async () => {
+    let current = true;
+    const { tracker, session } = await setup({ isRouteCurrent: () => current });
+    place(0);
+    const geometry = route();
+    expect(geometry?.visible).toBe(true);
+    const displacement = vi.spyOn(tracker, 'displace');
+    const before = tracker.read(now).progressMeters;
+    current = false;
+    frame(-0.5);
+    expect(geometry?.visible).toBe(false);
+    expect(displacement).not.toHaveBeenCalled();
+    expect(tracker.read(now).progressMeters).toBe(before);
+    expect(session.end).toHaveBeenCalledOnce();
+    expect(gpu.loop).toBeNull();
+  });
+  it('does not request an immersive session for an already stale route', async () => {
+    const requestSession = vi.fn();
+    vi.stubGlobal('navigator', { xr: { requestSession } });
+    await expect(
+      startArGuidance({
+        track,
+        tracker: new RouteTracker(track),
+        overlay: document.createElement('div'),
+        facingDegrees: () => 90,
+        isRouteCurrent: () => false,
+      }),
+    ).rejects.toMatchObject({ reason: 'ended' });
+    expect(requestSession).not.toHaveBeenCalled();
+  });
+  it('ends a session whose permission request resolves after route ownership was lost', async () => {
+    let current = true;
+    let grant!: (session: unknown) => void;
+    const session = { end: vi.fn(async () => {}) };
+    vi.stubGlobal('navigator', {
+      xr: {
+        requestSession: () =>
+          new Promise((resolve) => {
+            grant = resolve;
+          }),
+      },
+    });
+    const tracker = new RouteTracker(track);
+    const attach = vi.spyOn(tracker, 'attachDisplacement');
+    const pending = startArGuidance({
+      track,
+      tracker,
+      overlay: document.createElement('div'),
+      facingDegrees: () => 90,
+      isRouteCurrent: () => current,
+    });
+    current = false;
+    grant(session);
+    await expect(pending).rejects.toMatchObject({ reason: 'ended' });
+    expect(session.end).toHaveBeenCalledOnce();
+    expect(attach).not.toHaveBeenCalled();
+    expect(gpu.loop).toBeNull();
+  });
   it('keeps the drawn route with 20 cm sway in real frame batching', async () => {
     const long = buildRouteTrack(
       [

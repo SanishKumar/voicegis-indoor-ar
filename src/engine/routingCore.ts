@@ -1,3 +1,5 @@
+import type { RouteDisplayClearance } from './routeClearance';
+
 export const STEP_TYPE = {
   START: 'start',
   STRAIGHT: 'straight',
@@ -63,6 +65,7 @@ export interface RouteStep {
 }
 
 export interface RouteSuccess {
+  displayClearance?: RouteDisplayClearance;
   found: true;
   algorithm: 'a-star';
   pathIds: string[];
@@ -72,6 +75,7 @@ export interface RouteSuccess {
 }
 
 export interface RouteFailure {
+  displayClearance?: RouteDisplayClearance;
   found: false;
   error: string;
 }

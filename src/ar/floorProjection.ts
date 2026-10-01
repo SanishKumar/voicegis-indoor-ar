@@ -1,4 +1,16 @@
-import { nextVerticalRun, positionAt, type RouteTrack } from '../navigation/routeProgress';
+import {
+  bearingAt,
+  nextVerticalRun,
+  positionAt,
+  type RouteTrack,
+} from '../navigation/routeProgress';
+import type { Coordinate2D } from '@voicegis/spatial-schema';
+import {
+  arChevronFootprint,
+  CAMERA_ROUTE_HALF_WIDTH_METERS,
+  CHEVRON_POINTS,
+  DESTINATION_RADIUS_METERS,
+} from '../engine/routeClearance';
 
 /**
  * The route ahead, drawn on the floor of a camera image.
@@ -53,6 +65,11 @@ export interface Chevron {
 }
 
 export interface FloorProjection {
+  /** Metric floor rectangles, clipped at the lens, never a screen-space miter. */
+  floorTiles: ScreenPoint[][];
+  floorChevrons: ScreenPoint[][];
+  floorDestination: ScreenPoint[];
+  withheldGraphics: number;
   /** The route ahead as screen polylines, split where it passes behind the camera. */
   ribbon: ScreenPoint[][];
   chevrons: Chevron[];
@@ -67,6 +84,8 @@ export interface FloorProjection {
 }
 
 export interface ProjectionOptions {
+  footprintAllowed?: (polygon: Coordinate2D[], floor: string) => boolean;
+  discAllowed?: (point: Coordinate2D, floor: string, radius: number) => boolean;
   aheadMeters?: number;
   /** The route nearer than this to the visitor is left undrawn; it is under them. */
   startOffsetMeters?: number;
@@ -82,13 +101,13 @@ export const DEFAULT_CAMERA_MODEL = Object.freeze({
   eyeHeightMeters: 1.35,
 });
 
-const DEFAULTS: Required<ProjectionOptions> = {
+const DEFAULTS = {
   aheadMeters: 25,
   startOffsetMeters: 1.2,
   spacingMeters: 0.5,
   chevronEveryMeters: 2.5,
   nearMeters: 0.15,
-};
+} as const;
 
 const DEG = Math.PI / 180;
 
@@ -118,7 +137,7 @@ export interface Projector {
 export function createProjector(
   pose: ViewerPose,
   camera: CameraModel,
-  nearMeters = DEFAULTS.nearMeters,
+  nearMeters: number = DEFAULTS.nearMeters,
 ): Projector {
   const focal = camera.height / 2 / Math.tan((camera.verticalFovDegrees / 2) * DEG);
   const centreX = camera.width / 2;
@@ -174,6 +193,10 @@ export function projectRouteAhead(
 ): FloorProjection {
   const settings = { ...DEFAULTS, ...options };
   const empty: FloorProjection = {
+    floorTiles: [],
+    floorChevrons: [],
+    floorDestination: [],
+    withheldGraphics: 0,
     ribbon: [],
     chevrons: [],
     destination: null,
@@ -246,10 +269,64 @@ export function projectRouteAhead(
   }
   close();
 
+  // Project the footprint itself. Offsetting an already projected centreline
+  // gave a falsely metric width and cut across the inside of sharp corners.
+  const projectPolygon = (polygon: Coordinate2D[], along: number): ScreenPoint[] => {
+    const vertices = polygon.map(([x, y]) => toCamera(x, y));
+    const clipped: CameraSpace[] = [];
+    for (let i = 0; i < vertices.length; i++) {
+      const a = vertices[i];
+      const b = vertices[(i + 1) % vertices.length];
+      if (inFront(a)) clipped.push(a);
+      if (inFront(a) !== inFront(b)) {
+        const t = (settings.nearMeters - a.z) / (b.z - a.z);
+        clipped.push({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+          z: settings.nearMeters,
+        });
+      }
+    }
+    return clipped.length >= 3 ? clipped.map((p) => toScreen(p, along)) : [];
+  };
+  const floorTiles: ScreenPoint[][] = [];
+  let withheldGraphics = 0;
+  const sortedAlongs = [...alongs].sort((a, b) => a - b);
+  for (let i = 1; i < sortedAlongs.length; i++) {
+    const a = positionAt(track, sortedAlongs[i - 1]);
+    const b = positionAt(track, sortedAlongs[i]);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = Math.hypot(dx, dy);
+    if (a.floor !== b.floor || length < 1e-7) continue;
+    const nx = (-dy / length) * CAMERA_ROUTE_HALF_WIDTH_METERS;
+    const ny = (dx / length) * CAMERA_ROUTE_HALF_WIDTH_METERS;
+    const polygon: Coordinate2D[] = [
+      [a.x + nx, a.y + ny],
+      [b.x + nx, b.y + ny],
+      [b.x - nx, b.y - ny],
+      [a.x - nx, a.y - ny],
+    ];
+    if (settings.footprintAllowed?.(polygon, a.floor) === false) {
+      withheldGraphics++;
+      continue;
+    }
+    const tile = projectPolygon(polygon, sortedAlongs[i]);
+    if (tile.length) floorTiles.push(tile);
+  }
+
   const chevrons: Chevron[] = [];
+  const floorChevrons: ScreenPoint[][] = [];
   const every = settings.chevronEveryMeters;
   for (let along = Math.ceil(progress / every) * every; along < limit; along += every) {
     const here = positionAt(track, along);
+    const bearing = bearingAt(track, along);
+    if (
+      settings.footprintAllowed?.(arChevronFootprint(here.x, here.y, bearing), here.floor) === false
+    ) {
+      withheldGraphics++;
+      continue;
+    }
     const step = along + 0.3 <= limit ? 0.3 : -0.3;
     const there = positionAt(track, along + step);
     const a = toCamera(here.x, here.y);
@@ -265,13 +342,30 @@ export function projectRouteAhead(
       pixelsPerMeter: focal / a.z,
       alongMeters: along,
     });
+    const anglePlan = bearing * DEG;
+    const polygon: Coordinate2D[] = CHEVRON_POINTS.map(([across, ahead]) => [
+      here.x + Math.cos(anglePlan) * across + Math.sin(anglePlan) * ahead,
+      here.y + Math.sin(anglePlan) * across - Math.cos(anglePlan) * ahead,
+    ]);
+    const projected = projectPolygon(polygon, along);
+    if (projected.length) floorChevrons.push(projected);
   }
 
   let destination: ScreenPoint | null = null;
+  let floorDestination: ScreenPoint[] = [];
   if (reachesEnd) {
     const end = positionAt(track, track.length);
     const point = toCamera(end.x, end.y);
-    if (inFront(point)) destination = toScreen(point, track.length);
+    if (settings.discAllowed?.([end.x, end.y], end.floor, DESTINATION_RADIUS_METERS) === false) {
+      withheldGraphics++;
+    } else if (inFront(point)) {
+      destination = toScreen(point, track.length);
+      const circle: Coordinate2D[] = Array.from({ length: 32 }, (_, i) => [
+        end.x + Math.cos((i * Math.PI) / 16) * DESTINATION_RADIUS_METERS,
+        end.y + Math.sin((i * Math.PI) / 16) * DESTINATION_RADIUS_METERS,
+      ]);
+      floorDestination = projectPolygon(circle, track.length);
+    }
   }
 
   // The horizon is where a level line of sight lands: above centre when looking down.
@@ -282,6 +376,10 @@ export function projectRouteAhead(
   const horizonY = horizon !== null && horizon >= 0 && horizon <= camera.height ? horizon : null;
 
   return {
+    floorTiles,
+    floorChevrons,
+    floorDestination,
+    withheldGraphics,
     ribbon,
     chevrons,
     destination,

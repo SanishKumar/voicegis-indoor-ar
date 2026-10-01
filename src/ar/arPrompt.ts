@@ -108,7 +108,7 @@ export function arPrompt({
   if (snapshot?.reason === 'arrived') {
     return {
       kind: 'arriving',
-      note: 'Your destination is here.',
+      note: 'You are near the mapped destination. Check the destination sign, then confirm when you’re there.',
       action: { kind: 'confirm-arrival', label: 'I’m at my destination' },
       leads: 'action',
     };

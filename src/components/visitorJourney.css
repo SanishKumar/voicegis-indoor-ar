@@ -152,6 +152,8 @@
 
 .compiled-map-presentation {
   position: absolute;
+  /* A detail disclosure must paint above the map's later floor/zoom groups. */
+  z-index: 1;
   top: 14px;
   right: 16px;
   display: flex;
@@ -186,6 +188,23 @@
 .compiled-map-presentation .compiled-map-overview {
   padding: 0 14px;
   border: 1px solid #a8adb1;
+}
+.compiled-map-graphics {
+  width: 196px;
+  box-sizing: border-box;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid #a8adb1;
+  border-radius: 14px;
+  background: var(--ed-cream);
+  box-shadow: 0 3px 12px #17334f12;
+}
+.compiled-map-graphics p {
+  margin: 5px 4px 2px;
+  color: var(--ed-ink);
+  font-size: 12px;
+  line-height: 1.4;
 }
 .compiled-map-presentation button:focus-visible,
 .compiled-map-fallback button:focus-visible {
@@ -235,6 +254,15 @@
 }
 
 @media (max-width: 900px) {
+  /* Keep all choices in the map band, above the trip sheet. A vertical list
+     can hide its last choice behind directions on a narrow phone. */
+  .compiled-map-graphics {
+    width: min(280px, calc(100vw - 24px));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .compiled-map-graphics p {
+    grid-column: 1 / -1;
+  }
   .compiled-map:not([data-route-floors='0']) .compiled-map-presentation {
     left: 12px;
     right: auto;
@@ -254,7 +282,7 @@
     right: 12px;
   }
   .compiled-map-location {
-    max-width: calc(100% - 124px);
+    max-width: calc(100% - 168px);
   }
   .visitor-shell .compiled-map-floors {
     flex-direction: row;

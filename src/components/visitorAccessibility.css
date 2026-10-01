@@ -1,0 +1,54 @@
+/* Visitor text reflow without changing the shared operator styles. */
+.visitor-shell:not(.is-journey) {
+  overflow-y: auto;
+}
+
+.visitor-shell:not(.is-journey) .visitor-header,
+.visitor-shell:not(.is-journey) .visitor-status-bar {
+  flex: none;
+}
+
+.visitor-shell:not(.is-journey) .visitor-map-stage {
+  /* Header text must not collapse the search/map area to a sliver. The shell
+     scrolls instead; this also works for shortened landscape viewports. */
+  min-height: min(360px, 65svh);
+}
+
+.visitor-shell .visitor-brand-copy span,
+.visitor-shell .visitor-location-copy small {
+  font-size: 0.8125rem;
+}
+
+.visitor-shell .visitor-brand-copy strong {
+  font-size: 1.25rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.visitor-shell .visitor-location-control,
+.visitor-shell .visitor-heading-check,
+.visitor-shell .visitor-access-profile,
+.visitor-shell .visitor-status-bar .status-item {
+  font-size: 1rem;
+}
+
+.visitor-shell .visitor-location-copy {
+  flex-wrap: wrap;
+}
+
+.visitor-shell .visitor-location-copy strong {
+  /* Its full accessible name is on the change-location control. Keep this
+     compact header label from breaking a place name into individual letters. */
+  white-space: nowrap;
+}
+
+@media (forced-colors: active) {
+  .visitor-shell button:focus-visible,
+  .visitor-shell summary:focus-visible,
+  .visitor-shell input:focus-visible {
+    outline: 2px solid Highlight;
+  }
+  .visitor-shell button[aria-pressed='true'] {
+    outline: 2px solid Highlight;
+  }
+}

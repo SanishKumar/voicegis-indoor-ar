@@ -2,9 +2,11 @@ import { wrapDegrees } from '../navigation/coordinateFrames';
 import type { FacingAnchor } from './facingFrom';
 
 /**
- * Manual fallback only. An arbitrary yaw, authored sign heading, route bearing,
- * or walking direction is not a measured camera-to-building alignment.
- * The later visual-pose bridge must use its own synchronized, qualified source.
+ * Explicit manual alignment or approximate direction from facing a scanned
+ * sign, transferred through the same live orientation reference. Neither is a
+ * measured camera-to-building pose; raw yaw, route bearing and walking direction
+ * alone cannot supply this alignment. A later visual-pose bridge must use its
+ * own synchronized, qualified source.
  * Thresholds here are provisional; synthetic tests do not qualify a handset.
  */
 export function alignedCameraHeading(

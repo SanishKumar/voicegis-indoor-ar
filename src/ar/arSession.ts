@@ -15,10 +15,16 @@ import { rotatePlanVector } from '../navigation/poseHeadingCorrection';
 import type { RouteTracker } from '../navigation/liveTracker';
 import { FloorPlacement } from './floorPlacement';
 import {
+  CHEVRON_POINTS,
+  CHEVRON_OUTLINE_SCALE,
+  DESTINATION_RADIUS_METERS,
+} from '../engine/routeClearance';
+import {
   bearingAt,
   nextVerticalRun,
   positionAt,
   type RouteTrack,
+  type TrackPosition,
 } from '../navigation/routeProgress';
 import {
   alignPlanToWorld,
@@ -112,6 +118,8 @@ export interface ArFrameReport {
   headingCorrectionDegrees?: number;
   /** Settling allows one bounded refinement; locked never relearns. Neither validates heading independently. */
   headingCorrectionState?: 'learning' | 'settling' | 'locked';
+  /** Graphics withheld by authored footprint checks, not detected real obstacles. */
+  withheldGraphics?: number;
 }
 
 export interface ArGuidanceOptions {
@@ -122,6 +130,14 @@ export interface ArGuidanceOptions {
   overlay: HTMLElement;
   /** Explicitly aligned plan bearing; null withholds the route until alignment is available. */
   facingDegrees: () => number | null;
+  /** Synchronous route/policy ownership guard, also checked before each frame. */
+  isRouteCurrent?: () => boolean;
+  /** Checks the actual outlined glyph / destination disc against authored map geometry. */
+  graphicAllowed?: (
+    point: TrackPosition,
+    bearing: number,
+    kind: 'chevron' | 'destination',
+  ) => boolean;
   onFrame?: (report: ArFrameReport) => void;
   onEnd?: (reason: ArEndReason) => void;
 }
@@ -156,18 +172,15 @@ function startFailure(error: unknown): ArEndReason {
 /** A chevron half a metre across, drawn in x/y with y as the way forward. */
 function chevronGeometry() {
   const shape = new Shape();
-  shape.moveTo(-0.28, -0.2);
-  shape.lineTo(0, 0.2);
-  shape.lineTo(0.28, -0.2);
-  shape.lineTo(0.28, -0.38);
-  shape.lineTo(0, -0.02);
-  shape.lineTo(-0.28, -0.38);
+  shape.moveTo(...CHEVRON_POINTS[0]);
+  for (const point of CHEVRON_POINTS.slice(1)) shape.lineTo(...point);
   shape.closePath();
   return new ShapeGeometry(shape);
 }
 
 export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGuidanceHandle> {
   const { track, tracker } = options;
+  if (options.isRouteCurrent?.() === false) throw new ArStartError('ended');
   const xr = navigator.xr;
   if (!xr) throw new ArStartError('unsupported');
 
@@ -181,6 +194,11 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     });
   } catch (error) {
     throw new ArStartError(startFailure(error), error);
+  }
+
+  if (options.isRouteCurrent?.() === false) {
+    await session.end().catch(() => undefined);
+    throw new ArStartError('ended');
   }
 
   const renderer = new WebGLRenderer({ alpha: true, antialias: true });
@@ -208,7 +226,11 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     cleanup();
     throw new ArStartError('failed', error);
   }
-  if (ended) throw new ArStartError('ended');
+  if (ended || options.isRouteCurrent?.() === false) {
+    await session.end().catch(() => undefined);
+    cleanup();
+    throw new ArStartError('ended');
+  }
 
   const scene = new Scene();
   const camera = new PerspectiveCamera();
@@ -217,7 +239,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
   route.visible = false;
   scene.add(route);
   const chevron = chevronGeometry();
-  const ring = new RingGeometry(0.3, 0.45, 40);
+  const ring = new RingGeometry(0.3, DESTINATION_RADIUS_METERS, 40);
   const chevronMaterial = new MeshBasicMaterial({
     color: ROUTE_COLOR,
     side: DoubleSide,
@@ -248,6 +270,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
 
   let chevrons: { holder: Group; along: number }[] = [];
   let builtTo = 0;
+  let withheldGraphics = 0;
   let alignment: PlanWorldAlignment | null = null;
   /*
    * Measured movement is converted with the alignment it was placed with; the
@@ -280,6 +303,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
 
   const buildRoute = (progress: number) => {
     clearRoute();
+    withheldGraphics = 0;
     const drawing = drawAlignment;
     if (drawing === null) return;
     const run = nextVerticalRun(track, progress);
@@ -291,14 +315,19 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
     const first = Math.ceil((progress + 0.75) / CHEVRON_EVERY_METERS) * CHEVRON_EVERY_METERS;
     for (let along = first; along <= limit; along += CHEVRON_EVERY_METERS) {
       const here = positionAt(track, along);
+      const bearing = bearingAt(track, along);
+      if (options.graphicAllowed?.(here, bearing, 'chevron') === false) {
+        withheldGraphics += 1;
+        continue;
+      }
       const [x, , z] = planToWorld(drawing, here.x, here.y);
       const holder = new Group();
       holder.position.set(x, 0.01, z);
       // The world turns the other way from a bearing: bearings are clockwise from above.
-      holder.rotation.y = -planBearingToWorld(drawing, bearingAt(track, along)) * DEG;
+      holder.rotation.y = -planBearingToWorld(drawing, bearing) * DEG;
       const outline = new Mesh(chevron, outlineMaterial);
       outline.rotation.x = -Math.PI / 2;
-      outline.scale.setScalar(1.25);
+      outline.scale.setScalar(CHEVRON_OUTLINE_SCALE);
       outline.position.y = -0.002;
       const face = new Mesh(chevron, chevronMaterial);
       face.rotation.x = -Math.PI / 2;
@@ -306,13 +335,22 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       route.add(holder);
       chevrons.push({ holder, along });
     }
-    if (limit >= track.length) {
+    if (
+      limit >= track.length &&
+      options.graphicAllowed?.(
+        positionAt(track, track.length),
+        bearingAt(track, track.length),
+        'destination',
+      ) !== false
+    ) {
       const end = positionAt(track, track.length);
       const [x, , z] = planToWorld(drawing, end.x, end.y);
       const marker = new Mesh(ring, endMaterial);
       marker.rotation.x = -Math.PI / 2;
       marker.position.set(x, 0.015, z);
       route.add(marker);
+    } else if (limit >= track.length) {
+      withheldGraphics += 1;
     }
     builtTo = limit;
     route.position.y = drawing.floorY;
@@ -421,7 +459,11 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
   } catch {
     hitSource = null;
   }
-  if (ended) throw new ArStartError('ended');
+  if (ended || options.isRouteCurrent?.() === false) {
+    await session.end().catch(() => undefined);
+    cleanup();
+    throw new ArStartError('ended');
+  }
 
   tracker.attachDisplacement(performance.now());
   attached = true;
@@ -441,6 +483,7 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
       progressMeters: snapshot.progressMeters,
       headingCorrectionDegrees: correction.biasDegrees,
       headingCorrectionState: correction.state,
+      withheldGraphics,
     });
   };
 
@@ -517,6 +560,16 @@ export async function startArGuidance(options: ArGuidanceOptions): Promise<ArGui
 
   renderer.setAnimationLoop((_time, frame) => {
     if (ended || !frame) return;
+    if (options.isRouteCurrent?.() === false) {
+      // Clear the compositor before releasing GPU resources. Never count this
+      // frame's displacement or keep drawing a route while React unmounts.
+      route.visible = false;
+      target.visible = false;
+      renderer.render(scene, camera);
+      cleanup();
+      void session.end().catch(() => undefined);
+      return;
+    }
     const space = renderer.xr.getReferenceSpace();
     const nowMs = performance.now();
     const pose = space ? frame.getViewerPose(space) : null;

@@ -118,51 +118,58 @@ test('routing from destination details retires the search dialog before guidance
   await expect(directions).toBeFocused();
 });
 
-test('route calculation owns focus immediately and cancellation cannot be resurrected', async ({
-  page,
-}) => {
-  let releaseWorker!: () => void;
-  const workerGate = new Promise<void>((resolve) => {
-    releaseWorker = resolve;
+test.describe('delayed routing cancellation', () => {
+  // This case deliberately gates the worker download. A precaching service
+  // worker can answer before page.route sees the request, bypassing that gate.
+  // Offline delivery has its own suite; here exercise the actual route race.
+  test.use({ serviceWorkers: 'block' });
+
+  test('route calculation owns focus immediately and cancellation cannot be resurrected', async ({
+    page,
+  }) => {
+    let releaseWorker!: () => void;
+    const workerGate = new Promise<void>((resolve) => {
+      releaseWorker = resolve;
+    });
+    let workerRequested = false;
+    await page.route('**/assets/routing.worker-*.js', async (route) => {
+      workerRequested = true;
+      await workerGate;
+      await route.continue();
+    });
+
+    await openVisitor(page);
+    const searchTrigger = page.getByRole('button', {
+      name: 'Search rooms and departments',
+      exact: true,
+    });
+    await searchTrigger.click();
+    await page
+      .getByRole('textbox', { name: 'Search rooms and departments' })
+      .fill('Outpatient Pharmacy');
+    await page.getByRole('button', { name: 'Navigate to Outpatient Pharmacy' }).click();
+
+    const pending = page.getByRole('status', {
+      name: 'Calculating route to Outpatient Pharmacy',
+    });
+    await expect(pending).toBeVisible();
+    await expect(pending).toBeFocused();
+    await expect.poll(() => workerRequested).toBe(true);
+
+    await pending.getByRole('button', { name: 'Cancel' }).click();
+    await expect(pending).toHaveCount(0);
+    await expect(searchTrigger).toBeFocused();
+
+    const workerResponse = page.waitForResponse(/routing\.worker-.*\.js/);
+    releaseWorker();
+    await workerResponse;
+    await page.waitForTimeout(250);
+
+    await expect(
+      page.getByRole('region', { name: 'Directions to Outpatient Pharmacy' }),
+    ).toHaveCount(0);
+    await expect(searchTrigger).toBeFocused();
   });
-  let workerRequested = false;
-  await page.route('**/assets/routing.worker-*.js', async (route) => {
-    workerRequested = true;
-    await workerGate;
-    await route.continue();
-  });
-
-  await openVisitor(page);
-  const searchTrigger = page.getByRole('button', {
-    name: 'Search rooms and departments',
-    exact: true,
-  });
-  await searchTrigger.click();
-  await page
-    .getByRole('textbox', { name: 'Search rooms and departments' })
-    .fill('Outpatient Pharmacy');
-  await page.getByRole('button', { name: 'Navigate to Outpatient Pharmacy' }).click();
-
-  const pending = page.getByRole('status', {
-    name: 'Calculating route to Outpatient Pharmacy',
-  });
-  await expect(pending).toBeVisible();
-  await expect(pending).toBeFocused();
-  await expect.poll(() => workerRequested).toBe(true);
-
-  await pending.getByRole('button', { name: 'Cancel' }).click();
-  await expect(pending).toHaveCount(0);
-  await expect(searchTrigger).toBeFocused();
-
-  const workerResponse = page.waitForResponse(/routing\.worker-.*\.js/);
-  releaseWorker();
-  await workerResponse;
-  await page.waitForTimeout(250);
-
-  await expect(page.getByRole('region', { name: 'Directions to Outpatient Pharmacy' })).toHaveCount(
-    0,
-  );
-  await expect(searchTrigger).toBeFocused();
 });
 
 test('changing the start restores the location opener instead of the search trigger', async ({

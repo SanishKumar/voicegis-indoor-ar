@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { GraphNode, RouteStep } from '../engine/routingCore';
 import { buildRouteTrack } from '../navigation/routeProgress';
-import { DEFAULT_CAMERA_MODEL, projectRouteAhead, type ViewerPose } from './floorProjection';
+import {
+  createProjector,
+  DEFAULT_CAMERA_MODEL,
+  projectRouteAhead,
+  type ViewerPose,
+} from './floorProjection';
 
 const node = (id: string, x: number, y: number, floor = 'g'): GraphNode => ({
   id,
@@ -42,6 +47,46 @@ const atStart = (facingDegrees: number, pitchDegrees = 0, rollDegrees = 0): View
 const points = (projection: ReturnType<typeof projectRouteAhead>) => projection.ribbon.flat();
 
 describe('the route ahead on the floor of the camera image', () => {
+  it('projects metric edges instead of widening a screen-space centreline', () => {
+    const pose = atStart(25, -25, 12);
+    const projection = projectRouteAhead(bend, 0, pose, camera);
+    const project = createProjector(pose, camera);
+    const first = projection.floorTiles[0];
+    expect(first).toHaveLength(4);
+    expect(first[0].x).toBeCloseTo(project.project(0.32, 28.8)!.x, 6);
+    expect(first[0].y).toBeCloseTo(project.project(0.32, 28.8)!.y, 6);
+    expect(first[3].x).toBeCloseTo(project.project(-0.32, 28.8)!.x, 6);
+  });
+  it('checks each full footprint and removes rejected graphics without erasing the instructions', () => {
+    const footprintAllowed = vi.fn(() => false);
+    const projection = projectRouteAhead(
+      bend,
+      30,
+      { x: 0, y: 0, facingDegrees: 90, pitchDegrees: 0, rollDegrees: 0 },
+      camera,
+      {
+        footprintAllowed,
+        discAllowed: () => false,
+      },
+    );
+    expect(footprintAllowed).toHaveBeenCalled();
+    expect(projection.floorTiles).toEqual([]);
+    expect(projection.floorChevrons).toEqual([]);
+    expect(projection.floorDestination).toEqual([]);
+    expect(projection.destination).toBeNull();
+    expect(projection.withheldGraphics).toBeGreaterThan(0);
+    expect(bend.length).toBe(50);
+  });
+  it('clips metric footprints at the lens without drawing into the floor above', () => {
+    const pose = { x: 0, y: 0, facingDegrees: 90, pitchDegrees: 0, rollDegrees: 0 };
+    const projection = projectRouteAhead(lifted, 0, pose, camera, { startOffsetMeters: 0 });
+    expect(projection.floorTiles.length).toBeGreaterThan(0);
+    for (const point of [...projection.floorTiles.flat(), ...projection.floorChevrons.flat()]) {
+      expect(point.depthMeters).toBeGreaterThanOrEqual(0.15);
+      expect(Number.isFinite(point.x) && Number.isFinite(point.y)).toBe(true);
+      expect(point.alongMeters).toBeLessThanOrEqual(10);
+    }
+  });
   it('draws a straight corridor up the centre, below the horizon, receding towards it', () => {
     const projection = projectRouteAhead(bend, 0, atStart(0), camera);
     expect(projection.ribbon).toHaveLength(1);

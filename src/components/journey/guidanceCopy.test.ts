@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { GraphNode, RouteStep } from '../../engine/routingCore';
 import { buildRouteTrack, guidanceAt } from '../../navigation/routeProgress';
-import { bannerCopy, formatMeters, formatMinutes, stepSummary } from './guidanceCopy';
+import {
+  bannerCopy,
+  formatMeters,
+  formatMinutes,
+  stepSummary,
+  withArrivalState,
+} from './guidanceCopy';
 
 const node = (id: string, x: number, y: number, floor = 'g'): GraphNode => ({
   id,
@@ -32,6 +38,45 @@ const copyAt = (meters: number) =>
   bannerCopy(steps, track, guidanceAt(track, meters), meters, floors)!;
 
 describe('instruction banner', () => {
+  it('leaves ordinary instructions unchanged when no arrival fact is present', () => {
+    const copy = copyAt(6);
+    expect(
+      withArrivalState(copy, 'Outpatient Pharmacy', {
+        confirmed: false,
+        nearDestination: false,
+        atEnd: false,
+      }),
+    ).toBe(copy);
+    expect(
+      withArrivalState(null, 'Outpatient Pharmacy', {
+        confirmed: true,
+        nearDestination: false,
+        atEnd: true,
+      }),
+    ).toBeNull();
+  });
+
+  it.each([
+    [{ confirmed: false, nearDestination: false, atEnd: true }, 'End of route', 'route-end'],
+    [{ confirmed: false, nearDestination: true, atEnd: true }, 'Near destination', 'near'],
+    [{ confirmed: true, nearDestination: true, atEnd: true }, 'Arrival confirmed', 'confirmed'],
+  ] as const)(
+    'uses the same arrival fact for written and spoken guidance: %s',
+    (state, lead, key) => {
+      const copy = withArrivalState(copyAt(track.length), 'Outpatient Pharmacy', state)!;
+      expect(copy.lead).toBe(lead);
+      expect(copy.text).toBe('Outpatient Pharmacy');
+      expect(copy.speech).toContain(lead);
+      expect(copy.speech).toContain(copy.then);
+      expect(copy.announcementKey).toBe(`${key}:Outpatient Pharmacy`);
+      expect(copy.step.type).toBe('arrive');
+      expect(copy.speech).not.toContain('You are here');
+      if (state.confirmed) expect(copy.speech).toContain('confirmed by you');
+      else if (state.nearDestination) expect(copy.speech).toContain('Check the destination sign');
+      else expect(copy.speech).toContain('your arrival is not confirmed');
+    },
+  );
+
   it('opens with the start instruction and what follows it', () => {
     expect(copyAt(0)).toMatchObject({
       lead: 'Start',

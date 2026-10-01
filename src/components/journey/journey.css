@@ -28,12 +28,29 @@
   z-index: 40;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: 14px;
   min-height: 88px;
+  max-height: 48%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 14px 14px 14px 16px;
   background: var(--ed-ink);
   color: var(--ed-cream);
+}
+
+.jr-banner:focus-visible {
+  outline: 2px solid var(--ed-cream);
+  outline-offset: -4px;
+}
+
+/* An unusually long instruction remains scrollable at enlarged text sizes.
+   Keep its voice action at the top, not halfway down the overflowed copy. */
+.jr-banner-icon,
+.jr-banner-voice {
+  align-self: start;
+  position: sticky;
+  top: 0;
 }
 
 .jr-banner-icon {
@@ -67,7 +84,7 @@
   gap: 4px 10px;
   margin: 0 0 2px;
   font-family: var(--ed-body);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   line-height: 1.3;
   color: rgba(255, 249, 240, 0.78);
@@ -78,7 +95,7 @@
   padding: 1px 8px;
   border: 1px solid rgba(255, 249, 240, 0.38);
   border-radius: 9999px;
-  font-size: 10.5px;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -89,7 +106,7 @@
   display: block;
   margin: 0;
   font-family: var(--ed-display);
-  font-size: 21px;
+  font-size: 1.3125rem;
   font-weight: 700;
   line-height: 1.18;
   letter-spacing: 0.006em;
@@ -99,7 +116,7 @@
 
 .jr-banner-then {
   margin: 5px 0 0;
-  font-size: 13.5px;
+  font-size: 0.875rem;
   line-height: 1.35;
   color: rgba(255, 249, 240, 0.78);
 }
@@ -122,8 +139,8 @@
   color: var(--ed-ink);
 }
 
-/* A narrow phone gives the instruction the width: the icon and the voice
-   control shrink and the display size steps down a notch. */
+/* A narrow phone gives the instruction more width, without reducing the
+   voice control below a 44px touch target. */
 @media (max-width: 360px) {
   .jr-banner {
     gap: 10px;
@@ -137,12 +154,7 @@
   }
 
   .jr-banner-text {
-    font-size: 18px;
-  }
-
-  .jr-banner-voice {
-    width: 40px;
-    height: 40px;
+    font-size: 1.125rem;
   }
 }
 
@@ -156,7 +168,19 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 72%;
+  /* Preserve a useful map band on regular phones. Extra information scrolls
+     in the sheet instead of gradually covering the entire map. */
+  max-height: min(
+    72%,
+    calc(
+      100% - var(--journey-banner-height, 88px) -
+        var(--journey-map-band, max(12px, min(172px, 24%)))
+    )
+  );
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scroll-padding-block: 12px;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--ed-ink);
   background: var(--ed-cream);
@@ -173,9 +197,9 @@
   margin: 0;
 }
 
-/* Only the step list gives up height when the sheet is short; everything
-   above it keeps the size it asked for. */
-.jr-sheet > :not(.jr-steps) {
+/* One scroll owner: keyboard focus can reveal every action, explanation and
+   step even when enlarged text leaves very little map space. */
+.jr-sheet > * {
   flex: none;
 }
 
@@ -195,25 +219,23 @@
 }
 
 .jr-trip-title {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
 }
 
 .jr-trip-time {
   display: block;
   font-family: var(--ed-display);
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: 700;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }
 
 .jr-trip-to {
-  overflow: hidden;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.4;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   color: var(--ed-ink-soft);
 }
 
@@ -221,9 +243,37 @@
   color: var(--ed-ink);
 }
 
+.jr-destination-context {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.jr-destination-context summary {
+  min-height: 44px;
+  padding: 10px 0;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.jr-destination-context[open] {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ed-ink-soft);
+}
+
+.jr-destination-context summary:focus-visible {
+  outline: 2px solid var(--ed-blue);
+  outline-offset: 2px;
+}
+
+.jr-destination-context .jr-note + .jr-note {
+  margin-top: 4px;
+}
+
 .jr-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 8px 0;
   border-top: 1px solid rgba(0, 6, 9, 0.14);
@@ -231,11 +281,11 @@
 }
 
 .jr-meta-copy {
-  flex: 1;
+  flex: 1 1 160px;
   min-width: 0;
   display: grid;
   gap: 2px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.4;
 }
 
@@ -245,22 +295,46 @@
   align-items: baseline;
   gap: 5px;
   min-width: 0;
-  white-space: nowrap;
+  flex-wrap: wrap;
   color: var(--ed-ink-soft);
 }
 
 .jr-via strong,
 .jr-from strong {
-  overflow: hidden;
   min-width: 0;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   color: var(--ed-ink);
+}
+
+/* Keep the complete start name and a 44px Change action without forcing the
+   action into a third line beside the profile chip on a narrow phone. */
+.jr-from {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+}
+.jr-from > span:first-child {
+  grid-column: 1;
+  grid-row: 1;
+}
+.jr-from > span[aria-hidden='true'] {
+  display: none;
+}
+.jr-from > strong {
+  grid-column: 1;
+  grid-row: 2;
+}
+.jr-from > .jr-link {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
 }
 
 .jr-link {
   flex: none;
   margin-left: 4px;
-  padding: 0;
+  min-height: 44px;
+  padding: 4px;
   border: 0;
   background: none;
   color: var(--ed-blue);
@@ -292,7 +366,7 @@
 .jr-chip {
   flex: none;
   padding: 0 14px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .jr-chip.is-on {
@@ -302,8 +376,10 @@
 }
 
 .jr-pill {
-  padding: 0 18px;
-  font-size: 14px;
+  max-width: 100%;
+  padding: 8px 18px;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
 }
 
 .jr-icon-button {
@@ -315,17 +391,24 @@
 .jr-primary {
   flex: 1;
   min-width: 0;
-  padding: 0 18px;
+  padding: 8px 18px;
   border-color: var(--ed-ink);
   background: var(--ed-ink);
   color: var(--ed-cream);
-  font-size: 15px;
-  white-space: nowrap;
+  font-size: 0.9375rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .jr-primary[aria-pressed='true'] {
   border-color: var(--ed-blue);
   background: var(--ed-blue);
+}
+
+@media (max-width: 360px) {
+  .jr-primary {
+    padding-inline: 8px;
+  }
 }
 
 .jr-chip:hover:not(:disabled):not(.is-on),
@@ -359,11 +442,36 @@
 .jr-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
+/* At normal narrow-phone heights, reserve enough map space even when another
+   shell uses part of the viewport. The collapsed sheet keeps its primary
+   action above the fold. Recovery cards, expanded steps, short viewports and
+   focus in earlier controls keep ordinary scroll flow, without a footer
+   covering a control the browser has just scrolled into view. */
+@media (max-width: 360px) and (min-height: 640px) {
+  .jr {
+    --journey-map-band: 172px;
+  }
+
+  .jr[data-journey='guiding']:not(.has-steps):not(:has(.map-recovery-slot:not(:empty))):not(
+      :has(.jr-sheet > :not(.jr-actions) :focus)
+    )
+    .jr-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    padding-top: 8px;
+    border-top: 1px solid var(--ed-ink-soft);
+    background: var(--ed-cream);
+    box-shadow: 0 12px 0 var(--ed-cream);
+  }
+}
+
 .jr-note {
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
   color: var(--ed-ink-soft);
 }
@@ -373,9 +481,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: visible;
 }
 
 .jr-steps[hidden] {
@@ -423,13 +529,13 @@
 }
 
 .jr-step-text {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.3;
 }
 
 .jr-step small {
-  font-size: 12.5px;
+  font-size: 0.8125rem;
   color: var(--ed-ink-soft);
 }
 
@@ -513,12 +619,13 @@
   }
 
   .jr-banner {
+    flex: none;
     min-height: 104px;
     padding: 18px 18px 18px 20px;
   }
 
   .jr-banner-text {
-    font-size: 23px;
+    font-size: 1.4375rem;
   }
 
   .jr-sheet {
@@ -531,7 +638,7 @@
 
   .jr-venue {
     display: block;
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -585,7 +692,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.45;
   color: var(--ed-ink-soft);
 }
@@ -600,7 +707,8 @@
 }
 
 .jr-secondary {
-  padding: 0;
+  min-height: 44px;
+  padding: 4px;
   border: 0;
   background: none;
   color: var(--ed-ink);
@@ -614,4 +722,25 @@
 .jr-secondary:focus-visible {
   outline: 2px solid var(--ed-blue);
   outline-offset: 2px;
+}
+
+/* System colours retain action, selection and focus boundaries when authored
+   cream/blue backgrounds are replaced by a high-contrast palette. */
+@media (forced-colors: active) {
+  .jr-banner {
+    border-bottom: 1px solid CanvasText;
+  }
+  .jr-banner-icon,
+  .jr-banner-status,
+  .jr-step-icon {
+    border: 1px solid CanvasText;
+  }
+  .jr-step.is-next .jr-step-icon,
+  .jr-chip.is-on,
+  .jr-banner-voice[aria-pressed='true'] {
+    outline: 2px solid Highlight;
+  }
+  .jr :focus-visible {
+    outline: 2px solid Highlight;
+  }
 }

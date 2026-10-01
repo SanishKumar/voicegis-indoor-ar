@@ -15,10 +15,10 @@ export default defineConfig({
   retries: 0,
   workers: process.env.CI ? 1 : 2,
   timeout: 30_000,
-  // Both device projects run serially in CI. Sensor-driven walks use real
-  // elapsed time; the visitor subset alone now exceeds eight minutes.
-  // Keep per-test limits intact, but allow the complete suite to finish.
-  globalTimeout: process.env.CI ? 15 * 60_000 : undefined,
+  // The expanded 162-case operator suite took 15.8 minutes locally with one
+  // worker. Sensor walks require real elapsed time. Leave headroom for CI
+  // variation without relaxing per-test limits, assertions or retries.
+  globalTimeout: process.env.CI ? 20 * 60_000 : undefined,
   expect: {
     timeout: 15_000,
   },

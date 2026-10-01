@@ -1,13 +1,13 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
+import { lazy, useEffect, useRef, useState } from 'react';
+import { useNavigation, NAV_STATUS, VIEW_TYPE } from '../context/NavigationContext.jsx';
 import { VISITOR_VIEW, visitorViewFor } from '../context/visitorView.ts';
 import { guidanceAt, positionAt, trackForRoute } from '../navigation/routeProgress';
-import CameraPreview from './CameraPreview.jsx';
+import VisitorViewBoundary from './VisitorViewBoundary';
 import CheckInToast from './CheckInToast.tsx';
 import FieldTestPanel from './FieldTestPanel.tsx';
 import { sharedOrientation } from '../ar/sharedOrientation';
 import Header from './Header.jsx';
-import { bannerCopy } from './journey/guidanceCopy';
+import { bannerCopy, withArrivalState } from './journey/guidanceCopy';
 import JourneyChrome from './journey/JourneyChrome.jsx';
 import { useLiveTracking } from './journey/useLiveTracking.js';
 import { useSpokenGuidance } from './journey/useSpokenGuidance.js';
@@ -17,8 +17,10 @@ import POICard from './POICard.jsx';
 import SearchPanel from './SearchPanel.jsx';
 import StatusBar from './StatusBar.jsx';
 import WelcomeScreen from './WelcomeScreen.jsx';
+import './visitorAccessibility.css';
 
 const VisitorMap = lazy(() => import('./VisitorMap.tsx'));
+const CameraPreview = lazy(() => import('./CameraPreview.jsx'));
 
 export default function VisitorApp() {
   const {
@@ -47,7 +49,10 @@ export default function VisitorApp() {
    * dismissed. While it is, the map belongs to the journey: the header and
    * status strip give their space to the instruction banner and trip sheet.
    */
-  const journey = state.navStatus === NAV_STATUS.ROUTING || state.route !== null;
+  const journey =
+    state.navStatus === NAV_STATUS.ROUTING ||
+    state.navStatus === NAV_STATUS.PAUSED ||
+    state.route !== null;
   const track = state.route?.found === true ? trackForRoute(state.route) : null;
   const walkthrough = useWalkthrough({
     track,
@@ -105,18 +110,30 @@ export default function VisitorApp() {
    * is read aloud whether the map or the camera is on screen, and the mute
    * choice survives switching between them.
    */
+  const spokenGuidance = track ? guidanceAt(track, state.progressMeters) : null;
   const spokenCopy =
     track !== null && state.route?.found === true
-      ? bannerCopy(
-          state.route.steps,
-          track,
-          guidanceAt(track, state.progressMeters),
-          state.progressMeters,
-          (floorId) => venue.getFloorById(floorId)?.name,
-          positionAt(track, state.progressMeters).vertical,
+      ? withArrivalState(
+          bannerCopy(
+            state.route.steps,
+            track,
+            spokenGuidance,
+            state.progressMeters,
+            (floorId) => venue.getFloorById(floorId)?.name,
+            positionAt(track, state.progressMeters).vertical,
+          ),
+          venue.getNodeById(state.destinationNodeId)?.poi?.name ?? 'destination',
+          {
+            confirmed: state.navStatus === NAV_STATUS.ARRIVED,
+            nearDestination: live && tracking.snapshot?.reason === 'arrived',
+            atEnd: spokenGuidance.atEnd,
+          },
         )
       : null;
-  useSpokenGuidance(spokenCopy, voice && state.navStatus === NAV_STATUS.NAVIGATING);
+  useSpokenGuidance(
+    spokenCopy,
+    voice && (state.navStatus === NAV_STATUS.NAVIGATING || state.navStatus === NAV_STATUS.ARRIVED),
+  );
 
   useEffect(() => {
     const previous = previousOnboardingCompleteRef.current;
@@ -160,7 +177,11 @@ export default function VisitorApp() {
       <main className="main-content visitor-map-stage" id="main-content">
         {visitorViewFor(state.activeView) === VISITOR_VIEW.MAP && (
           <>
-            <Suspense fallback={<div className="map-loading">Loading the venue model…</div>}>
+            <VisitorViewBoundary
+              key={state.venueKey}
+              view="map"
+              recoveryTarget={journey ? mapRecoveryTarget : null}
+            >
               <VisitorMap
                 key={state.venueKey}
                 viewMemory={mapViewMemory}
@@ -169,7 +190,7 @@ export default function VisitorApp() {
                 following={following}
                 sigmaMeters={live ? (tracking.snapshot?.sigmaMeters ?? null) : null}
               />
-            </Suspense>
+            </VisitorViewBoundary>
             <SearchPanel />
             <POICard />
             <JourneyChrome
@@ -181,7 +202,11 @@ export default function VisitorApp() {
             />
           </>
         )}
-        <CameraPreview tracking={trackingControl} voice={voice} onVoice={setVoice} />
+        {visitorViewFor(state.activeView) === VISITOR_VIEW.CAMERA_PREVIEW && (
+          <VisitorViewBoundary view="camera" onExit={() => actions.setView(VIEW_TYPE.MAP)}>
+            <CameraPreview tracking={trackingControl} voice={voice} onVoice={setVoice} />
+          </VisitorViewBoundary>
+        )}
       </main>
       <StatusBar />
       <LocationPicker isOpen={showLocationPicker} onClose={() => setShowLocationPicker(false)} />

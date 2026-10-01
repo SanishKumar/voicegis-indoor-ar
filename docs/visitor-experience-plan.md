@@ -2,6 +2,10 @@
 
 Reviewed 11 September 2026. Scope: Visitor first; preserve Studio, Inspector, the compiler, accessibility policy, offline delivery, and evidence integrity. This is an implementation sequence, not a promise that browser sensors already provide reliable indoor positioning.
 
+For the **1 October current implementation and prioritized remaining work**,
+read [visitor readiness](visitor-readiness.md). Dated entries below describe
+their original slice, including limitations that later slices may have changed.
+
 ## Product direction
 
 The destination experience should feel simple: choose a place, establish a starting position, see one useful instruction, and follow it. A person can inspect the full journey, return to their position, tilt into 3D, or briefly raise the camera without restarting navigation. The system advances instructions only when observations support movement. When it cannot locate the person confidently, it explains what happened and offers a quick recovery.
@@ -925,3 +929,161 @@ public-build floor-placement/field-log run passed all eight cases too, for 42
 targeted browser passes total, with no retries or skips.
 This does not resolve the older complete-browser-suite CI timeout. The existing
 large-chunk warning remains. No commit, push or deployment is included.
+
+### Imported closure freshness and trip recovery — 30 September 2026
+
+The Visitor provider now evaluates every request/preview at decision time,
+not the import's historical time. An immutable policy revision and bounded
+wall/monotonic lease retire late worker results and stale camera/XR frames.
+Expiry, foreground return and policy removal/replacement pause affected trips
+on the map, retaining destination and accessibility preference but removing
+obsolete directions. A new valid policy still needs a newly scanned or
+explicitly selected start; preview progress and older scans cannot stand in
+for current location. Cached offline maps are not treated as an all-clear.
+
+A blocked step-free route also retains its destination so “Try the fastest
+route” works when explicitly chosen; no automatic mobility downgrade occurs.
+The operator diagnostic reproduces the accepted receipt's evaluation time.
+See [the policy lifetime contract and verification](operational-policy-lifetime.md).
+
+Local gate: lint, types, 1,577 tests in 126 files, venue/replay/QR checks and
+public build pass. Targeted public browser journeys, camera/AR floor,
+offline and deferred-view recovery pass 52/52 across both screen sizes.
+Closure import/recovery browser cases run through the existing operator UI;
+the public build still has **no live closure feed**. Authenticated publication,
+ordered delivery, trusted freshness and rollback protection across reloads
+remain separate backend work. No hosted CI, handset qualification, commit,
+push or deployment is claimed.
+
+Next bounded software slice: validate rendered-route footprint against
+walkable spaces, door openings, turns, restrictions and mobility clearance.
+It does not imply dynamic obstacle detection/avoidance is implemented. The
+rest of the current sequence is in [visitor readiness](visitor-readiness.md).
+
+### Authored route-graphic clearance — 1 October 2026
+
+The selected route now carries worker-transferable clearance evidence tied to
+its package/profile. Continuous width checks use the actual authored space
+boundaries and only openings traversed by that route. Exact boundary
+intersections catch narrow concavities between sample points; touching room
+polygons are not treated as a single open hall. An invalid centerline rejects
+guidance; a valid centerline with insufficient graphic width retains written
+directions and withholds 2D/3D/camera route graphics with an explicit notice.
+
+Ordinary camera guidance projects metric rectangles/chevrons rather than
+widening a screen-space centreline. Camera/XR also check full arrow outlines
+and destination discs, omitting glyphs that cannot fit at a corner/opening.
+Renderer dimensions are shared with those checks. The camera's floor/FOV
+remain estimates, and real-world registration is still unqualified.
+
+This is not body/wheelchair clearance certification, depth occlusion or dynamic
+obstacle avoidance. Decorative furniture is not treated as surveyed evidence.
+See [the contract, fixtures and limits](route-graphic-clearance.md).
+
+Final local software gate passes lint, types, 1,601 unit tests in 127 files,
+unchanged venue/replay/QR artifacts and the public build. Startup JavaScript
+remains within budget at 439.6 KiB raw / 143.4 KiB gzip. No commit, push,
+deployment or real-handset qualification is included.
+
+The final public production build passes all 76 targeted desktop/mobile browser
+cases in route-clearance, camera-alignment, AR floor placement, visitor journeys,
+map views/graphics, offline recovery and deferred-view loading. This is a local
+Chromium run, not the entire operator suite, hosted CI or real-phone validation.
+
+Next bounded Visitor slice: cartography/interaction/accessibility polish,
+including small-phone density, labels, search/arrival recovery and large-text
+and keyboard journeys. Live closure delivery, release/offline-update safeguards,
+sign-change tooling and surveyed traversability remain separate open work.
+
+### Visitor search, arrival and accessible reflow — 1 October 2026
+
+Search now counts the full public match set, reveals results in pages of ten,
+and focuses the first newly revealed result. Query/category recovery preserves
+the useful query, nested details preserve search intent, and lower recovery
+actions bring the input back into view even when the entire enlarged dialog
+has scrolled. Details and Route remain explicit separate actions.
+
+Authored floor/space/description context is disclosed without inventing an
+entrance or staff contact. Preview completion, physical proximity and explicit
+arrival confirmation use shared wording across the map, camera facts and
+spoken guidance. Reaching the final preview no longer produces “You are here”
+in the camera; proximity still requests a destination-sign check. Voice
+milestone keys announce proximity and confirmation once each without repeating
+each metre of countdown. Done and End route restore visible search focus.
+
+Typography scales, narrow/short screens preserve a bounded map band and
+scrollable written instructions, and the sheet uses one scroll owner rather
+than a clipped nested step list. The measured instruction height bounds the
+sheet; only a changed instruction resets banner scroll. Native keyboard focus
+reveals lower controls. High-contrast selection/focus and reduced-motion paths
+have explicit coverage. A compact graphics chooser keeps all three 44 px
+options above the directions sheet on ordinary narrow phones.
+
+An exhaustive routing-matrix test reuses already calculated forward/reverse
+routes rather than calculating the same routes again for each assertion. Its
+profile, connector, symmetry and outage assertions remain intact; no timeout
+or navigation threshold was relaxed.
+
+Final full local gate passes lint, types, 1,629 unit tests in 131 files,
+unchanged venue/replay/QR artifacts and the public build. Startup JavaScript
+remains within budget at 444.1 KiB raw / 144.9 KiB gzip. The deferred Three.js
+large-chunk warning remains. See [interaction scope and evidence](visitor-interaction-accessibility.md).
+
+Final targeted browsers pass 134/134 across desktop/mobile: 108 public
+integration cases; 20 additional public keyboard/header/camera-layout cases;
+and six policy-recovery cases using the existing operator import UI. The
+cancellation fixture now blocks service workers in its own context so the
+deliberately delayed worker request cannot be bypassed by offline precaching.
+Its focus/cancel/late-result assertions remain intact. No retries or skips;
+this is not the complete operator suite or a hosted CI result.
+
+This is not screen-reader/platform certification, real-venue usability or
+handset positioning/AR validation. There is no major-product parity claim,
+and dynamic obstacle detection/avoidance is not implemented. All work remains
+local and uncommitted; no push or deployment is included.
+
+Next bounded software slice: release/offline-update safeguards, beginning with
+waiting-cache integrity before old-cache retirement and changed-release
+upgrade/rollback coverage. The broader remaining sequence is in
+[visitor readiness](visitor-readiness.md).
+
+### Release review and pre-push verification — 1 October 2026
+
+Offline activation now reverifies the replacement cache before retiring earlier
+cache bytes. Missing or corrupt entries can be repaired only from their exact
+build revisions. A failed check retains earlier bytes, but does not roll back
+to the earlier active worker. Eight new deterministic activation cases pass;
+the offline-worker unit file now has 15 cases. Multi-client changed-release
+rollback and an exact-revision publishing gate remain separate work.
+
+The full browser review exposed two narrow-layout defects: the operator dock
+reduced the map band below its existing 160 px assertion, and the sticky footer
+covered a map-recovery action. Normal narrow-phone heights now reserve 172 px;
+recovery cards use ordinary scroll flow. A subsequently strengthened real-Tab
+case found the same footer could hide the focused Change action. Focus in
+preceding sheet controls now also restores ordinary flow. Original map-band,
+44 px target, focus and hit-test expectations remain intact.
+
+Verification sequence:
+
+- The complete `npm run test:browser` command with `CI=true` passed 177 cases:
+  162 operator cases in 14.6 minutes, 12 public offline cases, two install/update
+  failure cases and one project-subfolder case. No retries or skips.
+- After the final focus-only CSS fix and stronger keyboard assertion, all
+  60 affected operator accessibility/journey/map/loading cases and 18 public
+  accessibility/loading cases passed again on both screen sizes. This is
+  affected-suite revalidation, not a second full-suite run.
+- The final `npm run check` passed lint, types, 1,637 unit tests in 131 files,
+  unchanged venue/replay/QR artifacts and the public build. Startup JavaScript
+  remains 444.1 KiB raw / 144.9 KiB gzip, within 500 / 170 KiB limits.
+
+An initial complete one-worker review run took 15.8 minutes including the failed
+assertion waits. CI's aggregate Playwright budget is now 20 minutes and its
+enclosing quality job 30 minutes. Per-test limits, assertions and zero retries
+are unchanged. The deferred Three.js large-chunk warning remains visible.
+
+These are local Chromium checks, not a hosted CI result, real-handset/venue
+qualification or a deployment. The user authorized committing and pushing the
+verified work; the manually triggered visitor publishing workflow is separate.
+Software scope and substantial unimplemented features remain explicit in
+[visitor readiness](visitor-readiness.md).

@@ -20,10 +20,19 @@ import {
 import { useNavigation, NAV_STATUS } from '../../context/NavigationContext.jsx';
 import { startPointLabel } from '../../capture/startLabel.ts';
 import { sharedOrientation } from '../../ar/sharedOrientation';
+import { operationalProblem } from '../../navigation/operationalLease';
+import { ROUTE_CLEARANCE_MESSAGE } from '../../engine/routeClearance';
 import { guidanceAt, positionAt, trackForRoute } from '../../navigation/routeProgress';
-import { bannerCopy, formatMeters, formatMinutes, stepSummary } from './guidanceCopy';
+import {
+  bannerCopy,
+  formatMeters,
+  formatMinutes,
+  stepSummary,
+  withArrivalState,
+} from './guidanceCopy';
 import ManeuverIcon from './ManeuverIcon.jsx';
 import { speechAvailable } from './useSpokenGuidance.js';
+import { useJourneyLayout } from './useJourneyLayout.js';
 import './journey.css';
 
 /**
@@ -36,13 +45,20 @@ import './journey.css';
  * sheet holds the trip, the full step list waits behind one tap, and both
  * panels mark themselves as map insets so the camera keeps the route in the
  * space between them.
+ *
+ * @param {object} props
+ * @param {{ pause: () => void, toggle?: () => void, playing?: boolean }} props.walkthrough
+ * @param {Pick<import('./useLiveTracking').LiveTracking, 'status' | 'snapshot' | 'start' | 'stop' | 'confirmFloor' | 'plausible'> | null} [props.tracking]
+ * @param {boolean} [props.voice]
+ * @param {((enabled: boolean) => void) | null} [props.onVoice]
+ * @param {(element: HTMLDivElement | null) => void} [props.onRecoverySlot]
  */
 export default function JourneyChrome({
   walkthrough,
   tracking = null,
   voice = false,
   onVoice = null,
-  onRecoverySlot,
+  onRecoverySlot = undefined,
 }) {
   const {
     state,
@@ -52,9 +68,11 @@ export default function JourneyChrome({
     accessibleRouting,
     toggleAccessibleRouting,
     setShowLocationPicker,
+    operationalFreshness,
   } = useNavigation();
   const { route, navStatus, destinationNodeId, progressMeters } = state;
   const [stepsOpen, setStepsOpen] = useState(false);
+  const [offline, setOffline] = useState(() => navigator.onLine === false);
   const regionRef = useRef(null);
   const activeStepRef = useRef(null);
 
@@ -65,18 +83,44 @@ export default function JourneyChrome({
   const track = found ? trackForRoute(route) : null;
   const guidance = track ? guidanceAt(track, progressMeters) : null;
   const riding = track ? positionAt(track, progressMeters).vertical : false;
-  const copy = found
-    ? bannerCopy(route.steps, track, guidance, progressMeters, floorName, riding)
-    : null;
   const arrived = navStatus === NAV_STATUS.ARRIVED;
+  const copy = found
+    ? withArrivalState(
+        bannerCopy(route.steps, track, guidance, progressMeters, floorName, riding),
+        destinationName,
+        {
+          confirmed: arrived,
+          nearDestination: tracking?.status === 'on' && tracking?.snapshot?.reason === 'arrived',
+          atEnd: guidance.atEnd,
+        },
+      )
+    : null;
+  useJourneyLayout(
+    regionRef,
+    navStatus,
+    route,
+    arrived || (tracking?.status === 'on' && tracking?.snapshot?.reason === 'arrived')
+      ? destinationName
+      : copy?.text,
+  );
 
   // Route creation replaces the control that launched it. Focus the new
   // calculation or guidance region once, rather than dropping the visitor on
   // <body> or stealing focus on every instruction change.
   useEffect(() => {
-    if (navStatus !== NAV_STATUS.ROUTING && !route) return;
+    if (navStatus !== NAV_STATUS.ROUTING && navStatus !== NAV_STATUS.PAUSED && !route) return;
     regionRef.current?.focus({ preventScroll: true });
   }, [navStatus, route]);
+
+  useEffect(() => {
+    const update = () => setOffline(navigator.onLine === false);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
 
   // Keep the step being walked in view inside an open list.
   useEffect(() => {
@@ -90,7 +134,7 @@ export default function JourneyChrome({
     // Clearing guidance renders the map's search trigger again; restore focus
     // there only for this explicit dismissal.
     window.setTimeout(() => {
-      document.getElementById('btn-search-open')?.focus({ preventScroll: true });
+      document.getElementById('btn-search-open')?.focus();
     }, 0);
   };
 
@@ -123,6 +167,74 @@ export default function JourneyChrome({
             </div>
             <button type="button" className="jr-pill" onClick={endRoute}>
               <X size={16} aria-hidden="true" /> Cancel
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (navStatus === NAV_STATUS.PAUSED) {
+    const available = operationalFreshness?.status === 'current';
+    const reason = available
+      ? 'location-required'
+      : (operationalFreshness?.reason ?? state.policyPause?.reason);
+    return (
+      <div className="jr" data-journey="policy-paused" data-map-inset="">
+        <section className="jr-banner is-problem" data-map-inset="" aria-hidden="true">
+          <span className="jr-banner-icon">
+            <AlertTriangle size={26} />
+          </span>
+          <div className="jr-banner-copy">
+            <p className="jr-banner-lead">Directions paused</p>
+            <p className="jr-banner-text">{destinationName}</p>
+          </div>
+        </section>
+        <section
+          ref={regionRef}
+          className="jr-sheet"
+          data-map-inset=""
+          id="route-policy-panel"
+          role="alert"
+          aria-label="Directions paused"
+          tabIndex={-1}
+        >
+          <div className="map-recovery-slot" ref={onRecoverySlot} />
+          <p className="jr-trip-title">Your trip to {destinationName} is saved</p>
+          <p className="jr-note">
+            {accessibleRouting ? 'Step-free route' : 'Fastest available route'}
+          </p>
+          <p className="jr-note">{operationalProblem(reason, offline)}</p>
+          {!available && (
+            <p className="jr-note">
+              Scanning a code confirms location only; it cannot refresh closure information. Ask
+              venue staff for assistance.
+            </p>
+          )}
+          <div className="jr-actions">
+            {available && (
+              <>
+                <button
+                  type="button"
+                  className="jr-pill"
+                  onClick={() => {
+                    void sharedOrientation.request();
+                    setShowLocationPicker('scan');
+                  }}
+                >
+                  <ScanLine size={16} aria-hidden="true" /> Scan a code
+                </button>
+                <button
+                  type="button"
+                  className="jr-pill"
+                  onClick={() => setShowLocationPicker(true)}
+                >
+                  <LocateFixed size={16} aria-hidden="true" /> Choose current location
+                </button>
+              </>
+            )}
+            <button type="button" className="jr-pill" onClick={endRoute}>
+              <X size={16} aria-hidden="true" /> End route
             </button>
           </div>
         </section>
@@ -210,6 +322,33 @@ export default function JourneyChrome({
     ? `${shortFloor(connectorReceipt.fromFloorId)} → ${connector?.name ?? connectorReceipt.sourceId} → ${shortFloor(connectorReceipt.toFloorId)}`
     : `${shortFloor(destination?.floor)} · same floor`;
   const destinationFloor = destination ? floorName(String(destination.floor)) : undefined;
+  const destinationLevel = destination
+    ? venue.getFloorById(String(destination.floor))?.level
+    : undefined;
+  const destinationFloorLabel =
+    destinationLevel === 0
+      ? 'Ground floor'
+      : Number.isFinite(destinationLevel)
+        ? `Level ${destinationLevel}`
+        : destinationFloor;
+  const destinationSpace =
+    destination?.poi?.spaceName ??
+    (destination?.poi?.spaceId ? venue.getSpaceById?.(destination.poi.spaceId)?.name : undefined);
+  const destinationLocation = [
+    ...new Set([destinationFloor, destinationSpace].filter(Boolean)),
+  ].join(' · ');
+  const description = destination?.poi?.description?.trim();
+  // Compiled venues currently derive description from the space and floor.
+  // Show authored description only when it adds something, not the same two
+  // labels in reverse order. Nothing here invents a door, entrance or contact.
+  const destinationDescription =
+    description &&
+    ![
+      destinationLocation,
+      [destinationSpace, destinationFloor].filter(Boolean).join(' · '),
+    ].includes(description)
+      ? description
+      : null;
   const atEnd = guidance.atEnd;
   const live = tracking?.status === 'on';
   /*
@@ -303,24 +442,23 @@ export default function JourneyChrome({
         className={`jr-banner${atEnd || arrived ? ' is-arriving' : ''}`}
         data-map-inset=""
         aria-label="Next step"
+        tabIndex={0}
       >
         <span className="jr-banner-icon">
           {arrived ? <Check size={30} strokeWidth={2.5} /> : <ManeuverIcon type={copy.step.type} />}
         </span>
         <div className="jr-banner-copy" aria-live="polite">
           <p className="jr-banner-lead">
-            {arrived ? 'You’re here' : copy.lead}
-            <span className={`jr-banner-status${statusClass}`} title={statusTitle}>
-              {status}
-            </span>
+            {copy.lead}
+            {status !== copy.lead && (
+              <span className={`jr-banner-status${statusClass}`} title={statusTitle}>
+                {status}
+              </span>
+            )}
           </p>
-          <strong className="jr-banner-text">{arrived ? destinationName : copy.text}</strong>
-          {arrived ? (
-            <p className="jr-banner-then jr-arrived">
-              Arrival confirmed by you at {destinationName}.
-            </p>
-          ) : (
-            copy.then && <p className="jr-banner-then">{copy.then}</p>
+          <strong className="jr-banner-text">{copy.text}</strong>
+          {copy.then && (
+            <p className={`jr-banner-then${arrived ? ' jr-arrived' : ''}`}>{copy.then}</p>
           )}
         </div>
         {speechAvailable() && (
@@ -350,16 +488,24 @@ export default function JourneyChrome({
         <div className="map-recovery-slot" ref={onRecoverySlot} />
         <div className="jr-venue">{venue.config.name}</div>
 
+        {route.displayClearance?.status === 'withheld' && (
+          <p className="jr-note" role="status">
+            {ROUTE_CLEARANCE_MESSAGE}
+          </p>
+        )}
+
         <div className="jr-trip">
           <div className="jr-trip-main">
             <p className="jr-trip-title">
               <span className="jr-trip-time">
-                {formatMinutes(total, venue.config.walkSpeedMps)} · {formatMeters(total)}
+                {arrived
+                  ? 'Arrival confirmed'
+                  : `${formatMinutes(total, venue.config.walkSpeedMps)} · ${formatMeters(total)}`}
               </span>
             </p>
             <p className="jr-trip-to">
               to <strong>{destinationName}</strong>
-              {destinationFloor && <span> · {destinationFloor}</span>}
+              {destinationFloorLabel && <span> · {destinationFloorLabel}</span>}
             </p>
           </div>
           <button
@@ -373,6 +519,14 @@ export default function JourneyChrome({
             <X size={20} />
           </button>
         </div>
+
+        {(destinationLocation || destinationDescription) && (
+          <details className="jr-destination-context" open={arrived || atEnd || liveArrived}>
+            <summary>Destination details</summary>
+            {destinationLocation && <p className="jr-note">{destinationLocation}</p>}
+            {destinationDescription && <p className="jr-note">{destinationDescription}</p>}
+          </details>
+        )}
 
         <div className="jr-meta">
           <div className="jr-meta-copy">
@@ -518,7 +672,12 @@ export default function JourneyChrome({
           </button>
         </div>
         <div className="jr-steps" id="nav-steps-list" hidden={!stepsOpen}>
-          {!live && (
+          {arrived ? (
+            <p className="jr-note">
+              Arrival was confirmed by you. These steps are a route preview, not your tracked
+              location.
+            </p>
+          ) : !live ? (
             <p className="jr-note">
               Your position isn’t tracked yet.{' '}
               {!arrived && !walkthrough.playing && (canTrack || needsScanToTrack) ? (
@@ -535,7 +694,7 @@ export default function JourneyChrome({
                 'Guidance moves when you step through it or play the walk-through; scan a check-in code to update where you are.'
               )}
             </p>
-          )}
+          ) : null}
           <ol className="jr-step-list">
             {steps.map((step, index) => {
               const done = guidance.stepIndex >= index && index !== steps.length - 1;
@@ -550,7 +709,7 @@ export default function JourneyChrome({
                   <button
                     type="button"
                     onClick={() => stepTo(() => actions.previewStep(index))}
-                    aria-label={`Go to step ${index + 1}: ${step.instruction}`}
+                    aria-label={`Preview step ${index + 1}: ${step.instruction}`}
                   >
                     <span className="jr-step-icon">
                       <ManeuverIcon type={step.type} size={20} />
@@ -639,7 +798,11 @@ function describeTracking(snap, floorName) {
         detail: `Take the lift or stairs to ${floorName(snap.pendingFloor?.toFloorId) ?? 'the next floor'}. Scan the code there, or tap when you arrive.`,
       };
     case 'arrived':
-      return { label: 'Arriving', detail: 'You’re at your destination.' };
+      return {
+        label: 'Near destination',
+        detail:
+          'Tracking places you near the mapped destination. Check the sign before confirming.',
+      };
     case 'sensors-silent':
       return { label: 'Paused', detail: 'Motion sensors stopped. Check the phone isn’t locked.' };
     default:

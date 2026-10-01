@@ -10,10 +10,11 @@ visitor application, an offline package registry, operator inspection and
 authoring tools, a localization replay core, and two unrelated runtime-switchable
 venue benchmarks.
 
-> **Delivered scope:** check-in is a discrete position fix, not continuous
-> tracking. The camera view is screen-aligned, not world-anchored AR, and there
-> is no voice interface yet. The bundled venues are synthetic and support
-> reproducible product tests, not real-building accuracy claims.
+> **Delivered scope:** QR check-in is a discrete position fix. Opt-in walking
+> tracking, spoken guidance and experimental WebXR floor guidance are implemented,
+> but real-device/venue accuracy is not qualified. The ordinary camera overlay
+> uses estimated height/FOV; it is not world-anchored AR. The bundled venues
+> are synthetic. See [current visitor readiness and remaining work](docs/visitor-readiness.md).
 
 ## Delivered flagship
 
@@ -27,6 +28,9 @@ venue benchmarks.
   online installation while its browser cache remains intact.
 - Every route carries a receipt naming the package hash, profile, closures,
   connector choice, and excluded edges.
+- Imported closure information expires during a trip and pauses obsolete
+  guidance until policy and location are renewed. This is not a live closure
+  feed; see [the policy lifetime contract](docs/operational-policy-lifetime.md).
 
 ## Try it in 60 seconds
 
@@ -86,6 +90,9 @@ measured; the bundled venues are synthetic.
 - Interactive lit venue map with modeled spaces, openings, furniture, floor stacking, labels, and route decision points
 - React Three Fiber spatial twin with floor isolation, exploded view, semantic inspection, graph overlays, anchors, and active routes
 - Camera guidance view with route progress, optional device-heading alignment, and readiness diagnostics
+- Shared 2D/3D visitor journey with selectable/adaptive graphics detail
+- Experimental opt-in walking/XR tracking and approximate sign-derived direction; confidence holds and explicit recovery
+- Spoken turn instructions (not voice commands)
 - Public POI search with aliases and floor-aware results
 
 ### Package and localization runtime
@@ -186,6 +193,20 @@ activation/rollback helpers, and the shared stylesheet still contains operator
 selectors, so this is a UI/rendering split rather than a minimal privilege
 boundary. See [deployment](docs/deployment.md) for cache headers, update order,
 and the exact offline boundary.
+
+The public shell defers map/camera rendering code and enforces a startup
+JavaScript budget during builds. See [visitor performance](docs/visitor-performance.md)
+for the loading/recovery behavior, byte limits and remaining handset measurements.
+
+Route graphics now have a conservative authored-wall/opening clearance check.
+Width failures preserve written directions while withholding route graphics;
+an inconsistent centerline rejects the route. This is not surveyed mobility
+clearance or dynamic obstacle avoidance. See [route graphic clearance](docs/route-graphic-clearance.md).
+
+Visitor search exposes all public matches with recovery actions, and arrival is
+explicitly distinguished from preview completion or tracked proximity. Short
+screens and enlarged text use scrollable instruction/search panels. See
+[interaction and accessibility scope](docs/visitor-interaction-accessibility.md).
 
 ## Repository structure
 

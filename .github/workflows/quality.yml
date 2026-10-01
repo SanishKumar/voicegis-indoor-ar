@@ -32,9 +32,9 @@ jobs:
   browser-smoke:
     name: Browser smoke
     runs-on: ubuntu-latest
-    # Dependency/browser installation and both public offline runs follow
-    # or precede the operator suite's separate 15-minute global budget.
-    timeout-minutes: 25
+    # Installation, builds and public offline/sub-path runs need headroom
+    # around the expanded operator suite's separate 20-minute global budget.
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository

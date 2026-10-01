@@ -236,7 +236,8 @@ test('a checked-in visitor can track their walk and the guidance follows their s
 
   // Following the instructions all the way brings the visitor to the door.
   await expect(journey).toHaveAttribute('data-tracking-reason', 'arrived', { timeout: 100_000 });
-  await expect(page.locator('.jr-banner-lead')).toContainText('Arriving');
+  await expect(page.locator('.jr-banner-lead')).toContainText('Near destination');
+  await expect(journey).toHaveAttribute('data-journey', 'guiding');
   await directions.getByRole('button', { name: 'I’m at my destination' }).click();
   await expect(journey).toHaveAttribute('data-tracking', 'off');
   await expect(directions.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
@@ -368,7 +369,7 @@ test('inspecting a step pauses tracking and resuming keeps the physical position
   await expect(journey).toHaveAttribute('data-tracking', 'on');
   const showSteps = page.getByRole('button', { name: /^Show all [0-9]+ steps$/ });
   if (await showSteps.isVisible()) await showSteps.click();
-  await page.getByRole('button', { name: /^Go to step 2:/ }).click();
+  await page.getByRole('button', { name: /^Preview step 2:/ }).click();
   await expect(journey).toHaveAttribute('data-tracking', 'off');
   await expect
     .poll(async () => Number(await canvas.getAttribute('data-route-progress')))
@@ -405,6 +406,19 @@ test('a walk that leaves the route is reported, not followed', async ({ page }) 
   await expect(page.getByRole('button', { name: 'Scan a code' })).toBeVisible();
   await page.waitForTimeout(1_500);
   // The marker holds; it is not walked down a corridor the route never uses.
+  expect(Number(await canvas.getAttribute('data-route-progress'))).toBe(held);
+
+  // Once position is lost, silence and a tracking restart must not replace the
+  // required check-in with "sensors stopped" or remove the scanner shortcut.
+  await expect(journey).toHaveAttribute('data-tier', 'frozen');
+  await walker(page, 'walker.stop();');
+  await page.waitForTimeout(1_800);
+  await expect(journey).toHaveAttribute('data-tracking-reason', 'off-route');
+  await page.getByRole('button', { name: 'Stop tracking' }).click();
+  await expect(page.getByRole('button', { name: 'Scan a code', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Track my walk', exact: true }).click();
+  await expect(journey).toHaveAttribute('data-tracking', 'on');
+  await expect(journey).toHaveAttribute('data-tracking-reason', 'off-route');
   expect(Number(await canvas.getAttribute('data-route-progress'))).toBe(held);
 
   // The scan offer opens the camera scanner directly.

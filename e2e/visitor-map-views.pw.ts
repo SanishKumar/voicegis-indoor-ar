@@ -11,9 +11,13 @@ test('the two map presentations render an unobstructed venue', async ({ page }, 
   await precompleteOnboarding(page);
   await page.goto('/#/visitor');
   const canvas = page.locator('.compiled-map-canvas');
+  await expect(canvas).toHaveAttribute('data-camera-mode', '2d');
   await expect(canvas).toHaveAttribute('data-camera-transition', 'settled');
   await page.screenshot({ path: testInfo.outputPath('venue-2d.png') });
   await page.getByRole('button', { name: '3D model', exact: true }).click();
+  // The old 2D frame is also "settled". Wait for the requested mode before
+  // testing its transition, otherwise the idle sample can land mid-animation.
+  await expect(canvas).toHaveAttribute('data-camera-mode', '3d');
   await expect(canvas).toHaveAttribute('data-camera-transition', 'settled');
   await page.screenshot({ path: testInfo.outputPath('venue-3d.png') });
 
@@ -226,6 +230,8 @@ test('WebGL context restoration keeps the presentation and written journey', asy
   await openPharmacyRoute(page);
   await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
   await page.getByRole('button', { name: '3D model', exact: true }).click();
+  await page.getByRole('button', { name: 'Graphics detail', exact: true }).click();
+  await page.getByRole('button', { name: 'Low detail', exact: true }).click();
   const map = page.locator('.compiled-map');
   const canvas = map.locator('canvas');
   const instruction = await page.locator('.jr-banner-copy').innerText();
@@ -247,6 +253,13 @@ test('WebGL context restoration keeps the presentation and written journey', asy
   await canvas.dispatchEvent('test-restore-map');
   await expect(map).toHaveAttribute('data-render-status', 'ready');
   await expect(canvas).toHaveAttribute('data-camera-mode', '3d');
+  await expect(canvas).toHaveAttribute('data-graphics-setting', 'low');
+  await expect(canvas).toHaveAttribute('data-graphics-shadows', 'false');
+  await expect
+    .poll(() =>
+      canvas.evaluate((element: HTMLCanvasElement) => element.width === element.clientWidth),
+    )
+    .toBe(true);
   await expect(page.locator('.jr-banner-copy')).toHaveText(instruction, {
     useInnerText: true,
   });

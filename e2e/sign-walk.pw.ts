@@ -15,7 +15,15 @@ test('a quiet scanned sign supplies both camera direction and forward/backward m
   test.setTimeout(60_000);
   await precompleteOnboarding(page);
   await page.addInitScript(() => {
-    const phone = { alpha: 0, changed: true, started: 0, walking: false, handHeld: false };
+    const phone = {
+      alpha: 0,
+      changed: true,
+      started: 0,
+      walking: false,
+      handHeld: false,
+      lastAttitudeAt: 0,
+      handTurns: 0,
+    };
     Object.defineProperty(window, 'signWalkPhone', { value: phone });
     const request = async () => {
       if (!phone.started) phone.started = performance.now();
@@ -50,19 +58,21 @@ test('a quiet scanned sign supplies both camera direction and forward/backward m
     };
     setInterval(() => {
       if (!phone.started) return;
-      // After the scan the phone is held, not propped up: a hand moves it by a few
-      // hundredths of a degree now and then, which a change-driven sensor reports.
-      // Without that, a busy test machine delaying the gyroscope samples past the
-      // corroboration window would leave the attitude stale for good, where a
-      // real hand would renew it at once.
-      const jitter = phone.handHeld && Math.floor(performance.now() / 500) % 2 === 1 ? 0.02 : 0;
-      if (phone.changed || (phone.handHeld && performance.now() % 500 < 20)) {
+      const now = performance.now();
+      // The scan remains completely still for three seconds. Afterwards model
+      // a hand changing yaw by two degrees periodically, not an orientation
+      // heartbeat. Use elapsed time: a narrow modulo window can be missed for
+      // seconds on a busy runner, accidentally simulating a stopped sensor.
+      if (phone.changed || (phone.handHeld && now - phone.lastAttitudeAt >= 400)) {
+        if (phone.handHeld) phone.handTurns += 1;
+        const jitter = phone.handHeld && phone.handTurns % 2 === 1 ? 2 : 0;
         emit('deviceorientation', {
           alpha: phone.alpha + jitter,
           beta: 75,
           gamma: 0,
           absolute: false,
         });
+        phone.lastAttitudeAt = now;
         phone.changed = false;
       }
       const magnitude = phone.walking && performance.now() % 500 < 160 ? 12.81 : 9.81;

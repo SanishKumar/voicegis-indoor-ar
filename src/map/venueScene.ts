@@ -36,6 +36,12 @@ import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import { resolveCartographicLabels, type CartographicBounds } from '../engine/floorplanCartography';
 import type { VisitorLocation } from '../navigation/visitorLocation';
 import { cumulativeDistances } from '../navigation/routeProgress';
+import { MAP_ROUTE_RADIUS_METERS } from '../engine/routeClearance';
+import {
+  createVisitorRenderQuality,
+  type MapGraphicsSetting,
+  type MapGraphicsSnapshot,
+} from './visitorRenderQuality';
 import {
   azimuthForHeading,
   createVisitorCamera,
@@ -149,6 +155,9 @@ export interface SceneFollow {
 }
 
 export interface VenueScene {
+  getGraphics(): MapGraphicsSnapshot;
+  setGraphics(setting: MapGraphicsSetting): void;
+  onGraphicsChange(listener: (graphics: MapGraphicsSnapshot) => void): () => void;
   setMode(mode: MapMode): void;
   /** Screen space covered by interface, so framing avoids it. */
   setInsets(insets: MapInsets): void;
@@ -253,6 +262,7 @@ export function createVenueScene(
   labelLayer: HTMLElement,
   buildingPackage: CompiledBuildingPackage,
   initialView?: VisitorMapView,
+  initialGraphics?: MapGraphicsSnapshot,
 ): VenueScene {
   const outline = buildingPackage.floors.flatMap((floor) => floor.outline as Coordinate[]);
   const xs = outline.map((point) => point[0]);
@@ -272,9 +282,17 @@ export function createVenueScene(
   const context = canvas.getContext('webgl2', { antialias: true, alpha: true });
   if (!context || context.isContextLost()) throw new Error('Map graphics are unavailable');
   const renderer = new WebGLRenderer({ canvas, context, antialias: true, alpha: true });
-  const pixelRatio = Math.min(window.devicePixelRatio, 2);
+  const graphics = createVisitorRenderQuality(
+    {
+      memoryGiB: (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
+      cores: navigator.hardwareConcurrency,
+    },
+    initialGraphics,
+  );
+  const graphicsListeners = new Set<(graphics: MapGraphicsSnapshot) => void>();
+  let pixelRatio = graphics.profile(window.devicePixelRatio).pixelRatio;
   renderer.setPixelRatio(pixelRatio);
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = graphics.profile(window.devicePixelRatio).shadows;
   renderer.shadowMap.type = PCFShadowMap;
   renderer.toneMapping = ACESFilmicToneMapping;
 
@@ -315,7 +333,7 @@ export function createVenueScene(
   scene.add(new HemisphereLight(0xd6e7f5, 0xbfae92, 1.7));
   const key = new DirectionalLight(0xfff2df, 2.0);
   key.position.set(span * 0.55, span * 1.2, span * 0.45);
-  key.castShadow = true;
+  key.castShadow = renderer.shadowMap.enabled;
   key.shadow.mapSize.set(2048, 2048);
   // Three deprecated its soft filter in r184 and falls back to this one, so
   // softness comes from the map size and a normal bias rather than a deep
@@ -347,6 +365,42 @@ export function createVenueScene(
   ground.receiveShadow = true;
   ground.visible = false;
   scene.add(ground);
+
+  const applyGraphics = (publish = false) => {
+    const profile = graphics.profile(window.devicePixelRatio);
+    if (pixelRatio !== profile.pixelRatio) {
+      pixelRatio = profile.pixelRatio;
+      renderer.setPixelRatio(pixelRatio);
+      invalidate();
+    }
+    if (renderer.shadowMap.enabled !== profile.shadows) {
+      if (!profile.shadows) {
+        // Three disposes these targets but retains references to them. Clear
+        // both references so switching back can allocate fresh GPU targets.
+        key.shadow.dispose();
+        key.shadow.map = null;
+        key.shadow.mapPass = null;
+      }
+      renderer.shadowMap.enabled = profile.shadows;
+      renderer.shadowMap.needsUpdate = true;
+      key.castShadow = profile.shadows;
+      key.shadow.needsUpdate = true;
+      invalidate();
+    }
+    const snapshot = graphics.read();
+    const diagnostics = {
+      graphicsSetting: snapshot.setting,
+      graphicsDetail: snapshot.level,
+      graphicsReason: snapshot.reason,
+      graphicsPixelRatio: String(pixelRatio),
+      graphicsShadows: String(profile.shadows),
+    };
+    for (const [name, value] of Object.entries(diagnostics))
+      if (canvas.dataset[name] !== value) canvas.dataset[name] = value;
+    if (publish) for (const listener of graphicsListeners) listener(graphics.read());
+  };
+  applyGraphics();
+  let previousFrameDrawn = false;
 
   function shapeFrom(polygon: readonly Coordinate[]) {
     const shape = new Shape();
@@ -757,7 +811,12 @@ export function createVenueScene(
    * materials and re-stretches the one segment being walked, instead of
    * allocating geometry on every frame of a walk-through.
    */
-  const tubeGeometry = new CylinderGeometry(0.26, 0.26, 1, 10);
+  const tubeGeometry = new CylinderGeometry(
+    MAP_ROUTE_RADIUS_METERS,
+    MAP_ROUTE_RADIUS_METERS,
+    1,
+    10,
+  );
   const aheadMaterial = routeMaterial();
   const travelledMaterial = new MeshStandardMaterial({
     color: TRAVELLED_COLOR,
@@ -1333,6 +1392,14 @@ export function createVenueScene(
   }
 
   const handle: VenueScene = {
+    getGraphics: () => graphics.read(),
+    setGraphics(setting) {
+      if (graphics.setSetting(setting)) applyGraphics(true);
+    },
+    onGraphicsChange(listener) {
+      graphicsListeners.add(listener);
+      return () => graphicsListeners.delete(listener);
+    },
     setInsets(insets) {
       cameraRig.setInsets(insets);
       invalidate();
@@ -1538,7 +1605,13 @@ export function createVenueScene(
     frame() {
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
-      if (width === 0 || height === 0) return;
+      if (width === 0 || height === 0) {
+        previousFrameDrawn = false;
+        graphics.observeFrame(0, false);
+        return;
+      }
+      // Also follows browser zoom/DPR changes, without changing map framing.
+      applyGraphics();
       if (venueDrawingBufferNeedsResize(canvas.width, canvas.height, width, height, pixelRatio)) {
         renderer.setSize(width, height, false);
         invalidate();
@@ -1625,7 +1698,7 @@ export function createVenueScene(
         groundMaterial.opacity = groundOpacity;
         invalidate();
       }
-      ground.visible = groundOpacity > 0.005;
+      ground.visible = renderer.shadowMap.enabled && groundOpacity > 0.005;
       if (puck.parent !== null && cameraView.mode === '3d') {
         puck.getWorldPosition(windowUniforms.uWindowCentre.value);
         camera.getWorldDirection(windowUniforms.uViewDir.value).negate();
@@ -1643,10 +1716,14 @@ export function createVenueScene(
         cameraBearing: cameraView.azimuth.toFixed(4),
         cameraFollow: follow && !moved ? 'following' : 'free',
         routeProgress: routeProgress === null ? 'none' : routeProgress.toFixed(2),
+        routeSegments: String(tubes.length),
         labelObstacles: String(labelObstacles.length),
       };
       for (const [key, value] of Object.entries(diagnostics))
         if (canvas.dataset[key] !== value) canvas.dataset[key] = value;
+      const consecutiveDraw = previousFrameDrawn && needsDraw && !document.hidden;
+      previousFrameDrawn = needsDraw && !document.hidden;
+      if (graphics.observeFrame(elapsed, consecutiveDraw)) applyGraphics(true);
       if (!needsDraw) return;
       needsDraw = false;
       canvas.dataset.draws = String(Number(canvas.dataset.draws ?? 0) + 1);
@@ -1672,6 +1749,7 @@ export function createVenueScene(
         (mesh.material as MeshBasicMaterial | undefined)?.dispose();
       });
       userMoveListeners.clear();
+      graphicsListeners.clear();
       tubeGeometry.dispose();
       aheadMaterial.dispose();
       travelledMaterial.dispose();

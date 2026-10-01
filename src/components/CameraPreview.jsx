@@ -15,7 +15,7 @@
  * world instead and the phone's own tracked movement moves the marker.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Camera,
@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { useNavigation, VIEW_TYPE, NAV_STATUS } from '../context/NavigationContext.jsx';
 import { planBearing, signedHeadingDifference } from '../navigation/coordinateFrames';
-import { bannerCopy, formatMeters, formatMinutes } from './journey/guidanceCopy';
+import { bannerCopy, formatMeters, formatMinutes, withArrivalState } from './journey/guidanceCopy';
 import { speechAvailable } from './journey/useSpokenGuidance.js';
 import ManeuverIcon from './journey/ManeuverIcon.jsx';
 import { landmarksFrom } from '../engine/routeLandmarks';
@@ -46,8 +46,13 @@ import { createProjector, DEFAULT_CAMERA_MODEL, projectRouteAhead } from '../ar/
 import { ArStartError, immersiveArSupported, startArGuidance } from '../ar/arSession';
 import { arPrompt } from '../ar/arPrompt';
 import { logField } from '../fieldTest/fieldLog';
+import {
+  arChevronFootprint,
+  createRouteGraphicGuard,
+  DESTINATION_RADIUS_METERS,
+  ROUTE_CLEARANCE_MESSAGE,
+} from '../engine/routeClearance';
 
-const CREAM = '#fff9f0';
 const GLOW = '#8ec5ff';
 /** How often the drawn state is written out for the readiness chips and tests. */
 const REPORT_MS = 200;
@@ -234,13 +239,25 @@ function placeCallouts(elements, callouts, projector, width, height, topInset) {
 
 function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signHeading }) {
   const { route, navStatus, progressMeters, locationBasis, destinationNodeId } = state;
+  const routeIsCurrent = actions.isRouteCurrent;
   const navigating = navStatus === NAV_STATUS.NAVIGATING || navStatus === NAV_STATUS.ARRIVED;
   const found = navigating && Boolean(route?.found) && route.steps.length > 0;
   const track = found ? trackForRoute(route) : null;
+  const graphicGuard = useMemo(
+    () =>
+      route?.displayClearance?.status === 'checked' && route.found
+        ? createRouteGraphicGuard(venue.buildingPackage, route.path, route.displayClearance)
+        : null,
+    [route, venue.buildingPackage],
+  );
+  const graphicsAllowed =
+    route?.displayClearance?.status !== 'withheld' &&
+    (!graphicGuard || graphicGuard.assessment.status === 'checked');
   const floorName = (floorId) => venue.getFloorById(floorId)?.name;
   const destinationName = venue.getNodeById?.(destinationNodeId)?.poi?.name ?? 'Destination';
   const walkSpeedMps = venue.config?.walkSpeedMps ?? 1.2;
 
+  const rootRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const calloutLayerRef = useRef(null);
@@ -248,6 +265,11 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
   const streamRef = useRef(null);
   const overlayRef = useRef(null);
   const sheetRef = useRef(null);
+  // The lazy-loading message (or launch control) has just been replaced.
+  // Move focus into the real view once, not on every camera or sensor update.
+  useEffect(() => {
+    rootRef.current?.focus({ preventScroll: true });
+  }, []);
   const topRef = useRef(null);
   const [cameraError, setCameraError] = useState(null);
   const [videoReady, setVideoReady] = useState(false);
@@ -267,9 +289,16 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
     : progressMeters;
   const guidance = track ? guidanceAt(track, displayProgress) : null;
   const riding = track ? positionAt(track, displayProgress).vertical : false;
+  const arrived = navStatus === NAV_STATUS.ARRIVED;
+  const nearDestination =
+    Boolean(arSession || tracking?.status === 'on') && tracking?.snapshot?.reason === 'arrived';
   const copy =
     track && guidance
-      ? bannerCopy(route.steps, track, guidance, displayProgress, floorName, riding)
+      ? withArrivalState(
+          bannerCopy(route.steps, track, guidance, displayProgress, floorName, riding),
+          destinationName,
+          { confirmed: arrived, nearDestination, atEnd: guidance.atEnd },
+        )
       : null;
   const arOwnerRef = useRef(0);
   const arHandleRef = useRef(null);
@@ -281,6 +310,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
     points: 0,
     callouts: 0,
     hint: null,
+    withheldGraphics: 0,
   });
   /*
    * The phone reports its orientation far faster than anything should be
@@ -333,7 +363,10 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
   const arAvailable = arSupport === 'yes' && found;
   // What genuinely stops an immersive session: nowhere to start the route
   // from, or a tracker that has stopped trusting its own position.
-  const arBlocked = !knownStart || (tracking?.snapshot != null && !tracking.snapshot.canStartPose);
+  const arBlocked =
+    !graphicsAllowed ||
+    !knownStart ||
+    (tracking?.snapshot != null && !tracking.snapshot.canStartPose);
 
   // The sheet's height is what the inset map and the ribbon's fade keep clear of.
   useEffect(() => {
@@ -503,6 +536,11 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.clearRect(0, 0, width, height);
 
+      if (routeIsCurrent?.(route) === false) {
+        for (const element of calloutElements.values()) element.hidden = true;
+        return;
+      }
+
       const attitude = feedRef.current?.read() ?? null;
       const reading = tracking?.peek ? tracking.peek() : { snapshot: null };
       const resolved = facingFrom({
@@ -529,6 +567,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
         miniMapScene = prepareMiniMap(venue.buildingPackage, here.floor);
       }
       const drawable =
+        graphicsAllowed &&
         tilted &&
         source !== 'off' &&
         source !== 'assumed' &&
@@ -544,7 +583,10 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
         rollDegrees: attitude?.rollDegrees ?? 0,
       };
       const cameraModel = { width, height, ...DEFAULT_CAMERA_MODEL };
-      const projection = projectRouteAhead(track, progress, pose, cameraModel);
+      const projection = projectRouteAhead(track, progress, pose, cameraModel, {
+        footprintAllowed: graphicGuard?.fitsPolygon,
+        discAllowed: graphicGuard?.fitsDisc,
+      });
       const now = performance.now();
 
       // An immersive session draws its own floor and labels; the flat overlay stays out of its way.
@@ -599,12 +641,16 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
           x: here.x,
           y: here.y,
           facingDegrees: drawable ? facing : 0,
-          ...routeOnFloor(track, progress, here.floor),
+          ...(graphicsAllowed
+            ? routeOnFloor(track, progress, here.floor)
+            : { behind: [], ahead: [] }),
         });
       }
 
       const points =
-        drawable && !arSession ? projection.ribbon.reduce((sum, line) => sum + line.length, 0) : 0;
+        drawable && !arSession
+          ? projection.floorTiles.reduce((sum, tile) => sum + tile.length, 0)
+          : 0;
       if (now - lastReport >= REPORT_MS) {
         lastReport = now;
         // The ribbon's near end would run under the sheet; it fades out above it.
@@ -620,6 +666,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
           points,
           callouts: shown,
           hint,
+          withheldGraphics: projection.withheldGraphics,
         };
         if (
           lastDrawn === null ||
@@ -628,7 +675,8 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
           next.facing !== lastDrawn.facing ||
           next.points !== lastDrawn.points ||
           next.callouts !== lastDrawn.callouts ||
-          next.hint !== lastDrawn.hint
+          next.hint !== lastDrawn.hint ||
+          next.withheldGraphics !== lastDrawn.withheldGraphics
         ) {
           lastDrawn = next;
           setDrawn(next);
@@ -642,7 +690,20 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
       observer?.disconnect();
       layer.replaceChildren();
     };
-  }, [arSession, cameraError, knownStart, live, track, tracking, venue, walkSpeedMps]);
+  }, [
+    arSession,
+    cameraError,
+    knownStart,
+    live,
+    route,
+    routeIsCurrent,
+    track,
+    tracking,
+    venue,
+    graphicGuard,
+    graphicsAllowed,
+    walkSpeedMps,
+  ]);
 
   useEffect(() => {
     const cancel = () => {
@@ -694,6 +755,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
   };
 
   const startAr = async () => {
+    if (actions.isRouteCurrent?.(route) === false) return;
     // An immersive session tracks the phone itself. Requiring a reading from
     // the flat view's orientation feed left this button doing nothing at all on
     // phones where that feed never started - which were the phones it was for.
@@ -736,9 +798,19 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
         track,
         tracker,
         overlay: overlayRef.current,
+        isRouteCurrent: () => actions.isRouteCurrent?.(route) ?? true,
+        graphicAllowed: graphicGuard
+          ? (point, bearing, kind) =>
+              kind === 'destination'
+                ? graphicGuard.fitsDisc([point.x, point.y], point.floor, DESTINATION_RADIUS_METERS)
+                : graphicGuard.fitsPolygon(
+                    arChevronFootprint(point.x, point.y, bearing),
+                    point.floor,
+                  )
+          : undefined,
         // Finding the floor and tapping Start AR say nothing about building yaw.
-        // Until calibrated sign poses are available, accept only a fresh manual
-        // alignment. Never substitute the route bearing or walking direction.
+        // Accept a fresh explicit alignment or the sign's approximate direction.
+        // Never substitute the route bearing or walking direction.
         facingDegrees: () =>
           alignedCameraHeading(
             feedRef.current?.read() ?? null,
@@ -853,9 +925,6 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
     orientationSlot.kind !== 'waiting';
   const trackLeads = !arAvailable && !live && source === 'aligned';
   const remaining = guidance ? guidance.remainingMeters : 0;
-  const arrived =
-    navStatus === NAV_STATUS.ARRIVED ||
-    (arActive ? snapshot?.reason === 'arrived' : (guidance?.atEnd ?? false));
   // What the session needs from the visitor, and the one control that gives it.
   /*
    * Placed from the direction the phone knew, the route can be beside or
@@ -893,40 +962,44 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
    * it on this phone: an immersive session where there is one, because the
    * phone tracks the floor itself there, and the flat view's steps otherwise.
    */
-  const note = arProblem
-    ? arProblem
-    : snapshot?.canStartPose === false
-      ? 'Location needs a new check-in. Exit to plan and scan a sign where you are standing before starting AR. Stopping tracking does not recover your location.'
-      : live && snapshot?.tier === 'frozen'
-        ? 'Position tracking is paused. Check your location on the map before following the floor route.'
-        : !knownStart
-          ? 'Set your location on the map or scan a check-in code before placing the route.'
-          : arAvailable && !arSession && source === 'sign'
-            ? 'Your direction comes from the sign you scanned, so it is approximate. Tap Start AR, then confirm the floor.'
-            : arAvailable && !arSession && source !== 'aligned'
-              ? 'To know which way you face, scan a check-in sign while facing it squarely. Or face along the route and tap “I’m facing the corridor”.'
-              : needsOrientation
-                ? 'This phone wants permission before it reports which way it is pointing. Enable camera orientation, then point along the corridor.'
-                : orientationState === 'requesting'
-                  ? 'Asking the phone for its orientation.'
-                  : orientationState === 'waiting'
-                    ? 'Waiting for the first orientation reading from this phone.'
-                    : orientationState === 'paused'
-                      ? 'Camera alignment paused. Return here and align again before following the route.'
-                      : orientationState === 'stale' || orientationState === 'unavailable'
-                        ? 'Orientation signal lost. The route is hidden until fresh readings return; align again if the sensor reference was lost.'
-                        : // Nothing arriving at all is an orientation problem; a heading
-                          // the walk has measured, with no tilt behind it, is the rarer
-                          // case where only the tilt is missing, and says so.
-                          source === 'off'
-                          ? 'Waiting for the phone’s orientation. No floor route is shown without a fresh reading.'
-                          : !drawn.tilted
-                            ? 'Waiting for the phone’s tilt. The route cannot be laid on the floor without it.'
-                            : source === 'assumed'
-                              ? 'At your check-in point, face the corridor in the route’s direction, then tap “I’m facing the corridor”.'
-                              : !live
-                                ? 'Direction follows your phone; position holds until you track your walk.'
-                                : null;
+  const note = !graphicsAllowed
+    ? ROUTE_CLEARANCE_MESSAGE
+    : (arReport?.withheldGraphics ?? drawn.withheldGraphics) > 0
+      ? 'Some floor graphics are hidden near mapped walls or openings. Follow the written directions at those points.'
+      : arProblem
+        ? arProblem
+        : snapshot?.canStartPose === false
+          ? 'Location needs a new check-in. Exit to plan and scan a sign where you are standing before starting AR. Stopping tracking does not recover your location.'
+          : live && snapshot?.tier === 'frozen'
+            ? 'Position tracking is paused. Check your location on the map before following the floor route.'
+            : !knownStart
+              ? 'Set your location on the map or scan a check-in code before placing the route.'
+              : arAvailable && !arSession && source === 'sign'
+                ? 'Your direction comes from the sign you scanned, so it is approximate. Tap Start AR, then confirm the floor.'
+                : arAvailable && !arSession && source !== 'aligned'
+                  ? 'To know which way you face, scan a check-in sign while facing it squarely. Or face along the route and tap “I’m facing the corridor”.'
+                  : needsOrientation
+                    ? 'This phone wants permission before it reports which way it is pointing. Enable camera orientation, then point along the corridor.'
+                    : orientationState === 'requesting'
+                      ? 'Asking the phone for its orientation.'
+                      : orientationState === 'waiting'
+                        ? 'Waiting for the first orientation reading from this phone.'
+                        : orientationState === 'paused'
+                          ? 'Camera alignment paused. Return here and align again before following the route.'
+                          : orientationState === 'stale' || orientationState === 'unavailable'
+                            ? 'Orientation signal lost. The route is hidden until fresh readings return; align again if the sensor reference was lost.'
+                            : // Nothing arriving at all is an orientation problem; a heading
+                              // the walk has measured, with no tilt behind it, is the rarer
+                              // case where only the tilt is missing, and says so.
+                              source === 'off'
+                              ? 'Waiting for the phone’s orientation. No floor route is shown without a fresh reading.'
+                              : !drawn.tilted
+                                ? 'Waiting for the phone’s tilt. The route cannot be laid on the floor without it.'
+                                : source === 'assumed'
+                                  ? 'At your check-in point, face the corridor in the route’s direction, then tap “I’m facing the corridor”.'
+                                  : !live
+                                    ? 'Direction follows your phone; position holds until you track your walk.'
+                                    : null;
 
   const instructionCard = copy && (
     <div className="camera-preview-instruction">
@@ -935,20 +1008,29 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
       </div>
       <div className="camera-preview-instruction-copy">
         <div className="camera-preview-lead">{copy.lead}</div>
-        <div className="camera-preview-instruction-text">{shortStepTitle(copy.step)}</div>
+        <div className="camera-preview-instruction-text">
+          {copy.announcementKey ? copy.text : shortStepTitle(copy.step)}
+        </div>
       </div>
     </div>
   );
 
   return (
     <div
+      ref={rootRef}
       className="camera-preview"
       id="camera-preview"
+      role="region"
+      aria-label="Camera guidance"
+      tabIndex={-1}
       data-heading-source={source}
       data-facing={drawn.facing ?? ''}
       data-tilted={drawn.tilted ? 'yes' : 'no'}
       data-orientation={orientationState}
       data-ribbon={drawn.points}
+      data-route-clearance={
+        graphicsAllowed ? (route?.displayClearance?.status ?? 'not-checked') : 'withheld'
+      }
       data-callouts={drawn.callouts}
       data-ar={arActive ? 'active' : arSupport === 'yes' ? 'available' : arSupport}
       data-tracking={tracking?.status ?? 'none'}
@@ -1066,7 +1148,9 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
           {!cameraError && !arActive && (
             <p className="camera-preview-note">
               Camera preview · floor height is estimated, not detected.
-              {arAvailable && ' Start AR to place the route on a confirmed floor.'}
+              {arAvailable &&
+                graphicsAllowed &&
+                ' Start AR to place the route on a confirmed floor.'}
             </p>
           )}
         </header>
@@ -1095,9 +1179,21 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
           {!cameraError && guidance && (
             <div className="ar-sheet-facts">
               <div>
-                <span>Arrival</span> {arrived ? 'Now' : formatMinutes(remaining, walkSpeedMps)}
+                {copy?.announcementKey ? (
+                  copy.lead
+                ) : (
+                  <>
+                    <span>Estimated walk</span> {formatMinutes(remaining, walkSpeedMps)}
+                  </>
+                )}
               </div>
-              <div>{arrived ? 'You are here' : `${formatMeters(remaining)} left`}</div>
+              <div>
+                {arrived
+                  ? 'Confirmed by you'
+                  : nearDestination || guidance.atEnd
+                    ? 'Not yet confirmed'
+                    : `${formatMeters(remaining)} left`}
+              </div>
             </div>
           )}
           <div className="camera-preview-controls">
@@ -1172,10 +1268,21 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
                 {guidance && (
                   <div className="ar-sheet-facts">
                     <div>
-                      <span>Arrival</span>{' '}
-                      {arrived ? 'Now' : formatMinutes(remaining, walkSpeedMps)}
+                      {copy?.announcementKey ? (
+                        copy.lead
+                      ) : (
+                        <>
+                          <span>Estimated walk</span> {formatMinutes(remaining, walkSpeedMps)}
+                        </>
+                      )}
                     </div>
-                    <div>{arrived ? 'You are here' : `${formatMeters(remaining)} left`}</div>
+                    <div>
+                      {arrived
+                        ? 'Confirmed by you'
+                        : nearDestination || guidance.atEnd
+                          ? 'Not yet confirmed'
+                          : `${formatMeters(remaining)} left`}
+                    </div>
                   </div>
                 )}
                 <div className="camera-preview-controls">
@@ -1231,95 +1338,42 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
 /**
  * The projected route as a lit ribbon on the floor - a translucent blue bed,
  * bright edges that glow, big chevrons that recede with it - and a ring at
- * the end. Sixty centimetres wide at every depth.
+ * the end. Footprints are projected in metres before painting; glow is decoration.
  */
 function paintProjection(context, viewport, projection, fadeFrom) {
-  const focal =
-    viewport.height / 2 / Math.tan((DEFAULT_CAMERA_MODEL.verticalFovDegrees / 2) * (Math.PI / 180));
   context.save();
   context.lineJoin = 'round';
   context.lineCap = 'round';
-  for (const line of projection.ribbon) {
-    if (line.length < 2) continue;
-    const left = [];
-    const right = [];
-    for (let index = 0; index < line.length; index += 1) {
-      const point = line[index];
-      const previous = line[Math.max(0, index - 1)];
-      const next = line[Math.min(line.length - 1, index + 1)];
-      const dx = next.x - previous.x;
-      const dy = next.y - previous.y;
-      const length = Math.hypot(dx, dy) || 1;
-      // A path about two thirds of a metre across, and never so near that it
-      // fills the frame with a slab of colour.
-      const half = Math.max(2, Math.min(150, (focal / Math.max(1, point.depthMeters)) * 0.32));
-      const nx = (-dy / length) * half;
-      const ny = (dx / length) * half;
-      left.push([point.x + nx, point.y + ny]);
-      right.push([point.x - nx, point.y - ny]);
-    }
+  const polygon = (points) => {
     context.beginPath();
-    context.moveTo(left[0][0], left[0][1]);
-    for (let index = 1; index < left.length; index += 1) {
-      context.lineTo(left[index][0], left[index][1]);
-    }
-    for (let index = right.length - 1; index >= 0; index -= 1) {
-      context.lineTo(right[index][0], right[index][1]);
-    }
+    context.moveTo(points[0].x, points[0].y);
+    for (const point of points.slice(1)) context.lineTo(point.x, point.y);
     context.closePath();
+  };
+  for (const tile of projection.floorTiles) {
+    polygon(tile);
     context.fillStyle = 'rgba(10, 101, 219, 0.42)';
     context.fill();
-    for (const edge of [left, right]) {
-      context.beginPath();
-      context.moveTo(edge[0][0], edge[0][1]);
-      for (let index = 1; index < edge.length; index += 1) {
-        context.lineTo(edge[index][0], edge[index][1]);
-      }
-      context.shadowColor = 'rgba(142, 197, 255, 0.95)';
-      context.shadowBlur = 16;
-      context.strokeStyle = GLOW;
-      context.lineWidth = 2.5;
-      context.stroke();
-      context.stroke();
-      context.shadowBlur = 0;
-    }
   }
-  for (const chevron of projection.chevrons) {
-    const size = Math.max(5, Math.min(22, chevron.pixelsPerMeter * 0.22));
+  for (const chevron of projection.floorChevrons) {
     context.save();
-    context.translate(chevron.x, chevron.y);
-    context.rotate(chevron.angleRadians);
-    context.beginPath();
-    context.moveTo(-size * 0.75, -size * 0.9);
-    context.lineTo(size * 0.35, 0);
-    context.lineTo(-size * 0.75, size * 0.9);
-    context.lineTo(-size * 0.25, size * 0.9);
-    context.lineTo(size * 0.85, 0);
-    context.lineTo(-size * 0.25, -size * 0.9);
-    context.closePath();
+    polygon(chevron);
     context.shadowColor = 'rgba(142, 197, 255, 0.9)';
     context.shadowBlur = 12;
     context.fillStyle = 'rgba(223, 240, 255, 0.95)';
     context.fill();
     context.restore();
   }
-  if (projection.destination) {
-    const radius = Math.max(8, Math.min(44, 420 / Math.max(1, projection.destination.depthMeters)));
+  if (projection.floorDestination.length) {
     context.save();
     context.shadowColor = 'rgba(142, 197, 255, 0.9)';
     context.shadowBlur = 18;
-    context.beginPath();
-    context.arc(projection.destination.x, projection.destination.y, radius, 0, Math.PI * 2);
+    polygon(projection.floorDestination);
     context.strokeStyle = GLOW;
     context.lineWidth = 4;
     context.stroke();
-    context.beginPath();
-    context.arc(projection.destination.x, projection.destination.y, radius * 0.55, 0, Math.PI * 2);
     context.fillStyle = 'rgba(142, 197, 255, 0.35)';
     context.fill();
-    context.strokeStyle = CREAM;
-    context.lineWidth = 2;
-    context.stroke();
     context.restore();
   }
   // The near end of the ribbon would run under the sheet: let it go before it gets there.

@@ -40,6 +40,14 @@ the old client continues to receive one coherent old revision, and a later
 replacement with a digest mismatch becomes redundant without displacing the
 active known-good cache.
 
+The offline-worker unit file passes 15 cases, including eight activation cases.
+Those activation checks verify complete-cache cleanup, exact-byte repair before
+cleanup, and retention of earlier caches when current bytes are missing,
+corrupt, unreadable, or unavailable from the matching release. They also check
+that newer repair bytes are refused and incomplete-cache availability stays
+false. Changed-release upgrade/rollback coverage with multiple clients remains
+separate work.
+
 ## Hosting contract
 
 Serve the contents of `dist/` over HTTPS, at the domain root or under a
@@ -57,9 +65,9 @@ venue hashes are the same for every host. `npm run test:browser:offline` builds
 under `/voicegis-indoor-ar/` and proves the shell boots, installs, reopens a
 check-in link offline, and requests nothing outside its path.
 
-Host one deployment of this app per origin. Each worker deletes the other
-`voicegis-visitor-` caches when it activates, and site storage is shared by
-everything on the origin.
+Host one deployment of this app per origin. An activating worker deletes other
+`voicegis-visitor-` caches only after verifying or repairing its own complete
+cache. Site storage is shared by everything on the origin.
 
 Recommended response caching:
 
@@ -77,8 +85,13 @@ Upload hashed assets first, then the venue packages and catalog, then
 worker. While it waits, that worker continues to serve its own cached document,
 catalog, packages, and assets as one revision; it never combines a new shell
 with old venue data. A failed install leaves the preceding worker and cache
-active, and old VoiceGIS caches are deleted only after the replacement
-activates.
+active. At activation, the replacement reverifies its current cache and attempts
+to repair missing or corrupt entries using only its exact build revisions.
+Earlier VoiceGIS caches are deleted only if that check establishes completeness.
+If verification or repair fails, their bytes are retained. The current worker
+still activates and claims clients, reports an incomplete cache as unavailable,
+and continues to refuse mismatched network bytes. Retained old cache bytes do
+not automatically restore the previous active worker.
 
 ## Exact offline promise
 
@@ -106,6 +119,9 @@ repository's project site and deploys it. It runs **only when started by hand**
    passed. The workflow repeats `npm run check` but not the browser suites.
 3. The site appears at `https://<owner>.github.io/<repository>/`, for example
    `https://sanishkumar.github.io/voicegis-indoor-ar/#/visitor`.
+
+The workflow does not yet enforce a successful browser gate for the exact
+revision selected for publishing; that safeguard remains future work.
 
 Pages chooses its own response headers (currently a ten-minute `max-age` on
 everything) and does not honour the table above. The worker is registered with

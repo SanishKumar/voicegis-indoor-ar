@@ -47,6 +47,15 @@ function prompt(overrides: Partial<ArPromptInput> = {}) {
 }
 
 describe('what the AR view asks of the visitor', () => {
+  it('describes physical arrival as proximity until the visitor confirms', () => {
+    const near = prompt({ snapshot: snapshot({ reason: 'arrived' }) });
+    expect(near.kind).toBe('arriving');
+    expect(near.note).toContain('near the mapped destination');
+    expect(near.note).toContain('Check the destination sign');
+    expect(near.note).not.toContain('Your destination is here');
+    expect(near.action?.kind).toBe('confirm-arrival');
+    expect(prompt({ arrived: true }).kind).toBe('arrived');
+  });
   it('distinguishes a confirmed floor from an unavailable building direction', () => {
     const waiting = prompt({ report: report({ aligned: false, placement: 'heading' }) });
     expect(waiting.kind).toBe('heading');

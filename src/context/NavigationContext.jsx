@@ -29,6 +29,11 @@ import { sharedOrientation } from '../ar/sharedOrientation';
 import { SIGN_READING_MAX_SKEW_MS, signHeadingFrom } from '../ar/signHeading';
 import { logField } from '../fieldTest/fieldLog';
 import {
+  copyOperationalOverlay,
+  createOperationalLease,
+  NO_OPERATIONAL_POLICY,
+} from '../navigation/operationalLease';
+import {
   canConfirmArrival,
   JOURNEY_ACTION as ACTION,
   NAV_STATUS,
@@ -120,6 +125,16 @@ export function NavigationProvider({ children, venue }) {
   // request, while clearing it makes cancellation final for subsequent scans.
   const routeDestinationRef = useRef(null);
   const routeStartRef = useRef(state.startNodeId);
+  const acceptedRouteRef = useRef(null);
+  const policyRef = useRef({
+    overlay: null,
+    lease: null,
+    revision: 0,
+    required: false,
+    needsLocation: false,
+    pauseReason: null,
+    pauseDestination: null,
+  });
   const { packageCacheStatus } = useVenue();
 
   const [theme, setTheme] = useState(() => {
@@ -192,6 +207,91 @@ export function NavigationProvider({ children, venue }) {
       : null,
   );
   const [operationalEvaluatedAt, setOperationalEvaluatedAt] = useState(null);
+  const [operationalFreshness, setOperationalFreshness] = useState(NO_OPERATIONAL_POLICY);
+  const freshnessRef = useRef(NO_OPERATIONAL_POLICY);
+  const [policyConfirmationRequired, setPolicyConfirmationRequired] = useState(false);
+
+  const pausePolicy = useCallback((reason) => {
+    const policy = policyRef.current;
+    const destinationNodeId = routeDestinationRef.current;
+    if (!destinationNodeId) return;
+    if (!policy.needsLocation) {
+      policy.needsLocation = true;
+      setPolicyConfirmationRequired(true);
+    }
+    acceptedRouteRef.current = null;
+    if (policy.pauseReason === reason && policy.pauseDestination === destinationNodeId) return;
+    policy.pauseReason = reason;
+    policy.pauseDestination = destinationNodeId;
+    routeRequestGenerationRef.current += 1;
+    dispatch({ type: ACTION.PAUSE_POLICY, payload: { reason, destinationNodeId } });
+    logField('closure-policy', { status: 'paused', reason });
+  }, []);
+
+  const ensureOperationalPolicy = useCallback(() => {
+    const policy = policyRef.current;
+    const report = policy.lease
+      ? policy.lease.read(Date.now(), performance.now())
+      : policy.required
+        ? { status: 'unavailable', overlayId: null, reason: 'overlay-removed' }
+        : NO_OPERATIONAL_POLICY;
+    const previous = freshnessRef.current;
+    if (
+      previous.status !== report.status ||
+      previous.reason !== report.reason ||
+      previous.overlayId !== report.overlayId
+    ) {
+      freshnessRef.current = report;
+      setOperationalFreshness(report);
+      logField('closure-policy', {
+        status: report.status,
+        overlay: report.overlayId,
+        reason: report.reason ?? 'none',
+      });
+    }
+    if (report.status === 'unavailable') pausePolicy(report.reason);
+    return report;
+  }, [pausePolicy]);
+
+  // Timers alone are insufficient in a backgrounded mobile tab. Every resume
+  // and every route/frame action also checks the lease before doing work.
+  useEffect(() => {
+    let timer;
+    let disposed = false;
+    const check = () => {
+      if (disposed) return;
+      clearTimeout(timer);
+      const report = ensureOperationalPolicy();
+      const lease = policyRef.current.lease;
+      if (lease && (report.status === 'current' || report.reason === 'overlay-not-active')) {
+        timer = setTimeout(check, lease.delay(Date.now(), performance.now()));
+      }
+    };
+    check();
+    window.addEventListener('focus', check);
+    window.addEventListener('pageshow', check);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+      window.removeEventListener('focus', check);
+      window.removeEventListener('pageshow', check);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [ensureOperationalPolicy, operationalOverlay]);
+
+  const isRouteCurrent = useCallback(
+    (route) => {
+      const report = ensureOperationalPolicy();
+      return (
+        report.status !== 'unavailable' &&
+        !policyRef.current.needsLocation &&
+        acceptedRouteRef.current !== null &&
+        (route === undefined || route === acceptedRouteRef.current)
+      );
+    },
+    [ensureOperationalPolicy],
+  );
 
   const completeOnboarding = useCallback(() => {
     setOnboardingComplete(true);
@@ -206,6 +306,8 @@ export function NavigationProvider({ children, venue }) {
     // target, defeating both the button's meaning and the focus handoff.
     routeRequestGenerationRef.current += 1;
     routeDestinationRef.current = null;
+    acceptedRouteRef.current = null;
+    policyRef.current.pauseReason = null;
     dispatch({ type: ACTION.CLEAR_ROUTE });
     dispatch({ type: ACTION.SET_VIEW, payload: VIEW_TYPE.MAP });
     setOnboardingComplete(false);
@@ -238,9 +340,18 @@ export function NavigationProvider({ children, venue }) {
 
   const requestRoute = useCallback(
     async (destNodeId, startId, stepFree, startFloorId) => {
+      routeDestinationRef.current = destNodeId;
+      const report = ensureOperationalPolicy();
+      if (report.status === 'unavailable') return;
+      if (policyRef.current.needsLocation) {
+        pausePolicy('location-required');
+        return;
+      }
+      const policyRevision = policyRef.current.revision;
       const requestGeneration = routeRequestGenerationRef.current + 1;
       routeRequestGenerationRef.current = requestGeneration;
-      routeDestinationRef.current = destNodeId;
+      acceptedRouteRef.current = null;
+      policyRef.current.pauseReason = null;
       routeStartRef.current = startId;
       dispatch({
         type: ACTION.SET_ROUTE_START,
@@ -255,14 +366,21 @@ export function NavigationProvider({ children, venue }) {
           venue,
           startId,
           destNodeId,
-          routeOptionsFor(stepFree, operationalOverlay, operationalEvaluatedAt),
+          routeOptionsFor(stepFree, policyRef.current.overlay, new Date().toISOString()),
         );
-        if (routeRequestGenerationRef.current !== requestGeneration) return;
-        if (!route.found) routeDestinationRef.current = null;
+        if (
+          routeRequestGenerationRef.current !== requestGeneration ||
+          policyRef.current.revision !== policyRevision
+        )
+          return;
+        if (ensureOperationalPolicy().status === 'unavailable') return;
+        acceptedRouteRef.current = route.found ? route : null;
+        // A failed compliant route still owns the trip intent. The visitor may
+        // explicitly choose another profile/start; only dismissal cancels it.
         dispatch({ type: ACTION.SET_ROUTE_RESULT, payload: route });
       } catch (err) {
         if (routeRequestGenerationRef.current !== requestGeneration) return;
-        routeDestinationRef.current = null;
+        if (ensureOperationalPolicy().status === 'unavailable') return;
         console.error('Routing error:', err);
         dispatch({
           type: ACTION.SET_ROUTE_RESULT,
@@ -270,18 +388,32 @@ export function NavigationProvider({ children, venue }) {
         });
       }
     },
-    [operationalEvaluatedAt, operationalOverlay, venue],
+    [ensureOperationalPolicy, pausePolicy, venue],
   );
 
   const previewRoute = useCallback(
-    (destNodeId, startNodeId = state.startNodeId) =>
-      calculateCompiledRoute(
+    (destNodeId, startNodeId = state.startNodeId) => {
+      if (operationalFreshness.status === 'unavailable' || policyConfirmationRequired) {
+        return {
+          found: false,
+          error: 'Current closure information and a confirmed start are required',
+        };
+      }
+      return calculateCompiledRoute(
         venue,
         startNodeId,
         destNodeId,
-        routeOptionsFor(accessibleRouting, operationalOverlay, operationalEvaluatedAt),
-      ),
-    [accessibleRouting, operationalEvaluatedAt, operationalOverlay, state.startNodeId, venue],
+        routeOptionsFor(accessibleRouting, operationalOverlay, new Date().toISOString()),
+      );
+    },
+    [
+      accessibleRouting,
+      operationalFreshness,
+      operationalOverlay,
+      policyConfirmationRequired,
+      state.startNodeId,
+      venue,
+    ],
   );
 
   const toggleTheme = useCallback(() => {
@@ -308,13 +440,42 @@ export function NavigationProvider({ children, venue }) {
     }
   }, [requestRoute, venue]);
 
-  const setOperationalOverlay = useCallback((overlay, evaluatedAt = new Date().toISOString()) => {
-    routeRequestGenerationRef.current += 1;
-    routeDestinationRef.current = null;
-    setOperationalOverlayState(overlay);
-    setOperationalEvaluatedAt(overlay ? evaluatedAt : null);
-    dispatch({ type: ACTION.CLEAR_ROUTE });
-  }, []);
+  const setOperationalOverlay = useCallback(
+    (overlay, evaluatedAt = new Date().toISOString()) => {
+      const policy = policyRef.current;
+      if (overlay === null && !policy.required) return;
+      const ownedOverlay = copyOperationalOverlay(overlay);
+      policy.overlay = ownedOverlay;
+      policy.required ||= overlay !== null;
+      policy.revision += 1;
+      policy.lease =
+        overlay === null
+          ? null
+          : createOperationalLease(
+              ownedOverlay,
+              venue.buildingPackage,
+              Date.now(),
+              performance.now(),
+            );
+      routeRequestGenerationRef.current += 1;
+      acceptedRouteRef.current = null;
+      setOperationalOverlayState(ownedOverlay);
+      // Historical import diagnostics only. Live routing always uses its own clock.
+      setOperationalEvaluatedAt(overlay ? evaluatedAt : null);
+      const report = ensureOperationalPolicy();
+      if (report.status !== 'unavailable' && routeDestinationRef.current) {
+        pausePolicy('overlay-changed');
+      }
+    },
+    [ensureOperationalPolicy, pausePolicy, venue],
+  );
+
+  const confirmPlanningStart = useCallback(() => {
+    if (ensureOperationalPolicy().status === 'unavailable') return;
+    policyRef.current.needsLocation = false;
+    policyRef.current.pauseReason = null;
+    setPolicyConfirmationRequired(false);
+  }, [ensureOperationalPolicy]);
 
   /**
    * A scan changes the planning location and resumes an active journey to the
@@ -331,6 +492,8 @@ export function NavigationProvider({ children, venue }) {
       if (!result.ok) return result;
 
       const destinationNodeId = routeDestinationRef.current;
+      acceptedRouteRef.current = null;
+      policyRef.current.pauseReason = null;
       routeStartRef.current = result.nodeId;
       routeRequestGenerationRef.current += 1;
       dispatch({
@@ -381,6 +544,7 @@ export function NavigationProvider({ children, venue }) {
         signHeading: sign.heading,
         signHeadingRefusal: sign.refusal,
       });
+      confirmPlanningStart();
       if (destinationNodeId) {
         void requestRoute(
           destinationNodeId,
@@ -391,19 +555,21 @@ export function NavigationProvider({ children, venue }) {
       }
       return result;
     },
-    [requestRoute, venue, state.venueKey],
+    [confirmPlanningStart, requestRoute, venue, state.venueKey],
   );
 
   const actions = {
     setStart: useCallback(
       (nodeId) => {
         const node = venue.getNodeById(nodeId);
+        if (!node) return;
         // Changing the start in the middle of directions means "route me from
         // here instead", as it does in every map app. Dropping the route made
         // the visitor search for their destination a second time.
         const destination = routeDestinationRef.current;
         routeRequestGenerationRef.current += 1;
-        routeDestinationRef.current = null;
+        acceptedRouteRef.current = null;
+        policyRef.current.pauseReason = null;
         routeStartRef.current = nodeId;
         setCheckIn(null);
         setCheckInProblem(null);
@@ -411,6 +577,8 @@ export function NavigationProvider({ children, venue }) {
           type: ACTION.SET_START,
           payload: { nodeId, floorId: node ? String(node.floor) : undefined },
         });
+        confirmPlanningStart();
+        if (destination === nodeId) routeDestinationRef.current = null;
         if (destination && destination !== nodeId) {
           void requestRoute(
             destination,
@@ -420,7 +588,7 @@ export function NavigationProvider({ children, venue }) {
           );
         }
       },
-      [venue, requestRoute],
+      [confirmPlanningStart, venue, requestRoute],
     ),
 
     checkInWithPayload,
@@ -453,12 +621,22 @@ export function NavigationProvider({ children, venue }) {
     clearRoute: useCallback(() => {
       routeRequestGenerationRef.current += 1;
       routeDestinationRef.current = null;
+      acceptedRouteRef.current = null;
+      policyRef.current.pauseReason = null;
       dispatch({ type: ACTION.CLEAR_ROUTE });
     }, []),
 
-    setView: useCallback((view) => {
-      dispatch({ type: ACTION.SET_VIEW, payload: view });
-    }, []),
+    setView: useCallback(
+      (view) => {
+        if (
+          view === VIEW_TYPE.CAMERA_PREVIEW &&
+          (ensureOperationalPolicy().status === 'unavailable' || policyRef.current.needsLocation)
+        )
+          return;
+        dispatch({ type: ACTION.SET_VIEW, payload: view });
+      },
+      [ensureOperationalPolicy],
+    ),
 
     setFloor: useCallback((floorId) => {
       dispatch({ type: ACTION.SET_FLOOR, payload: floorId });
@@ -473,25 +651,38 @@ export function NavigationProvider({ children, venue }) {
     }, []),
 
     nextStep: useCallback(() => {
+      if (!isRouteCurrent()) return;
       dispatch({ type: ACTION.NEXT_STEP });
-    }, []),
+    }, [isRouteCurrent]),
 
     prevStep: useCallback(() => {
+      if (!isRouteCurrent()) return;
       dispatch({ type: ACTION.PREV_STEP });
-    }, []),
+    }, [isRouteCurrent]),
 
-    previewStep: useCallback((index) => {
-      dispatch({ type: ACTION.PREVIEW_STEP, payload: index });
-    }, []),
+    previewStep: useCallback(
+      (index) => {
+        if (!isRouteCurrent()) return;
+        dispatch({ type: ACTION.PREVIEW_STEP, payload: index });
+      },
+      [isRouteCurrent],
+    ),
 
-    setProgress: useCallback((meters) => {
-      dispatch({ type: ACTION.SET_PROGRESS, payload: meters });
-    }, []),
+    setProgress: useCallback(
+      (meters) => {
+        if (!isRouteCurrent()) return;
+        dispatch({ type: ACTION.SET_PROGRESS, payload: meters });
+      },
+      [isRouteCurrent],
+    ),
 
     confirmArrival: useCallback(() => {
+      if (!isRouteCurrent()) return;
       if (canConfirmArrival(state)) routeDestinationRef.current = null;
       dispatch({ type: ACTION.CONFIRM_ARRIVAL });
-    }, [state]),
+    }, [isRouteCurrent, state]),
+
+    isRouteCurrent,
   };
 
   return (
@@ -515,6 +706,7 @@ export function NavigationProvider({ children, venue }) {
         checkInProblem,
         operationalOverlay,
         operationalEvaluatedAt,
+        operationalFreshness,
         setOperationalOverlay,
         packageCacheStatus,
         previewRoute,

@@ -4,6 +4,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { offlineServiceWorkerPlugin } from './scripts/offlineServiceWorkerPlugin.js';
+import { visitorStartupBudgetPlugin } from './scripts/visitorStartupBudgetPlugin.js';
 
 /**
  * `npm run dev:mobile` serves over HTTPS on every network interface.
@@ -37,7 +38,9 @@ export default defineConfig(({ mode }) => {
   const mobile = mode === 'mobile';
   const publicBuild = mode === 'public';
   return {
-    plugins: mobile ? [react(), basicSsl()] : [react(), offlineServiceWorkerPlugin(publicBuild)],
+    plugins: mobile
+      ? [react(), basicSsl()]
+      : [react(), visitorStartupBudgetPlugin(publicBuild), offlineServiceWorkerPlugin(publicBuild)],
     define: {
       __APP_REVISION__: JSON.stringify(revision()),
     },

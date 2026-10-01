@@ -11,21 +11,67 @@ import { NAV_STATUS, useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs, getAvailableCategories } from '../engine/searchIndex.js';
 import { formatDistance } from '../data/buildingConfig.js';
 import { useDialogFocus } from './useDialogFocus.ts';
+import './SearchPanel.css';
+
+const RESULTS_PER_PAGE = 10;
 
 export default function SearchPanel() {
   const { state, actions, previewRoute, venue } = useNavigation();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
+  const [shownCount, setShownCount] = useState(RESULTS_PER_PAGE);
   const inputRef = useRef(null);
   const triggerRef = useRef(null);
   const restoreTriggerRef = useRef(false);
+  const resultsRef = useRef(null);
+  const nextResultFocusRef = useRef(null);
   const pois = useMemo(() => venue.getPOIs(), [venue]);
   const categories = useMemo(() => getAvailableCategories(pois), [pois]);
   const results = useMemo(
-    () => searchPOIs(pois, query, { category: activeCategory }),
+    () => searchPOIs(pois, query, { category: activeCategory, limit: pois.length }),
     [activeCategory, pois, query],
   );
+  const visibleResults = useMemo(() => results.slice(0, shownCount), [results, shownCount]);
+  const matchesOutsideCategory = useMemo(
+    () =>
+      activeCategory && results.length === 0
+        ? searchPOIs(pois, query, { limit: pois.length }).length
+        : 0,
+    [activeCategory, pois, query, results.length],
+  );
+  const categoryLabel = activeCategory ? venue.getCategory(activeCategory)?.label : null;
+
+  const resetResultPage = useCallback(() => {
+    setShownCount(RESULTS_PER_PAGE);
+    nextResultFocusRef.current = null;
+    if (resultsRef.current) resultsRef.current.scrollTop = 0;
+  }, []);
+
+  const updateQuery = useCallback(
+    (value) => {
+      setQuery(value);
+      resetResultPage();
+    },
+    [resetResultPage],
+  );
+
+  const clearQuery = useCallback(() => {
+    updateQuery('');
+    inputRef.current?.focus();
+  }, [updateQuery]);
+
+  const clearCategory = useCallback(() => {
+    setActiveCategory(null);
+    resetResultPage();
+    inputRef.current?.focus();
+  }, [resetResultPage]);
+
+  const clearFilters = useCallback(() => {
+    updateQuery('');
+    setActiveCategory(null);
+    inputRef.current?.focus();
+  }, [updateQuery]);
 
   const openPanel = useCallback(() => {
     restoreTriggerRef.current = false;
@@ -36,7 +82,8 @@ export default function SearchPanel() {
     setIsOpen(false);
     setQuery('');
     setActiveCategory(null);
-  }, []);
+    resetResultPage();
+  }, [resetResultPage]);
 
   const dismissPanel = useCallback(() => {
     restoreTriggerRef.current = true;
@@ -74,20 +121,36 @@ export default function SearchPanel() {
     [actions, replacePanel],
   );
 
-  const toggleCategory = useCallback((cat) => {
-    setActiveCategory((prev) => (prev === cat ? null : cat));
-  }, []);
+  const toggleCategory = useCallback(
+    (cat) => {
+      setActiveCategory((prev) => (prev === cat ? null : cat));
+      resetResultPage();
+    },
+    [resetResultPage],
+  );
+
+  const showMore = useCallback(() => {
+    nextResultFocusRef.current = visibleResults.length;
+    setShownCount((count) => count + RESULTS_PER_PAGE);
+  }, [visibleResults.length]);
 
   const routePreviews = useMemo(
     () =>
       new Map(
-        results.map(({ node }) => [
+        visibleResults.map(({ node }) => [
           node.id,
           state.startNodeId && state.startNodeId !== node.id ? previewRoute(node.id) : null,
         ]),
       ),
-    [previewRoute, results, state.startNodeId],
+    [previewRoute, visibleResults, state.startNodeId],
   );
+
+  useEffect(() => {
+    const index = nextResultFocusRef.current;
+    if (index === null) return;
+    nextResultFocusRef.current = null;
+    resultsRef.current?.querySelectorAll('.search-result-select')[index]?.focus();
+  }, [visibleResults]);
 
   useEffect(() => {
     if (isOpen || !restoreTriggerRef.current) return;
@@ -182,22 +245,26 @@ export default function SearchPanel() {
         </div>
 
         <div className="search-input-wrapper">
-          <Search size={18} />
+          <Search size={18} aria-hidden="true" />
           <input
             ref={inputRef}
             type="text"
             className="search-input"
             placeholder="Room, service, department…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => updateQuery(e.target.value)}
             id="search-input"
             aria-label="Search rooms and departments"
+            aria-controls="search-results"
+            aria-describedby="search-results-summary"
+            autoComplete="off"
+            enterKeyHint="search"
           />
           {query && (
             <button
               type="button"
               className="search-clear-btn"
-              onClick={() => setQuery('')}
+              onClick={clearQuery}
               id="btn-search-clear"
               aria-label="Clear search"
             >
@@ -208,16 +275,26 @@ export default function SearchPanel() {
 
         <div className="search-section-label">
           <span>Browse by category</span>
-          <span>{results.length} destinations</span>
+          {(query || activeCategory) && (
+            <button type="button" className="search-reset-filters" onClick={clearFilters}>
+              Clear filters
+            </button>
+          )}
         </div>
 
-        <div className="category-chips" id="category-chips">
+        <div
+          className="category-chips"
+          id="category-chips"
+          role="group"
+          aria-label="Destination categories"
+        >
           {categories.map((catId) => {
             const cat = venue.getCategory(catId);
             if (!cat) return null;
             return (
               <button
                 key={catId}
+                type="button"
                 className={`category-chip ${activeCategory === catId ? 'active' : ''}`}
                 data-cat={catId}
                 onClick={() => toggleCategory(catId)}
@@ -229,61 +306,116 @@ export default function SearchPanel() {
           })}
         </div>
 
+        <p
+          className="search-results-summary"
+          id="search-results-summary"
+          role="status"
+          aria-label="Search results"
+          aria-live={isOpen && !state.selectedPOI ? 'polite' : 'off'}
+          aria-atomic="true"
+        >
+          {results.length} {results.length === 1 ? 'destination' : 'destinations'}
+          {query.trim() ? ` matching “${query.trim()}”` : ''}
+          {categoryLabel ? ` in ${categoryLabel}` : ''}.
+          {results.length > visibleResults.length
+            ? ` Showing ${visibleResults.length}; more are available below.`
+            : ''}
+        </p>
+
         {/* Results */}
-        <div className="search-results" id="search-results">
+        <div className="search-results" id="search-results" ref={resultsRef}>
           {results.length > 0 ? (
-            results.map(({ node }) => {
-              const cat = venue.getCategory(node.poi.category);
-              const routePreview = routePreviews.get(node.id);
-              return (
-                <div key={node.id} className="search-result-item" id={`search-result-${node.id}`}>
-                  <button
-                    type="button"
-                    className="search-result-select"
-                    onClick={() => handleResultClick(node)}
-                    aria-label={`View details for ${node.poi.name}`}
-                  >
-                    <div
-                      className="search-result-icon"
-                      style={{ background: cat?.bgColor, color: cat?.color }}
+            <>
+              <ul className="search-result-list" aria-label="Destination results">
+                {visibleResults.map(({ node }) => {
+                  const cat = venue.getCategory(node.poi.category);
+                  const routePreview = routePreviews.get(node.id);
+                  return (
+                    <li
+                      key={node.id}
+                      className="search-result-item"
+                      id={`search-result-${node.id}`}
                     >
-                      {node.poi.icon}
-                    </div>
-                    <div className="search-result-info">
-                      <div className="search-result-name">{node.poi.name}</div>
-                      <div className="search-result-desc">
-                        {node.poi.description} ·{' '}
-                        {node.poi.accessible ? 'Accessible' : 'Not accessible'}
+                      <button
+                        type="button"
+                        className="search-result-select"
+                        onClick={() => handleResultClick(node)}
+                        aria-label={`View details for ${node.poi.name}`}
+                        aria-describedby={`search-meta-${node.id}`}
+                      >
+                        <div
+                          className="search-result-icon"
+                          style={{ background: cat?.bgColor, color: cat?.color }}
+                          aria-hidden="true"
+                        >
+                          {node.poi.icon}
+                        </div>
+                        <div className="search-result-info">
+                          <div className="search-result-name">{node.poi.name}</div>
+                          <div className="search-result-desc" id={`search-meta-${node.id}`}>
+                            {node.floorName ?? venue.getFloorById(node.floor)?.name ?? node.floor} ·{' '}
+                            {node.poi.accessible ? 'Accessible' : 'Not accessible'}
+                          </div>
+                        </div>
+                      </button>
+                      <div className="search-result-route">
+                        {routePreview?.found && (
+                          <span className="search-result-distance">
+                            {formatDistance(routePreview.totalDistance)}
+                          </span>
+                        )}
+                        {routePreview && !routePreview.found && (
+                          <span className="search-result-distance">No route</span>
+                        )}
+                        <button
+                          type="button"
+                          className="search-route-button"
+                          onClick={(e) => handleNavigate(node, e)}
+                          aria-label={`Navigate to ${node.poi.name}`}
+                        >
+                          <Navigation size={13} aria-hidden="true" />
+                          Route
+                        </button>
                       </div>
-                    </div>
-                  </button>
-                  <div className="search-result-route">
-                    {routePreview?.found && (
-                      <span className="search-result-distance">
-                        {formatDistance(routePreview.totalDistance)}
-                      </span>
-                    )}
-                    {routePreview && !routePreview.found && (
-                      <span className="search-result-distance">No route</span>
-                    )}
-                    <button
-                      className="search-route-button"
-                      onClick={(e) => handleNavigate(node, e)}
-                      aria-label={`Navigate to ${node.poi.name}`}
-                    >
-                      <Navigation size={13} />
-                      Route
-                    </button>
-                  </div>
-                </div>
-              );
-            })
+                    </li>
+                  );
+                })}
+              </ul>
+              {results.length > visibleResults.length && (
+                <button type="button" className="search-more-results" onClick={showMore}>
+                  Show {Math.min(RESULTS_PER_PAGE, results.length - visibleResults.length)} more
+                  destinations
+                </button>
+              )}
+            </>
           ) : (
             <div className="search-empty">
-              <div className="search-empty-icon">
+              <div className="search-empty-icon" aria-hidden="true">
                 <MapPin size={32} />
               </div>
-              <div>No rooms found matching "{query}"</div>
+              <h3>No destinations found</h3>
+              <p>
+                {matchesOutsideCategory > 0
+                  ? `Your search has ${matchesOutsideCategory} ${matchesOutsideCategory === 1 ? 'match' : 'matches'} outside ${categoryLabel}.`
+                  : 'Try a room name, department, service or a shorter spelling.'}
+              </p>
+              <div className="search-empty-actions">
+                {activeCategory && (
+                  <button type="button" onClick={clearCategory}>
+                    Search all categories
+                  </button>
+                )}
+                {query && (
+                  <button type="button" onClick={clearQuery}>
+                    Try another search
+                  </button>
+                )}
+                {(query || activeCategory) && (
+                  <button type="button" onClick={clearFilters}>
+                    Browse all destinations
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

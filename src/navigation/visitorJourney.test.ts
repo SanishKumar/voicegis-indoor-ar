@@ -17,6 +17,35 @@ function journey() {
 }
 
 describe('visitor journey presentation versus location', () => {
+  it('a policy pause retires geometry and preview actions without inventing a new location', () => {
+    const { state } = journey();
+    const preview = reduce(reduce(state, { type: 'NEXT_STEP' }), {
+      type: 'SET_VIEW',
+      payload: 'camera-preview',
+    });
+    const paused = reduce(preview, {
+      type: 'PAUSE_POLICY',
+      payload: {
+        reason: 'overlay-expired',
+        destinationNodeId: state.destinationNodeId!,
+      },
+    });
+    expect(paused).toMatchObject({
+      route: null,
+      activeView: 'map',
+      navStatus: 'paused',
+      startNodeId: preview.startNodeId,
+      locationBasis: preview.locationBasis,
+      progressMeters: preview.progressMeters,
+      destinationNodeId: state.destinationNodeId,
+    });
+    expect(reduce(paused, { type: 'NEXT_STEP' })).toBe(paused);
+    expect(reduce(paused, { type: 'SET_PROGRESS', payload: 30 })).toBe(paused);
+    expect(reduce(paused, { type: 'CONFIRM_ARRIVAL' })).toBe(paused);
+    expect(
+      reduce(paused, { type: 'SET_START', payload: { nodeId: state.startNodeId } }).policyPause,
+    ).toBeNull();
+  });
   it('starts without a measured location', () => {
     expect(createVenueScopedState(ASTERION_RUNTIME).navigation).toMatchObject({
       locationBasis: 'default',
