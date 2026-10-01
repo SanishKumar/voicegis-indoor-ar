@@ -186,7 +186,9 @@ test('Inspector chrome keeps readable foreground and background contrast', async
         let background = 'rgb(255, 255, 255)';
         while (backgroundElement !== null) {
           const candidate = getComputedStyle(backgroundElement).backgroundColor;
-          if (!candidate.endsWith(', 0)') && candidate !== 'rgba(0, 0, 0, 0)') {
+          // Only a zero alpha is transparent. Opaque black, `rgb(0, 0, 0)`, also
+          // ends in ", 0)" and is the canvas every surface now sits on.
+          if (!/^rgba\(.*,\s*0\)$/.test(candidate)) {
             background = candidate;
             break;
           }

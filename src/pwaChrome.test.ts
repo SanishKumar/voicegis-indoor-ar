@@ -10,14 +10,14 @@ const manifest = JSON.parse(readFileSync('public/manifest.webmanifest', 'utf8'))
 const favicon = readFileSync('public/favicon.svg', 'utf8');
 
 describe('installed visitor chrome', () => {
-  it('uses the same cream surface in HTML, the manifest and the launch screen', () => {
-    expect(index).toContain('<meta name="theme-color" content="#fff9f0" />');
-    expect(index).toContain('name="apple-mobile-web-app-status-bar-style" content="default"');
-    expect(manifest.theme_color).toBe('#fff9f0');
-    expect(manifest.background_color).toBe('#fff9f0');
+  it('uses the same black canvas in HTML, the manifest and the launch screen', () => {
+    expect(index).toContain('<meta name="theme-color" content="#000000" />');
+    expect(index).toContain('name="apple-mobile-web-app-status-bar-style" content="black"');
+    expect(manifest.theme_color).toBe('#000000');
+    expect(manifest.background_color).toBe('#000000');
   });
 
-  it('carries the current cream-and-blue mark instead of the retired dark icon', () => {
+  it('carries the current black, white and blue mark', () => {
     expect(manifest.icons).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -28,9 +28,9 @@ describe('installed visitor chrome', () => {
         }),
       ]),
     );
-    expect(favicon).toContain('#fff9f0');
-    expect(favicon).toContain('#0a65db');
-    expect(favicon).not.toContain('#0a0e1a');
+    expect(favicon).toContain('#000000');
+    expect(favicon).toContain('#2b7fff');
+    expect(favicon).not.toContain('#fff9f0');
   });
 
   it('describes the delivered product consistently to link previews', () => {
