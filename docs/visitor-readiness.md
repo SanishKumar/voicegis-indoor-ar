@@ -120,8 +120,15 @@ commit before building its Pages artifact. The local reusable Quality workflow
 and every checkout use that revision, so a later branch update cannot change
 what is built. This remains a manually started publication workflow.
 
-Remaining targets include changed-release upgrade/rollback coverage with
-multiple clients. Retaining cache bytes alone does not complete that work.
+The public lifecycle browser run now covers changed JavaScript bootstrap URLs,
+several concurrent tabs, cold-offline upgrade and operational rollback by
+republishing an earlier complete release fixture. Waiting-cache eviction also
+covers retained earlier bytes, honest unavailability, rejected wrong repair
+bytes and successful exact-byte repair. These use the real production app with
+synthetic versioned bootstraps, not two separately built product versions.
+Deployment recovery on the chosen host, other browsers, and the capability and
+privacy checks above remain separate release work.
+
 The complete 162-case operator suite was measured with CI's one-worker settings:
 14.6 minutes for a green run, after an initial 15.8-minute review run exposed
 narrow-screen defects. The aggregate Playwright budget is now 20 minutes and

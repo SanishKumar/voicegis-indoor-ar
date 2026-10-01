@@ -131,9 +131,21 @@ test('the deployable shell contains no operator route, even when its hash is gue
 });
 
 test('a fresh page can check in and route after the connection is removed', async ({
+  allowBrowserError,
   context,
   page,
 }) => {
+  // Exercise the same offline recovery on machines with and without a camera.
+  // The deferred module must load before it can explain the missing device.
+  allowBrowserError(/console: Camera preview failed: NotFoundError: Requested device not found/);
+  await context.addInitScript(() => {
+    if (!navigator.mediaDevices) return; // The context also initializes about:blank pages.
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      value: async () => {
+        throw new DOMException('Requested device not found', 'NotFoundError');
+      },
+    });
+  });
   await warmOfflineInstall(page);
   await clearHttpCache(context, page);
   await page.close();
@@ -184,6 +196,9 @@ test('a fresh page can check in and route after the connection is removed', asyn
   const before = await offlinePage.locator('.jr-banner-text').innerText();
   await offlinePage.getByRole('button', { name: 'Camera view', exact: true }).click();
   await expect(offlinePage.locator('.camera-preview')).toBeVisible();
+  await expect(offlinePage.locator('.camera-preview-fallback')).toContainText(
+    'Requested device not found',
+  );
   expect(cameraResponses).toEqual([true]);
   await offlinePage.getByRole('button', { name: 'Exit to plan' }).click();
   await expect(offlinePage.locator('.jr-banner-text')).toHaveText(before);

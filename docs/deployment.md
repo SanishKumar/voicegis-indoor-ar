@@ -40,13 +40,30 @@ the old client continues to receive one coherent old revision, and a later
 replacement with a digest mismatch becomes redundant without displacing the
 active known-good cache.
 
+The same serial run now changes the executable JavaScript bootstrap and its
+content-addressed URL across two release fixtures, while still loading the
+actual production app. With several tabs open, reloading, closing one tab and
+opening another must all preserve the active revision. Closing every client
+allows the update to activate; a fresh page then executes the new bootstrap
+offline with Chromium's ordinary HTTP cache cleared. Republishing the earlier
+complete fixture exercises operational rollback through the same waiting and
+activation lifecycle, not through `skipWaiting` or cache reuse alone.
+
+A separate case evicts a deferred camera module from the waiting cache. With
+the network off, activation retains earlier cache bytes but the new shell
+reports offline availability as incomplete. Reconnecting to wrong module bytes
+cannot repair it; restoring its exact bytes recovers verified offline startup.
+Activation is observed on the candidate worker, without a fixed sleep or an
+extra polling tab that could keep the old worker alive.
+
 The offline-worker unit file passes 15 cases, including eight activation cases.
 Those activation checks verify complete-cache cleanup, exact-byte repair before
 cleanup, and retention of earlier caches when current bytes are missing,
 corrupt, unreadable, or unavailable from the matching release. They also check
 that newer repair bytes are refused and incomplete-cache availability stays
-false. Changed-release upgrade/rollback coverage with multiple clients remains
-separate work.
+false. The browser cases above add real Chromium lifecycle coverage. Their
+versioned bootstraps are synthetic releases, not a claim that production
+deployment, all storage-eviction patterns or every browser have been qualified.
 
 ## Hosting contract
 

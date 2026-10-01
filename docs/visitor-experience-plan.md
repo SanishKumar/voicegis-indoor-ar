@@ -1103,3 +1103,29 @@ logic, test commands and test thresholds are unchanged. Publishing remains
 manually triggered, and no deployment was started to validate these changes.
 Changed-release offline recovery with multiple clients is the next bounded
 release-safeguard task.
+
+### Hosted camera-test fix and multi-client offline releases — 1 October 2026
+
+The hosted application run passed all 162 operator cases, then failed both
+cold-offline camera cases because its runner had no camera. That test now
+explicitly simulates `NotFoundError`, requires the matching error exactly once,
+and checks the visible fallback and preserved journey after exiting. The lazy
+camera module must still come from the verified worker cache. No blanket error
+suppression or physical camera is needed.
+
+The isolated lifecycle run now exercises two synthetic, content-addressed
+JavaScript bootstraps importing the actual production app. Several open tabs
+hold the old release; reloads and newly opened tabs stay coherent. After every
+old client closes, the replacement boots offline. Republishing the earlier
+complete fixture also waits and then boots the earlier code offline. Another
+case evicts a waiting release's deferred module, verifies that earlier caches
+survive failed activation-time repair, rejects wrong repair bytes and recovers
+only when exact bytes return. Candidate-worker state replaces the previous
+one-second activation sleep.
+
+Validation: lint, types and all 17 public offline/lifecycle/subfolder browser
+cases passed with CI's one-worker settings. Temporarily removing the old-cache
+retirement guard makes the new eviction case fail on the missing prior cache;
+the production guard was restored. Application logic and the unit suite are
+unchanged. This is release-safeguard coverage, not handset or deployment
+qualification. No publication workflow was started.

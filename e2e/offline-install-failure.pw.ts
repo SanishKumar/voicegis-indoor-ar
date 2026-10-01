@@ -2,6 +2,12 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, precompleteOnboarding, test } from './support';
 import {
+  closeClientsAndActivate,
+  expectRelease,
+  installWaitingRelease,
+  withChangedReleases,
+} from './offline-release-fixture';
+import {
   collectOfflineEntries,
   renderOfflineWorker,
 } from '../scripts/offlineServiceWorkerPlugin.js';
@@ -72,19 +78,7 @@ test('an active release stays coherent while a complete update waits and a later
     await writeFile(catalogPath, v2Catalog);
     const v2Worker = renderOfflineWorker(await collectOfflineEntries(outDir));
     await writeFile(workerPath, v2Worker);
-    await page.evaluate(async () => {
-      const registration = await navigator.serviceWorker.getRegistration('/');
-      if (!registration) throw new Error('No public worker registration exists.');
-      await registration.update();
-    });
-    await expect
-      .poll(() =>
-        page.evaluate(async () => {
-          const registration = await navigator.serviceWorker.getRegistration('/');
-          return registration?.waiting?.state ?? null;
-        }),
-      )
-      .toBe('installed');
+    const candidate = await installWaitingRelease(context, page);
 
     // The new bytes exist on the server, but this client is still controlled
     // by v1. Its navigation and data reads must remain one cached revision.
@@ -123,8 +117,7 @@ test('an active release stays coherent while a complete update waits and a later
     );
     expect(missResults).toEqual(['refused', 'refused']);
 
-    await page.close();
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await closeClientsAndActivate(candidate, page);
     const v2Page = await context.newPage();
     await precompleteOnboarding(v2Page);
     await v2Page.goto('/#/visitor');
@@ -183,4 +176,176 @@ test('an active release stays coherent while a complete update waits and a later
       writeFile(workerPath, v1Worker),
     ]);
   }
+});
+
+test('changed JavaScript waits for every tab, boots offline, and rolls back as another complete release', async ({
+  context,
+  page,
+}) => {
+  await withChangedReleases(async (publish) => {
+    const v1 = await publish(1);
+    await precompleteOnboarding(page);
+    await page.goto('/#/visitor');
+    await expectRelease(page, v1, 1);
+    await expect(page.locator('.status-offline')).toHaveAttribute(
+      'data-offline-state',
+      'available',
+    );
+    const second = await context.newPage();
+    await second.goto('/#/visitor');
+    await expectRelease(second, v1, 1);
+
+    const v2 = await publish(2);
+    expect(v2.entryUrl).not.toBe(v1.entryUrl);
+    const upgrade = await installWaitingRelease(context, page);
+    await page.reload();
+    await second.reload();
+    await expectRelease(page, v1, 1);
+    await expectRelease(second, v1, 1);
+    await page.close();
+    // Closing one tab is not enough. Even a newly opened tab stays on v1
+    // while the second tab still holds the old worker alive.
+    const third = await context.newPage();
+    await third.goto('/#/visitor');
+    await expectRelease(third, v1, 1);
+    await expect
+      .poll(() =>
+        second.evaluate(
+          async () => (await navigator.serviceWorker.getRegistration('/'))?.waiting?.state,
+        ),
+      )
+      .toBe('installed');
+
+    const cdp = await context.newCDPSession(second);
+    await cdp.send('Network.clearBrowserCache');
+    await cdp.detach();
+    await context.setOffline(true);
+    await closeClientsAndActivate(upgrade, second, third);
+    const upgraded = await context.newPage();
+    const entryResponses: boolean[] = [];
+    upgraded.on('response', (response) => {
+      if (new URL(response.url()).pathname === v2.entryUrl) {
+        entryResponses.push(response.fromServiceWorker());
+      }
+    });
+    await upgraded.goto('/#/visitor');
+    await expectRelease(upgraded, v2, 2);
+    await expect(upgraded.locator('.status-offline')).toHaveAttribute(
+      'data-offline-state',
+      'available',
+    );
+    expect(entryResponses).toEqual([true]);
+    expect(await upgraded.evaluate(() => caches.keys())).toEqual([v2.cacheName]);
+
+    await context.setOffline(false);
+    // Operational rollback means republishing the earlier complete artifact,
+    // not reviving an obsolete worker or mixing its files with release 2.
+    expect(await publish(1)).toEqual(v1);
+    const rollback = await installWaitingRelease(context, upgraded);
+    const held = await context.newPage();
+    await held.goto('/#/visitor');
+    await expectRelease(held, v2, 2);
+    await closeClientsAndActivate(rollback, upgraded, held);
+    await context.setOffline(true);
+    const restored = await context.newPage();
+    await restored.goto('/#/visitor');
+    await expectRelease(restored, v1, 1);
+    await expect(restored.locator('.status-offline')).toHaveAttribute(
+      'data-offline-state',
+      'available',
+    );
+    expect(await restored.evaluate(() => caches.keys())).toEqual([v1.cacheName]);
+  });
+});
+
+test('eviction while an update waits retains earlier cache bytes and requires exact-release repair', async ({
+  context,
+  page,
+}) => {
+  await withChangedReleases(async (publish) => {
+    const v1 = await publish(1);
+    await precompleteOnboarding(page);
+    await page.goto('/#/visitor');
+    await expectRelease(page, v1, 1);
+    await expect(page.locator('.status-offline')).toHaveAttribute(
+      'data-offline-state',
+      'available',
+    );
+    const v2 = await publish(2);
+    const candidate = await installWaitingRelease(context, page);
+    // Leave the shell runnable but evict a deferred module after installation.
+    // This reproduces storage loss during a long wait for other tabs to close.
+    const missingUrl = await page.evaluate(async (cacheName) => {
+      const cache = await caches.open(cacheName);
+      const requests = await cache.keys();
+      const entry = requests.find(({ url }) =>
+        /\/assets\/CameraPreview-[^/]+\.js$/.test(new URL(url).pathname),
+      );
+      if (!entry) throw new Error('No deferred camera module in the waiting cache.');
+      if (!(await cache.delete(entry))) throw new Error('Waiting cache eviction failed.');
+      return entry.url;
+    }, v2.cacheName);
+    await context.setOffline(true);
+    await closeClientsAndActivate(candidate, page);
+    const incomplete = await context.newPage();
+    await incomplete.goto('/#/visitor');
+    await expectRelease(incomplete, v2, 2);
+    await expect(incomplete.locator('.status-offline')).toHaveAttribute(
+      'data-offline-state',
+      'online-only',
+    );
+    expect(await incomplete.evaluate(() => caches.keys())).toEqual(
+      expect.arrayContaining([v1.cacheName, v2.cacheName]),
+    );
+
+    // Wrong server bytes cannot repair release 2. Reporting online-only remains
+    // correct even if all files for a different, otherwise valid release exist.
+    const outDir = process.env.VOICEGIS_SMOKE_OUT_DIR!;
+    const missingPath = path.join(outDir, new URL(missingUrl).pathname.slice(1));
+    const exactBytes = await readFile(missingPath);
+    try {
+      await writeFile(missingPath, '/* bytes from a different release */');
+      await context.setOffline(false);
+      const repaired = await incomplete.evaluate(async () => {
+        const registration = await navigator.serviceWorker.getRegistration('/');
+        const worker = registration?.active;
+        if (!worker) throw new Error('No active worker.');
+        return new Promise<boolean>((resolve) => {
+          const channel = new MessageChannel();
+          channel.port1.onmessage = (event) => {
+            channel.port1.close();
+            resolve(event.data.complete);
+          };
+          worker.postMessage({ type: 'voicegis:verify-offline-cache' }, [channel.port2]);
+        });
+      });
+      expect(repaired).toBe(false);
+      expect(
+        await incomplete.evaluate(
+          async ({ cacheName, url }) => Boolean(await (await caches.open(cacheName)).match(url)),
+          { cacheName: v2.cacheName, url: missingUrl },
+        ),
+      ).toBe(false);
+    } finally {
+      await writeFile(missingPath, exactBytes);
+    }
+    await incomplete.evaluate(() => window.dispatchEvent(new Event('online')));
+    await expect(incomplete.locator('.status-offline')).toHaveAttribute(
+      'data-offline-state',
+      'available',
+    );
+    const cdp = await context.newCDPSession(incomplete);
+    await cdp.send('Network.clearBrowserCache');
+    await cdp.detach();
+    await incomplete.close();
+    await context.setOffline(true);
+    const recovered = await context.newPage();
+    await recovered.goto('/#/visitor');
+    await expectRelease(recovered, v2, 2);
+    await expect(recovered.locator('.status-offline')).toHaveAttribute(
+      'data-offline-state',
+      'available',
+    );
+    expect(await recovered.evaluate(async (url) => (await fetch(url)).ok, missingUrl)).toBe(true);
+  });
 });
