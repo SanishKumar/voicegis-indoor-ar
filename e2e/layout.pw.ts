@@ -1,3 +1,4 @@
+import { measureTextContrast } from './contrast';
 import {
   expect,
   expectCenterHitTarget,
@@ -102,19 +103,29 @@ test('the operator workbench is a desktop rail and a labelled mobile dock', asyn
   const desktopWorkspace = await workspace.boundingBox();
   expect(desktopNav).not.toBeNull();
   expect(desktopWorkspace).not.toBeNull();
-  expect(desktopNav!.x).toBeCloseTo(0, 1);
-  expect(desktopNav!.width).toBeCloseTo(176, 1);
-  expect(desktopWorkspace!.x).toBeCloseTo(desktopNav!.x + desktopNav!.width, 1);
-  expect(desktopNav!.height).toBeCloseTo(800, 1);
+  // The rail is a pane floating in its own 176px column: the same gutter on
+  // its left, top and bottom, and the workspace starting where the column ends.
+  const railGutter = desktopNav!.x;
+  expect(railGutter).toBeGreaterThan(0);
+  expect(railGutter).toBeLessThanOrEqual(16);
+  expect(desktopNav!.y).toBeCloseTo(railGutter, 1);
+  expect(desktopNav!.x + desktopNav!.width).toBeCloseTo(176, 1);
+  expect(desktopWorkspace!.x).toBeCloseTo(176, 1);
+  expect(desktopNav!.y + desktopNav!.height).toBeCloseTo(800 - railGutter, 1);
 
   await page.setViewportSize({ width: 375, height: 812 });
   const mobileNav = await nav.boundingBox();
   const mobileWorkspace = await workspace.boundingBox();
   expect(mobileNav).not.toBeNull();
   expect(mobileWorkspace).not.toBeNull();
-  expect(mobileNav!.x).toBeCloseTo(0, 1);
-  expect(mobileNav!.width).toBeCloseTo(375, 1);
+  // The dock is a pane floating in the bottom row: the same gutter on both
+  // sides and beneath it, directly under the workspace.
+  const dockGutter = mobileNav!.x;
+  expect(dockGutter).toBeGreaterThan(0);
+  expect(dockGutter).toBeLessThanOrEqual(16);
+  expect(mobileNav!.x + mobileNav!.width).toBeCloseTo(375 - dockGutter, 1);
   expect(mobileNav!.y).toBeCloseTo(mobileWorkspace!.y + mobileWorkspace!.height, 1);
+  expect(mobileNav!.y + mobileNav!.height).toBeCloseTo(812 - dockGutter, 1);
   for (const label of ['Visitor view', '3D + venues', 'Studio', 'Record']) {
     const link = nav.getByRole('link', { name: label, exact: true });
     await expect(link).toBeVisible();
@@ -169,43 +180,24 @@ test('Inspector chrome keeps readable foreground and background contrast', async
   await page.goto('/#/inspector');
   await expect(page.locator('.spatial-twin')).toBeVisible();
 
-  const contrast = async (selector: string) =>
-    page
-      .locator(selector)
-      .first()
-      .evaluate((element) => {
-        const channels = (value: string) =>
-          (value.match(/[\d.]+/g) ?? []).slice(0, 3).map((channel) => Number(channel) / 255);
-        const luminance = (value: string) => {
-          const linear = channels(value).map((channel) =>
-            channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
-          );
-          return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
-        };
-        let backgroundElement: Element | null = element;
-        let background = 'rgb(255, 255, 255)';
-        while (backgroundElement !== null) {
-          const candidate = getComputedStyle(backgroundElement).backgroundColor;
-          // Only a zero alpha is transparent. Opaque black, `rgb(0, 0, 0)`, also
-          // ends in ", 0)" and is the canvas every surface now sits on.
-          if (!/^rgba\(.*,\s*0\)$/.test(candidate)) {
-            background = candidate;
-            break;
-          }
-          backgroundElement = backgroundElement.parentElement;
-        }
-        const foregroundLuminance = luminance(getComputedStyle(element).color);
-        const backgroundLuminance = luminance(background);
-        return (
-          (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
-          (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
-        );
-      });
+  /*
+   * Measured from the pixels, not read from the stylesheet: these surfaces are
+   * glass, and no declared colour says what the text is sitting on. Of the
+   * matches, the worst run that is really on top where it is drawn - the
+   * model's labels move with the camera, and one can sit under a pane.
+   */
+  const contrast = async (selector: string) => {
+    await page.locator(selector).first().scrollIntoViewIfNeeded();
+    const runs = await measureTextContrast(page, selector);
+    expect(runs.length, `${selector} has no text that is visible and on top`).toBeGreaterThan(0);
+    return Math.min(...runs.map((run) => run.ratio));
+  };
 
   await expect(page.locator('.twin-poi-label').first()).toBeVisible();
   expect(await contrast('.twin-poi-label')).toBeGreaterThanOrEqual(4.5);
   expect(await contrast('.twin-empty-inspector h2')).toBeGreaterThanOrEqual(4.5);
-  expect(await contrast('.venue-package-manager-toggle')).toBeGreaterThanOrEqual(4.5);
+  // The card's own words. Its toggle beside them is an icon with no text to measure.
+  expect(await contrast('.venue-package-manager-title')).toBeGreaterThanOrEqual(4.5);
 
   const space = page.getByRole('combobox', { name: 'Inspect a space' });
   const firstSpace = await space.evaluate(
