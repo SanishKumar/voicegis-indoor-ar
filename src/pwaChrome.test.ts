@@ -10,14 +10,15 @@ const manifest = JSON.parse(readFileSync('public/manifest.webmanifest', 'utf8'))
 const favicon = readFileSync('public/favicon.svg', 'utf8');
 
 describe('installed visitor chrome', () => {
-  it('uses the same black canvas in HTML, the manifest and the launch screen', () => {
-    expect(index).toContain('<meta name="theme-color" content="#000000" />');
+  it('uses the sky in HTML, the manifest and the launch screen', () => {
+    // The browser bar takes the top of the sky; the launch screen its middle.
+    expect(index).toContain('<meta name="theme-color" content="#23539f" />');
     expect(index).toContain('name="apple-mobile-web-app-status-bar-style" content="black"');
-    expect(manifest.theme_color).toBe('#000000');
-    expect(manifest.background_color).toBe('#000000');
+    expect(manifest.theme_color).toBe('#23539f');
+    expect(manifest.background_color).toBe('#3f77c6');
   });
 
-  it('carries the current black, white and blue mark', () => {
+  it('carries the current sky-and-white mark', () => {
     expect(manifest.icons).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -28,8 +29,8 @@ describe('installed visitor chrome', () => {
         }),
       ]),
     );
-    expect(favicon).toContain('#000000');
-    expect(favicon).toContain('#2b7fff');
+    expect(favicon).toContain('#23539f');
+    expect(favicon).toContain('#ffffff');
     expect(favicon).not.toContain('#fff9f0');
   });
 
