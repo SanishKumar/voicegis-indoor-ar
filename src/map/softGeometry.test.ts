@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { insetPolygon, roundCorners, stadium, type Point } from './softGeometry';
+import { cutOutline, insetPolygon, ribbon, roundCorners, type Point } from './softGeometry';
 
 const SQUARE: Point[] = [
   [0, 0],
@@ -128,23 +128,119 @@ describe('roundCorners', () => {
   });
 });
 
-describe('stadium', () => {
-  it('is as long as the run plus its two round ends, and as wide as asked', () => {
-    const [minX, minY, maxX, maxY] = bounds(stadium([0, 0], [10, 0], 0.5));
-    expect(minX).toBeCloseTo(-0.5);
-    expect(maxX).toBeCloseTo(10.5);
-    expect(minY).toBeCloseTo(-0.5);
-    expect(maxY).toBeCloseTo(0.5);
+describe('cutOutline', () => {
+  it('leaves one line round a room with one door, starting and ending at the door', () => {
+    const lines = cutOutline(SQUARE, [{ at: [5, 0], halfWidth: 1 }]);
+    expect(lines).toHaveLength(1);
+    const [line] = lines;
+    // From one side of the door, all the way round, to the other side.
+    expect(line[0]).toEqual([6, 0]);
+    expect(line[line.length - 1]).toEqual([4, 0]);
+    expect(line).toEqual(
+      expect.arrayContaining([
+        [10, 0],
+        [10, 10],
+        [0, 10],
+        [0, 0],
+      ]),
+    );
   });
 
-  it('keeps every point the half-width from the run', () => {
-    for (const [x, y] of stadium([2, 3], [2, 9], 0.25, 4)) {
-      const nearestY = Math.min(9, Math.max(3, y));
-      expect(Math.hypot(x - 2, y - nearestY)).toBeCloseTo(0.25);
+  it('gives a line for each stretch between two doors', () => {
+    const lines = cutOutline(SQUARE, [
+      { at: [5, 0], halfWidth: 1 },
+      { at: [5, 10], halfWidth: 1 },
+    ]);
+    expect(lines).toHaveLength(2);
+    for (const line of lines) {
+      // Each runs up one side of the room: bottom, side, top.
+      expect(line).toHaveLength(4);
     }
   });
 
-  it('is empty for a run with no length', () => {
-    expect(stadium([1, 1], [1, 1], 0.5)).toEqual([]);
+  it('ignores a door that is beside some other wall', () => {
+    expect(cutOutline(SQUARE, [{ at: [5, 5], halfWidth: 1 }])).toHaveLength(1);
+    expect(cutOutline(SQUARE, [{ at: [40, 0], halfWidth: 1 }])).toHaveLength(1);
+  });
+
+  it('cuts a door that sits on a corner out of both walls', () => {
+    const lines = cutOutline(SQUARE, [{ at: [10, 0], halfWidth: 1 }]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0][0]).toEqual([10, 1]);
+    expect(lines[0][lines[0].length - 1]).toEqual([9, 0]);
+  });
+
+  it('returns the whole outline, closed, when there is no door', () => {
+    const lines = cutOutline(SQUARE, []);
+    expect(lines).toHaveLength(1);
+    expect(lines[0][0]).toEqual(lines[0][lines[0].length - 1]);
+  });
+});
+
+describe('ribbon', () => {
+  const distanceToSegment = ([x, y]: Point, [x1, y1]: Point, [x2, y2]: Point) => {
+    const length = Math.hypot(x2 - x1, y2 - y1);
+    const t = Math.min(1, Math.max(0, ((x - x1) * (x2 - x1) + (y - y1) * (y2 - y1)) / length ** 2));
+    return Math.hypot(x - (x1 + t * (x2 - x1)), y - (y1 + t * (y2 - y1)));
+  };
+
+  it('is the width asked for all along a straight line, with a round end at each end', () => {
+    const outline = ribbon(
+      [
+        [0, 0],
+        [10, 0],
+      ],
+      0.5,
+      3,
+    );
+    const [minX, minY, maxX, maxY] = bounds(outline);
+    expect(minY).toBeCloseTo(-0.5);
+    expect(maxY).toBeCloseTo(0.5);
+    // The ends bulge out by less than the half-width: a round end, not a square one.
+    expect(minX).toBeLessThan(0);
+    expect(minX).toBeGreaterThanOrEqual(-0.5);
+    expect(maxX).toBeGreaterThan(10);
+    for (const point of outline) {
+      expect(distanceToSegment(point, [0, 0], [10, 0])).toBeCloseTo(0.5);
+    }
+  });
+
+  it('turns a corner as one piece, keeping its width on both legs', () => {
+    const line: Point[] = [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+    ];
+    const outline = ribbon(line, 0.5);
+    // Outside of the corner and inside of it: the mitre points.
+    expect(outline).toContainEqual([10.5, -0.5]);
+    expect(outline).toContainEqual([9.5, 0.5]);
+    expect(area(outline)).toBeGreaterThan(19.5);
+    expect(area(outline)).toBeLessThan(21);
+  });
+
+  it('is one outline however many points the line has', () => {
+    const curve: Point[] = Array.from({ length: 30 }, (_, index) => [
+      Math.cos(index / 10) * 8,
+      Math.sin(index / 10) * 8,
+    ]);
+    const outline = ribbon(curve, 0.2, 2);
+    // Two sides and two round ends: nothing per segment.
+    expect(outline).toHaveLength(30 * 2 + 4);
+    for (const [x, y] of outline) {
+      expect(Math.abs(Math.hypot(x, y) - 8)).toBeLessThan(0.25);
+    }
+  });
+
+  it('is empty for a line with no length', () => {
+    expect(
+      ribbon(
+        [
+          [1, 1],
+          [1, 1],
+        ],
+        0.5,
+      ),
+    ).toEqual([]);
   });
 });

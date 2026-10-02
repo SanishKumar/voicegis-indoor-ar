@@ -191,7 +191,7 @@
     }
   ],
   "manifest": {
-    "contentHash": "f05b012abaecdfa5dba1df59b5096ba40cc3609efd5ecfb37d64240c231feccb",
+    "contentHash": "052f28005fa125e25cd370e83ce54e7bc154254648c7040f8ee618df37c9b55e",
     "hashAlgorithm": "sha256"
   },
   "packageVersion": "0.2.0",
@@ -8538,6 +8538,28 @@
           [
             99,
             90
+          ]
+        ]
+      },
+      {
+        "id": "healing-garden-lawn",
+        "kind": "lawn",
+        "polygon": [
+          [
+            126,
+            100
+          ],
+          [
+            156,
+            100
+          ],
+          [
+            156,
+            126
+          ],
+          [
+            126,
+            126
           ]
         ]
       },

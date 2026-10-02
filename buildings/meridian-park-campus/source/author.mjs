@@ -405,6 +405,7 @@ const grounds = [
   ['lawn-south-east', 'lawn', rect(160, 110, 204, 140)],
   ['lawn-north', 'lawn', rect(4, 4, 36, 58)],
   ['lawn-far-east', 'lawn', rect(154, 4, 206, 58)],
+  ['healing-garden-lawn', 'lawn', rect(126, 100, 156, 126)],
   ['pond', 'water', rect(170, 116, 196, 134)],
   ['fountain-island', 'planting', rect(99, 78, 111, 90)],
   ['forecourt-apron', 'paving', rect(84, 46, 126, 50)],

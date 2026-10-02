@@ -127,6 +127,41 @@ describe('visitor route geometry', () => {
     expect(canvas.width).toBe(800);
     expect(changed).toHaveBeenCalledOnce();
   });
+  it('stops drawing once the marker has arrived and turned, and does not ease for ever', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(80);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(24);
+    // Motion is wanted here, so the marker eases to its place instead of jumping.
+    scene.dispose();
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      referencePackage as CompiledBuildingPackage,
+    );
+    let clock = performance.now();
+    vi.spyOn(performance, 'now').mockImplementation(() => clock);
+    const run = (frames: number) => {
+      for (let i = 0; i < frames; i++) {
+        clock += 16;
+        scene.frame();
+      }
+    };
+    scene.setFollow({ headingUp: true, scale: 0.36, lookahead: 0.2 });
+    scene.setPuck({ x: 4, y: 4, floorId: 'g', heading: [1, 0] });
+    run(10);
+    // A step on and a quarter turn, to a heading whose bearing is zero: the
+    // one an eased turn can go on approaching without ever reaching.
+    scene.setPuck({ x: 6, y: 5, floorId: 'g', heading: [0, -1] });
+    run(10);
+    const moving = Number(canvas.dataset.draws);
+    // Three seconds is long past the end of the move.
+    run(190);
+    const arrived = Number(canvas.dataset.draws);
+    expect(arrived).toBeGreaterThan(moving);
+    run(120);
+    expect(Number(canvas.dataset.draws)).toBe(arrived);
+    expect(canvas.dataset.cameraBearing).toBe('0.0000');
+  });
   it('changes only render detail, preserves geometry/camera/progress and releases shadow targets', () => {
     scene.setGraphics('full');
     scene.setMode('3d');

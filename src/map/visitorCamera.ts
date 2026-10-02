@@ -28,6 +28,8 @@ export const NO_INSETS: Readonly<MapInsets> = Object.freeze({
 
 const MIN_SCALE = 0.22;
 const MAX_SCALE = 2.4;
+/** The most time one frame may account for; see MAX_FRAME_STEP_MS in venueScene. */
+const MAX_FRAME_STEP_MS = 400;
 /** Time constants for eased moves, in milliseconds. */
 const MOVE_TAU = 190;
 const TURN_TAU = 260;
@@ -42,7 +44,12 @@ interface Goal {
   azimuth?: number;
 }
 
-const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+/**
+ * The closest the camera comes. A scale is a share of the venue's span, so a
+ * fixed floor that suits a building leaves a campus unable to reach its rooms:
+ * the closest view never shows more than about 18 m across.
+ */
+export const closestScale = (span: number) => Math.min(MIN_SCALE, 16 / Math.max(1, span));
 
 /** Shortest signed turn from one bearing to another. */
 function turnBetween(from: number, to: number) {
@@ -99,6 +106,8 @@ export function createVisitorCamera(span: number, saved = defaultMapView()) {
   let goal: Goal | null = null;
   let userMoved = false;
   const wantedTilt = () => (view.mode === '2d' ? 0 : view.tilt3d);
+  const closest = closestScale(span);
+  const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(closest, scale));
 
   /** The uncovered part of the canvas. Never smaller than a sliver. */
   const visible = (width: number, height: number) => {
@@ -230,7 +239,7 @@ export function createVisitorCamera(span: number, saved = defaultMapView()) {
     },
 
     update(width: number, height: number, elapsedMs: number, reducedMotion: boolean) {
-      const dt = Math.min(100, Math.max(0, elapsedMs));
+      const dt = Math.min(MAX_FRAME_STEP_MS, Math.max(0, elapsedMs));
       const destination = wantedTilt();
       tilt = reducedMotion ? destination : tilt + (destination - tilt) * (1 - Math.exp(-dt / 85));
       if (Math.abs(destination - tilt) < 0.0001) tilt = destination;

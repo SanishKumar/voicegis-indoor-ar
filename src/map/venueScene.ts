@@ -36,7 +36,8 @@ import { resolveCartographicLabels, type CartographicBounds } from '../engine/fl
 import type { VisitorLocation } from '../navigation/visitorLocation';
 import { cumulativeDistances } from '../navigation/routeProgress';
 import { MAP_ROUTE_RADIUS_METERS } from '../engine/routeClearance';
-import { insetPolygon, roundCorners, stadium } from './softGeometry';
+import { createSiteScenery } from './siteScenery';
+import { cutOutline, insetPolygon, ribbon, roundCorners } from './softGeometry';
 import {
   createVisitorRenderQuality,
   type MapGraphicsSetting,
@@ -172,6 +173,18 @@ const ROOM_THICKNESS = 0.1;
 const EXPLODE = 3.1;
 /** How quickly a storey eases to its place in the stack, and its ghosting. */
 const FLOOR_TAU_MS = 220;
+/*
+ * The most time one frame may account for. Eased moves are a function of time
+ * passed, so a slow frame moves further and a move takes the same time on a
+ * slow device as on a fast one. This was 100 ms, which made every frame slower
+ * than that count as 100: at three frames a second, opening the floor stack
+ * took fifteen frames and five seconds instead of under one. The cap is only
+ * there so a tab that was hidden for a minute does not jump when it returns.
+ */
+const MAX_FRAME_STEP_MS = 400;
+/** How near its place the marker has to be for the move to count as finished. */
+const PUCK_ARRIVED_METERS = 0.002;
+const PUCK_ARRIVED_RADIANS = 0.0005;
 /** Radius of the window through the walls around the marker, in metres. */
 const WALL_WINDOW_METERS = 2.6;
 /** The route's end outranks every other label. */
@@ -184,6 +197,21 @@ const DESTINATION_PRIORITY = 20;
 const POI_REACH_PIXELS = 26;
 /** The least height a label answers a tap over, whatever height it is drawn at. */
 const LABEL_TOUCH_HEIGHT = 44;
+
+/*
+ * A venue with grounds is several times the size of a building, and three
+ * things that were tuned for a building have to follow it.
+ */
+/** Paving: the paths and courts between buildings. A warm white, against the cool rooms. */
+const OUTDOOR_FILL = 0xfffaf0;
+/** An open area you cross - a garden, a car park - is thin, so the ground under it shows. */
+const OUTDOOR_AREA_OPACITY = 0.28;
+/** How much of a building-sized venue is in view at its opening zoom, in metres. */
+const REFERENCE_METRES_VISIBLE = 82;
+/** Following zooms to a scale tuned for venues up to this span; larger ones come in closer. */
+const FOLLOW_REFERENCE_SPAN = 80;
+/** From far off the route would be a hair; it is never drawn thinner than this, in CSS pixels. */
+const SITE_ROUTE_MIN_PIXELS = 5;
 
 /** Where the guidance is, and which way the route runs from there. */
 export interface ScenePuck {
@@ -248,6 +276,12 @@ export interface VenueScene {
   setSelectedSpace(spaceId: string | null): void;
   /** POI id under a client point, or null. */
   pickPoi(clientX: number, clientY: number): string | null;
+  /**
+   * From the outside view of a venue with grounds: if the point is on a
+   * building, bring the camera in to that building and say so. A tap on a roof
+   * is how a visitor goes from the campus to the rooms.
+   */
+  enterBuildingAt(clientX: number, clientY: number): boolean;
   /** True when the last pointer sequence was a drag rather than a tap. */
   wasDragged(): boolean;
   zoomBy(factor: number): void;
@@ -471,6 +505,13 @@ export function createVenueScene(
   };
   applyGraphics();
   let previousFrameDrawn = false;
+  /*
+   * A building opens at a scale that suits a building. A campus is wider than
+   * it is tall and several times the size, and at that scale it sat small in
+   * the middle of the screen. It opens fitted to its own outline instead - but
+   * only when it is opened fresh, not when a view the visitor chose is restored.
+   */
+  let openingFitPending = buildingPackage.site !== undefined && initialView === undefined;
 
   function shapeFrom(polygon: ReadonlyArray<readonly [number, number]>) {
     const shape = new Shape();
@@ -534,60 +575,28 @@ export function createVenueScene(
     return material;
   }
 
-  function wallGeometries(
-    a: readonly [number, number],
-    b: readonly [number, number],
+  /**
+   * The rim of one room: its outline, cut at the doors, each stretch between
+   * two doors drawn as a single ribbon.
+   *
+   * A doorway is a gap in the rim, not decoration: the portal's own width is
+   * taken out and the rim is built from what is left.
+   */
+  function rimGeometries(
+    outline: ReadonlyArray<readonly [number, number]>,
     portals: readonly { position: Coordinate; width: number }[],
   ) {
-    const dx = b[0] - a[0];
-    const dy = b[1] - a[1];
-    const length = Math.hypot(dx, dy);
-    if (length < 0.05) return [];
-    const ux = dx / length;
-    const uy = dy / length;
-
-    // A doorway is a gap in the wall, not decoration: the portal's own width
-    // is removed and the wall is built from what is left.
-    const gaps = portals
-      .map((portal) => {
-        const px = portal.position[0] - a[0];
-        const py = portal.position[1] - a[1];
-        return {
-          along: px * ux + py * uy,
-          across: Math.abs(px * -uy + py * ux),
-          half: portal.width / 2 + 0.15,
-        };
-      })
-      .filter((hit) => hit.across < 0.6 && hit.along > -hit.half && hit.along < length + hit.half)
-      .map((hit) => [Math.max(0, hit.along - hit.half), Math.min(length, hit.along + hit.half)])
-      .sort((left, right) => left[0] - right[0]);
-
-    let cursor = 0;
-    const runs: Array<[number, number]> = [];
-    for (const [from, to] of gaps) {
-      if (from > cursor) runs.push([cursor, from]);
-      cursor = Math.max(cursor, to);
-    }
-    if (cursor < length) runs.push([cursor, length]);
-
     const built = [];
-    const half = WALL_THICKNESS / 2;
-    for (const [from, to] of runs) {
-      if (to - from < 0.02) continue;
-      // A strip with a round end on each point. Along a curve the pieces
-      // overlap at their ends, which is what makes the rim one smooth line;
-      // at a doorway the round end is the end of the rim.
-      const start: Coordinate = [a[0] + ux * from, a[1] + uy * from];
-      const end: Coordinate = [a[0] + ux * to, a[1] + uy * to];
-      const footprint = stadium(start, end, half - 0.025, 2);
-      if (footprint.length === 0) continue;
-      // The extrusion and its turned-over top together come to the rim's height.
+    const openings = portals.map((portal) => ({
+      at: portal.position,
+      halfWidth: portal.width / 2 + 0.15,
+    }));
+    for (const line of cutOutline(outline, openings)) {
+      const footprint = ribbon(line, WALL_THICKNESS / 2);
+      if (footprint.length < 3) continue;
       const geometry = new ExtrudeGeometry(shapeFrom(footprint), {
-        depth: WALL_HEIGHT - 0.05,
-        bevelEnabled: true,
-        bevelSize: 0.025,
-        bevelThickness: 0.025,
-        bevelSegments: 1,
+        depth: WALL_HEIGHT,
+        bevelEnabled: false,
       });
       geometry.rotateX(Math.PI / 2);
       geometry.translate(0, WALL_HEIGHT + 0.03, 0);
@@ -609,19 +618,34 @@ export function createVenueScene(
     materials: MeshStandardMaterial[];
     routeGroup: Group;
     spaceMeshes: Map<string, Mesh>;
-    poiTargets: Array<{ id: string; object: Object3D }>;
+    poiTargets: Array<{ id: string; object: Object3D; indoors: boolean }>;
     /** Each place and where its marker's head is, for taps that land near it. */
-    poiAnchors: Array<{ id: string; spaceId: string | null; head: Vector3 }>;
+    poiAnchors: Array<{ id: string; spaceId: string | null; head: Vector3; indoors: boolean }>;
+    /** Spaces in the open, which stay in view when the roofs are on. */
+    outdoorSpaces: Set<string>;
     labels: Array<{
       id: string;
       text: string;
       priority: number;
       minScale: number;
       anchor: Vector3;
+      /** In a venue with grounds: 'near' is under a roof, 'far' is the roof's own name. */
+      shown?: 'near' | 'far';
     }>;
   }
 
   const floors = new Map<string, FloorView>();
+
+  const site = buildingPackage.site ?? null;
+  const scenery = site
+    ? createSiteScenery(site, (point, height) => vec([point[0], point[1]], height))
+    : null;
+  /** 1 from far off, with the roofs on; 0 close to, among the rooms. */
+  let siteFar = scenery ? 1 : 0;
+  /** How many metres of the venue fit in the uncovered height of the canvas. */
+  let metresVisible = REFERENCE_METRES_VISIBLE;
+  /** How much wider than true the route is drawn, so it survives the outside view. */
+  let routeWidth = 1;
 
   for (const floor of buildingPackage.floors) {
     const group = new Group();
@@ -643,9 +667,12 @@ export function createVenueScene(
 
     // A little larger than the building, with its corners rounded and its
     // edge turned over in three steps rather than cut once.
+    const onSite = scenery !== null && site !== null && floor.id === site.floorId;
+    const outdoorSpaces = new Set<string>();
     const plate = roundCorners(
       insetPolygon(floor.outline as Coordinate[], -PLATE_OVERHANG),
-      PLATE_RADIUS,
+      // The ground a campus stands on is a broad board with broad corners.
+      onSite ? 7 : PLATE_RADIUS,
       7,
     );
     const slab = new ExtrudeGeometry(shapeFrom(plate), {
@@ -665,28 +692,57 @@ export function createVenueScene(
     slabMesh.receiveShadow = true;
     group.add(slabMesh);
 
+    if (onSite && scenery) {
+      group.add(scenery.group);
+      materials.push(...scenery.materials);
+      for (const building of scenery.buildings) {
+        labels.push({
+          id: `building:${building.id}`,
+          text: building.name,
+          priority: 30,
+          minScale: 0,
+          anchor: building.anchor,
+          shown: 'far',
+        });
+      }
+    }
+
     const spaceMeshes = new Map<string, Mesh>();
     for (const space of spaces) {
       const polygon = space.polygon as Coordinate[];
+      const middle: Coordinate = [
+        polygon.reduce((total, point) => total + point[0], 0) / polygon.length,
+        polygon.reduce((total, point) => total + point[1], 0) / polygon.length,
+      ];
+      // In the open: on the ground floor of a venue with grounds, and not in a building.
+      const outdoors = onSite && scenery !== null && !scenery.isIndoors(middle);
+      if (outdoors) outdoorSpaces.add(space.id);
       // A tile of its own: in from the boundary it shares with its neighbours,
       // corners rounded, and thick enough to have an edge for the light.
-      const tile = roundCorners(insetPolygon(polygon, ROOM_INSET), ROOM_RADIUS);
+      const tile = roundCorners(insetPolygon(polygon, ROOM_INSET), ROOM_RADIUS, 4);
       const geometry = new ExtrudeGeometry(shapeFrom(tile), {
         depth: ROOM_THICKNESS,
         bevelEnabled: true,
         bevelSize: 0.05,
         bevelThickness: 0.05,
-        bevelSegments: 2,
+        bevelSegments: 1,
       });
       geometry.rotateX(Math.PI / 2);
       geometry.translate(0, 0.24, 0);
       const mesh = new Mesh(
         geometry,
         track(
-          glass(
-            SPACE_FILL[space.type] ?? SPACE_FILL.room,
-            SPACE_OPACITY[space.type] ?? SPACE_OPACITY.room,
-          ),
+          outdoors
+            ? glass(
+                OUTDOOR_FILL,
+                space.type === 'lobby'
+                  ? OUTDOOR_AREA_OPACITY
+                  : (SPACE_OPACITY[space.type] ?? SPACE_OPACITY.room),
+              )
+            : glass(
+                SPACE_FILL[space.type] ?? SPACE_FILL.room,
+                SPACE_OPACITY[space.type] ?? SPACE_OPACITY.room,
+              ),
         ),
       );
       mesh.receiveShadow = true;
@@ -706,27 +762,33 @@ export function createVenueScene(
           [(Math.min(...sx) + Math.max(...sx)) / 2, (Math.min(...sy) + Math.max(...sy)) / 2],
           1.5,
         ),
+        ...(scenery !== null && !outdoors ? { shown: 'near' as const } : {}),
       });
+    }
+    // Four walks round a fountain share one name; say it once.
+    for (let index = labels.length - 1; index >= 0; index -= 1) {
+      const label = labels[index];
+      if (!label.id.startsWith('space:')) continue;
+      if (labels.findIndex((other) => other.text === label.text) !== index) labels.splice(index, 1);
     }
 
     // Merged per colour: one mesh per wall colour rather than one per segment,
     // which is the difference between tens of draw calls and hundreds.
-    const wallsByColor = new Map<number, ReturnType<typeof wallGeometries>>();
+    const wallsByColor = new Map<number, ReturnType<typeof rimGeometries>>();
     const addWalls = (points: ReadonlyArray<readonly [number, number]>, color: number) => {
       const bucket = wallsByColor.get(color) ?? [];
-      points.forEach((point, index) => {
-        bucket.push(...wallGeometries(point, points[(index + 1) % points.length], portals));
-      });
+      bucket.push(...rimGeometries(points, portals));
       wallsByColor.set(color, bucket);
     };
     for (const space of spaces) {
-      // What you walk along has no rim.
-      if (space.type === 'corridor') continue;
+      // What you walk along has no rim, and nor does anything in the open.
+      if (space.type === 'corridor' || outdoorSpaces.has(space.id)) continue;
       // The rim runs just inside the edge of the room's tile, round its corners.
       addWalls(
         roundCorners(
           insetPolygon(space.polygon as Coordinate[], ROOM_INSET + WALL_THICKNESS / 2),
           ROOM_RADIUS - WALL_THICKNESS / 2,
+          4,
         ) as Coordinate[],
         WALL_FILL,
       );
@@ -750,6 +812,8 @@ export function createVenueScene(
     const planters: Coordinate[] = [];
     for (const space of spaces) {
       if (!['lobby', 'entrance', 'room', 'service'].includes(space.type)) continue;
+      // The grounds have their own trees and benches, placed by the venue.
+      if (outdoorSpaces.has(space.id)) continue;
       const polygon = space.polygon as Coordinate[];
       const px = polygon.map((point) => point[0]);
       const py = polygon.map((point) => point[1]);
@@ -825,10 +889,13 @@ export function createVenueScene(
     const poiTargets: FloorView['poiTargets'] = [];
     const poiAnchors: FloorView['poiAnchors'] = [];
     for (const poi of pois) {
+      // Under a roof, in a venue that has roofs.
+      const indoors = scenery !== null && !outdoorSpaces.has(poi.spaceId);
       poiAnchors.push({
         id: poi.id,
         spaceId: poi.spaceId ?? null,
         head: vec(poi.position as Coordinate, 0.95),
+        indoors,
       });
       const pinMaterial = track(surface(0x2b7fff, { emissive: 0x2b7fff, emissiveIntensity: 0.35 }));
 
@@ -838,7 +905,7 @@ export function createVenueScene(
       body.userData.poiId = poi.id;
       body.castShadow = true;
       group.add(body);
-      poiTargets.push({ id: poi.id, object: body });
+      poiTargets.push({ id: poi.id, object: body, indoors });
 
       const head = new Mesh(new SphereGeometry(0.3, 16, 12), pinMaterial);
       head.position.copy(vec(poi.position as Coordinate, 0.95));
@@ -848,7 +915,7 @@ export function createVenueScene(
       // Both halves answer a tap. The head is the part a finger actually lands
       // on, and picking resolves through userData rather than identity, so a
       // second entry for the same POI costs nothing.
-      poiTargets.push({ id: poi.id, object: head });
+      poiTargets.push({ id: poi.id, object: head, indoors });
 
       labels.push({
         id: `poi:${poi.id}`,
@@ -856,6 +923,7 @@ export function createVenueScene(
         priority: 12,
         minScale: 0,
         anchor: vec(poi.position as Coordinate, 1.45),
+        ...(indoors ? { shown: 'near' as const } : {}),
       });
     }
 
@@ -876,6 +944,7 @@ export function createVenueScene(
       spaceMeshes,
       poiTargets,
       poiAnchors,
+      outdoorSpaces,
       labels,
     });
   }
@@ -961,7 +1030,7 @@ export function createVenueScene(
     mesh.visible = length > 0.001;
     if (!mesh.visible) return;
     mesh.position.copy(from).add(to).multiplyScalar(0.5);
-    mesh.scale.set(1, length, 1);
+    mesh.scale.set(routeWidth, length, routeWidth);
     mesh.quaternion.setFromUnitVectors(up, scratchDirection.normalize());
   }
 
@@ -1094,6 +1163,7 @@ export function createVenueScene(
       const view = floors.get(point.floor);
       if (!view) return;
       const joint = new Mesh(jointGeometry, aheadMaterial);
+      joint.scale.setScalar(routeWidth);
       joint.userData.sharedResources = true;
       joint.position.copy(vec([point.x, point.y], 0.52));
       view.routeGroup.add(joint);
@@ -1257,14 +1327,27 @@ export function createVenueScene(
       puckShown.angle = wanted;
       puckShown.floorId = puckTarget.floorId;
     } else {
-      const step = Math.min(100, Math.max(0, elapsedMs));
+      const step = Math.min(MAX_FRAME_STEP_MS, Math.max(0, elapsedMs));
       const k = 1 - Math.exp(-step / 90);
-      puckShown.x += (puckTarget.x - puckShown.x) * k;
-      puckShown.y += (puckTarget.y - puckShown.y) * k;
+      const dx = puckTarget.x - puckShown.x;
+      const dy = puckTarget.y - puckShown.y;
       let turn = (wanted - puckShown.angle) % (Math.PI * 2);
       if (turn > Math.PI) turn -= Math.PI * 2;
       if (turn < -Math.PI) turn += Math.PI * 2;
-      puckShown.angle += turn * (1 - Math.exp(-step / 120));
+      /*
+       * An eased move gets closer for ever and never arrives, and every frame
+       * it is still moving the whole scene is drawn again: the marker turning
+       * to face north went on shrinking its last 1e-30 of a radian, and the
+       * heading-up camera with it, for more than a minute after the visitor
+       * had stopped. Once what is left cannot be seen, it is finished.
+       */
+      const arrived = Math.hypot(dx, dy) < PUCK_ARRIVED_METERS;
+      puckShown.x = arrived ? puckTarget.x : puckShown.x + dx * k;
+      puckShown.y = arrived ? puckTarget.y : puckShown.y + dy * k;
+      puckShown.angle =
+        Math.abs(turn) < PUCK_ARRIVED_RADIANS
+          ? wanted
+          : puckShown.angle + turn * (1 - Math.exp(-step / 120));
     }
     if (puck.parent !== floor.group) floor.group.add(puck);
     puck.position.copy(vec([puckShown.x, puckShown.y], 0.72));
@@ -1327,7 +1410,11 @@ export function createVenueScene(
     const existing = labelElements.get(id);
     if (existing !== undefined) return existing;
     const element = document.createElement('span');
-    element.className = id.startsWith('poi:') ? 'map-pill map-pill-poi' : 'map-pill';
+    element.className = id.startsWith('poi:')
+      ? 'map-pill map-pill-poi'
+      : id.startsWith('building:')
+        ? 'map-pill map-pill-building'
+        : 'map-pill';
     element.textContent = text;
     element.style.opacity = '0';
     labelLayer.appendChild(element);
@@ -1368,6 +1455,11 @@ export function createVenueScene(
     const candidates = [];
     for (const label of view.labels) {
       const element = elementFor(label.id, label.text);
+      // From outside, a building is its name; inside, it is its rooms.
+      if (label.shown !== undefined && (label.shown === 'far') !== siteFar > 0.5) {
+        element.style.opacity = '0';
+        continue;
+      }
       let size = labelSizes.get(label.id);
       if (size === undefined || size[0] === 0) {
         element.style.opacity = '0.001';
@@ -1396,8 +1488,10 @@ export function createVenueScene(
     const placed = new Set<string>();
     labelBounds.clear();
     // Scale is how far in the camera has come from its opening distance, which
-    // is what decides which tier of labels is allowed to compete.
-    const scale = 1 / cameraView.scale;
+    // is what decides which tier of labels is allowed to compete. A venue with
+    // grounds opens several times further out than a building does, so there
+    // it is how far in the camera is compared with a building's opening view.
+    const scale = scenery ? REFERENCE_METRES_VISIBLE / metresVisible : 1 / cameraView.scale;
     // Nothing is labelled under the interface: the covered strips and the
     // map's own buttons are taken before any label competes for space.
     const insets = cameraRig.getInsets();
@@ -1425,8 +1519,16 @@ export function createVenueScene(
       // anchor is free and reports where it put it; drawing at the original
       // centre throws that away and puts the labels back on top of each other -
       // which is exactly what a room and its POI of the same name did.
-      const { minX, minY, maxX, maxY } = label.bounds;
-      // Anything that would leave the canvas is dropped rather than clipped.
+      let { minX, maxX } = label.bounds;
+      const { minY, maxY } = label.bounds;
+      // A building's name is slid back on to the screen if its building is at
+      // the edge: from outside, the names are the map.
+      if (label.id.startsWith('building:') && maxX - minX < width - 12) {
+        const shift = minX < 6 ? 6 - minX : maxX > width - 6 ? width - 6 - maxX : 0;
+        minX += shift;
+        maxX += shift;
+      }
+      // Anything else that would leave the canvas is dropped rather than clipped.
       if (minX < 2 || minY < 2 || maxX > width - 2 || maxY > height - 2) {
         element.style.opacity = '0';
         continue;
@@ -1574,8 +1676,10 @@ export function createVenueScene(
     );
     raycaster.setFromCamera(pointer, camera);
 
+    // With the roofs on, what is under them cannot be seen and cannot be pressed.
+    const roofed = siteFar > 0.5;
     const markers = raycaster.intersectObjects(
-      view.poiTargets.map((entry) => entry.object),
+      view.poiTargets.filter((entry) => !(roofed && entry.indoors)).map((entry) => entry.object),
       false,
     );
     if (markers.length > 0) return markers[0].object.userData.poiId as string;
@@ -1597,6 +1701,7 @@ export function createVenueScene(
     let nearest: string | null = null;
     let nearestDistance = POI_REACH_PIXELS;
     for (const anchor of view.poiAnchors) {
+      if (roofed && anchor.indoors) continue;
       projected
         .copy(anchor.head)
         .setY(anchor.head.y + view.currentY)
@@ -1617,6 +1722,7 @@ export function createVenueScene(
     const rooms = raycaster.intersectObjects([...view.spaceMeshes.values()], false);
     if (rooms.length === 0) return null;
     const spaceId = rooms[0].object.userData.spaceId as string;
+    if (roofed && !view.outdoorSpaces.has(spaceId)) return null;
     let inRoom: string | null = null;
     let inRoomDistance = Infinity;
     for (const anchor of view.poiAnchors) {
@@ -1628,6 +1734,38 @@ export function createVenueScene(
       }
     }
     return inRoom;
+  }
+
+  function enterBuildingAt(clientX: number, clientY: number): boolean {
+    if (scenery === null || site === null || siteFar <= 0.5 || activeFloorId !== site.floorId)
+      return false;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return false;
+    pointer.set(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster
+      .intersectObject(scenery.group, true)
+      .find((entry) => typeof entry.object.userData.siteBuildingId === 'string');
+    if (hit === undefined) return false;
+    const building = scenery.buildings.find(
+      (entry) => entry.id === hit.object.userData.siteBuildingId,
+    );
+    if (building === undefined) return false;
+    // The building, with a little of the grounds round it for bearings.
+    cameraRig.fit(
+      building.footprint.map(([x, y]) => {
+        const world = vec([x, y]);
+        return [world.x, 0, world.z] as const;
+      }),
+      canvas.clientWidth,
+      canvas.clientHeight,
+      { padding: 1.3 },
+    );
+    invalidate();
+    return true;
   }
 
   /** World points for the part of the route being read, stack heights included. */
@@ -1837,11 +1975,13 @@ export function createVenueScene(
 
     resetView() {
       cameraRig.reset();
+      openingFitPending = scenery !== null;
       layout();
       rebuildRoute();
     },
 
     pickPoi,
+    enterBuildingAt,
 
     frame() {
       const width = canvas.clientWidth;
@@ -1857,6 +1997,22 @@ export function createVenueScene(
         renderer.setSize(width, height, false);
         invalidate();
       }
+      if (openingFitPending && site !== null) {
+        openingFitPending = false;
+        const outline = buildingPackage.floors.find((floor) => floor.id === site.floorId)?.outline;
+        // Left alone if a route is already being framed.
+        if (outline && routePoints.length < 2) {
+          cameraRig.fit(
+            (outline as Coordinate[]).map((point) => {
+              const world = vec(point);
+              return [world.x, 0, world.z] as const;
+            }),
+            width,
+            height,
+            { padding: 1.04 },
+          );
+        }
+      }
       const now = performance.now();
       const elapsed = now - lastFrame;
       // The stack opens and closes rather than cutting: every storey eases to
@@ -1865,7 +2021,7 @@ export function createVenueScene(
       // the stop it climbs from.
       const ease = motionPreference.matches
         ? 1
-        : 1 - Math.exp(-Math.min(100, Math.max(0, elapsed)) / FLOOR_TAU_MS);
+        : 1 - Math.exp(-Math.min(MAX_FRAME_STEP_MS, Math.max(0, elapsed)) / FLOOR_TAU_MS);
       let floorsMoving = false;
       let floorsMoved = false;
       for (const view of floors.values()) {
@@ -1913,7 +2069,9 @@ export function createVenueScene(
         ]);
         cameraRig.follow([world.x, world.z], {
           azimuth: follow.headingUp ? puckShown.angle : undefined,
-          scale: follow.scale,
+          // Tuned for a building. On a campus the same number would show half
+          // the site; it is brought in so the walk is read at the same size.
+          scale: follow.scale * Math.min(1, FOLLOW_REFERENCE_SPAN / span),
         });
       }
       const moved = cameraRig.wasMovedByUser();
@@ -1925,6 +2083,32 @@ export function createVenueScene(
       lastFrame = now;
       if (puckTarget)
         puck.scale.setScalar(cameraRig.worldUnitsPerPixel(width, height) * PUCK_PIXELS);
+      if (scenery) {
+        const unitsPerPixel = cameraRig.worldUnitsPerPixel(width, height);
+        metresVisible = unitsPerPixel * cameraRig.visibleHeight(width, height);
+        const next = scenery.setView(metresVisible, routePoints.length >= 2);
+        siteFar = next.far;
+        if (next.changed) invalidate();
+        // The route keeps a least width on screen. Its true width is the
+        // width of a person, which from across a campus is under a pixel.
+        const wanted = Math.max(
+          1,
+          (unitsPerPixel * SITE_ROUTE_MIN_PIXELS) / 2 / MAP_ROUTE_RADIUS_METERS,
+        );
+        if (Math.abs(wanted - routeWidth) > routeWidth * 0.04) {
+          routeWidth = wanted;
+          for (const tube of tubes) {
+            tube.mesh.scale.x = routeWidth;
+            tube.mesh.scale.z = routeWidth;
+          }
+          for (const split of [splitBehind, splitAhead]) {
+            split.scale.x = routeWidth;
+            split.scale.z = routeWidth;
+          }
+          for (const joint of joints) joint.mesh.scale.setScalar(routeWidth);
+          invalidate();
+        }
+      }
       if (cameraChanged()) invalidate();
 
       // The shadow underneath sits below whatever is lowest in the stack and
@@ -1992,6 +2176,7 @@ export function createVenueScene(
       userMoveListeners.clear();
       graphicsListeners.clear();
       window.cancelAnimationFrame(hoverFrame);
+      scenery?.dispose();
       tubeGeometry.dispose();
       jointGeometry.dispose();
       aheadMaterial.dispose();

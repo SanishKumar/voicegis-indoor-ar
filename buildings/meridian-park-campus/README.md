@@ -52,11 +52,22 @@ spaces actually share, and it stops with an error if they do not share one.
 node buildings/meridian-park-campus/source/author.mjs
 npm run compile:campus
 npm run venues:sync
+node scripts/refreshCatalogRelease.mjs meridian-park-campus
 npm run codes
 ```
 
-The catalog entry in `public/venues/catalog.json` carries the package's content
-hash and has to be updated when the package changes.
+The catalog entry in `public/venues/catalog.json` names a release by its
+package's content hash, so it goes stale whenever the package changes. The
+third step points it at the package just published.
+
+## How it is drawn
+
+From outside, the three buildings are roofs with their names on them, among
+the lawns, the pond and the car park. Coming in close, or pressing a building,
+takes the roofs off and shows the rooms. While a route is showing the roofs
+are a ghost, so the line can be followed from one building, across the
+grounds and into another. `docs/design-system.md` has the rules; the drawing
+is `src/map/siteScenery.ts`.
 
 ## Opening it
 

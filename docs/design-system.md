@@ -204,22 +204,58 @@ canvas, as frosted glass in daylight, and nothing on it has a hard corner.
   corners on a ball. What has been walked turns grey-blue.
 
 The rounding is `src/map/softGeometry.ts`: inset a polygon, round its corners,
-and the footprint of a rim with round ends. It is only how the building is
-drawn. Routing, clearance and position all work from the authored geometry.
+cut an outline at its doors, and the footprint of a rim that follows what is
+left. A rim is one ribbon from door to door, not a row of pieces: the same
+look for about a tenth of the triangles. It is only how the building is drawn.
+Routing, clearance and position all work from the authored geometry.
+
+**The model draws only when something changes.** Every eased move has to
+arrive: once what is left of it cannot be seen it lands on its target, and the
+frame loop goes back to doing nothing. A move that only ever gets closer keeps
+the whole scene redrawing, and `venueScene.geometry.test.ts` holds the marker
+to that. Eased moves are also a function of time passed and not of frames, so
+a slow phone takes as long over one as a fast one.
 
 The inspector's model and the Studio's plan are tools for checking a compiled
 venue, so they keep its exact geometry, in the same whites and pale blues
 (`src/engine/cartographicTheme.ts`) on clear ground.
 
+### A site with more than one building
+
+A venue may carry a `site`: its buildings, its grounds and what stands on
+them (`src/map/siteScenery.ts`). It is a picture and nothing else. What a
+visitor can walk on outside - a promenade, a court, a garden path - is a space
+like any corridor, and that is what routes use.
+
+- **Outside, a building is a roof.** From far enough out to see the grounds,
+  each building is a pale block with a set-back crown, taller for more
+  storeys, standing on a plinth, and it is named once. Its rooms and their
+  names are not drawn.
+- **Inside, the roof is gone.** Coming in closer than about 70 m of ground
+  across the view takes the roofs away and brings the rooms and their names
+  back. Pressing a building from outside goes in to it. The change is a fade
+  between 115 m and 70 m, and nothing is switched.
+- **A route is never under a roof.** While a route is showing, roofs are a
+  ghost of themselves, so the line can be followed through a building from
+  any distance. The route also keeps a least width on screen: its true width
+  is a person's, which from across a campus is less than a pixel.
+- **Grounds are flat colour under the glass.** Lawn is mint, planting a
+  deeper green, water blue and a little raised, paving white, a car park
+  slate with its bays marked, a road darker with a dashed centre. Outdoor
+  walks are warm white where indoor ones are cool. Trees, lamps, benches, the
+  fountain and the statue are a few rounded solids each, drawn as instances.
+- **A venue with one building has no site** and is drawn exactly as before.
+
 ### Labels on the model
 
-Three kinds, and they look different because they are different:
+Four kinds, and they look different because they are different:
 
-| Kind            | Looks like                | Means                                  |
-| --------------- | ------------------------- | -------------------------------------- |
-| A place         | White tag, blue dot, 13px | Somewhere you can go. It can be tapped |
-| An area         | Paler, smaller tag, 12px  | The name of a room or corridor         |
-| The destination | Dark tag, white dot, 14px | Where the route ends. Always placed    |
+| Kind            | Looks like                | Means                                        |
+| --------------- | ------------------------- | -------------------------------------------- |
+| A place         | White tag, blue dot, 13px | Somewhere you can go. It can be tapped       |
+| An area         | Paler, smaller tag, 12px  | The name of a room or corridor               |
+| The destination | Dark tag, white dot, 14px | Where the route ends. Always placed          |
+| A building      | Larger white tag, no dot  | A building seen from outside. Press to go in |
 
 They are light because a dark tag on every room turned the model into a wall
 of labels with a building behind it. The collision pass decides which are

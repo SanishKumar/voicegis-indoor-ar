@@ -486,6 +486,8 @@ export default function VisitorMap({
     // under the cursor.
     if (sceneRef.current?.wasDragged() === true) return;
     const poiId = sceneRef.current?.pickPoi(event.clientX, event.clientY) ?? null;
+    // Not a place: from outside, a tap on a building goes in to it.
+    if (poiId === null && sceneRef.current?.enterBuildingAt(event.clientX, event.clientY)) return;
     if (poiId === null) return;
     const node = venue.getNodeById(`poi:${poiId}`);
     if (node) actions.selectPOI(node);

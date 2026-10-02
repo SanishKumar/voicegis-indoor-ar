@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
 import {
   azimuthForHeading,
+  closestScale,
   createVisitorCamera,
   defaultMapView,
   planToWorld,
@@ -108,7 +109,8 @@ describe('one camera, two presentations', () => {
       rig.zoomBy(factor);
       rig.update(320, 700, 16, true);
       expect(rig.camera.projectionMatrix.elements.every(Number.isFinite)).toBe(true);
-      expect(rig.view.scale).toBeGreaterThanOrEqual(0.22);
+      // The closest view depends on the venue: 0.22 of a building, less of a campus.
+      expect(rig.view.scale).toBeGreaterThanOrEqual(closestScale(100));
       expect(rig.view.scale).toBeLessThanOrEqual(2.4);
     }
   });

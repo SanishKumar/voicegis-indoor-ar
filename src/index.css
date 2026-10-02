@@ -6715,6 +6715,17 @@ body {
   background: var(--color-signal-blue);
 }
 
+/* A building, named from outside. Larger than a place and without the dot:
+   pressing it goes in, it does not go to. */
+.map-pill-building {
+  padding: 5px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 3px 12px rgba(15, 33, 71, 0.22);
+  color: var(--color-ink);
+  font-size: var(--text-control);
+}
+
 .map-pill-destination,
 .map-pill-poi.map-pill-destination {
   padding: 4px 12px 4px 10px;
