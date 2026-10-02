@@ -25,7 +25,6 @@ import {
   DoubleSide,
   Shape,
   ShadowMaterial,
-  ShapeGeometry,
   SphereGeometry,
   Vector2,
   Vector3,
@@ -37,6 +36,7 @@ import { resolveCartographicLabels, type CartographicBounds } from '../engine/fl
 import type { VisitorLocation } from '../navigation/visitorLocation';
 import { cumulativeDistances } from '../navigation/routeProgress';
 import { MAP_ROUTE_RADIUS_METERS } from '../engine/routeClearance';
+import { insetPolygon, roundCorners, stadium } from './softGeometry';
 import {
   createVisitorRenderQuality,
   type MapGraphicsSetting,
@@ -60,6 +60,20 @@ import {
  * through them, walls are white, shadows fall blue, and there is one
  * saturated thing on it - the route. The canvas itself is transparent; what
  * is behind the building is the sky.
+ *
+ * Nothing on it has a hard corner. The floor is a plate with a rounded
+ * outline and a soft edge. Each room is a tray of its own: a rounded tile
+ * pulled in from its neighbours, with a thin rim that follows the tile's
+ * curve and opens where there is a door. Between two trays the plate shows
+ * through as a seam of sky. A corridor is a tile with no rim, because it is
+ * what you walk along, and the route turns its corners on a ball. A plan
+ * drawn square reads as a diagram of a building. Drawn soft it reads as a place.
+ *
+ * There are no walls on the shared boundaries. A wall there has to be square,
+ * since it belongs to both rooms, and it covered the rounding of each.
+ *
+ * This is only how the building is drawn. Routing, clearance and position
+ * all work from the authored geometry, which none of this touches.
  */
 
 type Coordinate = [number, number];
@@ -134,8 +148,20 @@ const PUCK_PIXELS = 30;
 const SHAFT_COLOR = 0x8fb2e6;
 const SELECTED_FILL = 0x2b7fff;
 
-const WALL_THICKNESS = 0.22;
-const WALL_HEIGHT = 1.4;
+/* A rim, not a wall: thin, and low enough to see over into a room from the
+   tilted view, which is what lets the model feel open rather than boxed in. */
+const WALL_THICKNESS = 0.16;
+const WALL_HEIGHT = 0.85;
+/** How far the floor plate reaches beyond the building's outline, in metres. */
+const PLATE_OVERHANG = 0.45;
+/** How round the plate's own corners are. */
+const PLATE_RADIUS = 1.8;
+/** How far a room's tile is pulled in from its boundary: half the seam between rooms. */
+const ROOM_INSET = 0.17;
+/** How round a room's corners are. A room smaller than this rounds by what it can. */
+const ROOM_RADIUS = 0.9;
+/** How thick a room's tile is: enough to catch the light along its edge. */
+const ROOM_THICKNESS = 0.1;
 
 /*
  * How far apart the storeys are pulled when a route crosses between them.
@@ -150,6 +176,14 @@ const FLOOR_TAU_MS = 220;
 const WALL_WINDOW_METERS = 2.6;
 /** The route's end outranks every other label. */
 const DESTINATION_PRIORITY = 20;
+/*
+ * How near a tap has to be to a place's marker to count, in CSS pixels. The
+ * marker itself is a pin a few pixels across at the opening zoom, which is a
+ * target you can only hit by aiming; 26px either side makes it a 52px one.
+ */
+const POI_REACH_PIXELS = 26;
+/** The least height a label answers a tap over, whatever height it is drawn at. */
+const LABEL_TOUCH_HEIGHT = 44;
 
 /** Where the guidance is, and which way the route runs from there. */
 export interface ScenePuck {
@@ -324,7 +358,7 @@ export function createVenueScene(
   renderer.toneMapping = ACESFilmicToneMapping;
   // The film curve rolls white off to a light grey. The model is meant to read
   // as white against the sky, so it is exposed up to where its lit faces are.
-  renderer.toneMappingExposure = 1.3;
+  renderer.toneMappingExposure = 1.55;
 
   const scene = new Scene();
   const cameraRig = createVisitorCamera(span, initialView);
@@ -373,6 +407,9 @@ export function createVenueScene(
   // depth bias: the flat-shaded low walls otherwise show acne along their tops.
   key.shadow.bias = -0.0004;
   key.shadow.normalBias = 0.03;
+  // A shadow at full strength draws a hard dark bar beside every wall. At a
+  // little over half it is a tint that says which way the light falls.
+  key.shadow.intensity = 0.55;
   const shadowSpan = span * 0.8;
   Object.assign(key.shadow.camera, {
     left: -shadowSpan,
@@ -435,7 +472,7 @@ export function createVenueScene(
   applyGraphics();
   let previousFrameDrawn = false;
 
-  function shapeFrom(polygon: readonly Coordinate[]) {
+  function shapeFrom(polygon: ReadonlyArray<readonly [number, number]>) {
     const shape = new Shape();
     polygon.forEach(([x, y], index) => {
       if (index === 0) shape.moveTo(wx(x), wz(y));
@@ -498,8 +535,8 @@ export function createVenueScene(
   }
 
   function wallGeometries(
-    a: Coordinate,
-    b: Coordinate,
+    a: readonly [number, number],
+    b: readonly [number, number],
     portals: readonly { position: Coordinate; width: number }[],
   ) {
     const dx = b[0] - a[0];
@@ -534,14 +571,26 @@ export function createVenueScene(
     if (cursor < length) runs.push([cursor, length]);
 
     const built = [];
+    const half = WALL_THICKNESS / 2;
     for (const [from, to] of runs) {
-      const run = to - from;
-      if (run < 0.12) continue;
-      const t = (from + to) / 2 / length;
-      const geometry = new BoxGeometry(run, WALL_HEIGHT, WALL_THICKNESS);
-      geometry.translate(0, WALL_HEIGHT / 2 + 0.03, 0);
-      geometry.rotateY(Math.atan2(-dy, dx));
-      geometry.translate(wx(a[0] + dx * t), 0, wz(a[1] + dy * t));
+      if (to - from < 0.02) continue;
+      // A strip with a round end on each point. Along a curve the pieces
+      // overlap at their ends, which is what makes the rim one smooth line;
+      // at a doorway the round end is the end of the rim.
+      const start: Coordinate = [a[0] + ux * from, a[1] + uy * from];
+      const end: Coordinate = [a[0] + ux * to, a[1] + uy * to];
+      const footprint = stadium(start, end, half - 0.025, 2);
+      if (footprint.length === 0) continue;
+      // The extrusion and its turned-over top together come to the rim's height.
+      const geometry = new ExtrudeGeometry(shapeFrom(footprint), {
+        depth: WALL_HEIGHT - 0.05,
+        bevelEnabled: true,
+        bevelSize: 0.025,
+        bevelThickness: 0.025,
+        bevelSegments: 1,
+      });
+      geometry.rotateX(Math.PI / 2);
+      geometry.translate(0, WALL_HEIGHT + 0.03, 0);
       built.push(geometry);
     }
     return built;
@@ -561,6 +610,8 @@ export function createVenueScene(
     routeGroup: Group;
     spaceMeshes: Map<string, Mesh>;
     poiTargets: Array<{ id: string; object: Object3D }>;
+    /** Each place and where its marker's head is, for taps that land near it. */
+    poiAnchors: Array<{ id: string; spaceId: string | null; head: Vector3 }>;
     labels: Array<{
       id: string;
       text: string;
@@ -590,12 +641,19 @@ export function createVenueScene(
     const spacesNamedByAPoi = new Set(pois.map((poi) => poi.spaceId));
     const labels: FloorView['labels'] = [];
 
-    const slab = new ExtrudeGeometry(shapeFrom(floor.outline as Coordinate[]), {
-      depth: 0.9,
+    // A little larger than the building, with its corners rounded and its
+    // edge turned over in three steps rather than cut once.
+    const plate = roundCorners(
+      insetPolygon(floor.outline as Coordinate[], -PLATE_OVERHANG),
+      PLATE_RADIUS,
+      7,
+    );
+    const slab = new ExtrudeGeometry(shapeFrom(plate), {
+      depth: 0.7,
       bevelEnabled: true,
-      bevelSize: 0.16,
-      bevelThickness: 0.16,
-      bevelSegments: 1,
+      bevelSize: 0.24,
+      bevelThickness: 0.24,
+      bevelSegments: 3,
     });
     // rotateX sends the extrusion to -Y, so the slab already hangs below zero
     // with its top face at zero. Lifting it would bury everything on it.
@@ -610,7 +668,16 @@ export function createVenueScene(
     const spaceMeshes = new Map<string, Mesh>();
     for (const space of spaces) {
       const polygon = space.polygon as Coordinate[];
-      const geometry = new ShapeGeometry(shapeFrom(polygon));
+      // A tile of its own: in from the boundary it shares with its neighbours,
+      // corners rounded, and thick enough to have an edge for the light.
+      const tile = roundCorners(insetPolygon(polygon, ROOM_INSET), ROOM_RADIUS);
+      const geometry = new ExtrudeGeometry(shapeFrom(tile), {
+        depth: ROOM_THICKNESS,
+        bevelEnabled: true,
+        bevelSize: 0.05,
+        bevelThickness: 0.05,
+        bevelSegments: 2,
+      });
       geometry.rotateX(Math.PI / 2);
       geometry.translate(0, 0.24, 0);
       const mesh = new Mesh(
@@ -619,7 +686,6 @@ export function createVenueScene(
           glass(
             SPACE_FILL[space.type] ?? SPACE_FILL.room,
             SPACE_OPACITY[space.type] ?? SPACE_OPACITY.room,
-            { side: DoubleSide },
           ),
         ),
       );
@@ -646,7 +712,7 @@ export function createVenueScene(
     // Merged per colour: one mesh per wall colour rather than one per segment,
     // which is the difference between tens of draw calls and hundreds.
     const wallsByColor = new Map<number, ReturnType<typeof wallGeometries>>();
-    const addWalls = (points: readonly Coordinate[], color: number) => {
+    const addWalls = (points: ReadonlyArray<readonly [number, number]>, color: number) => {
       const bucket = wallsByColor.get(color) ?? [];
       points.forEach((point, index) => {
         bucket.push(...wallGeometries(point, points[(index + 1) % points.length], portals));
@@ -654,10 +720,17 @@ export function createVenueScene(
       wallsByColor.set(color, bucket);
     };
     for (const space of spaces) {
+      // What you walk along has no rim.
       if (space.type === 'corridor') continue;
-      addWalls(space.polygon as Coordinate[], WALL_FILL);
+      // The rim runs just inside the edge of the room's tile, round its corners.
+      addWalls(
+        roundCorners(
+          insetPolygon(space.polygon as Coordinate[], ROOM_INSET + WALL_THICKNESS / 2),
+          ROOM_RADIUS - WALL_THICKNESS / 2,
+        ) as Coordinate[],
+        WALL_FILL,
+      );
     }
-    addWalls(floor.outline as Coordinate[], WALL_FILL);
     for (const [color, geometries] of wallsByColor) {
       if (geometries.length === 0) continue;
       const mesh = new Mesh(mergeGeometries(geometries), track(wallSurface(color)));
@@ -732,7 +805,7 @@ export function createVenueScene(
       planters,
       (object, point) => object.position.copy(vec(point, 0.23)),
     );
-    addInstances(new IcosahedronGeometry(0.3, 0), surface(0x9fc3b4), planters, (object, point) => {
+    addInstances(new IcosahedronGeometry(0.3, 1), surface(0x9fc3b4), planters, (object, point) => {
       object.position.copy(vec(point, 0.62));
       object.scale.set(1, 1.15, 1);
       object.rotation.set(0, random() * Math.PI, 0);
@@ -750,7 +823,13 @@ export function createVenueScene(
      * in the product.
      */
     const poiTargets: FloorView['poiTargets'] = [];
+    const poiAnchors: FloorView['poiAnchors'] = [];
     for (const poi of pois) {
+      poiAnchors.push({
+        id: poi.id,
+        spaceId: poi.spaceId ?? null,
+        head: vec(poi.position as Coordinate, 0.95),
+      });
       const pinMaterial = track(surface(0x2b7fff, { emissive: 0x2b7fff, emissiveIntensity: 0.35 }));
 
       const body = new Mesh(new ConeGeometry(0.32, 0.8, 14), pinMaterial);
@@ -796,6 +875,7 @@ export function createVenueScene(
       routeGroup,
       spaceMeshes,
       poiTargets,
+      poiAnchors,
       labels,
     });
   }
@@ -838,13 +918,20 @@ export function createVenueScene(
     for (const view of floors.values()) emptyGroup(view.routeGroup);
   }
 
+  /*
+   * The route is its own colour and nothing else: it gives off its blue and
+   * takes no light, and it is left out of the film curve. Lit like the rest of
+   * the model it bleached towards white wherever the sun was on it, which is
+   * the one thing on the map that must not fade.
+   */
   const routeMaterial = () =>
     new MeshStandardMaterial({
-      color: ROUTE_COLOR,
+      name: 'route-ahead',
+      color: 0x000000,
       emissive: ROUTE_COLOR,
-      emissiveIntensity: 0.45,
-      roughness: 0.4,
-      flatShading: true,
+      emissiveIntensity: 1,
+      roughness: 1,
+      toneMapped: false,
     });
 
   /*
@@ -883,6 +970,20 @@ export function createVenueScene(
     mesh.userData.sharedResources = true;
     return mesh;
   }
+
+  /*
+   * A ball at every point of the route, the tube's own width. Two cylinders
+   * meeting at a corner leave a notch on the outside of the turn and a sharp
+   * crease on the inside; the ball fills both, so the route turns smoothly
+   * while still running along the authored edges and nowhere else.
+   */
+  const jointGeometry = new SphereGeometry(MAP_ROUTE_RADIUS_METERS, 14, 10);
+  interface RouteJoint {
+    mesh: Mesh;
+    /** Distance along the route at which this point is passed. */
+    at: number;
+  }
+  let joints: RouteJoint[] = [];
 
   interface RouteTube {
     mesh: Mesh;
@@ -941,6 +1042,10 @@ export function createVenueScene(
     invalidate();
     splitBehind.removeFromParent();
     splitAhead.removeFromParent();
+    for (const joint of joints) {
+      joint.mesh.material =
+        routeProgress !== null && routeProgress >= joint.at ? travelledMaterial : aheadMaterial;
+    }
     for (const tube of tubes) {
       if (routeProgress === null || routeProgress <= tube.start) {
         tube.mesh.material = aheadMaterial;
@@ -977,12 +1082,23 @@ export function createVenueScene(
     invalidate();
     clearRoute();
     tubes = [];
+    joints = [];
     shafts = [];
     hops = [];
     if (routePoints.length < 2) return;
 
     const distances = cumulativeDistances(routePoints);
     const showing = stacked() ? routeFloors : [activeFloorId];
+    routePoints.forEach((point, index) => {
+      if (!showing.includes(point.floor)) return;
+      const view = floors.get(point.floor);
+      if (!view) return;
+      const joint = new Mesh(jointGeometry, aheadMaterial);
+      joint.userData.sharedResources = true;
+      joint.position.copy(vec([point.x, point.y], 0.52));
+      view.routeGroup.add(joint);
+      joints.push({ mesh: joint, at: distances[index] });
+    });
     routePoints.forEach((from, index) => {
       const to = routePoints[index + 1];
       if (to === undefined || from.floor !== to.floor || !showing.includes(from.floor)) return;
@@ -1188,6 +1304,8 @@ export function createVenueScene(
    * offsetWidth per label per frame forces a layout on every one of them.
    */
   const labelElements = new Map<string, HTMLElement>();
+  /** Where each label was last drawn, in canvas pixels. Empty for one not shown. */
+  const labelBounds = new Map<string, { minX: number; minY: number; maxX: number; maxY: number }>();
   let labelObstacles: CartographicBounds[] = [];
   const labelSizes = new Map<string, [number, number]>();
   const projected = new Vector3();
@@ -1276,6 +1394,7 @@ export function createVenueScene(
     }
 
     const placed = new Set<string>();
+    labelBounds.clear();
     // Scale is how far in the camera has come from its opening distance, which
     // is what decides which tier of labels is allowed to compete.
     const scale = 1 / cameraView.scale;
@@ -1316,6 +1435,7 @@ export function createVenueScene(
       element.style.opacity = '1';
       element.classList.toggle('map-pill-destination', label.id === destinationId);
       placed.add(label.id);
+      labelBounds.set(label.id, { minX, minY, maxX, maxY });
     }
     for (const [id, element] of labelElements) {
       if (!placed.has(id)) element.style.opacity = '0';
@@ -1355,9 +1475,29 @@ export function createVenueScene(
     canvas.setPointerCapture(event.pointerId);
   };
 
+  /*
+   * With a mouse, the pointer says what can be pressed before it is pressed.
+   * Checked at most once a frame: a ray through the scene on every mouse event
+   * is work nobody sees.
+   */
+  let hoverFrame = 0;
+  let hoverX = 0;
+  let hoverY = 0;
+  const showHover = () => {
+    hoverFrame = 0;
+    canvas.style.cursor = pickPoi(hoverX, hoverY) === null ? '' : 'pointer';
+  };
+
   const pointerMove = (event: PointerEvent) => {
     const previous = pointers.get(event.pointerId);
-    if (previous === undefined) return;
+    if (previous === undefined) {
+      if (event.pointerType === 'mouse') {
+        hoverX = event.clientX;
+        hoverY = event.clientY;
+        if (hoverFrame === 0) hoverFrame = window.requestAnimationFrame(showHover);
+      }
+      return;
+    }
     const dx = event.clientX - previous.x;
     const dy = event.clientY - previous.y;
     pointers.set(event.pointerId, { ...previous, x: event.clientX, y: event.clientY });
@@ -1415,6 +1555,80 @@ export function createVenueScene(
 
   const raycaster = new Raycaster();
   const pointer = new Vector2();
+
+  /*
+   * A place answers a tap in four ways, tried from the most exact down: the
+   * marker itself, the place's label, anywhere within a fingertip of the
+   * marker, and the room the place is in. Only the first existed, and the
+   * marker is a pin a few pixels wide - on a phone the map looked tappable
+   * and almost never was.
+   */
+  function pickPoi(clientX: number, clientY: number): string | null {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    const view = floors.get(activeFloorId);
+    if (view === undefined) return null;
+    pointer.set(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    raycaster.setFromCamera(pointer, camera);
+
+    const markers = raycaster.intersectObjects(
+      view.poiTargets.map((entry) => entry.object),
+      false,
+    );
+    if (markers.length > 0) return markers[0].object.userData.poiId as string;
+
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    for (const [id, bounds] of labelBounds) {
+      if (!id.startsWith('poi:')) continue;
+      const grow = Math.max(0, (LABEL_TOUCH_HEIGHT - (bounds.maxY - bounds.minY)) / 2);
+      if (
+        x >= bounds.minX - 6 &&
+        x <= bounds.maxX + 6 &&
+        y >= bounds.minY - grow &&
+        y <= bounds.maxY + grow
+      )
+        return id.slice('poi:'.length);
+    }
+
+    let nearest: string | null = null;
+    let nearestDistance = POI_REACH_PIXELS;
+    for (const anchor of view.poiAnchors) {
+      projected
+        .copy(anchor.head)
+        .setY(anchor.head.y + view.currentY)
+        .project(camera);
+      if (projected.z > 1) continue;
+      const distance = Math.hypot(
+        (projected.x * 0.5 + 0.5) * rect.width - x,
+        (-projected.y * 0.5 + 0.5) * rect.height - y,
+      );
+      if (distance < nearestDistance) {
+        nearest = anchor.id;
+        nearestDistance = distance;
+      }
+    }
+    if (nearest !== null) return nearest;
+
+    // The room under the finger, when it holds a place: the one nearest the tap.
+    const rooms = raycaster.intersectObjects([...view.spaceMeshes.values()], false);
+    if (rooms.length === 0) return null;
+    const spaceId = rooms[0].object.userData.spaceId as string;
+    let inRoom: string | null = null;
+    let inRoomDistance = Infinity;
+    for (const anchor of view.poiAnchors) {
+      if (anchor.spaceId !== spaceId) continue;
+      const distance = anchor.head.distanceTo(rooms[0].point);
+      if (distance < inRoomDistance) {
+        inRoom = anchor.id;
+        inRoomDistance = distance;
+      }
+    }
+    return inRoom;
+  }
 
   /** World points for the part of the route being read, stack heights included. */
   function routeFramePoints() {
@@ -1627,22 +1841,7 @@ export function createVenueScene(
       rebuildRoute();
     },
 
-    pickPoi(clientX, clientY) {
-      const rect = canvas.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return null;
-      pointer.set(
-        ((clientX - rect.left) / rect.width) * 2 - 1,
-        -((clientY - rect.top) / rect.height) * 2 + 1,
-      );
-      raycaster.setFromCamera(pointer, camera);
-      const view = floors.get(activeFloorId);
-      if (view === undefined) return null;
-      const hits = raycaster.intersectObjects(
-        view.poiTargets.map((entry) => entry.object),
-        false,
-      );
-      return hits.length > 0 ? (hits[0].object.userData.poiId as string) : null;
-    },
+    pickPoi,
 
     frame() {
       const width = canvas.clientWidth;
@@ -1792,7 +1991,9 @@ export function createVenueScene(
       });
       userMoveListeners.clear();
       graphicsListeners.clear();
+      window.cancelAnimationFrame(hoverFrame);
       tubeGeometry.dispose();
+      jointGeometry.dispose();
       aheadMaterial.dispose();
       travelledMaterial.dispose();
       puck.traverse((object) => {

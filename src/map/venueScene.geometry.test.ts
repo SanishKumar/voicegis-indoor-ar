@@ -78,7 +78,7 @@ function routeCentreLines(): Vector3[][] {
   observed.scene!.traverse((object) => {
     if (!(object instanceof Mesh)) return;
     const material = object.material as MeshStandardMaterial;
-    if (material.emissiveIntensity !== 0.45) return;
+    if (material.name !== 'route-ahead') return;
     if (object.geometry instanceof TubeGeometry) {
       lines.push(
         object.geometry.parameters.path.getPoints(80).map((point) => object.localToWorld(point)),
@@ -239,6 +239,44 @@ describe('visitor route geometry', () => {
       expect(
         Math.max(...line.map((point) => point.z)) - Math.min(...line.map((point) => point.z)),
       ).toBeLessThan(0.00001);
+  });
+
+  it('answers a tap anywhere within a fingertip of a place, not only on its marker', () => {
+    // The marker is a pin a few pixels across. Sweep the whole canvas and see
+    // how much of it answers for each place.
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 800,
+      height: 600,
+      right: 800,
+      bottom: 600,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    scene.frame();
+    const reach = new Map<string, { minX: number; maxX: number; minY: number; maxY: number }>();
+    for (let y = 2; y < 600; y += 4) {
+      for (let x = 2; x < 800; x += 4) {
+        const id = scene.pickPoi(x, y);
+        if (id === null) continue;
+        const box = reach.get(id) ?? { minX: x, maxX: x, minY: y, maxY: y };
+        reach.set(id, {
+          minX: Math.min(box.minX, x),
+          maxX: Math.max(box.maxX, x),
+          minY: Math.min(box.minY, y),
+          maxY: Math.max(box.maxY, y),
+        });
+      }
+    }
+    expect(reach.size).toBeGreaterThan(1);
+    for (const [id, box] of reach) {
+      expect(box.maxX - box.minX, `${id} is too narrow to tap`).toBeGreaterThanOrEqual(44);
+      expect(box.maxY - box.minY, `${id} is too short to tap`).toBeGreaterThanOrEqual(44);
+    }
+    // The open sky beside the building is not a place.
+    expect(scene.pickPoi(3, 3)).toBeNull();
   });
 
   it('removes interaction handlers when the scene is disposed', () => {
