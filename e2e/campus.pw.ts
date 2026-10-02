@@ -63,6 +63,58 @@ test('pressing a building goes in to it', async ({ page }) => {
   await expect(page.locator('.poi-card-overlay.open')).toHaveCount(0);
 });
 
+/** Opens the campus by the link printed on one of its signs. */
+async function checkInAt(page: Page, sign: string) {
+  await precompleteOnboarding(page);
+  const payload = encodeURIComponent(`voicegis://meridian/${sign}`);
+  await page.goto(`/?venue=/venues/meridian-park-campus.package.json&checkin=${payload}#/visitor`);
+  await expect(page.locator('.checkin-toast')).toBeVisible();
+}
+
+test('a sign indoors opens the map among the rooms round it, and the outside is one press away', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await checkInAt(page, 'g/emergency-entrance');
+
+  // In the Emergency Centre: its rooms are named and the buildings are not.
+  await expect.poll(() => shownLabels(page), { timeout: 15_000 }).toContain('Triage');
+  expect(await shownLabels(page)).not.toContain('Emergency Centre');
+
+  await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
+  await page.getByRole('button', { name: 'Reset the map view' }).click();
+  await expect
+    .poll(() => shownLabels(page), { timeout: 15_000 })
+    .toEqual(expect.arrayContaining(['Main Hospital', 'Emergency Centre', 'Wellness Pavilion']));
+  expect(await shownLabels(page)).not.toContain('Triage');
+
+  // And back in to where the sign is.
+  await page.getByRole('button', { name: 'Recenter on last check-in' }).click();
+  await expect.poll(() => shownLabels(page), { timeout: 15_000 }).not.toContain('Emergency Centre');
+});
+
+test('a sign out of doors opens on the whole site', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await checkInAt(page, 'g/main-gate');
+  await expect
+    .poll(() => shownLabels(page), { timeout: 15_000 })
+    .toEqual(expect.arrayContaining(['Main Hospital', 'Emergency Centre', 'Wellness Pavilion']));
+  expect(await shownLabels(page)).not.toContain('Triage');
+});
+
+test('a floor that is not under the view is brought into it', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await checkInAt(page, 'g/emergency-entrance');
+  await expect.poll(() => shownLabels(page), { timeout: 15_000 }).toContain('Triage');
+
+  // Level 1 exists only over the Main Hospital, across the site from here.
+  // Left where it was, the view would be of nothing.
+  await page.getByRole('button', { name: /^Show Level 1/ }).click();
+  await expect
+    .poll(() => shownLabels(page), { timeout: 15_000 })
+    .toEqual(expect.arrayContaining(['Maternity Unit', 'Day Surgery']));
+});
+
 test('a route leaves one building, crosses the garden and enters another', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openCampus(page);

@@ -246,6 +246,28 @@ like any corridor, and that is what routes use.
   fountain and the statue are a few rounded solids each, drawn as instances.
 - **A venue with one building has no site** and is drawn exactly as before.
 
+Which of the two views a visitor is given follows from where they are:
+
+| Where the visitor is               | The map shows                                 |
+| ---------------------------------- | --------------------------------------------- |
+| Not known yet, or out of doors     | The whole site: the outside view              |
+| Inside a building, at a sign       | That building round them, up to 30 m each way |
+| On an upper floor                  | That floor, which is one building, round them |
+| Looking at a floor that isn't here | That floor, fitted: never an empty screen     |
+| A route is showing                 | The route. None of the above moves it         |
+
+Sixty metres across is inside the distance at which the roofs come off, so
+coming in to a visitor always arrives among the rooms, on a phone as on a
+desk. _Reset the map view_ goes back out to the whole site and _Recenter_
+comes back in. A view the visitor chose and came back to is restored and left
+alone.
+
+**The checkpoint is never hidden.** It is painted over everything, so from
+outside it shows through the roof of the building the visitor is in; it is
+never drawn smaller than 16px across; and labels are placed round it, not on
+it. A sign hangs at a place, so the checkpoint, that place's name and from
+outside the building's name all want the same spot.
+
 ### Labels on the model
 
 Four kinds, and they look different because they are different:

@@ -185,6 +185,15 @@ const MAX_FRAME_STEP_MS = 400;
 /** How near its place the marker has to be for the move to count as finished. */
 const PUCK_ARRIVED_METERS = 0.002;
 const PUCK_ARRIVED_RADIANS = 0.0005;
+/** The checkpoint: its size on the ground, and the least it is ever drawn on screen. */
+const LOCATION_RADIUS_METERS = 0.85;
+const LOCATION_MIN_RADIUS_PIXELS = 8;
+/**
+ * How far round the visitor the view reaches when it is brought to where they
+ * are. Sixty metres across is inside the distance at which roofs come off, so
+ * the view this gives is always among the rooms, on a phone as on a desk.
+ */
+const LOCATION_REACH_METERS = 30;
 /** Radius of the window through the walls around the marker, in metres. */
 const WALL_WINDOW_METERS = 2.6;
 /** The route's end outranks every other label. */
@@ -511,7 +520,12 @@ export function createVenueScene(
    * the middle of the screen. It opens fitted to its own outline instead - but
    * only when it is opened fresh, not when a view the visitor chose is restored.
    */
-  let openingFitPending = buildingPackage.site !== undefined && initialView === undefined;
+  let pendingFit: 'home' | 'location' | null =
+    buildingPackage.site !== undefined && initialView === undefined ? 'home' : null;
+  /** The place the view was last brought to, so the same one is not fitted twice. */
+  let fittedLocation: string | null = null;
+  /** A restored view already shows where the visitor chose to look. */
+  let keepRestoredView = initialView !== undefined;
 
   function shapeFrom(polygon: ReadonlyArray<readonly [number, number]>) {
     const shape = new Shape();
@@ -1422,14 +1436,13 @@ export function createVenueScene(
     return element;
   }
 
-  /** The marker's footprint on screen, so no label is placed over it. */
-  function puckObstacle(width: number, height: number) {
-    if (puck.parent === null) return [];
-    const centre = puck.getWorldPosition(projected).project(camera);
+  /** A square of screen round a point in the scene, for the label pass to keep clear of. */
+  function obstacleAt(object: Group, half: number, width: number, height: number) {
+    if (object.parent === null) return [];
+    const centre = object.getWorldPosition(projected).project(camera);
     if (centre.z > 1) return [];
     const x = (centre.x * 0.5 + 0.5) * width;
     const y = (-centre.y * 0.5 + 0.5) * height;
-    const half = PUCK_PIXELS * 0.7;
     return [
       {
         minX: x - half,
@@ -1442,6 +1455,27 @@ export function createVenueScene(
       },
     ];
   }
+
+  /** The marker's footprint on screen, so no label is placed over it. */
+  const puckObstacle = (width: number, height: number) =>
+    obstacleAt(puck, PUCK_PIXELS * 0.7, width, height);
+
+  /*
+   * And the checkpoint's. A sign hangs at a place, so the checkpoint and that
+   * place's name want the same spot, and from outside so does the name of the
+   * building: without this the name sat on the dot and "you are here" was
+   * the one thing the map did not show.
+   */
+  const locationObstacle = (width: number, height: number) =>
+    obstacleAt(
+      locationGroup,
+      Math.max(
+        LOCATION_MIN_RADIUS_PIXELS,
+        LOCATION_RADIUS_METERS / cameraRig.worldUnitsPerPixel(width, height),
+      ) + 3,
+      width,
+      height,
+    );
 
   function drawLabels(width: number, height: number) {
     const view = floors.get(activeFloorId);
@@ -1507,6 +1541,7 @@ export function createVenueScene(
     const reserved = [
       ...labelObstacles,
       ...puckObstacle(width, height),
+      ...locationObstacle(width, height),
       ...(insets.top > 0 ? [strip(0, 0, width, insets.top)] : []),
       ...(insets.bottom > 0 ? [strip(0, height - insets.bottom, width, height)] : []),
       ...(insets.left > 0 ? [strip(0, 0, insets.left, height)] : []),
@@ -1768,6 +1803,77 @@ export function createVenueScene(
     return true;
   }
 
+  /** Whether the middle of the view is over a floor, by the floor's bounds. */
+  function looksAtFloor(floorId: string) {
+    const outline = buildingPackage.floors.find((floor) => floor.id === floorId)?.outline as
+      Coordinate[] | undefined;
+    if (outline === undefined) return true;
+    const [x, z] = cameraView.target;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const point of outline) {
+      const world = vec(point);
+      minX = Math.min(minX, world.x);
+      maxX = Math.max(maxX, world.x);
+      minZ = Math.min(minZ, world.z);
+      maxZ = Math.max(maxZ, world.z);
+    }
+    return x >= minX && x <= maxX && z >= minZ && z <= maxZ;
+  }
+
+  /*
+   * Where the view goes on a site when nothing else has a claim on it.
+   *
+   *   outdoors, or nowhere yet   the whole site: the outside view
+   *   inside a building          the part of that building round the visitor
+   *   on an upper floor          that floor, which is one building
+   *
+   * So the outside view is where a visit starts, and checking in at a sign
+   * indoors brings the map in to where that sign is.
+   */
+  function fitHome(toLocation: boolean, width: number, height: number) {
+    if (site === null || scenery === null) return;
+    const outline = buildingPackage.floors.find((floor) => floor.id === activeFloorId)?.outline as
+      Coordinate[] | undefined;
+    if (outline === undefined) return;
+    const fit = (points: ReadonlyArray<readonly [number, number]>, padding: number) =>
+      cameraRig.fit(
+        points.map((point) => {
+          const world = vec([point[0], point[1]]);
+          return [world.x, 0, world.z] as const;
+        }),
+        width,
+        height,
+        { padding },
+      );
+    const upstairs = activeFloorId !== site.floorId;
+    if (toLocation && location !== null && location.floorId === activeFloorId) {
+      const around = upstairs ? outline : scenery.buildingAt(location.position)?.footprint;
+      if (around !== undefined) {
+        const [x, y] = location.position;
+        const xs = around.map((point) => point[0]);
+        const ys = around.map((point) => point[1]);
+        fit(
+          [
+            [
+              Math.max(Math.min(...xs), x - LOCATION_REACH_METERS),
+              Math.max(Math.min(...ys), y - LOCATION_REACH_METERS),
+            ],
+            [
+              Math.min(Math.max(...xs), x + LOCATION_REACH_METERS),
+              Math.min(Math.max(...ys), y + LOCATION_REACH_METERS),
+            ],
+          ],
+          1.1,
+        );
+        return;
+      }
+    }
+    fit(outline, upstairs ? 1.15 : 1.04);
+  }
+
   /** World points for the part of the route being read, stack heights included. */
   function routeFramePoints() {
     const showing = stacked() ? routeFloors : [activeFloorId];
@@ -1888,19 +1994,29 @@ export function createVenueScene(
       if (!location) return;
       const floor = floors.get(location.floorId);
       if (!floor) return;
-      // Fixed-size checkpoint symbol: no heading cone or invented accuracy halo.
-      const rim = new Mesh(
-        new CylinderGeometry(0.85, 0.85, 0.12, 32),
-        new MeshStandardMaterial({ color: 0xffffff }),
-      );
+      // A checkpoint symbol: no heading cone or invented accuracy halo. Painted
+      // over everything, so from outside it shows through the roof of the
+      // building the visitor is in.
+      const rim = new Mesh(new CircleGeometry(LOCATION_RADIUS_METERS, 40), overlay(0xffffff));
       const dot = new Mesh(
-        new CylinderGeometry(0.59, 0.59, 0.17, 32),
-        new MeshStandardMaterial({ color: location.basis === 'qr' ? 0x2b7fff : 0x7f93b0 }),
+        new CircleGeometry(LOCATION_RADIUS_METERS * 0.7, 40),
+        overlay(location.basis === 'qr' ? 0x2b7fff : 0x7f93b0),
       );
-      dot.position.y = 0.1;
+      rim.rotation.x = -Math.PI / 2;
+      dot.rotation.x = -Math.PI / 2;
+      dot.position.y = 0.01;
+      rim.renderOrder = 996;
+      dot.renderOrder = 997;
       locationGroup.add(rim, dot);
       locationGroup.position.copy(vec(location.position, 1.65));
       floor.group.add(locationGroup);
+      const place = `${location.floorId}:${location.position[0]},${location.position[1]}`;
+      if (scenery !== null && place !== fittedLocation) {
+        fittedLocation = place;
+        // A new place to be: the view goes to it, unless it was just restored.
+        if (!keepRestoredView) pendingFit = 'location';
+      }
+      keepRestoredView = false;
     },
 
     focusLocation() {
@@ -1919,6 +2035,16 @@ export function createVenueScene(
 
     setActiveFloor(floorId) {
       if (!floors.has(floorId)) return;
+      // Changing floor keeps the view where it is, as it does in any building,
+      // with two exceptions on a site. Going upstairs from the outside view:
+      // there are no grounds up there, so the floor is framed as the one
+      // building it is. And going to a floor that is not under the camera at
+      // all - Level 1 while looking at a building that has none - which would
+      // otherwise show an empty screen.
+      if (site !== null && floorId !== activeFloorId && pendingFit === null) {
+        const fromOutside = floorId !== site.floorId && siteFar > 0.5;
+        if (fromOutside || !looksAtFloor(floorId)) pendingFit = 'home';
+      }
       activeFloorId = floorId;
       // Stack heights are relative to whichever floor is being read, so the
       // one in hand stays put and the others move around it.
@@ -1975,7 +2101,7 @@ export function createVenueScene(
 
     resetView() {
       cameraRig.reset();
-      openingFitPending = scenery !== null;
+      pendingFit = scenery !== null ? 'home' : null;
       layout();
       rebuildRoute();
     },
@@ -1997,21 +2123,11 @@ export function createVenueScene(
         renderer.setSize(width, height, false);
         invalidate();
       }
-      if (openingFitPending && site !== null) {
-        openingFitPending = false;
-        const outline = buildingPackage.floors.find((floor) => floor.id === site.floorId)?.outline;
+      if (pendingFit !== null) {
+        const toLocation = pendingFit === 'location';
+        pendingFit = null;
         // Left alone if a route is already being framed.
-        if (outline && routePoints.length < 2) {
-          cameraRig.fit(
-            (outline as Coordinate[]).map((point) => {
-              const world = vec(point);
-              return [world.x, 0, world.z] as const;
-            }),
-            width,
-            height,
-            { padding: 1.04 },
-          );
-        }
+        if (routePoints.length < 2) fitHome(toLocation, width, height);
       }
       const now = performance.now();
       const elapsed = now - lastFrame;
@@ -2087,7 +2203,8 @@ export function createVenueScene(
         const unitsPerPixel = cameraRig.worldUnitsPerPixel(width, height);
         metresVisible = unitsPerPixel * cameraRig.visibleHeight(width, height);
         const next = scenery.setView(metresVisible, routePoints.length >= 2);
-        siteFar = next.far;
+        // Upstairs there is no outside to see the building from.
+        siteFar = site !== null && activeFloorId === site.floorId ? next.far : 0;
         if (next.changed) invalidate();
         // The route keeps a least width on screen. Its true width is the
         // width of a person, which from across a campus is under a pixel.
@@ -2106,6 +2223,19 @@ export function createVenueScene(
             split.scale.z = routeWidth;
           }
           for (const joint of joints) joint.mesh.scale.setScalar(routeWidth);
+          invalidate();
+        }
+      }
+      // The checkpoint keeps a least size on screen: across a campus its true
+      // size is a pixel or two.
+      if (location !== null) {
+        const size = Math.max(
+          1,
+          (cameraRig.worldUnitsPerPixel(width, height) * LOCATION_MIN_RADIUS_PIXELS) /
+            LOCATION_RADIUS_METERS,
+        );
+        if (Math.abs(size - locationGroup.scale.x) > locationGroup.scale.x * 0.02) {
+          locationGroup.scale.setScalar(size);
           invalidate();
         }
       }

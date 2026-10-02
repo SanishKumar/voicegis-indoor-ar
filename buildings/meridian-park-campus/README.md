@@ -66,8 +66,15 @@ From outside, the three buildings are roofs with their names on them, among
 the lawns, the pond and the car park. Coming in close, or pressing a building,
 takes the roofs off and shows the rooms. While a route is showing the roofs
 are a ghost, so the line can be followed from one building, across the
-grounds and into another. `docs/design-system.md` has the rules; the drawing
-is `src/map/siteScenery.ts`.
+grounds and into another.
+
+Where the map opens depends on where the visitor is. With no check-in, or one
+at an outdoor sign such as the Main Gate, it opens on the whole site. A
+check-in at an indoor sign opens it among the rooms round that sign, with the
+whole site one press away on _Reset the map view_.
+
+`docs/design-system.md` has the rules; the drawing is
+`src/map/siteScenery.ts`.
 
 ## Opening it
 
