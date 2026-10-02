@@ -282,6 +282,50 @@ test('the current map instruction and its controls stay reachable on a small pho
   }
 });
 
+test('a control in the trip sheet stays put when it takes focus, so a tap on it lands', async ({
+  browser,
+}) => {
+  // A finger, not a mouse: focus arrives between touch-down and touch-up, and
+  // on a 360px phone that used to unpin the action row, move the sheet's
+  // content 25px, and release the tap over something else.
+  const context = await browser.newContext({
+    viewport: { width: 360, height: 740 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  const page = await context.newPage();
+  // A short route, on purpose. The sheet is anchored to the bottom of the
+  // screen, so it is only while its content is shorter than its limit that a
+  // change in the action row's height moves everything above it.
+  await page.goto('/#/visitor');
+  await page
+    .getByRole('button', { name: /Emergency Reception/ })
+    .first()
+    .click();
+  await page
+    .getByRole('button', { name: /Start from Civic Plaza Entrance/ })
+    .first()
+    .click();
+
+  const directions = page.getByRole('region', { name: 'Directions to Emergency Reception' });
+  await expect(directions).toBeVisible();
+  for (const control of [
+    directions.getByRole('button', { name: /Change start location/ }),
+    directions.getByRole('button', { name: /step-free/i }),
+  ]) {
+    await control.scrollIntoViewIfNeeded();
+    const before = await control.boundingBox();
+    await control.focus();
+    const after = await control.boundingBox();
+    expect(Math.abs(after!.y - before!.y), 'the control moved when it took focus').toBeLessThan(1);
+    await control.blur();
+  }
+
+  await directions.getByRole('button', { name: /Change start location/ }).tap();
+  await expect(page.getByRole('dialog', { name: 'Set Your Location' })).toBeVisible();
+  await context.close();
+});
+
 test('a foreign-venue check-in is consumed with a visible refusal', async ({ page }) => {
   await precompleteOnboarding(page);
   const payload = encodeURIComponent('voicegis://harbor-exchange/g/ferry-entry');

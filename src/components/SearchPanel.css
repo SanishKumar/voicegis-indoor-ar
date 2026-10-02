@@ -27,6 +27,8 @@
   grid-column: 1;
   grid-row: 1;
   font-size: 0.75rem;
+  /* One line. The venue is already named in the header above; a second line
+     here pushed the dialog's last action below the fold on a phone. */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

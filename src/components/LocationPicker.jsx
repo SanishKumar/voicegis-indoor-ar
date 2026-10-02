@@ -160,12 +160,17 @@ export default function LocationPicker({ isOpen, onClose }) {
             </div>
           )}
           {filteredPOIs.map((node) => {
+            // The place's own description opens with its name again, so the
+            // second line said "Garden Café · Ground · Diagn…" under "Garden
+            // Café" and was cut off before it reached anything new. Which floor
+            // it is on is the part the name does not already say.
+            const floorName = venue.getFloorById(node.floor)?.name ?? node.poi.description;
             return (
               <button key={node.id} className="lp-result-item" onClick={() => handleSelect(node)}>
                 <div className="lp-result-icon">{node.poi.icon}</div>
                 <div className="lp-result-info">
                   <div className="lp-result-name">{node.poi.name}</div>
-                  <div className="lp-result-desc">{node.poi.description}</div>
+                  <div className="lp-result-desc">{floorName}</div>
                 </div>
                 <ChevronRight size={16} className="lp-result-arrow" />
               </button>

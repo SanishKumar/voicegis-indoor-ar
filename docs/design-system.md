@@ -160,8 +160,7 @@ from the edge of a phone screen and 12-16px in on a desk.
   dark list (`color-scheme: dark`).
 - **Pane, dialog, sheet** - the strong pane, 16px corners.
 - **Tag** - small, 6px corners, outlined.
-- **Map label** - the chip fill with white text; the destination's label is
-  solid white with navy text.
+- **Map label** - a light tag laid on the model; see "Labels on the model" below.
 
 Focus is a 2px solid ring: white on glass, navy on white. In the visitor app
 every touch target is at least 44px, and the browser suites check it.
@@ -185,15 +184,71 @@ clear of them. A pane within 32px of an edge counts as belonging to that edge.
 ## The models
 
 The visitor's 2D/3D model (`src/map/venueScene.ts`) is drawn on a transparent
-canvas. Floor plates are translucent - walkable space the most solid, a room
-thinner glass, restricted space the thinnest - so the sky shows through them.
-Walls are white. The light is the sky's blue from every side plus a warm sun;
-together they make white, and where a wall blocks the sun only the blue is
-left, so shadows fall blue. The route is the only saturated thing on a model,
-and what has been walked turns grey-blue.
+canvas, as frosted glass in daylight, and nothing on it has a hard corner.
 
-The inspector's model and the Studio's plan use the same idea in opaque whites
-and pale blues (`src/engine/cartographicTheme.ts`), on clear ground.
+- **The plate.** The floor is a little larger than the building, with rounded
+  corners and an edge turned over in three steps.
+- **Rooms are trays.** Each room is a tile of its own, pulled in 17cm from the
+  boundary it shares with its neighbours and rounded at the corners, with a
+  thin low rim that follows the curve and opens where there is a door. Between
+  two trays the plate shows through as a seam of sky. There are no walls on the
+  shared boundaries: a wall there has to be square, and it hid the rounding.
+- **Corridors have no rim.** They are what you walk along.
+- **Translucency.** Walkable space is the most solid, a room is thinner glass,
+  restricted space the thinnest.
+- **Light.** The sky's blue from every side plus a warm sun. Together they make
+  white; where a rim blocks the sun only the blue is left, so shadows fall
+  blue, and at a little over half strength so they tint and do not bar.
+- **The route.** The only saturated thing on a model. It gives off its own
+  blue and takes no light, so it never bleaches in the sun, and it turns its
+  corners on a ball. What has been walked turns grey-blue.
+
+The rounding is `src/map/softGeometry.ts`: inset a polygon, round its corners,
+and the footprint of a rim with round ends. It is only how the building is
+drawn. Routing, clearance and position all work from the authored geometry.
+
+The inspector's model and the Studio's plan are tools for checking a compiled
+venue, so they keep its exact geometry, in the same whites and pale blues
+(`src/engine/cartographicTheme.ts`) on clear ground.
+
+### Labels on the model
+
+Three kinds, and they look different because they are different:
+
+| Kind            | Looks like                | Means                                  |
+| --------------- | ------------------------- | -------------------------------------- |
+| A place         | White tag, blue dot, 13px | Somewhere you can go. It can be tapped |
+| An area         | Paler, smaller tag, 12px  | The name of a room or corridor         |
+| The destination | Dark tag, white dot, 14px | Where the route ends. Always placed    |
+
+They are light because a dark tag on every room turned the model into a wall
+of labels with a building behind it. The collision pass decides which are
+shown; a label is either readable in full or not drawn.
+
+### Tapping a place
+
+A place answers a tap on its marker, on its label, anywhere within 26px of its
+marker, or anywhere in the room it is in. The marker alone is a pin a few
+pixels across; `venueScene.geometry.test.ts` requires every place to answer
+over at least 44px each way. With a mouse the pointer changes over anything
+that can be pressed.
+
+### Where the map's controls go
+
+One block at the end of `src/components/visitorJourney.css` places all of
+them, and the rule is that no two groups share a corner.
+
+|                 | View switch                     | Floors           | Zoom                         | Location note    |
+| --------------- | ------------------------------- | ---------------- | ---------------------------- | ---------------- |
+| Wide, browsing  | top right                       | under the switch | bottom right                 | top left         |
+| Wide, journey   | top left, beside the directions | top right        | bottom right                 | -                |
+| Phone, browsing | top left                        | top right        | a row above the search field | under the switch |
+| Phone, journey  | top left, under the banner      | top right        | a row above the sheet        | -                |
+
+The view switch (2D / 3D) is a segmented pill. Opening the camera and changing
+the graphics are actions, and are separate buttons beside it. The floor stack
+is the one group whose size is not known, so it is the one that scrolls when
+the map is short. Labels are kept out from under all of them.
 
 ## Accessibility
 

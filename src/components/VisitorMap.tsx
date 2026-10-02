@@ -96,7 +96,7 @@ function useMapInsets(mapRef: RefObject<HTMLDivElement | null>, enabled: boolean
       // The map's own button groups, so labels are not drawn underneath them.
       const groups: Rect[] = [];
       for (const group of map.querySelectorAll(
-        '.compiled-map-presentation, .compiled-map-floors, .compiled-map-zoom',
+        '.compiled-map-presentation, .compiled-map-floors, .compiled-map-zoom, .compiled-map-location',
       )) {
         const rect = group.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) continue;
@@ -124,7 +124,7 @@ function useMapInsets(mapRef: RefObject<HTMLDivElement | null>, enabled: boolean
     resize.observe(map);
     const watchCovers = () => {
       for (const element of stage.querySelectorAll(
-        '[data-map-inset], .compiled-map-presentation, .compiled-map-floors, .compiled-map-zoom',
+        '[data-map-inset], .compiled-map-presentation, .compiled-map-floors, .compiled-map-zoom, .compiled-map-location',
       ))
         resize.observe(element);
       schedule();
@@ -556,39 +556,50 @@ export default function VisitorMap({
           }
         }}
       >
-        <div className="compiled-map-modes">
-          <button
-            type="button"
-            aria-label="2D plan"
-            aria-pressed={presentation.mode === '2d'}
-            disabled={renderStatus !== 'ready'}
-            onClick={() => changeMode('2d')}
-          >
-            2D
-          </button>
-          <button
-            type="button"
-            aria-label="3D model"
-            aria-pressed={presentation.mode === '3d'}
-            disabled={renderStatus !== 'ready'}
-            onClick={() => changeMode('3d')}
-          >
-            3D
-          </button>
+        {/*
+         * Two different things, so two different shapes. Which view you are
+         * looking at is a choice between two, and is one segmented pill. Opening
+         * the camera and changing the graphics are actions, and are buttons
+         * beside it. They used to share the pill, where the selected view's
+         * white circle sat against the next icon and read as covering it.
+         */}
+        <div className="compiled-map-bar">
+          <div className="compiled-map-modes">
+            <button
+              type="button"
+              aria-label="2D plan"
+              aria-pressed={presentation.mode === '2d'}
+              disabled={renderStatus !== 'ready'}
+              onClick={() => changeMode('2d')}
+            >
+              2D
+            </button>
+            <button
+              type="button"
+              aria-label="3D model"
+              aria-pressed={presentation.mode === '3d'}
+              disabled={renderStatus !== 'ready'}
+              onClick={() => changeMode('3d')}
+            >
+              3D
+            </button>
+          </div>
           {journey && route && (
             <button
               type="button"
-              className="compiled-map-camera"
+              className="compiled-map-tool compiled-map-camera"
               aria-label="Camera view"
               title="Check which way to go with the camera"
               onClick={() => actions.setView(VIEW_TYPE.CAMERA_PREVIEW)}
             >
-              <Camera size={16} strokeWidth={2} aria-hidden="true" />
+              <Camera size={18} strokeWidth={2} aria-hidden="true" />
+              <span>Camera</span>
             </button>
           )}
           <button
             ref={graphicsButtonRef}
             type="button"
+            className="compiled-map-tool"
             aria-label="Graphics detail"
             title="Map graphics detail"
             aria-expanded={graphicsOpen}
@@ -596,7 +607,7 @@ export default function VisitorMap({
             disabled={renderStatus !== 'ready'}
             onClick={() => setGraphicsOpen((open) => !open)}
           >
-            <SlidersHorizontal size={16} strokeWidth={2} aria-hidden="true" />
+            <SlidersHorizontal size={18} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
         {graphicsOpen && graphics && (

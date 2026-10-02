@@ -5506,10 +5506,7 @@ body {
 .checkin-toast-detail {
   color: var(--color-text-muted);
   font-size: 12px;
-  font-family: ui-monospace, monospace;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .checkin-toast-close {
@@ -6083,7 +6080,8 @@ body {
 
 .visitor-location-copy strong {
   overflow: hidden;
-  max-width: 150px;
+  min-width: 0;
+  max-width: 260px;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6659,21 +6657,40 @@ body {
   pointer-events: none;
 }
 
-/* Placed by the collision pass, so a pill is either readable in full or not
+/* Labels on the model.
+   --------------------------------------------------------------------------
+   Three kinds, and they look different because they are different:
+
+     a place      somewhere you can go and can tap: a white tag with a blue dot
+     an area      the name of a room or corridor: a quieter, smaller tag
+     the destination  the one being walked to: the dark tag, and always placed
+
+   They are light, not dark. A dark tag on every room turned the model into a
+   wall of labels with a building somewhere behind it; a white one sits on the
+   white model like a paper flag and still shows against the sky when the
+   placer has to move it off the building.
+
+   Placed by the collision pass, so a label is either readable in full or not
    drawn. Half a room name is worse than none. */
 .map-pill {
   position: absolute;
   top: 0;
   left: 0;
-  padding: 3px 9px;
-  border: 1px solid var(--glass-line);
-  border-radius: var(--radius-inputs);
-  background: var(--glass-fill-chip);
-  color: var(--color-whiteout);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+  /* A soft lift off the model. Not elevation in the interface's sense: the
+     label is an object in the scene, and this is the shadow it casts on it. */
+  box-shadow: 0 1px 5px rgba(15, 33, 71, 0.14);
+  color: var(--color-ink-soft);
   font-family: var(--font-control);
-  font-size: var(--text-caption);
+  font-size: 0.75rem;
   font-weight: var(--font-weight-medium);
-  line-height: 1.4;
+  line-height: 1.5;
   white-space: nowrap;
   opacity: 0;
   transition: opacity 120ms ease;
@@ -6681,15 +6698,43 @@ body {
 }
 
 .map-pill-poi {
-  border-color: var(--color-whiteout);
-  color: var(--color-whiteout);
+  padding: 3px 10px 3px 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 8px rgba(15, 33, 71, 0.18);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
 }
-/* The destination is the one label being hunted for: solid white, always placed. */
+
+/* The dot says this one is a place, and can be pressed. */
+.map-pill-poi::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-signal-blue);
+}
+
 .map-pill-destination,
 .map-pill-poi.map-pill-destination {
-  border-color: var(--color-ink-hairline);
-  background: var(--surface-whiteout);
-  color: var(--color-ink);
+  padding: 4px 12px 4px 10px;
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  box-shadow: 0 3px 10px rgba(15, 33, 71, 0.3);
+  color: var(--color-whiteout);
+  font-size: var(--text-control);
+}
+
+.map-pill-destination::before,
+.map-pill-poi.map-pill-destination::before {
+  background: var(--color-whiteout);
+}
+
+@media (prefers-contrast: more), (forced-colors: active) {
+  .map-pill {
+    background: #ffffff;
+    color: var(--color-ink);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -6699,14 +6744,13 @@ body {
    check-in toast is a full-width fixed banner under the header on a phone, and
    a top-right stack sits directly under it - the toast then swallows every
    press aimed at a floor. Centring also puts the stack in the thumb's reach. */
+/* Where this stack sits is set with the rest of the map's controls, in
+   visitorJourney.css; here it is only a column of buttons. */
 .compiled-map-floors {
   position: absolute;
-  top: 50%;
-  right: var(--ed-16);
   display: flex;
   flex-direction: column;
   gap: 6px;
-  transform: translateY(-50%);
 }
 
 .compiled-map-floor {
@@ -6890,6 +6934,16 @@ body {
   color: var(--ed-ink-soft);
 }
 
+/* The second line of a row wraps. Cut off with an ellipsis it stopped short of
+   the one thing it was there to say - which floor. */
+.visitor-shell .search-result-desc,
+.visitor-shell .lp-result-desc {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+
 .visitor-shell .search-section-label {
   font-size: var(--text-caption);
   font-weight: var(--font-weight-medium);
@@ -6938,6 +6992,15 @@ body {
 .visitor-shell .search-trigger {
   border: 0;
   background: none;
+}
+
+@media (max-width: 900px) {
+  .visitor-shell .search-trigger {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+  }
 }
 
 .visitor-shell .search-trigger-pill {
@@ -7281,8 +7344,6 @@ body {
    keyboard nor a switch, so the same three moves are real buttons. */
 .compiled-map-zoom {
   position: absolute;
-  right: var(--ed-16);
-  bottom: var(--ed-16);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -7411,20 +7472,6 @@ body {
   }
 }
 
-/* The bottom sheet sits over the map's own controls. They move above whatever
-   the sheet currently is, rather than a guess at what it might be. */
-@media (max-width: 900px) {
-  .compiled-map-zoom {
-    bottom: calc(var(--visitor-sheet-height, 0px) + 12px);
-  }
-
-  .compiled-map-floors {
-    top: auto;
-    bottom: calc(var(--visitor-sheet-height, 0px) + 168px);
-    transform: none;
-  }
-}
-
 /* --------------------------------------------------------------------------
    Check-in confirmation
    --------------------------------------------------------------------------
@@ -7444,6 +7491,21 @@ body {
   width: auto;
   margin: 8px 8px 0;
   animation: none;
+}
+
+/* The words take the width and the dismiss button stays at the end. */
+.visitor-shell .checkin-toast-body {
+  flex: 1;
+}
+
+/* On a desk a pane the full width of the window for one sentence is a bar;
+   it is as wide as it needs to be, at the left where the reading starts. */
+@media (min-width: 901px) {
+  .visitor-shell .checkin-toast {
+    align-self: flex-start;
+    min-width: 420px;
+    max-width: min(640px, calc(100% - 16px));
+  }
 }
 
 /* ==========================================================================

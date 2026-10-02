@@ -248,6 +248,7 @@
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-heading);
   font-variant-numeric: tabular-nums;
+  text-wrap: balance;
 }
 
 .jr-trip-to {
@@ -278,7 +279,6 @@
 
 .jr-destination-context[open] {
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--color-hairline);
 }
 
 .jr-destination-context summary:focus-visible {
@@ -483,17 +483,38 @@
     --journey-map-band: 172px;
   }
 
+  /*
+   * The row's box is the same whether it is pinned or not: it runs to the
+   * sheet's edges and takes over the sheet's bottom padding as its own.
+   *
+   * It has to be. Pinning is switched off while focus is in an earlier control,
+   * and focus arrives between a finger going down and coming up. When pinning
+   * also changed the row's padding, the sheet's content moved 25px under the
+   * finger, the press was released over something else, and "Change" and
+   * "Step-free" did nothing at all on a 360px phone.
+   */
+  .jr[data-journey='guiding']:not(.has-steps) .jr-actions {
+    margin: 0 -16px calc(-14px - env(safe-area-inset-bottom, 0px));
+    padding: 10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  /* The row above it ends in a rule of its own; two together read as a mistake. */
+  .jr[data-journey='guiding']:not(.has-steps) .jr-meta {
+    border-bottom: 0;
+  }
+
   .jr[data-journey='guiding']:not(.has-steps):not(:has(.map-recovery-slot:not(:empty))):not(
       :has(.jr-sheet > :not(.jr-actions) :focus)
     )
     .jr-actions {
     position: sticky;
-    bottom: 0;
+    bottom: calc(-14px - env(safe-area-inset-bottom, 0px));
     z-index: 1;
-    margin: 0 -16px calc(-14px - env(safe-area-inset-bottom, 0px));
-    padding: 8px 16px calc(14px + env(safe-area-inset-bottom, 0px));
-    border-top: 1px solid var(--color-hairline);
-    background: rgb(40, 60, 108);
+    /* Solid, in the colour the sheet has down here over the cloud. A blur
+       would not do it: the sheet is itself a blurred pane, and a blur inside
+       one does not reach the sheet's own text scrolling beneath the row. */
+    background: rgb(56, 76, 124);
     box-shadow: none;
   }
 }
@@ -606,32 +627,8 @@
   display: none;
 }
 
-/* ------------------------------------------------------ map in a journey */
-/* No transitions on these: they are measured the moment they move, so labels can
-   be kept out from under them. A sliding button is measured where it started. */
-.visitor-shell.is-journey .compiled-map-floors {
-  top: calc(var(--map-inset-top, 0px) + 12px);
-  right: 12px;
-  bottom: auto;
-  left: auto;
-  transform: none;
-}
-
-.visitor-shell.is-journey .compiled-map-presentation {
-  top: calc(var(--map-inset-top, 0px) + 12px);
-  right: auto;
-  bottom: auto;
-  left: calc(var(--map-inset-left, 0px) + 12px);
-  align-items: flex-start;
-}
-
-.visitor-shell.is-journey .compiled-map-zoom {
-  top: auto;
-  right: 12px;
-  bottom: calc(var(--map-inset-bottom, 0px) + 12px);
-  left: auto;
-  transform: none;
-}
+/* Where the map's own controls sit during a journey is set with the rest of
+   their layout, in visitorJourney.css. */
 
 /* ------------------------------------------------------------ wide screens */
 @media (min-width: 900px) {

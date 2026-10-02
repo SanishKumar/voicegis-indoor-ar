@@ -168,9 +168,16 @@
   align-items: flex-end;
   gap: 8px;
 }
+/* One row: the view switch, then the actions beside it. */
+.compiled-map-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 /* The view switch is a segmented toggle: the one pill among the map controls. */
 .compiled-map-modes {
   display: flex;
+  gap: 2px;
   padding: 3px;
   border: 1px solid var(--glass-line);
   border-radius: var(--radius-pills);
@@ -179,7 +186,13 @@
   -webkit-backdrop-filter: var(--glass-blur-light);
   backdrop-filter: var(--glass-blur-light);
 }
+/* Every control here centres what it holds. An icon is a block, and a block in
+   an unstyled button sits at its left edge rather than in the middle. */
 .compiled-map-presentation button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-width: 44px;
   min-height: 44px;
   border: 0;
@@ -191,18 +204,42 @@
   font-weight: var(--font-weight-medium);
   cursor: pointer;
 }
+.compiled-map-modes button {
+  padding: 0 12px;
+}
 .compiled-map-presentation button[aria-pressed='true'] {
   background: var(--surface-whiteout);
   color: var(--color-ink);
 }
+/* An action on the map: a small pane of its own, like the zoom buttons. */
+.compiled-map-presentation .compiled-map-tool,
 .compiled-map-presentation .compiled-map-overview {
-  padding: 0 14px;
+  padding: 0 12px;
   border: 1px solid var(--glass-line);
   border-radius: var(--radius-buttons);
   background: var(--glass-fill-strong);
   box-shadow: var(--glass-sheen);
   -webkit-backdrop-filter: var(--glass-blur-light);
   backdrop-filter: var(--glass-blur-light);
+}
+.compiled-map-presentation .compiled-map-tool:hover:not(:disabled),
+.compiled-map-presentation .compiled-map-overview:hover:not(:disabled) {
+  border-color: var(--color-whiteout);
+}
+.compiled-map-presentation .compiled-map-tool[aria-expanded='true'] {
+  border-color: var(--surface-whiteout);
+  background: var(--surface-whiteout);
+  color: var(--color-ink);
+}
+.compiled-map-presentation .compiled-map-overview[aria-pressed='true'] {
+  border-color: var(--surface-whiteout);
+}
+/* The camera is named where there is room; the icon alone carries it on the
+   narrowest phones, where the accessible name still says what it is. */
+@media (max-width: 359px) {
+  .compiled-map-camera span {
+    display: none;
+  }
 }
 .compiled-map-graphics {
   width: 196px;
@@ -287,11 +324,6 @@
   .compiled-map-graphics p {
     grid-column: 1 / -1;
   }
-  .compiled-map:not([data-route-floors='0']) .compiled-map-presentation {
-    left: 12px;
-    right: auto;
-    align-items: flex-start;
-  }
   .compiled-map-presentation .compiled-map-overview {
     width: 96px;
     padding: 0 5px;
@@ -300,35 +332,6 @@
   .compiled-map-canvas,
   .compiled-map-labels {
     height: max(1px, calc(100% - var(--visitor-sheet-height, 0px)));
-  }
-  .compiled-map-presentation {
-    top: 10px;
-    right: 12px;
-  }
-  .compiled-map-location {
-    max-width: calc(100% - 168px);
-  }
-  .visitor-shell .compiled-map-floors {
-    flex-direction: row;
-    top: auto;
-    right: 12px;
-    bottom: calc(var(--visitor-sheet-height, 0px) + 64px);
-    transform: none;
-    max-width: calc(100% - 24px);
-    overflow-x: auto;
-  }
-  .visitor-shell .compiled-map-zoom {
-    flex-direction: row;
-    right: 12px;
-    bottom: calc(var(--visitor-sheet-height, 0px) + 12px);
-  }
-  .visitor-shell .compiled-map[data-route-floors='0'] .compiled-map-zoom {
-    flex-direction: column;
-    bottom: 12px;
-  }
-  .visitor-shell .compiled-map[data-route-floors='0'] .compiled-map-floors {
-    flex-direction: column;
-    bottom: 220px;
   }
   .compiled-map:not([data-route-floors='0']) .compiled-map-location {
     display: none;
@@ -352,10 +355,6 @@
   }
   .journey-panel .nav-current-instruction strong {
     font-size: 16px;
-  }
-  .compiled-map-location {
-    top: 10px;
-    left: 10px;
   }
 }
 
@@ -382,11 +381,172 @@
   .visitor-shell .visitor-location-control {
     flex: 1;
     min-width: 0;
-    padding: 8px 10px;
+    /* Two lines of the name inside the same 44px the other controls have. */
+    height: 44px;
+    padding: 0 10px;
+  }
+  .visitor-shell .visitor-location-copy {
+    flex: 1;
+  }
+  .visitor-shell .visitor-location-copy strong {
+    display: -webkit-box;
+    max-width: none;
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
   .visitor-shell .visitor-heading-check,
   .visitor-shell .visitor-access-profile,
   .visitor-shell .visitor-utility-actions {
     flex-shrink: 0;
+  }
+}
+
+/* ==========================================================================
+   Where the map's controls go
+   --------------------------------------------------------------------------
+   One place for all of it. These used to be positioned from four stylesheets,
+   each correcting the last, and on a small phone the view switch, the floor
+   stack, the zoom buttons and the location note ended up on top of each other.
+
+   The rule: no two groups share a corner.
+
+     wide, browsing   view switch top right, floors under it, zoom bottom right,
+                      location note top left
+     wide, journey    view switch top left (beside the directions pane),
+                      floors top right, zoom bottom right
+     phone, browsing  view switch top left, location note under it,
+                      floors top right, zoom in a row above the search field
+     phone, journey   view switch top left under the banner, floors top right,
+                      zoom in a row above the trip sheet
+
+   The floor stack is the only group whose size is not known - a building has
+   as many floors as it has - so it is the one that scrolls when the map is
+   short, rather than the one that runs into something.
+
+   No transitions on any of these: they are measured the moment they move, so
+   labels can be kept out from under them, and a sliding button is measured
+   where it started.
+   ========================================================================== */
+.visitor-shell .compiled-map {
+  --map-edge: 16px;
+  /* The tallest the zoom column gets: four 44px buttons and three 6px gaps. */
+  --map-zoom-stack: 194px;
+  --map-top: calc(var(--map-inset-top, 0px) + var(--map-edge));
+  --map-bottom: calc(var(--map-inset-bottom, 0px) + var(--map-edge));
+}
+
+.visitor-shell .compiled-map-presentation {
+  top: var(--map-top);
+  right: var(--map-edge);
+  bottom: auto;
+  left: auto;
+  align-items: flex-end;
+}
+
+.visitor-shell .compiled-map-location {
+  top: var(--map-top);
+  left: var(--map-edge);
+}
+
+/* The graphics choices open over whatever is below them, the trip sheet
+   included: on a short phone there is not room for them above it, and a menu
+   half hidden under a sheet cannot be read or pressed. */
+.visitor-shell .compiled-map-presentation:has(.compiled-map-graphics) {
+  z-index: 45;
+}
+
+.visitor-shell .compiled-map-zoom {
+  top: auto;
+  right: var(--map-edge);
+  bottom: var(--map-bottom);
+  left: auto;
+  flex-direction: column;
+  transform: none;
+}
+
+.visitor-shell .compiled-map-floors {
+  /* Under the view switch: its 44px, and the gap. */
+  top: calc(var(--map-top) + 56px);
+  right: var(--map-edge);
+  bottom: auto;
+  left: auto;
+  flex-direction: column;
+  transform: none;
+  max-height: calc(100% - var(--map-top) - 56px - var(--map-bottom) - var(--map-zoom-stack) - 12px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  /* Room for a focus ring, which the scrolling box would otherwise clip. */
+  margin: -5px;
+  padding: 5px;
+}
+
+.visitor-shell .compiled-map-floors::-webkit-scrollbar {
+  display: none;
+}
+
+.visitor-shell .compiled-map-floor {
+  flex: none;
+}
+
+/* A journey on a wide screen: the directions pane is on the left, so the view
+   switch moves beside it and the floors take the top-right corner. */
+.visitor-shell.is-journey .compiled-map-presentation {
+  right: auto;
+  left: calc(var(--map-inset-left, 0px) + var(--map-edge));
+  align-items: flex-start;
+}
+
+.visitor-shell.is-journey .compiled-map-floors {
+  top: var(--map-top);
+  max-height: calc(100% - var(--map-top) - var(--map-bottom) - var(--map-zoom-stack) - 12px);
+}
+
+@media (max-width: 900px) {
+  .visitor-shell .compiled-map {
+    --map-edge: 12px;
+    /* The way into search, across the bottom of the map: 56px, its margin and a gap. */
+    --map-search: 78px;
+  }
+
+  .visitor-shell .compiled-map-presentation,
+  .visitor-shell.is-journey .compiled-map-presentation {
+    right: auto;
+    left: var(--map-edge);
+    align-items: flex-start;
+  }
+
+  /* Under the view switch, and short: on a phone it is a note, not a card. */
+  .visitor-shell .compiled-map-location {
+    top: calc(var(--map-top) + 54px);
+    max-width: calc(100% - var(--map-edge) * 2 - 56px);
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .visitor-shell .compiled-map-floors,
+  .visitor-shell.is-journey .compiled-map-floors {
+    top: var(--map-top);
+    /* Down to the zoom row, which is one button tall here. */
+    max-height: calc(100% - var(--map-top) - var(--map-bottom) - 56px);
+  }
+
+  .visitor-shell .compiled-map-zoom {
+    flex-direction: row;
+  }
+
+  /* Browsing: the search field runs across the bottom, so the zoom row and the
+     floor stack both stop above it. */
+  .visitor-shell .compiled-map[data-route-floors='0'] .compiled-map-zoom {
+    bottom: calc(var(--map-bottom) + var(--map-search) - var(--map-edge));
+  }
+
+  .visitor-shell .compiled-map[data-route-floors='0'] .compiled-map-floors {
+    max-height: calc(100% - var(--map-top) - var(--map-search) - 56px);
   }
 }
