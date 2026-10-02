@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import catalogJson from '../../public/venues/catalog.json';
 import asterionPackage from '../../public/venues/asterion-medical-center.package.json';
 import harborPackage from '../../public/venues/harbor-exchange.package.json';
+import campusPackage from '../../public/venues/meridian-park-campus.package.json';
 import {
   VenueCatalogValidationError,
   createRuntimeCatalogEntries,
@@ -13,7 +14,7 @@ describe('Venue version catalog contract', () => {
     const catalog = parseVenueVersionCatalog(catalogJson);
     const runtimeEntries = createRuntimeCatalogEntries(catalog);
 
-    expect(runtimeEntries).toHaveLength(2);
+    expect(runtimeEntries).toHaveLength(3);
     expect(runtimeEntries[0].packageUrl).toBe('/venues/asterion-medical-center.package.json');
     expect(runtimeEntries[0].defaultRelease.contentHash).toBe(asterionPackage.manifest.contentHash);
   });
@@ -21,6 +22,7 @@ describe('Venue version catalog contract', () => {
   it.each([
     ['asterion-medical-center', asterionPackage],
     ['harbor-exchange', harborPackage],
+    ['meridian-park-campus', campusPackage],
   ])('keeps the %s catalog release synchronized with its package', (venueId, buildingPackage) => {
     const catalog = parseVenueVersionCatalog(catalogJson);
     const venue = catalog.venues.find((candidate) => candidate.id === venueId)!;

@@ -1,0 +1,4767 @@
+{
+  "schemaVersion": "0.1.0",
+  "building": {
+    "id": "meridian-park-campus",
+    "name": "Meridian Park Medical Campus",
+    "units": "meters",
+    "entrySpaceId": "gate",
+    "coordinateSystem": {
+      "type": "local-cartesian",
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "northOffsetDegrees": 0
+    }
+  },
+  "floors": [
+    {
+      "id": "g",
+      "name": "Ground · Campus",
+      "level": 0,
+      "elevation": 0,
+      "clearHeight": 4.2,
+      "outline": [
+        [
+          0,
+          0
+        ],
+        [
+          210,
+          0
+        ],
+        [
+          210,
+          150
+        ],
+        [
+          0,
+          150
+        ]
+      ]
+    },
+    {
+      "id": "l1",
+      "name": "Level 1 · Women & Children",
+      "level": 1,
+      "elevation": 4.8,
+      "clearHeight": 3.7,
+      "outline": [
+        [
+          40,
+          8
+        ],
+        [
+          150,
+          8
+        ],
+        [
+          150,
+          46
+        ],
+        [
+          40,
+          46
+        ]
+      ]
+    },
+    {
+      "id": "l2",
+      "name": "Level 2 · Wards & Research",
+      "level": 2,
+      "elevation": 9,
+      "clearHeight": 3.7,
+      "outline": [
+        [
+          40,
+          8
+        ],
+        [
+          150,
+          8
+        ],
+        [
+          150,
+          46
+        ],
+        [
+          40,
+          46
+        ]
+      ]
+    }
+  ],
+  "spaces": [
+    {
+      "id": "gate",
+      "floorId": "g",
+      "name": "Main Gate",
+      "type": "entrance",
+      "polygon": [
+        [
+          99,
+          134
+        ],
+        [
+          111,
+          134
+        ],
+        [
+          111,
+          142
+        ],
+        [
+          99,
+          142
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "promenade",
+      "floorId": "g",
+      "name": "Garden Promenade",
+      "type": "corridor",
+      "polygon": [
+        [
+          102,
+          96
+        ],
+        [
+          108,
+          96
+        ],
+        [
+          108,
+          134
+        ],
+        [
+          102,
+          134
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "court-north",
+      "floorId": "g",
+      "name": "Fountain Court",
+      "type": "corridor",
+      "polygon": [
+        [
+          93,
+          72
+        ],
+        [
+          117,
+          72
+        ],
+        [
+          117,
+          78
+        ],
+        [
+          93,
+          78
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "court-south",
+      "floorId": "g",
+      "name": "Fountain Court",
+      "type": "corridor",
+      "polygon": [
+        [
+          93,
+          90
+        ],
+        [
+          117,
+          90
+        ],
+        [
+          117,
+          96
+        ],
+        [
+          93,
+          96
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "court-west",
+      "floorId": "g",
+      "name": "Fountain Court",
+      "type": "corridor",
+      "polygon": [
+        [
+          93,
+          78
+        ],
+        [
+          99,
+          78
+        ],
+        [
+          99,
+          90
+        ],
+        [
+          93,
+          90
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "court-east",
+      "floorId": "g",
+      "name": "Fountain Court",
+      "type": "corridor",
+      "polygon": [
+        [
+          111,
+          78
+        ],
+        [
+          117,
+          78
+        ],
+        [
+          117,
+          90
+        ],
+        [
+          111,
+          90
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "forecourt",
+      "floorId": "g",
+      "name": "Hospital Forecourt",
+      "type": "corridor",
+      "polygon": [
+        [
+          102,
+          46
+        ],
+        [
+          108,
+          46
+        ],
+        [
+          108,
+          72
+        ],
+        [
+          102,
+          72
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "west-walk",
+      "floorId": "g",
+      "name": "West Garden Walk",
+      "type": "corridor",
+      "polygon": [
+        [
+          50,
+          81
+        ],
+        [
+          93,
+          81
+        ],
+        [
+          93,
+          87
+        ],
+        [
+          50,
+          87
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "east-walk",
+      "floorId": "g",
+      "name": "East Garden Walk",
+      "type": "corridor",
+      "polygon": [
+        [
+          117,
+          81
+        ],
+        [
+          160,
+          81
+        ],
+        [
+          160,
+          87
+        ],
+        [
+          117,
+          87
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "car-park",
+      "floorId": "g",
+      "name": "Visitor Car Park",
+      "type": "lobby",
+      "polygon": [
+        [
+          24,
+          112
+        ],
+        [
+          96,
+          112
+        ],
+        [
+          96,
+          134
+        ],
+        [
+          24,
+          134
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "car-park-walk",
+      "floorId": "g",
+      "name": "Car Park Walk",
+      "type": "corridor",
+      "polygon": [
+        [
+          96,
+          120
+        ],
+        [
+          102,
+          120
+        ],
+        [
+          102,
+          126
+        ],
+        [
+          96,
+          126
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "garden-path",
+      "floorId": "g",
+      "name": "Garden Path",
+      "type": "corridor",
+      "polygon": [
+        [
+          108,
+          110
+        ],
+        [
+          126,
+          110
+        ],
+        [
+          126,
+          116
+        ],
+        [
+          108,
+          116
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "healing-garden",
+      "floorId": "g",
+      "name": "Healing Garden",
+      "type": "lobby",
+      "polygon": [
+        [
+          126,
+          100
+        ],
+        [
+          156,
+          100
+        ],
+        [
+          156,
+          126
+        ],
+        [
+          126,
+          126
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-hall",
+      "floorId": "g",
+      "name": "Main Entrance Hall",
+      "type": "lobby",
+      "polygon": [
+        [
+          96,
+          32
+        ],
+        [
+          114,
+          32
+        ],
+        [
+          114,
+          46
+        ],
+        [
+          96,
+          46
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-concourse",
+      "floorId": "g",
+      "name": "Main Concourse",
+      "type": "corridor",
+      "polygon": [
+        [
+          44,
+          24
+        ],
+        [
+          146,
+          24
+        ],
+        [
+          146,
+          32
+        ],
+        [
+          44,
+          32
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-registration",
+      "floorId": "g",
+      "name": "Outpatient Registration",
+      "type": "room",
+      "polygon": [
+        [
+          44,
+          10
+        ],
+        [
+          60,
+          10
+        ],
+        [
+          60,
+          24
+        ],
+        [
+          44,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-pharmacy",
+      "floorId": "g",
+      "name": "Hospital Pharmacy",
+      "type": "room",
+      "polygon": [
+        [
+          60,
+          10
+        ],
+        [
+          74,
+          10
+        ],
+        [
+          74,
+          24
+        ],
+        [
+          60,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-imaging",
+      "floorId": "g",
+      "name": "Imaging & Radiology",
+      "type": "room",
+      "polygon": [
+        [
+          74,
+          10
+        ],
+        [
+          92,
+          10
+        ],
+        [
+          92,
+          24
+        ],
+        [
+          74,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-lifts",
+      "floorId": "g",
+      "name": "Main Lift Lobby",
+      "type": "vertical-circulation",
+      "polygon": [
+        [
+          92,
+          10
+        ],
+        [
+          100,
+          10
+        ],
+        [
+          100,
+          24
+        ],
+        [
+          92,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-stairs",
+      "floorId": "g",
+      "name": "Main Stair Hall",
+      "type": "vertical-circulation",
+      "polygon": [
+        [
+          100,
+          10
+        ],
+        [
+          106,
+          10
+        ],
+        [
+          106,
+          24
+        ],
+        [
+          100,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-laboratory",
+      "floorId": "g",
+      "name": "Laboratory",
+      "type": "room",
+      "polygon": [
+        [
+          106,
+          10
+        ],
+        [
+          122,
+          10
+        ],
+        [
+          122,
+          24
+        ],
+        [
+          106,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-cardiology",
+      "floorId": "g",
+      "name": "Cardiology Clinic",
+      "type": "room",
+      "polygon": [
+        [
+          122,
+          10
+        ],
+        [
+          146,
+          10
+        ],
+        [
+          146,
+          24
+        ],
+        [
+          122,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-information",
+      "floorId": "g",
+      "name": "Visitor Information",
+      "type": "service",
+      "polygon": [
+        [
+          44,
+          32
+        ],
+        [
+          62,
+          32
+        ],
+        [
+          62,
+          44
+        ],
+        [
+          44,
+          44
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-cafe",
+      "floorId": "g",
+      "name": "Courtyard Café",
+      "type": "room",
+      "polygon": [
+        [
+          62,
+          32
+        ],
+        [
+          80,
+          32
+        ],
+        [
+          80,
+          44
+        ],
+        [
+          62,
+          44
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-shop",
+      "floorId": "g",
+      "name": "Gift & Flower Shop",
+      "type": "room",
+      "polygon": [
+        [
+          80,
+          32
+        ],
+        [
+          96,
+          32
+        ],
+        [
+          96,
+          44
+        ],
+        [
+          80,
+          44
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-quiet-room",
+      "floorId": "g",
+      "name": "Quiet Room",
+      "type": "room",
+      "polygon": [
+        [
+          114,
+          32
+        ],
+        [
+          128,
+          32
+        ],
+        [
+          128,
+          44
+        ],
+        [
+          114,
+          44
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "g-blood-tests",
+      "floorId": "g",
+      "name": "Blood Tests",
+      "type": "room",
+      "polygon": [
+        [
+          128,
+          32
+        ],
+        [
+          146,
+          32
+        ],
+        [
+          146,
+          44
+        ],
+        [
+          128,
+          44
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-concourse",
+      "floorId": "l1",
+      "name": "Level 1 Concourse",
+      "type": "corridor",
+      "polygon": [
+        [
+          44,
+          24
+        ],
+        [
+          146,
+          24
+        ],
+        [
+          146,
+          32
+        ],
+        [
+          44,
+          32
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-maternity",
+      "floorId": "l1",
+      "name": "Maternity Unit",
+      "type": "room",
+      "polygon": [
+        [
+          44,
+          10
+        ],
+        [
+          66,
+          10
+        ],
+        [
+          66,
+          24
+        ],
+        [
+          44,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-childrens",
+      "floorId": "l1",
+      "name": "Children's Ward",
+      "type": "room",
+      "polygon": [
+        [
+          66,
+          10
+        ],
+        [
+          92,
+          10
+        ],
+        [
+          92,
+          24
+        ],
+        [
+          66,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-lifts",
+      "floorId": "l1",
+      "name": "Level 1 Lift Lobby",
+      "type": "vertical-circulation",
+      "polygon": [
+        [
+          92,
+          10
+        ],
+        [
+          100,
+          10
+        ],
+        [
+          100,
+          24
+        ],
+        [
+          92,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-stairs",
+      "floorId": "l1",
+      "name": "Level 1 Stair Hall",
+      "type": "vertical-circulation",
+      "polygon": [
+        [
+          100,
+          10
+        ],
+        [
+          106,
+          10
+        ],
+        [
+          106,
+          24
+        ],
+        [
+          100,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-day-surgery",
+      "floorId": "l1",
+      "name": "Day Surgery",
+      "type": "room",
+      "polygon": [
+        [
+          106,
+          10
+        ],
+        [
+          126,
+          10
+        ],
+        [
+          126,
+          24
+        ],
+        [
+          106,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-recovery",
+      "floorId": "l1",
+      "name": "Recovery Suite",
+      "type": "room",
+      "polygon": [
+        [
+          126,
+          10
+        ],
+        [
+          146,
+          10
+        ],
+        [
+          146,
+          24
+        ],
+        [
+          126,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-womens-health",
+      "floorId": "l1",
+      "name": "Women's Health Clinic",
+      "type": "room",
+      "polygon": [
+        [
+          44,
+          32
+        ],
+        [
+          70,
+          32
+        ],
+        [
+          70,
+          44
+        ],
+        [
+          44,
+          44
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-ultrasound",
+      "floorId": "l1",
+      "name": "Ultrasound",
+      "type": "room",
+      "polygon": [
+        [
+          70,
+          32
+        ],
+        [
+          96,
+          32
+        ],
+        [
+          96,
+          44
+        ],
+        [
+          70,
+          44
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-family-lounge",
+      "floorId": "l1",
+      "name": "Family Lounge",
+      "type": "lobby",
+      "polygon": [
+        [
+          96,
+          32
+        ],
+        [
+          114,
+          32
+        ],
+        [
+          114,
+          44
+        ],
+        [
+          96,
+          44
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l1-physiotherapy",
+      "floorId": "l1",
+      "name": "Outpatient Physiotherapy",
+      "type": "room",
+      "polygon": [
+        [
+          114,
+          32
+        ],
+        [
+          146,
+          32
+        ],
+        [
+          146,
+          44
+        ],
+        [
+          114,
+          44
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l2-concourse",
+      "floorId": "l2",
+      "name": "Level 2 Concourse",
+      "type": "corridor",
+      "polygon": [
+        [
+          44,
+          24
+        ],
+        [
+          146,
+          24
+        ],
+        [
+          146,
+          32
+        ],
+        [
+          44,
+          32
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l2-cardiac-ward",
+      "floorId": "l2",
+      "name": "Cardiac Ward",
+      "type": "room",
+      "polygon": [
+        [
+          44,
+          10
+        ],
+        [
+          70,
+          10
+        ],
+        [
+          70,
+          24
+        ],
+        [
+          44,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l2-oncology",
+      "floorId": "l2",
+      "name": "Oncology Day Unit",
+      "type": "room",
+      "polygon": [
+        [
+          70,
+          10
+        ],
+        [
+          92,
+          10
+        ],
+        [
+          92,
+          24
+        ],
+        [
+          70,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l2-lifts",
+      "floorId": "l2",
+      "name": "Level 2 Lift Lobby",
+      "type": "vertical-circulation",
+      "polygon": [
+        [
+          92,
+          10
+        ],
+        [
+          100,
+          10
+        ],
+        [
+          100,
+          24
+        ],
+        [
+          92,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l2-stairs",
+      "floorId": "l2",
+      "name": "Level 2 Stair Hall",
+      "type": "vertical-circulation",
+      "polygon": [
+        [
+          100,
+          10
+        ],
+        [
+          106,
+          10
+        ],
+        [
+          106,
+          24
+        ],
+        [
+          100,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l2-dialysis",
+      "floorId": "l2",
+      "name": "Dialysis Unit",
+      "type": "room",
+      "polygon": [
+        [
+          106,
+          10
+        ],
+        [
+          126,
+          10
+        ],
+        [
+          126,
+          24
+        ],
+        [
+          106,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l2-research",
+      "floorId": "l2",
+      "name": "Clinical Research Office",
+      "type": "room",
+      "polygon": [
+        [
+          126,
+          10
+        ],
+        [
+          146,
+          10
+        ],
+        [
+          146,
+          24
+        ],
+        [
+          126,
+          24
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l2-administration",
+      "floorId": "l2",
+      "name": "Administration",
+      "type": "service",
+      "polygon": [
+        [
+          44,
+          32
+        ],
+        [
+          70,
+          32
+        ],
+        [
+          70,
+          44
+        ],
+        [
+          44,
+          44
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l2-education",
+      "floorId": "l2",
+      "name": "Education Centre",
+      "type": "room",
+      "polygon": [
+        [
+          70,
+          32
+        ],
+        [
+          96,
+          32
+        ],
+        [
+          96,
+          44
+        ],
+        [
+          70,
+          44
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "l2-staff-lounge",
+      "floorId": "l2",
+      "name": "Staff Lounge",
+      "type": "restricted",
+      "polygon": [
+        [
+          96,
+          32
+        ],
+        [
+          114,
+          32
+        ],
+        [
+          114,
+          44
+        ],
+        [
+          96,
+          44
+        ]
+      ],
+      "public": false,
+      "accessible": true
+    },
+    {
+      "id": "l2-sky-terrace",
+      "floorId": "l2",
+      "name": "Sky Terrace",
+      "type": "lobby",
+      "polygon": [
+        [
+          114,
+          32
+        ],
+        [
+          146,
+          32
+        ],
+        [
+          146,
+          44
+        ],
+        [
+          114,
+          44
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "e-entrance",
+      "floorId": "g",
+      "name": "Emergency Entrance",
+      "type": "lobby",
+      "polygon": [
+        [
+          40,
+          78
+        ],
+        [
+          50,
+          78
+        ],
+        [
+          50,
+          90
+        ],
+        [
+          40,
+          90
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "e-corridor",
+      "floorId": "g",
+      "name": "Emergency Corridor",
+      "type": "corridor",
+      "polygon": [
+        [
+          34,
+          66
+        ],
+        [
+          40,
+          66
+        ],
+        [
+          40,
+          102
+        ],
+        [
+          34,
+          102
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "e-triage",
+      "floorId": "g",
+      "name": "Triage",
+      "type": "room",
+      "polygon": [
+        [
+          12,
+          66
+        ],
+        [
+          34,
+          66
+        ],
+        [
+          34,
+          78
+        ],
+        [
+          12,
+          78
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "e-treatment",
+      "floorId": "g",
+      "name": "Emergency Treatment",
+      "type": "room",
+      "polygon": [
+        [
+          12,
+          78
+        ],
+        [
+          34,
+          78
+        ],
+        [
+          34,
+          90
+        ],
+        [
+          12,
+          90
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "e-minor-injuries",
+      "floorId": "g",
+      "name": "Minor Injuries",
+      "type": "room",
+      "polygon": [
+        [
+          12,
+          90
+        ],
+        [
+          34,
+          90
+        ],
+        [
+          34,
+          102
+        ],
+        [
+          12,
+          102
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "e-waiting",
+      "floorId": "g",
+      "name": "Emergency Waiting Area",
+      "type": "room",
+      "polygon": [
+        [
+          40,
+          66
+        ],
+        [
+          48,
+          66
+        ],
+        [
+          48,
+          78
+        ],
+        [
+          40,
+          78
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "e-pharmacy",
+      "floorId": "g",
+      "name": "Out-of-Hours Pharmacy",
+      "type": "room",
+      "polygon": [
+        [
+          40,
+          90
+        ],
+        [
+          48,
+          90
+        ],
+        [
+          48,
+          102
+        ],
+        [
+          40,
+          102
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "w-entrance",
+      "floorId": "g",
+      "name": "Pavilion Entrance",
+      "type": "lobby",
+      "polygon": [
+        [
+          160,
+          78
+        ],
+        [
+          170,
+          78
+        ],
+        [
+          170,
+          90
+        ],
+        [
+          160,
+          90
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "w-gallery",
+      "floorId": "g",
+      "name": "Pavilion Gallery",
+      "type": "corridor",
+      "polygon": [
+        [
+          170,
+          66
+        ],
+        [
+          176,
+          66
+        ],
+        [
+          176,
+          102
+        ],
+        [
+          170,
+          102
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "w-hydrotherapy",
+      "floorId": "g",
+      "name": "Hydrotherapy Pool",
+      "type": "room",
+      "polygon": [
+        [
+          176,
+          66
+        ],
+        [
+          198,
+          66
+        ],
+        [
+          198,
+          80
+        ],
+        [
+          176,
+          80
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "w-gym",
+      "floorId": "g",
+      "name": "Rehabilitation Gym",
+      "type": "room",
+      "polygon": [
+        [
+          176,
+          80
+        ],
+        [
+          198,
+          80
+        ],
+        [
+          198,
+          92
+        ],
+        [
+          176,
+          92
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "w-studio",
+      "floorId": "g",
+      "name": "Wellness Studio",
+      "type": "room",
+      "polygon": [
+        [
+          176,
+          92
+        ],
+        [
+          198,
+          92
+        ],
+        [
+          198,
+          102
+        ],
+        [
+          176,
+          102
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "w-reception",
+      "floorId": "g",
+      "name": "Pavilion Reception",
+      "type": "room",
+      "polygon": [
+        [
+          162,
+          66
+        ],
+        [
+          170,
+          66
+        ],
+        [
+          170,
+          78
+        ],
+        [
+          162,
+          78
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    },
+    {
+      "id": "w-therapy",
+      "floorId": "g",
+      "name": "Therapy Rooms",
+      "type": "room",
+      "polygon": [
+        [
+          162,
+          90
+        ],
+        [
+          170,
+          90
+        ],
+        [
+          170,
+          102
+        ],
+        [
+          162,
+          102
+        ]
+      ],
+      "public": true,
+      "accessible": true
+    }
+  ],
+  "portals": [
+    {
+      "id": "p-gate--promenade",
+      "floorId": "g",
+      "kind": "gate",
+      "connects": [
+        "gate",
+        "promenade"
+      ],
+      "position": [
+        105,
+        134
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-promenade--court-south",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "promenade",
+        "court-south"
+      ],
+      "position": [
+        105,
+        96
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-court-south--court-west",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "court-south",
+        "court-west"
+      ],
+      "position": [
+        96,
+        90
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-court-south--court-east",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "court-south",
+        "court-east"
+      ],
+      "position": [
+        114,
+        90
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-court-north--court-west",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "court-north",
+        "court-west"
+      ],
+      "position": [
+        96,
+        78
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-court-north--court-east",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "court-north",
+        "court-east"
+      ],
+      "position": [
+        114,
+        78
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-court-north--forecourt",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "court-north",
+        "forecourt"
+      ],
+      "position": [
+        105,
+        72
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-court-west--west-walk",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "court-west",
+        "west-walk"
+      ],
+      "position": [
+        93,
+        84
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-court-east--east-walk",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "court-east",
+        "east-walk"
+      ],
+      "position": [
+        117,
+        84
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-promenade--car-park-walk",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "promenade",
+        "car-park-walk"
+      ],
+      "position": [
+        102,
+        123
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-car-park-walk--car-park",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "car-park-walk",
+        "car-park"
+      ],
+      "position": [
+        96,
+        123
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-promenade--garden-path",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "promenade",
+        "garden-path"
+      ],
+      "position": [
+        108,
+        113
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-garden-path--healing-garden",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "garden-path",
+        "healing-garden"
+      ],
+      "position": [
+        126,
+        113
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-forecourt--g-hall",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "forecourt",
+        "g-hall"
+      ],
+      "position": [
+        105,
+        46
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-g-hall--g-concourse",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "g-hall",
+        "g-concourse"
+      ],
+      "position": [
+        105,
+        32
+      ],
+      "width": 6,
+      "accessible": true
+    },
+    {
+      "id": "p-g-registration--g-concourse",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "g-registration",
+        "g-concourse"
+      ],
+      "position": [
+        52,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-g-pharmacy--g-concourse",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "g-pharmacy",
+        "g-concourse"
+      ],
+      "position": [
+        67,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-g-imaging--g-concourse",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "g-imaging",
+        "g-concourse"
+      ],
+      "position": [
+        83,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-g-lifts--g-concourse",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "g-lifts",
+        "g-concourse"
+      ],
+      "position": [
+        96,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-g-stairs--g-concourse",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "g-stairs",
+        "g-concourse"
+      ],
+      "position": [
+        103,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-g-laboratory--g-concourse",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "g-laboratory",
+        "g-concourse"
+      ],
+      "position": [
+        114,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-g-cardiology--g-concourse",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "g-cardiology",
+        "g-concourse"
+      ],
+      "position": [
+        134,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-g-information--g-concourse",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "g-information",
+        "g-concourse"
+      ],
+      "position": [
+        53,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-g-cafe--g-concourse",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "g-cafe",
+        "g-concourse"
+      ],
+      "position": [
+        71,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-g-shop--g-concourse",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "g-shop",
+        "g-concourse"
+      ],
+      "position": [
+        88,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-g-quiet-room--g-concourse",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "g-quiet-room",
+        "g-concourse"
+      ],
+      "position": [
+        121,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-g-blood-tests--g-concourse",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "g-blood-tests",
+        "g-concourse"
+      ],
+      "position": [
+        137,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l1-maternity--l1-concourse",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": [
+        "l1-maternity",
+        "l1-concourse"
+      ],
+      "position": [
+        55,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l1-childrens--l1-concourse",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": [
+        "l1-childrens",
+        "l1-concourse"
+      ],
+      "position": [
+        79,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l1-lifts--l1-concourse",
+      "floorId": "l1",
+      "kind": "opening",
+      "connects": [
+        "l1-lifts",
+        "l1-concourse"
+      ],
+      "position": [
+        96,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l1-stairs--l1-concourse",
+      "floorId": "l1",
+      "kind": "opening",
+      "connects": [
+        "l1-stairs",
+        "l1-concourse"
+      ],
+      "position": [
+        103,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l1-day-surgery--l1-concourse",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": [
+        "l1-day-surgery",
+        "l1-concourse"
+      ],
+      "position": [
+        116,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l1-recovery--l1-concourse",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": [
+        "l1-recovery",
+        "l1-concourse"
+      ],
+      "position": [
+        136,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l1-womens-health--l1-concourse",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": [
+        "l1-womens-health",
+        "l1-concourse"
+      ],
+      "position": [
+        57,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l1-ultrasound--l1-concourse",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": [
+        "l1-ultrasound",
+        "l1-concourse"
+      ],
+      "position": [
+        83,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l1-family-lounge--l1-concourse",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": [
+        "l1-family-lounge",
+        "l1-concourse"
+      ],
+      "position": [
+        105,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l1-physiotherapy--l1-concourse",
+      "floorId": "l1",
+      "kind": "door",
+      "connects": [
+        "l1-physiotherapy",
+        "l1-concourse"
+      ],
+      "position": [
+        130,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l2-cardiac-ward--l2-concourse",
+      "floorId": "l2",
+      "kind": "door",
+      "connects": [
+        "l2-cardiac-ward",
+        "l2-concourse"
+      ],
+      "position": [
+        57,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l2-oncology--l2-concourse",
+      "floorId": "l2",
+      "kind": "door",
+      "connects": [
+        "l2-oncology",
+        "l2-concourse"
+      ],
+      "position": [
+        81,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l2-lifts--l2-concourse",
+      "floorId": "l2",
+      "kind": "opening",
+      "connects": [
+        "l2-lifts",
+        "l2-concourse"
+      ],
+      "position": [
+        96,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l2-stairs--l2-concourse",
+      "floorId": "l2",
+      "kind": "opening",
+      "connects": [
+        "l2-stairs",
+        "l2-concourse"
+      ],
+      "position": [
+        103,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l2-dialysis--l2-concourse",
+      "floorId": "l2",
+      "kind": "door",
+      "connects": [
+        "l2-dialysis",
+        "l2-concourse"
+      ],
+      "position": [
+        116,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l2-research--l2-concourse",
+      "floorId": "l2",
+      "kind": "door",
+      "connects": [
+        "l2-research",
+        "l2-concourse"
+      ],
+      "position": [
+        136,
+        24
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l2-administration--l2-concourse",
+      "floorId": "l2",
+      "kind": "door",
+      "connects": [
+        "l2-administration",
+        "l2-concourse"
+      ],
+      "position": [
+        57,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l2-education--l2-concourse",
+      "floorId": "l2",
+      "kind": "door",
+      "connects": [
+        "l2-education",
+        "l2-concourse"
+      ],
+      "position": [
+        83,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l2-staff-lounge--l2-concourse",
+      "floorId": "l2",
+      "kind": "door",
+      "connects": [
+        "l2-staff-lounge",
+        "l2-concourse"
+      ],
+      "position": [
+        105,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-l2-sky-terrace--l2-concourse",
+      "floorId": "l2",
+      "kind": "door",
+      "connects": [
+        "l2-sky-terrace",
+        "l2-concourse"
+      ],
+      "position": [
+        130,
+        32
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-west-walk--e-entrance",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "west-walk",
+        "e-entrance"
+      ],
+      "position": [
+        50,
+        84
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-e-entrance--e-corridor",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "e-entrance",
+        "e-corridor"
+      ],
+      "position": [
+        40,
+        84
+      ],
+      "width": 5,
+      "accessible": true
+    },
+    {
+      "id": "p-e-triage--e-corridor",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "e-triage",
+        "e-corridor"
+      ],
+      "position": [
+        34,
+        72
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-e-treatment--e-corridor",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "e-treatment",
+        "e-corridor"
+      ],
+      "position": [
+        34,
+        84
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-e-minor-injuries--e-corridor",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "e-minor-injuries",
+        "e-corridor"
+      ],
+      "position": [
+        34,
+        96
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-e-waiting--e-corridor",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "e-waiting",
+        "e-corridor"
+      ],
+      "position": [
+        40,
+        72
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-e-pharmacy--e-corridor",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "e-pharmacy",
+        "e-corridor"
+      ],
+      "position": [
+        40,
+        96
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-east-walk--w-entrance",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "east-walk",
+        "w-entrance"
+      ],
+      "position": [
+        160,
+        84
+      ],
+      "width": 4,
+      "accessible": true
+    },
+    {
+      "id": "p-w-entrance--w-gallery",
+      "floorId": "g",
+      "kind": "opening",
+      "connects": [
+        "w-entrance",
+        "w-gallery"
+      ],
+      "position": [
+        170,
+        84
+      ],
+      "width": 5,
+      "accessible": true
+    },
+    {
+      "id": "p-w-hydrotherapy--w-gallery",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "w-hydrotherapy",
+        "w-gallery"
+      ],
+      "position": [
+        176,
+        73
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-w-gym--w-gallery",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "w-gym",
+        "w-gallery"
+      ],
+      "position": [
+        176,
+        86
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-w-studio--w-gallery",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "w-studio",
+        "w-gallery"
+      ],
+      "position": [
+        176,
+        97
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-w-reception--w-gallery",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "w-reception",
+        "w-gallery"
+      ],
+      "position": [
+        170,
+        72
+      ],
+      "width": 3,
+      "accessible": true
+    },
+    {
+      "id": "p-w-therapy--w-gallery",
+      "floorId": "g",
+      "kind": "door",
+      "connects": [
+        "w-therapy",
+        "w-gallery"
+      ],
+      "position": [
+        170,
+        96
+      ],
+      "width": 3,
+      "accessible": true
+    }
+  ],
+  "verticalConnectors": [
+    {
+      "id": "lift-main",
+      "name": "Main Lifts",
+      "kind": "elevator",
+      "accessible": true,
+      "stops": [
+        {
+          "floorId": "g",
+          "spaceId": "g-lifts",
+          "position": [
+            96,
+            15
+          ]
+        },
+        {
+          "floorId": "l1",
+          "spaceId": "l1-lifts",
+          "position": [
+            96,
+            15
+          ]
+        },
+        {
+          "floorId": "l2",
+          "spaceId": "l2-lifts",
+          "position": [
+            96,
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stairs-main",
+      "name": "Main Stairs",
+      "kind": "stairs",
+      "accessible": false,
+      "stops": [
+        {
+          "floorId": "g",
+          "spaceId": "g-stairs",
+          "position": [
+            103,
+            15
+          ]
+        },
+        {
+          "floorId": "l1",
+          "spaceId": "l1-stairs",
+          "position": [
+            103,
+            15
+          ]
+        },
+        {
+          "floorId": "l2",
+          "spaceId": "l2-stairs",
+          "position": [
+            103,
+            15
+          ]
+        }
+      ]
+    }
+  ],
+  "pois": [
+    {
+      "id": "poi-main-gate",
+      "floorId": "g",
+      "spaceId": "gate",
+      "name": "Main Gate",
+      "category": "entrance",
+      "position": [
+        105,
+        138
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "front gate",
+        "entrance"
+      ]
+    },
+    {
+      "id": "poi-fountain",
+      "floorId": "g",
+      "spaceId": "court-north",
+      "name": "Central Fountain",
+      "category": "landmark",
+      "position": [
+        105,
+        76
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "fountain",
+        "fountain court"
+      ]
+    },
+    {
+      "id": "poi-car-park",
+      "floorId": "g",
+      "spaceId": "car-park",
+      "name": "Visitor Car Park",
+      "category": "service",
+      "position": [
+        84,
+        123
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "parking",
+        "car park"
+      ]
+    },
+    {
+      "id": "poi-statue",
+      "floorId": "g",
+      "spaceId": "healing-garden",
+      "name": "Founders' Statue",
+      "category": "landmark",
+      "position": [
+        146,
+        108
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "statue",
+        "memorial"
+      ]
+    },
+    {
+      "id": "poi-healing-garden",
+      "floorId": "g",
+      "spaceId": "healing-garden",
+      "name": "Healing Garden",
+      "category": "landmark",
+      "position": [
+        136,
+        118
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "garden"
+      ]
+    },
+    {
+      "id": "poi-g-registration",
+      "floorId": "g",
+      "spaceId": "g-registration",
+      "name": "Outpatient Registration",
+      "category": "service",
+      "position": [
+        52,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "registration",
+        "check in"
+      ]
+    },
+    {
+      "id": "poi-g-pharmacy",
+      "floorId": "g",
+      "spaceId": "g-pharmacy",
+      "name": "Hospital Pharmacy",
+      "category": "pharmacy",
+      "position": [
+        67,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "chemist",
+        "prescriptions"
+      ]
+    },
+    {
+      "id": "poi-g-imaging",
+      "floorId": "g",
+      "spaceId": "g-imaging",
+      "name": "Imaging & Radiology",
+      "category": "diagnostic",
+      "position": [
+        83,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "x-ray",
+        "mri",
+        "scan"
+      ]
+    },
+    {
+      "id": "poi-g-laboratory",
+      "floorId": "g",
+      "spaceId": "g-laboratory",
+      "name": "Laboratory",
+      "category": "diagnostic",
+      "position": [
+        114,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "lab",
+        "pathology"
+      ]
+    },
+    {
+      "id": "poi-g-cardiology",
+      "floorId": "g",
+      "spaceId": "g-cardiology",
+      "name": "Cardiology Clinic",
+      "category": "medical",
+      "position": [
+        134,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "heart clinic"
+      ]
+    },
+    {
+      "id": "poi-g-information",
+      "floorId": "g",
+      "spaceId": "g-information",
+      "name": "Visitor Information",
+      "category": "service",
+      "position": [
+        53,
+        38
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "help desk",
+        "reception"
+      ]
+    },
+    {
+      "id": "poi-g-cafe",
+      "floorId": "g",
+      "spaceId": "g-cafe",
+      "name": "Courtyard Café",
+      "category": "food",
+      "position": [
+        71,
+        38
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "coffee",
+        "cafe"
+      ]
+    },
+    {
+      "id": "poi-g-shop",
+      "floorId": "g",
+      "spaceId": "g-shop",
+      "name": "Gift & Flower Shop",
+      "category": "service",
+      "position": [
+        88,
+        38
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "shop",
+        "flowers"
+      ]
+    },
+    {
+      "id": "poi-g-quiet-room",
+      "floorId": "g",
+      "spaceId": "g-quiet-room",
+      "name": "Quiet Room",
+      "category": "family",
+      "position": [
+        121,
+        38
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "chapel",
+        "prayer room"
+      ]
+    },
+    {
+      "id": "poi-g-blood-tests",
+      "floorId": "g",
+      "spaceId": "g-blood-tests",
+      "name": "Blood Tests",
+      "category": "diagnostic",
+      "position": [
+        137,
+        38
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "phlebotomy"
+      ]
+    },
+    {
+      "id": "poi-main-entrance",
+      "floorId": "g",
+      "spaceId": "g-hall",
+      "name": "Hospital Main Entrance",
+      "category": "entrance",
+      "position": [
+        105,
+        42
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "hospital entrance",
+        "main hospital"
+      ]
+    },
+    {
+      "id": "poi-l1-maternity",
+      "floorId": "l1",
+      "spaceId": "l1-maternity",
+      "name": "Maternity Unit",
+      "category": "family",
+      "position": [
+        55,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "birth",
+        "labour ward"
+      ]
+    },
+    {
+      "id": "poi-l1-childrens",
+      "floorId": "l1",
+      "spaceId": "l1-childrens",
+      "name": "Children's Ward",
+      "category": "family",
+      "position": [
+        79,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "paediatrics",
+        "kids"
+      ]
+    },
+    {
+      "id": "poi-l1-day-surgery",
+      "floorId": "l1",
+      "spaceId": "l1-day-surgery",
+      "name": "Day Surgery",
+      "category": "medical",
+      "position": [
+        116,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "surgery"
+      ]
+    },
+    {
+      "id": "poi-l1-recovery",
+      "floorId": "l1",
+      "spaceId": "l1-recovery",
+      "name": "Recovery Suite",
+      "category": "medical",
+      "position": [
+        136,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "recovery"
+      ]
+    },
+    {
+      "id": "poi-l1-womens-health",
+      "floorId": "l1",
+      "spaceId": "l1-womens-health",
+      "name": "Women's Health Clinic",
+      "category": "medical",
+      "position": [
+        57,
+        38
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "gynaecology"
+      ]
+    },
+    {
+      "id": "poi-l1-ultrasound",
+      "floorId": "l1",
+      "spaceId": "l1-ultrasound",
+      "name": "Ultrasound",
+      "category": "diagnostic",
+      "position": [
+        83,
+        38
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "scan"
+      ]
+    },
+    {
+      "id": "poi-l1-family-lounge",
+      "floorId": "l1",
+      "spaceId": "l1-family-lounge",
+      "name": "Family Lounge",
+      "category": "family",
+      "position": [
+        105,
+        38
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "waiting area"
+      ]
+    },
+    {
+      "id": "poi-l1-physiotherapy",
+      "floorId": "l1",
+      "spaceId": "l1-physiotherapy",
+      "name": "Outpatient Physiotherapy",
+      "category": "medical",
+      "position": [
+        130,
+        38
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "physio"
+      ]
+    },
+    {
+      "id": "poi-l2-cardiac-ward",
+      "floorId": "l2",
+      "spaceId": "l2-cardiac-ward",
+      "name": "Cardiac Ward",
+      "category": "medical",
+      "position": [
+        57,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "heart ward"
+      ]
+    },
+    {
+      "id": "poi-l2-oncology",
+      "floorId": "l2",
+      "spaceId": "l2-oncology",
+      "name": "Oncology Day Unit",
+      "category": "medical",
+      "position": [
+        81,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "cancer care",
+        "chemotherapy"
+      ]
+    },
+    {
+      "id": "poi-l2-dialysis",
+      "floorId": "l2",
+      "spaceId": "l2-dialysis",
+      "name": "Dialysis Unit",
+      "category": "medical",
+      "position": [
+        116,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "renal",
+        "kidney"
+      ]
+    },
+    {
+      "id": "poi-l2-research",
+      "floorId": "l2",
+      "spaceId": "l2-research",
+      "name": "Clinical Research Office",
+      "category": "research",
+      "position": [
+        136,
+        17
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "trials"
+      ]
+    },
+    {
+      "id": "poi-l2-administration",
+      "floorId": "l2",
+      "spaceId": "l2-administration",
+      "name": "Administration",
+      "category": "service",
+      "position": [
+        57,
+        38
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "admin",
+        "records"
+      ]
+    },
+    {
+      "id": "poi-l2-education",
+      "floorId": "l2",
+      "spaceId": "l2-education",
+      "name": "Education Centre",
+      "category": "education",
+      "position": [
+        83,
+        38
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "lecture room",
+        "training"
+      ]
+    },
+    {
+      "id": "poi-l2-staff-lounge",
+      "floorId": "l2",
+      "spaceId": "l2-staff-lounge",
+      "name": "Staff Lounge",
+      "category": "staff",
+      "position": [
+        105,
+        38
+      ],
+      "public": false,
+      "accessible": true,
+      "aliases": [
+        "staff room"
+      ]
+    },
+    {
+      "id": "poi-l2-sky-terrace",
+      "floorId": "l2",
+      "spaceId": "l2-sky-terrace",
+      "name": "Sky Terrace",
+      "category": "landmark",
+      "position": [
+        130,
+        38
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "terrace",
+        "roof garden"
+      ]
+    },
+    {
+      "id": "poi-e-triage",
+      "floorId": "g",
+      "spaceId": "e-triage",
+      "name": "Triage",
+      "category": "emergency",
+      "position": [
+        23,
+        72
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "assessment"
+      ]
+    },
+    {
+      "id": "poi-e-treatment",
+      "floorId": "g",
+      "spaceId": "e-treatment",
+      "name": "Emergency Treatment",
+      "category": "emergency",
+      "position": [
+        23,
+        84
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "a&e",
+        "er",
+        "casualty"
+      ]
+    },
+    {
+      "id": "poi-e-minor-injuries",
+      "floorId": "g",
+      "spaceId": "e-minor-injuries",
+      "name": "Minor Injuries",
+      "category": "emergency",
+      "position": [
+        23,
+        96
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "urgent care"
+      ]
+    },
+    {
+      "id": "poi-e-waiting",
+      "floorId": "g",
+      "spaceId": "e-waiting",
+      "name": "Emergency Waiting Area",
+      "category": "family",
+      "position": [
+        44,
+        72
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "waiting room"
+      ]
+    },
+    {
+      "id": "poi-e-pharmacy",
+      "floorId": "g",
+      "spaceId": "e-pharmacy",
+      "name": "Out-of-Hours Pharmacy",
+      "category": "pharmacy",
+      "position": [
+        44,
+        96
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "night pharmacy"
+      ]
+    },
+    {
+      "id": "poi-emergency-entrance",
+      "floorId": "g",
+      "spaceId": "e-entrance",
+      "name": "Emergency Entrance",
+      "category": "emergency",
+      "position": [
+        46,
+        84
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "emergency",
+        "a&e entrance"
+      ]
+    },
+    {
+      "id": "poi-w-hydrotherapy",
+      "floorId": "g",
+      "spaceId": "w-hydrotherapy",
+      "name": "Hydrotherapy Pool",
+      "category": "medical",
+      "position": [
+        187,
+        73
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "pool"
+      ]
+    },
+    {
+      "id": "poi-w-gym",
+      "floorId": "g",
+      "spaceId": "w-gym",
+      "name": "Rehabilitation Gym",
+      "category": "medical",
+      "position": [
+        187,
+        86
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "physio gym",
+        "rehab"
+      ]
+    },
+    {
+      "id": "poi-w-studio",
+      "floorId": "g",
+      "spaceId": "w-studio",
+      "name": "Wellness Studio",
+      "category": "family",
+      "position": [
+        187,
+        97
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "yoga",
+        "classes"
+      ]
+    },
+    {
+      "id": "poi-w-reception",
+      "floorId": "g",
+      "spaceId": "w-reception",
+      "name": "Pavilion Reception",
+      "category": "service",
+      "position": [
+        166,
+        72
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "rehab reception"
+      ]
+    },
+    {
+      "id": "poi-w-therapy",
+      "floorId": "g",
+      "spaceId": "w-therapy",
+      "name": "Therapy Rooms",
+      "category": "medical",
+      "position": [
+        166,
+        96
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "occupational therapy"
+      ]
+    },
+    {
+      "id": "poi-pavilion-entrance",
+      "floorId": "g",
+      "spaceId": "w-entrance",
+      "name": "Wellness Pavilion Entrance",
+      "category": "entrance",
+      "position": [
+        164,
+        84
+      ],
+      "public": true,
+      "accessible": true,
+      "aliases": [
+        "pavilion",
+        "rehabilitation"
+      ]
+    }
+  ],
+  "localizationAnchors": [
+    {
+      "id": "anchor-main-gate",
+      "floorId": "g",
+      "spaceId": "gate",
+      "kind": "qr",
+      "position": [
+        105,
+        141
+      ],
+      "headingDegrees": 270,
+      "payload": "voicegis://meridian/g/main-gate"
+    },
+    {
+      "id": "anchor-fountain",
+      "floorId": "g",
+      "spaceId": "court-north",
+      "kind": "qr",
+      "position": [
+        105,
+        77
+      ],
+      "headingDegrees": 270,
+      "payload": "voicegis://meridian/g/fountain"
+    },
+    {
+      "id": "anchor-hospital-entrance",
+      "floorId": "g",
+      "spaceId": "g-hall",
+      "kind": "qr",
+      "position": [
+        105,
+        34
+      ],
+      "headingDegrees": 90,
+      "payload": "voicegis://meridian/g/hospital-entrance"
+    },
+    {
+      "id": "anchor-emergency-entrance",
+      "floorId": "g",
+      "spaceId": "e-entrance",
+      "kind": "qr",
+      "position": [
+        42,
+        84
+      ],
+      "headingDegrees": 0,
+      "payload": "voicegis://meridian/g/emergency-entrance"
+    },
+    {
+      "id": "anchor-pavilion-entrance",
+      "floorId": "g",
+      "spaceId": "w-entrance",
+      "kind": "qr",
+      "position": [
+        168,
+        84
+      ],
+      "headingDegrees": 180,
+      "payload": "voicegis://meridian/g/pavilion-entrance"
+    },
+    {
+      "id": "anchor-car-park",
+      "floorId": "g",
+      "spaceId": "car-park",
+      "kind": "qr",
+      "position": [
+        94,
+        123
+      ],
+      "headingDegrees": 180,
+      "payload": "voicegis://meridian/g/car-park"
+    },
+    {
+      "id": "anchor-level-1",
+      "floorId": "l1",
+      "spaceId": "l1-concourse",
+      "kind": "qr",
+      "position": [
+        96,
+        26
+      ],
+      "headingDegrees": 90,
+      "payload": "voicegis://meridian/l1/lifts"
+    },
+    {
+      "id": "anchor-level-2",
+      "floorId": "l2",
+      "spaceId": "l2-concourse",
+      "kind": "qr",
+      "position": [
+        96,
+        26
+      ],
+      "headingDegrees": 90,
+      "payload": "voicegis://meridian/l2/lifts"
+    }
+  ],
+  "site": {
+    "floorId": "g",
+    "buildings": [
+      {
+        "id": "main-hospital",
+        "name": "Main Hospital",
+        "footprint": [
+          [
+            40,
+            8
+          ],
+          [
+            150,
+            8
+          ],
+          [
+            150,
+            46
+          ],
+          [
+            40,
+            46
+          ]
+        ],
+        "storeys": 3
+      },
+      {
+        "id": "emergency-centre",
+        "name": "Emergency Centre",
+        "footprint": [
+          [
+            8,
+            62
+          ],
+          [
+            50,
+            62
+          ],
+          [
+            50,
+            106
+          ],
+          [
+            8,
+            106
+          ]
+        ],
+        "storeys": 1
+      },
+      {
+        "id": "wellness-pavilion",
+        "name": "Wellness Pavilion",
+        "footprint": [
+          [
+            160,
+            62
+          ],
+          [
+            202,
+            62
+          ],
+          [
+            202,
+            106
+          ],
+          [
+            160,
+            106
+          ]
+        ],
+        "storeys": 1
+      }
+    ],
+    "grounds": [
+      {
+        "id": "road-south",
+        "kind": "road",
+        "polygon": [
+          [
+            0,
+            142
+          ],
+          [
+            210,
+            142
+          ],
+          [
+            210,
+            150
+          ],
+          [
+            0,
+            150
+          ]
+        ]
+      },
+      {
+        "id": "car-park-bays",
+        "kind": "parking",
+        "polygon": [
+          [
+            24,
+            112
+          ],
+          [
+            96,
+            112
+          ],
+          [
+            96,
+            134
+          ],
+          [
+            24,
+            134
+          ]
+        ]
+      },
+      {
+        "id": "lawn-north-west",
+        "kind": "lawn",
+        "polygon": [
+          [
+            52,
+            50
+          ],
+          [
+            100,
+            50
+          ],
+          [
+            100,
+            70
+          ],
+          [
+            52,
+            70
+          ]
+        ]
+      },
+      {
+        "id": "lawn-north-east",
+        "kind": "lawn",
+        "polygon": [
+          [
+            110,
+            50
+          ],
+          [
+            158,
+            50
+          ],
+          [
+            158,
+            70
+          ],
+          [
+            110,
+            70
+          ]
+        ]
+      },
+      {
+        "id": "lawn-west",
+        "kind": "lawn",
+        "polygon": [
+          [
+            52,
+            89
+          ],
+          [
+            91,
+            89
+          ],
+          [
+            91,
+            108
+          ],
+          [
+            52,
+            108
+          ]
+        ]
+      },
+      {
+        "id": "lawn-east",
+        "kind": "lawn",
+        "polygon": [
+          [
+            119,
+            89
+          ],
+          [
+            158,
+            89
+          ],
+          [
+            158,
+            98
+          ],
+          [
+            119,
+            98
+          ]
+        ]
+      },
+      {
+        "id": "lawn-south-east",
+        "kind": "lawn",
+        "polygon": [
+          [
+            160,
+            110
+          ],
+          [
+            204,
+            110
+          ],
+          [
+            204,
+            140
+          ],
+          [
+            160,
+            140
+          ]
+        ]
+      },
+      {
+        "id": "lawn-north",
+        "kind": "lawn",
+        "polygon": [
+          [
+            4,
+            4
+          ],
+          [
+            36,
+            4
+          ],
+          [
+            36,
+            58
+          ],
+          [
+            4,
+            58
+          ]
+        ]
+      },
+      {
+        "id": "lawn-far-east",
+        "kind": "lawn",
+        "polygon": [
+          [
+            154,
+            4
+          ],
+          [
+            206,
+            4
+          ],
+          [
+            206,
+            58
+          ],
+          [
+            154,
+            58
+          ]
+        ]
+      },
+      {
+        "id": "pond",
+        "kind": "water",
+        "polygon": [
+          [
+            170,
+            116
+          ],
+          [
+            196,
+            116
+          ],
+          [
+            196,
+            134
+          ],
+          [
+            170,
+            134
+          ]
+        ]
+      },
+      {
+        "id": "fountain-island",
+        "kind": "planting",
+        "polygon": [
+          [
+            99,
+            78
+          ],
+          [
+            111,
+            78
+          ],
+          [
+            111,
+            90
+          ],
+          [
+            99,
+            90
+          ]
+        ]
+      },
+      {
+        "id": "forecourt-apron",
+        "kind": "paving",
+        "polygon": [
+          [
+            84,
+            46
+          ],
+          [
+            126,
+            46
+          ],
+          [
+            126,
+            50
+          ],
+          [
+            84,
+            50
+          ]
+        ]
+      },
+      {
+        "id": "border-south-west",
+        "kind": "planting",
+        "polygon": [
+          [
+            4,
+            136
+          ],
+          [
+            97,
+            136
+          ],
+          [
+            97,
+            140
+          ],
+          [
+            4,
+            140
+          ]
+        ]
+      },
+      {
+        "id": "border-south-east",
+        "kind": "planting",
+        "polygon": [
+          [
+            113,
+            136
+          ],
+          [
+            158,
+            136
+          ],
+          [
+            158,
+            140
+          ],
+          [
+            113,
+            140
+          ]
+        ]
+      }
+    ],
+    "features": [
+      {
+        "id": "tree-001",
+        "kind": "tree",
+        "position": [
+          55.8,
+          54
+        ]
+      },
+      {
+        "id": "tree-002",
+        "kind": "tree",
+        "position": [
+          56.3,
+          64
+        ]
+      },
+      {
+        "id": "tree-003",
+        "kind": "tree",
+        "position": [
+          64.5,
+          55.4
+        ]
+      },
+      {
+        "id": "tree-004",
+        "kind": "tree",
+        "position": [
+          62.3,
+          61.9
+        ]
+      },
+      {
+        "id": "tree-005",
+        "kind": "tree",
+        "position": [
+          71.3,
+          63.1
+        ]
+      },
+      {
+        "id": "tree-006",
+        "kind": "tree",
+        "position": [
+          81.4,
+          54.9
+        ]
+      },
+      {
+        "id": "tree-007",
+        "kind": "tree",
+        "position": [
+          79.2,
+          63
+        ]
+      },
+      {
+        "id": "tree-008",
+        "kind": "tree",
+        "position": [
+          89.6,
+          53.9
+        ]
+      },
+      {
+        "id": "tree-009",
+        "kind": "tree",
+        "position": [
+          87.7,
+          61.3
+        ]
+      },
+      {
+        "id": "tree-010",
+        "kind": "tree",
+        "position": [
+          97.3,
+          53.5
+        ]
+      },
+      {
+        "id": "tree-011",
+        "kind": "tree",
+        "position": [
+          95,
+          60.3
+        ]
+      },
+      {
+        "id": "tree-012",
+        "kind": "tree",
+        "position": [
+          115.6,
+          55.8
+        ]
+      },
+      {
+        "id": "tree-013",
+        "kind": "tree",
+        "position": [
+          112.9,
+          60.6
+        ]
+      },
+      {
+        "id": "tree-014",
+        "kind": "tree",
+        "position": [
+          120.1,
+          53.2
+        ]
+      },
+      {
+        "id": "tree-015",
+        "kind": "tree",
+        "position": [
+          122.4,
+          61.6
+        ]
+      },
+      {
+        "id": "tree-016",
+        "kind": "tree",
+        "position": [
+          130.8,
+          53.9
+        ]
+      },
+      {
+        "id": "tree-017",
+        "kind": "tree",
+        "position": [
+          128.2,
+          62.5
+        ]
+      },
+      {
+        "id": "tree-018",
+        "kind": "tree",
+        "position": [
+          139.7,
+          55.1
+        ]
+      },
+      {
+        "id": "tree-019",
+        "kind": "tree",
+        "position": [
+          138.8,
+          62.3
+        ]
+      },
+      {
+        "id": "tree-020",
+        "kind": "tree",
+        "position": [
+          154,
+          53.9
+        ]
+      },
+      {
+        "id": "tree-021",
+        "kind": "tree",
+        "position": [
+          154,
+          60.4
+        ]
+      },
+      {
+        "id": "tree-022",
+        "kind": "tree",
+        "position": [
+          55.7,
+          93.6
+        ]
+      },
+      {
+        "id": "tree-023",
+        "kind": "tree",
+        "position": [
+          56.7,
+          100.8
+        ]
+      },
+      {
+        "id": "tree-024",
+        "kind": "tree",
+        "position": [
+          62.7,
+          92.7
+        ]
+      },
+      {
+        "id": "tree-025",
+        "kind": "tree",
+        "position": [
+          64.8,
+          99.3
+        ]
+      },
+      {
+        "id": "tree-026",
+        "kind": "tree",
+        "position": [
+          72,
+          93.2
+        ]
+      },
+      {
+        "id": "tree-027",
+        "kind": "tree",
+        "position": [
+          79.1,
+          93.3
+        ]
+      },
+      {
+        "id": "tree-028",
+        "kind": "tree",
+        "position": [
+          81.4,
+          100.9
+        ]
+      },
+      {
+        "id": "tree-029",
+        "kind": "tree",
+        "position": [
+          162,
+          115.2
+        ]
+      },
+      {
+        "id": "tree-030",
+        "kind": "tree",
+        "position": [
+          163.9,
+          122.7
+        ]
+      },
+      {
+        "id": "tree-031",
+        "kind": "tree",
+        "position": [
+          188.7,
+          113.5
+        ]
+      },
+      {
+        "id": "tree-032",
+        "kind": "tree",
+        "position": [
+          9.1,
+          14.7
+        ]
+      },
+      {
+        "id": "tree-033",
+        "kind": "tree",
+        "position": [
+          7.3,
+          34
+        ]
+      },
+      {
+        "id": "tree-034",
+        "kind": "tree",
+        "position": [
+          7.3,
+          41.6
+        ]
+      },
+      {
+        "id": "tree-035",
+        "kind": "tree",
+        "position": [
+          16.8,
+          6.6
+        ]
+      },
+      {
+        "id": "tree-036",
+        "kind": "tree",
+        "position": [
+          15,
+          15.5
+        ]
+      },
+      {
+        "id": "tree-037",
+        "kind": "tree",
+        "position": [
+          16.9,
+          32.4
+        ]
+      },
+      {
+        "id": "tree-038",
+        "kind": "tree",
+        "position": [
+          14.5,
+          41.5
+        ]
+      },
+      {
+        "id": "tree-039",
+        "kind": "tree",
+        "position": [
+          24.5,
+          6.9
+        ]
+      },
+      {
+        "id": "tree-040",
+        "kind": "tree",
+        "position": [
+          23.6,
+          25.3
+        ]
+      },
+      {
+        "id": "tree-041",
+        "kind": "tree",
+        "position": [
+          25.7,
+          33.4
+        ]
+      },
+      {
+        "id": "tree-042",
+        "kind": "tree",
+        "position": [
+          22.3,
+          41.1
+        ]
+      },
+      {
+        "id": "tree-043",
+        "kind": "tree",
+        "position": [
+          31.1,
+          8.7
+        ]
+      },
+      {
+        "id": "tree-044",
+        "kind": "tree",
+        "position": [
+          31.7,
+          15.6
+        ]
+      },
+      {
+        "id": "tree-045",
+        "kind": "tree",
+        "position": [
+          33.4,
+          25.9
+        ]
+      },
+      {
+        "id": "tree-046",
+        "kind": "tree",
+        "position": [
+          32.9,
+          47.8
+        ]
+      },
+      {
+        "id": "tree-047",
+        "kind": "tree",
+        "position": [
+          156.8,
+          9.2
+        ]
+      },
+      {
+        "id": "tree-048",
+        "kind": "tree",
+        "position": [
+          157.5,
+          17.9
+        ]
+      },
+      {
+        "id": "tree-049",
+        "kind": "tree",
+        "position": [
+          158.7,
+          25.5
+        ]
+      },
+      {
+        "id": "tree-050",
+        "kind": "tree",
+        "position": [
+          159.1,
+          32.6
+        ]
+      },
+      {
+        "id": "tree-051",
+        "kind": "tree",
+        "position": [
+          157.9,
+          40.8
+        ]
+      },
+      {
+        "id": "tree-052",
+        "kind": "tree",
+        "position": [
+          159.6,
+          46.3
+        ]
+      },
+      {
+        "id": "tree-053",
+        "kind": "tree",
+        "position": [
+          166.5,
+          8.6
+        ]
+      },
+      {
+        "id": "tree-054",
+        "kind": "tree",
+        "position": [
+          164.6,
+          15.5
+        ]
+      },
+      {
+        "id": "tree-055",
+        "kind": "tree",
+        "position": [
+          166.3,
+          23.2
+        ]
+      },
+      {
+        "id": "tree-056",
+        "kind": "tree",
+        "position": [
+          165.3,
+          40.8
+        ]
+      },
+      {
+        "id": "tree-057",
+        "kind": "tree",
+        "position": [
+          164.4,
+          47.4
+        ]
+      },
+      {
+        "id": "tree-058",
+        "kind": "tree",
+        "position": [
+          174.6,
+          9.1
+        ]
+      },
+      {
+        "id": "tree-059",
+        "kind": "tree",
+        "position": [
+          175.6,
+          17.9
+        ]
+      },
+      {
+        "id": "tree-060",
+        "kind": "tree",
+        "position": [
+          172.3,
+          23.9
+        ]
+      },
+      {
+        "id": "tree-061",
+        "kind": "tree",
+        "position": [
+          174.7,
+          33.1
+        ]
+      },
+      {
+        "id": "tree-062",
+        "kind": "tree",
+        "position": [
+          175.4,
+          38.5
+        ]
+      },
+      {
+        "id": "tree-063",
+        "kind": "tree",
+        "position": [
+          174.2,
+          46.8
+        ]
+      },
+      {
+        "id": "tree-064",
+        "kind": "tree",
+        "position": [
+          183.2,
+          6.7
+        ]
+      },
+      {
+        "id": "tree-065",
+        "kind": "tree",
+        "position": [
+          180.3,
+          16.3
+        ]
+      },
+      {
+        "id": "tree-066",
+        "kind": "tree",
+        "position": [
+          180.5,
+          25.8
+        ]
+      },
+      {
+        "id": "tree-067",
+        "kind": "tree",
+        "position": [
+          183.7,
+          31.4
+        ]
+      },
+      {
+        "id": "tree-068",
+        "kind": "tree",
+        "position": [
+          181,
+          42
+        ]
+      },
+      {
+        "id": "tree-069",
+        "kind": "tree",
+        "position": [
+          181.9,
+          49.3
+        ]
+      },
+      {
+        "id": "tree-070",
+        "kind": "tree",
+        "position": [
+          190.7,
+          8.4
+        ]
+      },
+      {
+        "id": "tree-071",
+        "kind": "tree",
+        "position": [
+          192,
+          15.9
+        ]
+      },
+      {
+        "id": "tree-072",
+        "kind": "tree",
+        "position": [
+          188.9,
+          25.2
+        ]
+      },
+      {
+        "id": "tree-073",
+        "kind": "tree",
+        "position": [
+          191.9,
+          31.1
+        ]
+      },
+      {
+        "id": "tree-074",
+        "kind": "tree",
+        "position": [
+          189.7,
+          38.4
+        ]
+      },
+      {
+        "id": "tree-075",
+        "kind": "tree",
+        "position": [
+          190.1,
+          46.6
+        ]
+      },
+      {
+        "id": "tree-076",
+        "kind": "tree",
+        "position": [
+          197.5,
+          7.6
+        ]
+      },
+      {
+        "id": "tree-077",
+        "kind": "tree",
+        "position": [
+          198.1,
+          24.5
+        ]
+      },
+      {
+        "id": "tree-078",
+        "kind": "tree",
+        "position": [
+          199.2,
+          32.5
+        ]
+      },
+      {
+        "id": "tree-079",
+        "kind": "tree",
+        "position": [
+          196.5,
+          39.3
+        ]
+      },
+      {
+        "id": "tree-080",
+        "kind": "tree",
+        "position": [
+          198.3,
+          47.6
+        ]
+      },
+      {
+        "id": "tree-081",
+        "kind": "tree",
+        "position": [
+          99.5,
+          99
+        ]
+      },
+      {
+        "id": "tree-082",
+        "kind": "tree",
+        "position": [
+          110.5,
+          99
+        ]
+      },
+      {
+        "id": "tree-083",
+        "kind": "tree",
+        "position": [
+          99.5,
+          105
+        ]
+      },
+      {
+        "id": "tree-084",
+        "kind": "tree",
+        "position": [
+          110.5,
+          105
+        ]
+      },
+      {
+        "id": "tree-085",
+        "kind": "tree",
+        "position": [
+          99.5,
+          111
+        ]
+      },
+      {
+        "id": "tree-086",
+        "kind": "tree",
+        "position": [
+          99.5,
+          117
+        ]
+      },
+      {
+        "id": "tree-087",
+        "kind": "tree",
+        "position": [
+          110.5,
+          123
+        ]
+      },
+      {
+        "id": "tree-088",
+        "kind": "tree",
+        "position": [
+          99.5,
+          129
+        ]
+      },
+      {
+        "id": "tree-089",
+        "kind": "tree",
+        "position": [
+          110.5,
+          129
+        ]
+      },
+      {
+        "id": "fountain-central",
+        "kind": "fountain",
+        "position": [
+          105,
+          84
+        ]
+      },
+      {
+        "id": "statue-founders",
+        "kind": "statue",
+        "position": [
+          148,
+          106
+        ]
+      },
+      {
+        "id": "bench-1",
+        "kind": "bench",
+        "position": [
+          132,
+          104
+        ]
+      },
+      {
+        "id": "bench-2",
+        "kind": "bench",
+        "position": [
+          150,
+          120
+        ]
+      },
+      {
+        "id": "bench-3",
+        "kind": "bench",
+        "position": [
+          130,
+          122
+        ]
+      },
+      {
+        "id": "bench-4",
+        "kind": "bench",
+        "position": [
+          100.5,
+          70
+        ]
+      },
+      {
+        "id": "bench-5",
+        "kind": "bench",
+        "position": [
+          109.5,
+          70
+        ]
+      },
+      {
+        "id": "lamp-west-1",
+        "kind": "lamp",
+        "position": [
+          101,
+          100
+        ]
+      },
+      {
+        "id": "lamp-east-1",
+        "kind": "lamp",
+        "position": [
+          109,
+          100
+        ]
+      },
+      {
+        "id": "lamp-west-2",
+        "kind": "lamp",
+        "position": [
+          101,
+          112
+        ]
+      },
+      {
+        "id": "lamp-east-2",
+        "kind": "lamp",
+        "position": [
+          109,
+          112
+        ]
+      },
+      {
+        "id": "lamp-west-3",
+        "kind": "lamp",
+        "position": [
+          101,
+          124
+        ]
+      },
+      {
+        "id": "lamp-east-3",
+        "kind": "lamp",
+        "position": [
+          109,
+          124
+        ]
+      },
+      {
+        "id": "lamp-west-4",
+        "kind": "lamp",
+        "position": [
+          101,
+          132
+        ]
+      },
+      {
+        "id": "lamp-east-4",
+        "kind": "lamp",
+        "position": [
+          109,
+          132
+        ]
+      }
+    ]
+  }
+}

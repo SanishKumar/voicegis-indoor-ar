@@ -21,7 +21,12 @@ import { scannableAnchors, type AnchorLike } from '../src/capture/anchorCheckIn'
  * with a phone. Printing it is the field path.
  */
 
-const VENUES = ['reference-medical-centre', 'asterion-medical-center', 'harbor-exchange'];
+const VENUES = [
+  'reference-medical-centre',
+  'asterion-medical-center',
+  'harbor-exchange',
+  'meridian-park-campus',
+];
 
 interface CompiledPackage {
   building: { id: string; name?: string };

@@ -11,6 +11,10 @@ const artifacts = [
     source: 'buildings/harbor-exchange/compiled/building.package.json',
     target: 'public/venues/harbor-exchange.package.json',
   },
+  {
+    source: 'buildings/meridian-park-campus/compiled/building.package.json',
+    target: 'public/venues/meridian-park-campus.package.json',
+  },
 ];
 
 let failed = false;

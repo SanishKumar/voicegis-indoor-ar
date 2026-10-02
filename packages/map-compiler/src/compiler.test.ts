@@ -79,8 +79,7 @@ describe('indoor map compiler', () => {
     );
     const edgeBetween = (from: string, to: string) =>
       routing.edges.find(
-        (edge) =>
-          (edge.from === from && edge.to === to) || (edge.from === to && edge.to === from),
+        (edge) => (edge.from === from && edge.to === to) || (edge.from === to && edge.to === from),
       );
 
     expect(arrivalProjection).toBeDefined();
@@ -91,5 +90,99 @@ describe('indoor map compiler', () => {
     expect(edgeBetween(arrivalProjection.id, emergencyProjection.id)?.distanceMeters).toBe(5);
     expect(edgeBetween(emergencyProjection.id, 'portal:p-g-emergency')?.distanceMeters).toBe(4);
     expect(edgeBetween('portal:p-g-arrival', 'space:g-concourse')).toBeUndefined();
+  });
+
+  describe('a venue with grounds', () => {
+    const site = {
+      floorId: 'g',
+      buildings: [
+        {
+          id: 'only-building',
+          name: 'Only Building',
+          footprint: [
+            [1, 1],
+            [11, 1],
+            [11, 7],
+            [1, 7],
+          ],
+          storeys: 2,
+        },
+      ],
+      grounds: [
+        {
+          id: 'front-lawn',
+          kind: 'lawn',
+          polygon: [
+            [0, 0],
+            [12, 0],
+            [12, 1],
+            [0, 1],
+          ],
+        },
+      ],
+      features: [{ id: 'oak', kind: 'tree', position: [6, 0.5] }],
+    };
+
+    it('carries the site through to the package and covers it with the hash', () => {
+      const plain = compileBuilding(example);
+      const withSite = compileBuilding({ ...structuredClone(example), site });
+
+      expect(withSite.report).toMatchObject({ valid: true, summary: { errors: 0 } });
+      expect(withSite.package?.site).toEqual(site);
+      expect(withSite.package?.manifest.contentHash).not.toBe(plain.package?.manifest.contentHash);
+      // The picture is not the map: the same rooms and doors route the same way.
+      expect(withSite.package?.routing).toEqual(plain.package?.routing);
+    });
+
+    it('leaves a venue without one exactly as it was', () => {
+      const result = compileBuilding(example);
+      expect(result.package).not.toBeNull();
+      expect(Object.keys(result.package!)).not.toContain('site');
+    });
+
+    it('refuses grounds drawn outside the floor they stand on', () => {
+      const adrift = structuredClone(site);
+      adrift.grounds[0].polygon = [
+        [0, 0],
+        [40, 0],
+        [40, 1],
+        [0, 1],
+      ];
+      adrift.features[0].position = [6, -5];
+      const result = compileBuilding({ ...structuredClone(example), site: adrift });
+
+      expect(result.package).toBeNull();
+      expect(result.report.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'site-shape-outside-floor' }),
+          expect.objectContaining({ code: 'site-feature-outside-floor' }),
+        ]),
+      );
+    });
+
+    it('refuses a site on a floor that does not exist, and an unknown kind of ground', () => {
+      const lost = compileBuilding({
+        ...structuredClone(example),
+        site: { ...structuredClone(site), floorId: 'basement' },
+      });
+      expect(lost.report.issues).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'unknown-floor' })]),
+      );
+
+      const lava = structuredClone(site) as { grounds: Array<{ kind: string }> };
+      lava.grounds[0].kind = 'lava';
+      const invalid = compileBuilding({ ...structuredClone(example), site: lava });
+      expect(invalid.package).toBeNull();
+      expect(invalid.report.issues[0].code).toBe('schema-enum');
+    });
+
+    it('counts site identifiers with every other identifier in the venue', () => {
+      const clash = structuredClone(site);
+      clash.features[0].id = example.spaces[0].id;
+      const result = compileBuilding({ ...structuredClone(example), site: clash });
+      expect(result.report.issues).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'duplicate-id' })]),
+      );
+    });
   });
 });

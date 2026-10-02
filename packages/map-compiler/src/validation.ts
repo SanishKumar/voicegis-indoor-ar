@@ -80,6 +80,18 @@ function validateUniqueIds(source: BuildingSource, issues: ValidationIssue[]) {
       value,
       path: `/localizationAnchors/${index}`,
     })),
+    ...(source.site?.buildings ?? []).map((value, index) => ({
+      value,
+      path: `/site/buildings/${index}`,
+    })),
+    ...(source.site?.grounds ?? []).map((value, index) => ({
+      value,
+      path: `/site/grounds/${index}`,
+    })),
+    ...(source.site?.features ?? []).map((value, index) => ({
+      value,
+      path: `/site/features/${index}`,
+    })),
   ];
   const firstPathById = new Map<string, string>();
 
@@ -551,9 +563,81 @@ function validateReachability(source: BuildingSource, issues: ValidationIssue[])
   }
 }
 
+/*
+ * The site is only drawn, so the checks are the ones a drawing needs: it sits
+ * on a floor that exists, every shape has an area, and nothing is placed
+ * outside the ground it is drawn on.
+ */
+function validateSite(source: BuildingSource, issues: ValidationIssue[]) {
+  const site = source.site;
+  if (!site) return;
+  const floor = source.floors.find((candidate) => candidate.id === site.floorId);
+  if (!floor) {
+    issues.push(
+      issue(
+        'error',
+        'unknown-floor',
+        '/site/floorId',
+        `Site refers to unknown floor "${site.floorId}".`,
+      ),
+    );
+    return;
+  }
+
+  const shapes = [
+    ...site.buildings.map((building, index) => ({
+      id: building.id,
+      polygon: building.footprint,
+      path: `/site/buildings/${index}/footprint`,
+      label: 'Building footprint',
+    })),
+    ...site.grounds.map((ground, index) => ({
+      id: ground.id,
+      polygon: ground.polygon,
+      path: `/site/grounds/${index}/polygon`,
+      label: 'Ground',
+    })),
+  ];
+  for (const shape of shapes) {
+    if (polygonArea(shape.polygon) < 0.01) {
+      issues.push(
+        issue(
+          'error',
+          'degenerate-site-shape',
+          shape.path,
+          `${shape.label} "${shape.id}" has no area.`,
+        ),
+      );
+    }
+    if (!shape.polygon.every((point) => pointInPolygon(point, floor.outline))) {
+      issues.push(
+        issue(
+          'error',
+          'site-shape-outside-floor',
+          shape.path,
+          `${shape.label} "${shape.id}" extends outside floor "${floor.id}".`,
+        ),
+      );
+    }
+  }
+  for (const [index, feature] of site.features.entries()) {
+    if (!pointInPolygon(feature.position, floor.outline)) {
+      issues.push(
+        issue(
+          'error',
+          'site-feature-outside-floor',
+          `/site/features/${index}/position`,
+          `Site feature "${feature.id}" is outside floor "${floor.id}".`,
+        ),
+      );
+    }
+  }
+}
+
 export function validateBuildingSemantics(source: BuildingSource) {
   const issues: ValidationIssue[] = [];
   validateUniqueIds(source, issues);
+  validateSite(source, issues);
   validateFloorGeometry(source, issues);
   validateSpaceGeometry(source, issues);
   validatePortals(source, issues);

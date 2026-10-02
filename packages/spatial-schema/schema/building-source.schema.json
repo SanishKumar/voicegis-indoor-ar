@@ -42,7 +42,8 @@
     "localizationAnchors": {
       "type": "array",
       "items": { "$ref": "#/$defs/localizationAnchor" }
-    }
+    },
+    "site": { "$ref": "#/$defs/site" }
   },
   "$defs": {
     "id": {
@@ -69,6 +70,54 @@
       "type": "array",
       "minItems": 3,
       "items": { "$ref": "#/$defs/coordinate2d" }
+    },
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["floorId", "buildings", "grounds", "features"],
+      "properties": {
+        "floorId": { "$ref": "#/$defs/id" },
+        "buildings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "footprint", "storeys"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+              "footprint": { "$ref": "#/$defs/polygon" },
+              "storeys": { "type": "integer", "minimum": 1, "maximum": 60 }
+            }
+          }
+        },
+        "grounds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "kind", "polygon"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "kind": { "enum": ["lawn", "planting", "water", "paving", "parking", "road"] },
+              "polygon": { "$ref": "#/$defs/polygon" }
+            }
+          }
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "kind", "position"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "kind": { "enum": ["tree", "statue", "fountain", "bench", "lamp"] },
+              "position": { "$ref": "#/$defs/coordinate2d" }
+            }
+          }
+        }
+      }
     },
     "building": {
       "type": "object",

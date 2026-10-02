@@ -91,6 +91,46 @@ export interface LocalizationAnchorSource {
   payload: string;
 }
 
+export type SiteGroundKind = 'lawn' | 'planting' | 'water' | 'paving' | 'parking' | 'road';
+export type SiteFeatureKind = 'tree' | 'statue' | 'fountain' | 'bench' | 'lamp';
+
+/** One building standing on the site: where it is, and how tall it reads from outside. */
+export interface SiteBuildingSource {
+  id: string;
+  name: string;
+  footprint: Coordinate2D[];
+  storeys: number;
+}
+
+export interface SiteGroundSource {
+  id: string;
+  kind: SiteGroundKind;
+  polygon: Coordinate2D[];
+}
+
+export interface SiteFeatureSource {
+  id: string;
+  kind: SiteFeatureKind;
+  position: Coordinate2D;
+}
+
+/**
+ * What a venue looks like from outside: the buildings standing on its grounds
+ * and what lies between them.
+ *
+ * This is a picture, not a map. Nothing here is routed over, measured against
+ * or located by: a path someone can walk is a space like any other, with
+ * portals, and the lawn beside it is only drawn. A venue that is one building
+ * has no site at all.
+ */
+export interface SiteSource {
+  /** The floor that is at ground level, where the grounds are drawn. */
+  floorId: string;
+  buildings: SiteBuildingSource[];
+  grounds: SiteGroundSource[];
+  features: SiteFeatureSource[];
+}
+
 export interface BuildingSource {
   schemaVersion: typeof SPATIAL_SCHEMA_VERSION;
   building: BuildingMetadata;
@@ -100,6 +140,7 @@ export interface BuildingSource {
   verticalConnectors: VerticalConnectorSource[];
   pois: PoiSource[];
   localizationAnchors: LocalizationAnchorSource[];
+  site?: SiteSource;
 }
 
 export interface ShapeValidationResult {

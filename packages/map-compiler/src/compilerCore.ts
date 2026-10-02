@@ -49,6 +49,8 @@ export interface CompiledBuildingPackageContent {
   verticalConnectors: BuildingSource['verticalConnectors'];
   pois: BuildingSource['pois'];
   localizationAnchors: BuildingSource['localizationAnchors'];
+  /** Present only for a venue with grounds; a single building's package has none. */
+  site?: BuildingSource['site'];
   routing: {
     nodes: CompiledNavigationNode[];
     edges: CompiledNavigationEdge[];
@@ -351,6 +353,18 @@ function normalizedSource(source: BuildingSource): BuildingSource {
     localizationAnchors: sortById(source.localizationAnchors).map((value) =>
       structuredClone(value),
     ),
+    // Left out entirely when there is none, so a venue without grounds
+    // compiles to the same bytes, and the same hash, as it did before.
+    ...(source.site
+      ? {
+          site: {
+            floorId: source.site.floorId,
+            buildings: sortById(source.site.buildings).map((value) => structuredClone(value)),
+            grounds: sortById(source.site.grounds).map((value) => structuredClone(value)),
+            features: sortById(source.site.features).map((value) => structuredClone(value)),
+          },
+        }
+      : {}),
   };
 }
 
@@ -394,6 +408,7 @@ export function prepareBuildingCompilation(value: unknown): CompilationPreparati
     verticalConnectors: normalized.verticalConnectors,
     pois: normalized.pois,
     localizationAnchors: normalized.localizationAnchors,
+    ...(normalized.site ? { site: normalized.site } : {}),
     routing: generateNavigationGraph(normalized),
   };
   return { content, report };
