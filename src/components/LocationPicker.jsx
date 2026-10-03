@@ -164,7 +164,8 @@ export default function LocationPicker({ isOpen, onClose }) {
             // second line said "Garden Café · Ground · Diagn…" under "Garden
             // Café" and was cut off before it reached anything new. Which floor
             // it is on is the part the name does not already say.
-            const floorName = venue.getFloorById(node.floor)?.name ?? node.poi.description;
+            const floorName =
+              node.poi.where ?? venue.getFloorById(node.floor)?.name ?? node.poi.description;
             return (
               <button key={node.id} className="lp-result-item" onClick={() => handleSelect(node)}>
                 <div className="lp-result-icon">{node.poi.icon}</div>

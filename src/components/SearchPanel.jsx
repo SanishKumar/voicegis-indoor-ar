@@ -348,8 +348,11 @@ export default function SearchPanel() {
                         <div className="search-result-info">
                           <div className="search-result-name">{node.poi.name}</div>
                           <div className="search-result-desc" id={`search-meta-${node.id}`}>
-                            {node.floorName ?? venue.getFloorById(node.floor)?.name ?? node.floor} ·{' '}
-                            {node.poi.accessible ? 'Accessible' : 'Not accessible'}
+                            {node.poi.where ??
+                              node.floorName ??
+                              venue.getFloorById(node.floor)?.name ??
+                              node.floor}{' '}
+                            · {node.poi.accessible ? 'Accessible' : 'Not accessible'}
                           </div>
                         </div>
                       </button>

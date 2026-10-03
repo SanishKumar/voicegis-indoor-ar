@@ -8,10 +8,22 @@
  */
 
 /**
+ * Text as it is compared: lower case, and without its accents, so that
+ * "cafe" finds the Café and "creche" the Crèche. Nobody types the accent on a
+ * phone keyboard, and a name that only matches with it is a name not found.
+ */
+function folded(text) {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+/**
  * Generate trigrams from a string.
  */
 function trigrams(str) {
-  const s = `  ${str.toLowerCase()}  `;
+  const s = `  ${folded(str)}  `;
   const result = new Set();
   for (let i = 0; i < s.length - 2; i++) {
     result.add(s.substring(i, i + 3));
@@ -61,14 +73,14 @@ export function searchPOIs(pois, query, options = {}) {
       .map((node) => ({ node, score: 1 }));
   }
 
-  const q = query.toLowerCase().trim();
+  const q = folded(query).trim();
 
-  const results = candidates
+  const matched = candidates
     .map((node) => {
-      const name = node.poi.name.toLowerCase();
-      const desc = (node.poi.description || '').toLowerCase();
-      const cat = node.poi.category.toLowerCase();
-      const aliases = (node.poi.aliases || []).map((alias) => alias.toLowerCase());
+      const name = folded(node.poi.name);
+      const desc = folded(node.poi.description || '');
+      const cat = folded(node.poi.category);
+      const aliases = (node.poi.aliases || []).map(folded);
 
       // Exact prefix match gets highest score
       if (name.startsWith(q)) {
@@ -98,19 +110,25 @@ export function searchPOIs(pois, query, options = {}) {
         return { node, score: 0.5 };
       }
 
-      // Fuzzy trigram match on name
+      // Fuzzy trigram match on name: a guess at what a misspelling meant.
       const similarity = trigramSimilarity(q, name);
       if (similarity >= threshold) {
-        return { node, score: similarity * 0.8 };
+        return { node, score: similarity * 0.8, guess: true };
       }
 
       return null;
     })
-    .filter(Boolean)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .filter(Boolean);
 
-  return results;
+  // A guess is for when nothing was found. Beside a place that was actually
+  // asked for it is noise: "Maternity" found the Maternity Unit and, three
+  // letters in common, the Main Gate.
+  const found = matched.some((result) => !result.guess);
+  return matched
+    .filter((result) => !found || !result.guess)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ node, score }) => ({ node, score }));
 }
 
 /**

@@ -116,6 +116,12 @@ export interface VisitorPoiMetadata extends PoiMetadata {
   floorName: string;
   spaceId: string;
   spaceName: string;
+  /**
+   * Where the place is, as a visitor is told it. In one building that is its
+   * floor. Where there are several it is which building and which floor of
+   * it, or the grounds: "Ground" says nothing when three buildings have one.
+   */
+  where: string;
   public: boolean;
   accessible: boolean;
   aliases: string[];
@@ -233,6 +239,25 @@ export function createCompiledBuildingRuntime(
     return `${space.name} · ${floor?.name ?? poi.floorId}`;
   }
 
+  function whereIs(poi: PoiSource, floorName: string) {
+    const site = buildingPackage.site;
+    if (!site) return floorName;
+    const [x, y] = poi.position;
+    const building = site.buildings.find((candidate) => {
+      let inside = false;
+      const ring = candidate.footprint;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+        const [xi, yi] = ring[i];
+        const [xj, yj] = ring[j];
+        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+      }
+      return inside;
+    });
+    if (!building) return 'Grounds';
+    // "Level 1 · Women & Children" is "Level 1" once the building is named.
+    return `${building.name} · ${floorName.split(' · ')[0]}`;
+  }
+
   function poiMetadata(poi: PoiSource): VisitorPoiMetadata | undefined {
     const space = spacesById.get(poi.spaceId);
     const floor = floorsById.get(poi.floorId);
@@ -247,6 +272,7 @@ export function createCompiledBuildingRuntime(
       floorName: floor.name,
       spaceId: space.id,
       spaceName: space.name,
+      where: whereIs(poi, floor.name),
       public: poi.public && space.public,
       accessible: poi.accessible && space.accessible,
       aliases: poi.aliases ?? [],

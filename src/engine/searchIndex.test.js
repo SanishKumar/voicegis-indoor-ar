@@ -34,4 +34,28 @@ describe('POI search', () => {
       ),
     ).toBe(false);
   });
+
+  const place = (name, extra = {}) => ({
+    id: `poi:${name}`,
+    poi: { name, category: 'service', description: '', aliases: [], ...extra },
+  });
+
+  it('does not pad a place that was found with guesses at a misspelling', () => {
+    const places = [place('Maternity Unit'), place('Main Gate'), place('Materials Store')];
+    // "Main Gate" shares three letters in a row with "maternity" and no more.
+    expect(searchPOIs(places, 'Maternity').map(({ node }) => node.poi.name)).toEqual([
+      'Maternity Unit',
+    ]);
+    // With nothing found, the guesses are all there is, and they are offered.
+    expect(searchPOIs(places, 'matternity').map(({ node }) => node.poi.name)).toContain(
+      'Maternity Unit',
+    );
+  });
+
+  it('finds a name with an accent from a query typed without one', () => {
+    const places = [place('Courtyard Café'), place('Crèche'), place('Car Park')];
+    expect(searchPOIs(places, 'cafe')[0].node.poi.name).toBe('Courtyard Café');
+    expect(searchPOIs(places, 'creche')[0].node.poi.name).toBe('Crèche');
+    expect(searchPOIs(places, 'Café')[0].node.poi.name).toBe('Courtyard Café');
+  });
 });

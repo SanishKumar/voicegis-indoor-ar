@@ -131,12 +131,18 @@ test('200% text on a short phone keeps instructions, destination and every previ
   await expectInsideViewport(banner);
   await banner.focus();
   await page.keyboard.press('End');
+  // At the end, and at rest there: seen at the end twice running. A key
+  // pressed in the last frame of the scroll the key before it started is
+  // dropped by the browser, and a test can do that where a person cannot.
+  let timesAtEnd = 0;
   await expect
-    .poll(() =>
-      banner.evaluate(
+    .poll(async () => {
+      const atEnd = await banner.evaluate(
         (node) => Math.abs(node.scrollHeight - node.clientHeight - node.scrollTop) < 1,
-      ),
-    )
+      );
+      timesAtEnd = atEnd ? timesAtEnd + 1 : 0;
+      return timesAtEnd >= 2;
+    })
     .toBe(true);
   await page.keyboard.press('Home');
   await expect.poll(() => banner.evaluate((node) => node.scrollTop)).toBe(0);

@@ -106,4 +106,18 @@ describe('Meridian Park Medical Campus', () => {
   it('starts a visitor at the main gate', () => {
     expect(RUNTIME.getDefaultStartNodeId()).toBe('poi:poi-main-gate');
   });
+
+  it('says which building a place is in, because every building has a ground floor', () => {
+    const places = new Map(RUNTIME.getPOIs().map((node) => [node.id, node.poi.where]));
+    const where = (id: string) => places.get(`poi:${id}`);
+    expect(where('poi-w-gym')).toBe('Wellness Pavilion · Ground');
+    expect(where('poi-e-triage')).toBe('Emergency Centre · Ground');
+    expect(where('poi-g-pharmacy')).toBe('Main Hospital · Ground');
+    expect(where('poi-l1-maternity')).toBe('Main Hospital · Level 1');
+    expect(where('poi-l2-dialysis')).toBe('Main Hospital · Level 2');
+    // Out of doors is in no building.
+    expect(where('poi-fountain')).toBe('Grounds');
+    expect(where('poi-main-gate')).toBe('Grounds');
+    expect(where('poi-car-park')).toBe('Grounds');
+  });
 });

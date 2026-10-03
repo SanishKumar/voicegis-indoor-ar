@@ -325,8 +325,11 @@ export default function JourneyChrome({
   const destinationLevel = destination
     ? venue.getFloorById(String(destination.floor))?.level
     : undefined;
-  const destinationFloorLabel =
-    destinationLevel === 0
+  // Where there are several buildings, which of them the trip ends in is the
+  // first thing to know; "Ground floor" is true of all of them.
+  const destinationFloorLabel = venue.buildingPackage?.site
+    ? (destination?.poi?.where ?? destinationFloor)
+    : destinationLevel === 0
       ? 'Ground floor'
       : Number.isFinite(destinationLevel)
         ? `Level ${destinationLevel}`

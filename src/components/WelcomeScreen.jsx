@@ -59,7 +59,10 @@ export default function WelcomeScreen({ onComplete }) {
     return (preferred.length > 0 ? preferred : pois).slice(0, 4);
   }, [pois]);
 
-  const floorNameFor = useCallback((node) => venue.getFloorById(node.floor)?.name ?? '', [venue]);
+  const floorNameFor = useCallback(
+    (node) => node.poi?.where ?? venue.getFloorById(node.floor)?.name ?? '',
+    [venue],
+  );
 
   const chooseDestination = (node) => {
     setDestination({ id: node.id, name: node.poi.name });
