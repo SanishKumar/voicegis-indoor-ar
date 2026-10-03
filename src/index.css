@@ -5919,6 +5919,13 @@ body {
   cursor: pointer;
 }
 
+/* Two links share a row where the pane is wide enough for both. */
+.onboard-links {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--spacing-24);
+}
+
 /* Drawn rather than typed: a glyph would depend on the host charset and on the
    face carrying it. */
 .onboard-ghost-mark {

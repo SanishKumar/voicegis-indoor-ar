@@ -215,23 +215,26 @@ export default function WelcomeScreen({ onComplete }) {
                 <p className="onboard-empty">Nothing here matches that. Try a shorter word.</p>
               )}
 
-              <button type="button" className="onboard-ghost" onClick={onComplete}>
-                Browse the map instead
-                <span className="onboard-ghost-mark" aria-hidden="true" />
-              </button>
-              {otherPlaces && (
-                <button
-                  type="button"
-                  className="onboard-ghost"
-                  onClick={() => {
-                    setPlaceProblem(null);
-                    setStep(STEP.PLACE);
-                  }}
-                >
-                  Somewhere else? Choose the place
+              {/* Side by side where there is room; one under the other on a phone. */}
+              <div className="onboard-links">
+                <button type="button" className="onboard-ghost" onClick={onComplete}>
+                  Browse the map instead
                   <span className="onboard-ghost-mark" aria-hidden="true" />
                 </button>
-              )}
+                {otherPlaces && (
+                  <button
+                    type="button"
+                    className="onboard-ghost"
+                    onClick={() => {
+                      setPlaceProblem(null);
+                      setStep(STEP.PLACE);
+                    }}
+                  >
+                    Somewhere else? Choose the place
+                    <span className="onboard-ghost-mark" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             </div>
           </section>
         )}
