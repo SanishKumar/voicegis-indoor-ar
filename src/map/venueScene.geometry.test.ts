@@ -10,6 +10,7 @@ import {
   DirectionalLight,
   WebGLRenderTarget,
   Box3,
+  type InstancedMesh,
 } from 'three';
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import referencePackage from '../../buildings/reference-medical-centre/compiled/building.package.json';
@@ -109,6 +110,70 @@ describe('visitor route geometry', () => {
         new Box3().setFromObject(observed.scene!.getObjectByName(name)!).max.y,
       ).toBeGreaterThan(0);
     }
+  });
+  it('furnishes every room as a few meshes a floor, however many pieces there are', () => {
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      campusPackage as unknown as CompiledBuildingPackage,
+    );
+    scene.frame();
+    const furniture: InstancedMesh[] = [];
+    observed.scene!.traverse((object) => {
+      if (object.name.startsWith('furniture-')) furniture.push(object as InstancedMesh);
+    });
+    // One mesh for each kind of solid on each of three floors, not one a chair.
+    expect(furniture.length).toBeGreaterThanOrEqual(3);
+    expect(furniture.length).toBeLessThanOrEqual(3 * 4);
+    expect(furniture.reduce((total, mesh) => total + mesh.count, 0)).toBeGreaterThan(1500);
+    // Each piece in its own colour, on the one material.
+    for (const mesh of furniture) expect(mesh.instanceColor).not.toBeNull();
+  });
+  it('opens the stack with the grounds readable under ghosted storeys, and names where the trip ends', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(80);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(24);
+    const labels = document.createElement('div');
+    scene.dispose();
+    scene = createVenueScene(canvas, labels, campusPackage as unknown as CompiledBuildingPackage);
+    // From upstairs in the hospital, down its stairs, and across to the pavilion.
+    scene.setActiveFloor('l2');
+    scene.setRoute([
+      { x: 119, y: 17, floor: 'l2' },
+      { x: 103, y: 15, floor: 'l2' },
+      { x: 103, y: 15, floor: 'l1' },
+      { x: 103, y: 15, floor: 'g' },
+      { x: 105, y: 60, floor: 'g' },
+      { x: 186, y: 84, floor: 'g' },
+    ]);
+    scene.setDestination('poi:poi-w-gym');
+    scene.setMode('3d');
+    scene.setOverview(true);
+    scene.frame();
+    scene.frame();
+
+    // The furniture of each floor fades with its floor, so it says how each is drawn.
+    const opacity = new Map<number, number>();
+    observed.scene!.traverse((object) => {
+      if (object.name !== 'furniture-box') return;
+      const material = (object as InstancedMesh).material as MeshStandardMaterial;
+      opacity.set(Math.round(object.parent!.position.y), material.opacity);
+    });
+    const byHeight = [...opacity.entries()].sort((a, b) => a[0] - b[0]).map((entry) => entry[1]);
+    expect(byHeight).toHaveLength(3);
+    const [ground, between, inHand] = byHeight;
+    // The floor in hand is solid, the one passed through on the stairs a ghost,
+    // and the grounds - where most of the walk is - stay readable beneath.
+    expect(inHand).toBe(1);
+    expect(between).toBeLessThan(0.3);
+    expect(ground).toBeGreaterThan(0.6);
+    expect(ground).toBeLessThan(1);
+
+    const destination = [...labels.children].find(
+      (label) => label.textContent === 'Rehabilitation Gym',
+    ) as HTMLElement | undefined;
+    expect(destination?.style.visibility).toBe('visible');
+    expect(destination?.classList.contains('map-pill-destination')).toBe(true);
   });
   it('observes drawn frames, not idle RAFs, and publishes one automatic downshift', () => {
     // jsdom has no font layout. Nonzero sizes let the scene cache labels instead

@@ -3,6 +3,7 @@ import {
   AmbientLight,
   BoxGeometry,
   BufferGeometry,
+  Color,
   CircleGeometry,
   ConeGeometry,
   CylinderGeometry,
@@ -26,6 +27,7 @@ import {
   Shape,
   ShadowMaterial,
   SphereGeometry,
+  TorusGeometry,
   Vector2,
   Vector3,
   WebGLRenderer,
@@ -36,6 +38,7 @@ import { resolveCartographicLabels, type CartographicBounds } from '../engine/fl
 import type { VisitorLocation } from '../navigation/visitorLocation';
 import { cumulativeDistances } from '../navigation/routeProgress';
 import { MAP_ROUTE_RADIUS_METERS } from '../engine/routeClearance';
+import { furnishRoom, roomsOfFloor, type FurniturePart } from './roomInteriors';
 import { createSiteScenery } from './siteScenery';
 import { cutOutline, insetPolygon, ribbon, roundCorners } from './softGeometry';
 import {
@@ -194,6 +197,19 @@ const LOCATION_MIN_RADIUS_PIXELS = 8;
  * the view this gives is always among the rooms, on a phone as on a desk.
  */
 const LOCATION_REACH_METERS = 30;
+/** The top of a room's tile: what furniture stands on. */
+const FURNITURE_FLOOR = 0.27;
+/** The tube of the ring a scanner is drawn with, as a share of its diameter. */
+const FURNITURE_RING_TUBE = 0.14;
+/** How faint a floor of the stack is when it is not the one being read. */
+const STACK_GHOST_OPACITY = 0.22;
+/**
+ * The ground of a site, in the stack. Floors of one building lie over each
+ * other and have to be seen through; the grounds lie under nothing but the
+ * one building with upper floors, and they are where a walk between
+ * buildings happens. Ghosted like a storey, the whole campus faded to a hint.
+ */
+const SITE_STACK_OPACITY = 0.66;
 /** Radius of the window through the walls around the marker, in metres. */
 const WALL_WINDOW_METERS = 2.6;
 /** The route's end outranks every other label. */
@@ -318,29 +334,6 @@ export function venueDrawingBufferNeedsResize(
     bufferWidth !== Math.floor(cssWidth * pixelRatio) ||
     bufferHeight !== Math.floor(cssHeight * pixelRatio)
   );
-}
-
-/*
- * Furniture placement is seeded, not random: the same venue must draw the same
- * room every time it is opened, or the map appears to rearrange itself between
- * visits.
- */
-function seededRandom(seed: number) {
-  let value = seed;
-  return () => {
-    value = (value * 1664525 + 1013904223) % 4294967296;
-    return value / 4294967296;
-  };
-}
-
-function pointInPolygon([x, y]: Coordinate, polygon: readonly Coordinate[]) {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const [xi, yi] = polygon[i];
-    const [xj, yj] = polygon[j];
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-  }
-  return inside;
 }
 
 function surface(color: number, extra: Record<string, unknown> = {}) {
@@ -825,78 +818,56 @@ export function createVenueScene(
     }
 
     /*
-     * The furniture is what stops a floor plate reading as an empty diagram.
-     * It is illustration, not survey: the package does not record where chairs
-     * are, so these are placed inside the right rooms and never claimed to be
-     * anything more.
+     * The furniture is what stops a floor plate reading as an empty diagram,
+     * and what makes the inside of a building as much of a place as the
+     * outside of it. Each room is furnished by what it is for (roomInteriors):
+     * beds in a ward, shelving in a pharmacy, cars in a lift lobby. It is
+     * illustration, not survey, and it keeps clear of every door, every pin
+     * and every line a route can be drawn along.
      */
-    const random = seededRandom(20260828);
-    const seats: Coordinate[] = [];
-    const planters: Coordinate[] = [];
-    for (const space of spaces) {
-      if (!['lobby', 'entrance', 'room', 'service'].includes(space.type)) continue;
+    const furniture: FurniturePart[] = roomsOfFloor(buildingPackage, floor.id)
       // The grounds have their own trees and benches, placed by the venue.
-      if (outdoorSpaces.has(space.id)) continue;
-      const polygon = space.polygon as Coordinate[];
-      const px = polygon.map((point) => point[0]);
-      const py = polygon.map((point) => point[1]);
-      const wanted = space.type === 'lobby' || space.type === 'entrance' ? 8 : 3;
-      let tries = 0;
-      let placed = 0;
-      while (placed < wanted && tries < 120) {
-        tries += 1;
-        const candidate: Coordinate = [
-          Math.min(...px) + 1 + random() * (Math.max(...px) - Math.min(...px) - 2),
-          Math.min(...py) + 1 + random() * (Math.max(...py) - Math.min(...py) - 2),
-        ];
-        if (!pointInPolygon(candidate, polygon)) continue;
-        (random() > 0.62 ? planters : seats).push(candidate);
-        placed += 1;
-      }
-    }
-
-    const addInstances = (
-      geometry: ConstructorParameters<typeof InstancedMesh>[0],
-      material: MeshStandardMaterial,
-      points: Coordinate[],
-      place: (object: Object3D, point: Coordinate) => void,
-    ) => {
-      if (points.length === 0) return;
-      const mesh = new InstancedMesh(geometry, track(material), points.length);
-      const scratch = new Object3D();
-      points.forEach((point, index) => {
-        place(scratch, point);
+      .filter((room) => !outdoorSpaces.has(room.id))
+      .flatMap(furnishRoom);
+    /*
+     * One mesh for each kind of solid on the floor, however many pieces of
+     * furniture there are, each instance in its own colour. Furniture is
+     * scenery and is coloured like scenery: enough to say what a room is,
+     * quiet enough that the only saturated things on the model are the route
+     * and the destinations.
+     */
+    const scratch = new Object3D();
+    const tint = new Color();
+    for (const shape of ['box', 'cylinder', 'sphere', 'ring'] as const) {
+      const solids = furniture.filter((part) => part.shape === shape);
+      if (solids.length === 0) continue;
+      const geometry =
+        shape === 'box'
+          ? new BoxGeometry(1, 1, 1)
+          : shape === 'cylinder'
+            ? new CylinderGeometry(0.5, 0.5, 1, 14)
+            : shape === 'sphere'
+              ? new IcosahedronGeometry(0.5, 1)
+              : new TorusGeometry(0.5 - FURNITURE_RING_TUBE, FURNITURE_RING_TUBE, 10, 28);
+      const mesh = new InstancedMesh(geometry, track(surface(0xffffff)), solids.length);
+      solids.forEach((part, index) => {
+        scratch.position.copy(vec(part.position as Coordinate, FURNITURE_FLOOR + part.elevation));
+        // A ring stands upright with its opening along plan y, or is turned to face along x.
+        scratch.rotation.set(0, shape === 'ring' && part.turned ? Math.PI / 2 : 0, 0);
+        if (shape === 'ring') {
+          scratch.scale.set(part.size[0], part.size[0], part.size[1] / (FURNITURE_RING_TUBE * 2));
+        } else {
+          scratch.scale.set(part.size[0], part.size[2], part.size[1]);
+        }
         scratch.updateMatrix();
         mesh.setMatrixAt(index, scratch.matrix);
+        mesh.setColorAt(index, tint.setHex(part.color));
       });
+      mesh.name = `furniture-${shape}`;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
-    };
-
-    /*
-     * Furniture is scenery and is coloured like scenery. In tan, terracotta
-     * and olive it competed with the markers for attention and, at a metre
-     * across and head height, the planters read as trees growing indoors. Warm
-     * neutrals put it back where it belongs - enough to stop a floor plate
-     * looking like an empty diagram, quiet enough that the only saturated
-     * things on the model are the route and the destinations.
-     */
-    addInstances(new BoxGeometry(1.5, 0.42, 0.6), surface(0xb9cce6), seats, (object, point) => {
-      object.position.copy(vec(point, 0.24));
-      object.rotation.set(0, random() > 0.5 ? 0 : Math.PI / 2, 0);
-    });
-    addInstances(
-      new CylinderGeometry(0.22, 0.26, 0.46, 10),
-      surface(0xc9d8ec),
-      planters,
-      (object, point) => object.position.copy(vec(point, 0.23)),
-    );
-    addInstances(new IcosahedronGeometry(0.3, 1), surface(0x9fc3b4), planters, (object, point) => {
-      object.position.copy(vec(point, 0.62));
-      object.scale.set(1, 1.15, 1);
-      object.rotation.set(0, random() * Math.PI, 0);
-    });
+    }
 
     /*
      * A destination is a pin: a tapered body with its point on the floor and a
@@ -1395,7 +1366,11 @@ export function createVenueScene(
       view.group.visible = active || inStack;
       if (view.group.visible) shown += 1;
       view.targetY = inStack ? stackY(view) : 0;
-      view.targetOpacity = active ? 1 : 0.22;
+      view.targetOpacity = active
+        ? 1
+        : site !== null && view.id === site.floorId
+          ? SITE_STACK_OPACITY
+          : STACK_GHOST_OPACITY;
     }
     hopsGroup.visible = stacked();
     shaftsGroup.visible = stacked();
@@ -1498,8 +1473,20 @@ export function createVenueScene(
 
   function drawLabels(width: number, height: number) {
     const view = floors.get(activeFloorId);
+    // Each label with how far its floor has been lifted in the stack.
+    const drawn = (view?.labels ?? []).map((label) => ({ label, lift: 0 }));
+    // With the stack open, a trip can end on another floor than the one in
+    // hand. Its name is the one label the visitor is looking for, so it is
+    // drawn where that floor now is.
+    if (view !== undefined && stacked() && destinationId !== null) {
+      for (const other of floors.values()) {
+        if (other === view || !other.group.visible) continue;
+        const label = other.labels.find((entry) => entry.id === destinationId);
+        if (label !== undefined) drawn.push({ label, lift: other.currentY });
+      }
+    }
     for (const [id, element] of labelElements) {
-      if (view === undefined || !view.labels.some((label) => label.id === id)) {
+      if (!drawn.some((entry) => entry.label.id === id)) {
         element.style.opacity = '0';
         element.style.visibility = 'hidden';
       }
@@ -1507,7 +1494,7 @@ export function createVenueScene(
     if (view === undefined) return;
 
     const candidates = [];
-    for (const label of view.labels) {
+    for (const { label, lift } of drawn) {
       const element = elementFor(label.id, label.text);
       // From outside, a building is its name; inside, it is its rooms.
       if (
@@ -1525,7 +1512,9 @@ export function createVenueScene(
         if (size[0] > 0) labelSizes.set(label.id, size);
         else invalidate();
       }
-      projected.copy(label.anchor).project(camera);
+      projected.copy(label.anchor);
+      projected.y += lift;
+      projected.project(camera);
       if (projected.z > 1) {
         element.style.opacity = '0';
         continue;

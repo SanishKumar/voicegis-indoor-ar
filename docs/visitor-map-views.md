@@ -16,6 +16,11 @@ request. It changes presentation, not the localization or routing policy.
 - Floors stay collapsed unless the visitor requests **Route overview** in 3D
   for a cross-floor route. The active floor remains at height zero and changing
   presentation never changes the checkpoint's floor.
+- Opening or closing the overview reframes: one floor's leg and the whole trip
+  are different pictures, whoever chose the view. While it is open the camera
+  frames every floor the route crosses and does not follow the marker; closing
+  it gives the marker the camera back. The destination is named in the
+  overview even when it is on another floor than the one in hand.
 - **Expand map** temporarily hides the directions sheet without unmounting it.
   **Show directions** restores it and keyboard focus. A new route automatically
   returns to directions rather than hiding new guidance.

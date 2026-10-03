@@ -220,6 +220,46 @@ The inspector's model and the Studio's plan are tools for checking a compiled
 venue, so they keep its exact geometry, in the same whites and pale blues
 (`src/engine/cartographicTheme.ts`) on clear ground.
 
+### What is in a room
+
+A room is furnished by what it is for (`src/map/roomInteriors.ts`), so the
+inside of a building is as much of a place as the outside of it: a ward has
+beds in bays down its walls, a pharmacy shelving and a counter, imaging a
+scanner, a café tables, a laboratory benches, a lift lobby its cars and a
+stair hall its flights. What a room is for is read from its name first and
+then from the places in it; a room nothing is known about gets a sofa and a
+plant.
+
+| The room is                     | It holds                                    |
+| ------------------------------- | ------------------------------------------- |
+| A ward, recovery, treatment     | Beds in curtained bays, a nurses' desk      |
+| Dialysis, oncology, infusion    | Recliners, each with its machine            |
+| A pharmacy or a shop            | Wall shelving, islands, a counter           |
+| A café                          | A servery and round tables with stools      |
+| Imaging                         | A scanner, a control desk, a couch          |
+| A laboratory, blood tests       | Benches with equipment and stools           |
+| Registration, reception, triage | A counter with screens, rows of seats       |
+| An office, administration       | Desks back to back, cabinets                |
+| Education, a meeting room       | A screen, and rows of seats facing it       |
+| A waiting area, a lounge        | Sofas, low tables, plants                   |
+| A clinic, therapy, consulting   | Consulting bays: a desk and a couch         |
+| A gym, a studio, a pool         | Treadmills and bikes; mats; a basin         |
+| A terrace                       | Planters and café tables                    |
+| A lift lobby, a stair hall      | Lift cars with doors; flights and a landing |
+| A wide concourse                | A bench and a plant by turns down its sides |
+
+It is illustration and never survey: the package says what a room is, not
+where its beds are. Four things are never covered, and a piece that would
+cover one is left out and not moved: a doorway and a stride beyond it, a pin,
+the walls, and **any line a route can be drawn along** - taken from the
+routing graph, so a route never has to be drawn through a bed.
+`roomInteriors.test.ts` checks all four for every room of every venue.
+
+Furniture is scenery and coloured like it: whites, pale blues, one slate, a
+sand and a sage, drawn a little lower than life so that a shelf does not
+stand in front of the route behind it. All the furniture of a floor is four
+meshes, one for each kind of solid, however many pieces there are.
+
 ### A site with more than one building
 
 A venue may carry a `site`: its buildings, its grounds and what stands on
@@ -265,6 +305,15 @@ Which of the two views a visitor is given follows from where they are:
 | On an upper floor                  | That floor, which is one building, round them |
 | Looking at a floor that isn't here | That floor, fitted: never an empty screen     |
 | A route is showing                 | The route. None of the above moves it         |
+
+**A trip between buildings is seen whole in the route overview.** A route
+from a room upstairs in one building to a room in another is three things at
+once: a leg on one floor, a way down, and a walk across the grounds. In 3D,
+_Route overview_ stacks the floors it crosses and frames all of it: the floor
+in hand is solid, a floor only passed through on the stairs is a ghost, and
+the grounds stay readable beneath, because that is where the walk between
+buildings is. The trip's end is named wherever it is, and while the overview
+is open the camera holds the whole trip and does not go off after the marker.
 
 Sixty metres across is inside the distance at which the roofs come off, so
 coming in to a visitor always arrives among the rooms, on a phone as on a

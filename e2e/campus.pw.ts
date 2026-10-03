@@ -189,3 +189,75 @@ test('a route leaves one building, crosses the garden and enters another', async
     page.locator('.map-pill-destination', { hasText: 'Rehabilitation Gym' }),
   ).toBeVisible();
 });
+
+test('the route overview shows a whole trip from upstairs in one building to a room in another', async ({
+  page,
+}) => {
+  // Three stacked floors of a campus, drawn by a software renderer, several
+  // times over. Each wait keeps its own deadline; the whole is allowed longer.
+  test.slow();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openCampus(page);
+
+  // From the Dialysis Unit on Level 2 of the hospital to the gym in the pavilion.
+  await page.getByRole('button', { name: 'Search rooms and departments', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search rooms and departments' }).fill('Dialysis Unit');
+  await page.getByRole('button', { name: 'View details for Dialysis Unit', exact: true }).click();
+  await page.getByRole('button', { name: 'Set Dialysis Unit as starting point' }).click();
+  await page
+    .getByRole('textbox', { name: 'Search rooms and departments' })
+    .fill('Rehabilitation Gym');
+  await page.getByRole('button', { name: 'Navigate to Rehabilitation Gym' }).click();
+
+  const directions = page.getByRole('region', { name: 'Directions to Rehabilitation Gym' });
+  await expect(directions).toBeVisible();
+  const map = page.locator('.compiled-map');
+  const canvas = page.locator('.compiled-map-canvas');
+  // Level 2, Level 1 on the way down the stairs, and the ground.
+  await expect(map).toHaveAttribute('data-route-floors', '3');
+
+  // Every floor of it is in the written directions, in order. On a wide
+  // screen they are all listed; on a narrow one they are a press away.
+  const showAll = directions.getByRole('button', { name: /Show all \d+ steps/ });
+  if (await showAll.isVisible()) await showAll.click();
+  const steps = directions.locator('.jr-step-list');
+  await expect(steps).toContainText('Turn right into Level 2 Stair Hall');
+  await expect(steps).toContainText('Take Main Stairs to Ground · Campus');
+  await expect(steps).toContainText('Continue on Hospital Forecourt');
+  await expect(steps).toContainText('Turn left onto East Garden Walk');
+  await expect(steps).toContainText('Turn left into Rehabilitation Gym');
+  // A turn made inside a corridor is not a turn "onto" the corridor.
+  await expect(steps).not.toContainText('onto Level 2 Concourse');
+
+  // On the map, one floor of it at a time until the overview is asked for.
+  await page.getByRole('button', { name: '3D model', exact: true }).click();
+  await expect(map).toHaveAttribute('data-floors-shown', '1');
+  await expect(canvas).toHaveAttribute('data-camera-transition', 'settled');
+  const closeIn = Number(await canvas.getAttribute('data-camera-scale'));
+
+  await page.getByRole('button', { name: 'Route overview', exact: true }).click();
+  await expect
+    .poll(async () => Number(await map.getAttribute('data-floors-shown')), { timeout: 15_000 })
+    .toBe(3);
+  // The view goes out from one leg in one building to the whole of the trip,
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-camera-scale')), { timeout: 15_000 })
+    .toBeGreaterThan(closeIn * 2);
+  // and its end, on another floor of another building, has its name on it.
+  await expect(
+    page.locator('.map-pill-destination', { hasText: 'Rehabilitation Gym' }),
+  ).toBeVisible();
+
+  // Stepping along it with the overview open keeps the whole trip in view:
+  // the camera does not go off after the marker.
+  for (let index = 0; index < 3; index += 1) {
+    await directions.getByRole('button', { name: 'Next instruction' }).click();
+  }
+  await expect(canvas).toHaveAttribute('data-camera-follow', 'free');
+  await expect(map).toHaveAttribute('data-floors-shown', '3');
+
+  // Closing it gives the marker the camera back, on the floor it is on.
+  await page.getByRole('button', { name: 'Route overview', exact: true }).click();
+  await expect(map).toHaveAttribute('data-floors-shown', '1');
+  await expect(canvas).toHaveAttribute('data-camera-follow', 'following');
+});

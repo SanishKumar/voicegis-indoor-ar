@@ -94,6 +94,33 @@ export async function openVisitor(page: Page): Promise<void> {
   await expect(page.locator('.compiled-map')).toBeVisible();
 }
 
+/**
+ * Waits until the map has finished drawing itself and is at rest.
+ *
+ * A model is drawn here by a software renderer, a few hundred milliseconds a
+ * frame, and it draws a dozen frames as it opens. A test of something that is
+ * timed in milliseconds - a sensor that must be heard from four times a
+ * second - is otherwise a test of whether it happened to start between two of
+ * those frames. On a phone the frames are a few milliseconds and nobody
+ * presses anything in the first second, so this takes nothing away.
+ */
+export async function waitForMapAtRest(page: Page): Promise<void> {
+  const canvas = page.locator('.compiled-map-canvas');
+  await expect(canvas).toHaveAttribute('data-camera-transition', 'settled');
+  let last = '';
+  await expect
+    .poll(
+      async () => {
+        const drawn = (await canvas.getAttribute('data-draws')) ?? '';
+        const still = drawn !== '' && drawn === last;
+        last = drawn;
+        return still;
+      },
+      { intervals: [700], timeout: 20_000 },
+    )
+    .toBe(true);
+}
+
 export async function openPharmacyRoute(page: Page): Promise<void> {
   await precompleteOnboarding(page);
   const payload = encodeURIComponent('voicegis://asterion/l2/east');

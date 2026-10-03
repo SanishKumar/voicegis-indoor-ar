@@ -1,4 +1,4 @@
-import { expect, precompleteOnboarding, test } from './support';
+import { expect, precompleteOnboarding, test, waitForMapAtRest } from './support';
 
 test.afterEach(async ({ page }, info) => {
   if (info.status === info.expectedStatus) return;
@@ -104,6 +104,9 @@ test('a quiet scanned sign supplies both camera direction and forward/backward m
   });
   await page.goto('/?fieldtest=1#/visitor');
   await expect(page.locator('.compiled-map')).toBeVisible();
+  // The scan below needs the phone's motion to be heard without a quarter of
+  // a second's gap for three seconds. The map opening would be that gap.
+  await waitForMapAtRest(page);
   await page.getByRole('button', { name: /Change start location/ }).click();
   await page
     .getByRole('dialog', { name: 'Set Your Location' })

@@ -433,29 +433,40 @@ export default function VisitorMap({
     attempt,
   ]);
 
+  // The route overview is of the whole trip: every floor it crosses, stacked.
+  // While it is open the camera frames all of that and does not follow the
+  // marker along one floor of it. Closing it gives the marker the camera back.
+  const stackOpen = presentation.mode === '3d' && presentation.overview && routeFloorCount > 1;
+  const tracking = following && !stackOpen;
+
   useEffect(() => {
     if (!ready) return;
     // At the destination there is nothing ahead to make room for.
     sceneRef.current?.setFollow(
-      following ? { headingUp: true, scale: FOLLOW_SCALE, lookahead: atEnd ? 0 : 0.22 } : null,
+      tracking ? { headingUp: true, scale: FOLLOW_SCALE, lookahead: atEnd ? 0 : 0.22 } : null,
     );
-  }, [ready, following, atEnd, attempt]);
+  }, [ready, tracking, atEnd, attempt]);
 
   // A new route is always shown whole. After that the camera only reframes
-  // for the visitor's benefit - a panel resizing, a change of floor - and
-  // never over a view they chose themselves.
-  const wasFollowingRef = useRef(false);
+  // for the visitor's benefit - a panel resizing, a change of floor, the
+  // overview opening or closing - and never over a view they chose themselves.
+  const wasTrackingRef = useRef(false);
+  const wasStackOpenRef = useRef(stackOpen);
   useEffect(() => {
-    const leftFollowing = wasFollowingRef.current && !following;
-    wasFollowingRef.current = following;
-    if (!ready || !route || following) return;
+    const leftTracking = wasTrackingRef.current && !tracking;
+    wasTrackingRef.current = tracking;
+    // What is drawn has just changed from one floor to several, or back: the
+    // framing of the one is wrong for the other, whoever chose it.
+    const stackChanged = wasStackOpenRef.current !== stackOpen;
+    wasStackOpenRef.current = stackOpen;
+    if (!ready || !route || tracking) return;
     const newRoute = framedRouteRef.current !== route;
-    if (!newRoute && !leftFollowing && userMovedRef.current) return;
+    if (!newRoute && !leftTracking && !stackChanged && userMovedRef.current) return;
     framedRouteRef.current = route;
     // Following turned the map to the direction of travel; the overview it
     // returns to is the plan the right way up.
-    sceneRef.current?.frameRoute({ northUp: leftFollowing });
-  }, [ready, route, following, insets, state.activeFloorId, attempt]);
+    sceneRef.current?.frameRoute({ northUp: leftTracking || stackChanged });
+  }, [ready, route, tracking, stackOpen, insets, state.activeFloorId, attempt]);
 
   useEffect(() => {
     if (!ready) return;
@@ -688,7 +699,7 @@ export default function VisitorMap({
           <button
             type="button"
             className={userMoved ? 'is-emphasised' : undefined}
-            aria-label={following ? 'Recenter on guidance' : 'Show whole route'}
+            aria-label={tracking ? 'Recenter on guidance' : 'Show whole route'}
             onClick={() => {
               actions.setFloor(guidancePosition.floor);
               sceneRef.current?.recenter();
