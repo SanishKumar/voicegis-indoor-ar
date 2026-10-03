@@ -4,6 +4,12 @@ import reference from '../../buildings/reference-medical-centre/compiled/buildin
 import asterion from '../../buildings/asterion-medical-center/compiled/building.package.json';
 import harbor from '../../buildings/harbor-exchange/compiled/building.package.json';
 import campus from '../../buildings/meridian-park-campus/compiled/building.package.json';
+import {
+  checkInFromScan,
+  scannableAnchors,
+  type AnchorLike,
+  type RoutingNodeLike,
+} from '../capture/anchorCheckIn';
 import { calculateCompiledRoute } from '../engine/compiledRoutePolicy';
 import { createCompiledBuildingRuntime } from './compiledBuilding';
 
@@ -50,6 +56,48 @@ for (const [name, venue] of Object.entries(VENUES)) {
       for (const [from, to] of pairs) {
         const route = trip(from, to);
         expect(route.found, `${from} to ${to}`).toBe(true);
+      }
+    });
+
+    it('can draw every one of them on the map', () => {
+      // A route whose line does not fit between the mapped walls is given as
+      // words alone. That is the right answer to a bad survey and the wrong
+      // one to ship: no trip between two published places should need it.
+      for (const [from, to] of pairs) {
+        for (const stepFree of [false, true]) {
+          const route = trip(from, to, stepFree);
+          if (!route.found) continue;
+          expect(route.displayClearance?.status, `${from} to ${to}`).not.toBe('withheld');
+        }
+      }
+    });
+
+    it('starts a visitor at every sign somewhere a route can be drawn from', () => {
+      // Scanning a sign is how a visit begins. A sign beside a door used to
+      // start its routes on the doorway, where no line can be drawn clear of
+      // the wall, so every route from it was words with no map.
+      const anchors = venue.localizationAnchors as unknown as AnchorLike[];
+      const signs = scannableAnchors(anchors);
+      for (const sign of signs) {
+        const scan = checkInFromScan(
+          sign.payload,
+          anchors,
+          venue.routing.nodes as unknown as RoutingNodeLike[],
+        );
+        expect(scan.ok, sign.id).toBe(true);
+        if (!scan.ok) continue;
+        const start = venue.routing.nodes.find((node) => node.id === scan.nodeId);
+        expect(start?.kind, `${sign.id} starts on a ${start?.kind}`).not.toBe('portal');
+        for (const to of places) {
+          if (to === scan.nodeId) continue;
+          const route = trip(scan.nodeId, to);
+          expect(route.found, `${sign.id} to ${to}`).toBe(true);
+          if (!route.found) continue;
+          expect(route.displayClearance?.status, `${sign.id} to ${to}`).not.toBe('withheld');
+          for (const step of route.steps) {
+            expect(step.type, `${sign.id} to ${to}: "${step.instruction}"`).not.toBe('u_turn');
+          }
+        }
       }
     });
 

@@ -94,7 +94,9 @@ describe('resolving a scanned code to a starting point', () => {
 
   it('refuses when the anchor floor has nothing routable on it', () => {
     expect(
-      checkInFromScan('voicegis://asterion/l1/west', anchors, [{ id: 'g-near', floorId: 'g', position: [13, 24] }]),
+      checkInFromScan('voicegis://asterion/l1/west', anchors, [
+        { id: 'g-near', floorId: 'g', position: [13, 24] },
+      ]),
     ).toEqual({ ok: false, reason: 'no-node-on-floor' });
   });
 
@@ -107,6 +109,63 @@ describe('resolving a scanned code to a starting point', () => {
 
   it('treats an empty read as no code at all', () => {
     expect(checkInFromScan('   ', anchors, nodes)).toEqual({ ok: false, reason: 'unknown-code' });
+  });
+
+  describe('a sign hung beside a door', () => {
+    // A lobby ten metres deep, its door to the corridor at x 40, and a sign
+    // two metres inside that door.
+    const sign: AnchorLike = {
+      id: 'anchor-entrance',
+      floorId: 'g',
+      kind: 'qr',
+      position: [42, 84],
+      headingDegrees: 0,
+      payload: 'voicegis://campus/g/entrance',
+      spaceId: 'lobby',
+    };
+    const graph: RoutingNodeLike[] = [
+      { id: 'portal:lobby--corridor', floorId: 'g', position: [40, 84], kind: 'portal' },
+      { id: 'space:lobby', floorId: 'g', position: [45, 84], kind: 'space', sourceId: 'lobby' },
+      {
+        id: 'waypoint:corridor:01',
+        floorId: 'g',
+        position: [38, 84],
+        kind: 'waypoint',
+        sourceId: 'corridor',
+      },
+      { id: 'connector:lift:g', floorId: 'g', position: [43, 84], kind: 'connector-stop' },
+    ];
+
+    it('starts the route in the space the sign hangs in, not on the doorway nearest it', () => {
+      expect(checkInFromScan(sign.payload, [sign], graph)).toMatchObject({
+        ok: true,
+        nodeId: 'space:lobby',
+        distanceMeters: 3,
+      });
+    });
+
+    it('starts at the nearest point along a corridor the sign hangs in', () => {
+      const inCorridor = { ...sign, position: [37, 84] as [number, number], spaceId: 'corridor' };
+      expect(checkInFromScan(sign.payload, [inCorridor], graph)).toMatchObject({
+        ok: true,
+        nodeId: 'waypoint:corridor:01',
+      });
+    });
+
+    it('never starts on a doorway or in a lift, even for a sign that names no space', () => {
+      const { spaceId: _unnamed, ...unplaced } = sign;
+      expect(checkInFromScan(sign.payload, [unplaced], graph)).toMatchObject({
+        ok: true,
+        nodeId: 'space:lobby',
+      });
+    });
+
+    it('still resolves when doorways are all a floor has', () => {
+      expect(checkInFromScan(sign.payload, [sign], [graph[0]])).toMatchObject({
+        ok: true,
+        nodeId: 'portal:lobby--corridor',
+      });
+    });
   });
 });
 
@@ -130,11 +189,23 @@ describe('telling the visitor where they just checked in', () => {
     // space. A label naming only the space reads identically at both, so a
     // visitor could not tell a mis-scan from a correct one.
     const west = describeCheckIn(
-      { anchorId: 'anchor-g-west', floorId: 'g', spaceId: 'g-concourse', nodeId: 'n1', distanceMeters: 1 },
+      {
+        anchorId: 'anchor-g-west',
+        floorId: 'g',
+        spaceId: 'g-concourse',
+        nodeId: 'n1',
+        distanceMeters: 1,
+      },
       names,
     );
     const east = describeCheckIn(
-      { anchorId: 'anchor-g-east', floorId: 'g', spaceId: 'g-concourse', nodeId: 'n2', distanceMeters: 1 },
+      {
+        anchorId: 'anchor-g-east',
+        floorId: 'g',
+        spaceId: 'g-concourse',
+        nodeId: 'n2',
+        distanceMeters: 1,
+      },
       names,
     );
 

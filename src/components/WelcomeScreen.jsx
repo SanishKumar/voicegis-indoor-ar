@@ -17,6 +17,11 @@ const STEP = { DESTINATION: 0, POSITION: 1 };
  * are going, so that is asked first; the position question then arrives with
  * the destination already on screen, which is what makes it worth answering.
  *
+ * A visitor who came in by the code on a sign has already answered the second
+ * question: the sign said where it hangs. They are told so, and naming a
+ * destination is all that is left to do. Asking them where they are after
+ * they have just scanned where they are is the app not listening.
+ *
  * There is no longer a "Skip". Skipping used to leave the runtime with no start
  * and therefore no route, so it was an exit that led nowhere. Browsing the map
  * without a route is still available, but it is named for what it does.
@@ -27,7 +32,7 @@ const STEP = { DESTINATION: 0, POSITION: 1 };
  * look, and a later change of direction should not reach this file at all.
  */
 export default function WelcomeScreen({ onComplete }) {
-  const { actions, venue } = useNavigation();
+  const { actions, venue, checkIn } = useNavigation();
   const [step, setStep] = useState(STEP.DESTINATION);
   const [destination, setDestination] = useState(null);
   const [query, setQuery] = useState('');
@@ -64,7 +69,18 @@ export default function WelcomeScreen({ onComplete }) {
     [venue],
   );
 
+  // Where a sign already put the visitor, by the name of the place it hangs in.
+  const checkedInAt = checkIn
+    ? (venue.getSpaceById(checkIn.spaceId)?.name ?? venue.getFloorById(checkIn.floorId)?.name)
+    : null;
+
   const chooseDestination = (node) => {
+    if (checkIn) {
+      // Both halves are known: the sign gave the start.
+      void actions.navigateTo(node.id, checkIn.nodeId);
+      onComplete();
+      return;
+    }
     setDestination({ id: node.id, name: node.poi.name });
     setStep(STEP.POSITION);
   };
@@ -126,7 +142,15 @@ export default function WelcomeScreen({ onComplete }) {
             >
               Where are you <span className="onboard-title-accent">going?</span>
             </h2>
-            <p className="onboard-sub">Search, or pick from the list.</p>
+            <p className="onboard-sub">
+              {checkedInAt ? (
+                <>
+                  You are at <strong>{checkedInAt}</strong>. Search, or pick from the list.
+                </>
+              ) : (
+                'Search, or pick from the list.'
+              )}
+            </p>
 
             {/* One pane of glass holds everything there is to read or press. */}
             <div className="onboard-pane">

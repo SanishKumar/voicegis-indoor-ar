@@ -261,3 +261,40 @@ test('the route overview shows a whole trip from upstairs in one building to a r
   await expect(map).toHaveAttribute('data-floors-shown', '1');
   await expect(canvas).toHaveAttribute('data-camera-follow', 'following');
 });
+
+test('a first visit by the code on a sign needs only a destination, and its route is drawn', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Nothing set up beforehand: this is the first time the app has been opened,
+  // by the camera of a phone pointed at the sign inside the Emergency Entrance.
+  const payload = encodeURIComponent('voicegis://meridian/g/emergency-entrance');
+  await page.goto(`/?venue=/venues/meridian-park-campus.package.json&checkin=${payload}#/visitor`);
+
+  await expect(page.getByRole('heading', { name: 'Where are you going?' })).toBeVisible();
+  // The sign said where the visitor is, and they are told it was heard.
+  await expect(page.locator('.onboard-sub')).toContainText('You are at Emergency Entrance');
+  await page.getByRole('textbox', { name: 'Search destination rooms' }).fill('Rehabilitation Gym');
+  // Which building a place is in, because every building has a ground floor.
+  await page
+    .getByRole('button', { name: 'Rehabilitation Gym, Wellness Pavilion · Ground' })
+    .click();
+
+  // Not asked where they are, having just scanned where they are.
+  await expect(page.getByRole('heading', { name: 'Now, where are you?' })).toHaveCount(0);
+  const map = page.locator('.compiled-map');
+  await expect(map).toBeVisible();
+  const directions = page.getByRole('region', { name: 'Directions to Rehabilitation Gym' });
+  await expect(directions).toBeVisible();
+  await expect(directions).toContainText('Wellness Pavilion · Ground');
+
+  // And the route is on the map. Started on the doorway beside the sign, as it
+  // once was, its line could not be drawn clear of the wall and was withheld.
+  await expect(map).toHaveAttribute('data-route-clearance', 'checked');
+  await expect(page.getByText('Route graphics hidden')).toHaveCount(0);
+  await expect
+    .poll(async () =>
+      Number(await page.locator('.compiled-map-canvas').getAttribute('data-route-segments')),
+    )
+    .toBeGreaterThan(0);
+});

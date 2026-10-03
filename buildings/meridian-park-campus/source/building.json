@@ -3512,10 +3512,10 @@
     {
       "id": "anchor-car-park",
       "floorId": "g",
-      "spaceId": "car-park",
+      "spaceId": "car-park-walk",
       "kind": "qr",
       "position": [
-        94,
+        99,
         123
       ],
       "headingDegrees": 180,

@@ -393,7 +393,9 @@ sign('fountain', 'court-north', [105, 77], 270, 'fountain');
 sign('hospital-entrance', 'g-hall', [105, 34], 90, 'hospital-entrance');
 sign('emergency-entrance', 'e-entrance', [42, 84], 0, 'emergency-entrance');
 sign('pavilion-entrance', 'w-entrance', [168, 84], 180, 'pavilion-entrance');
-sign('car-park', 'car-park', [94, 123], 180, 'car-park');
+// By the way out of the car park, on the walk it leads to. Hung inside the
+// car park it started every route from the middle of it, forty metres back.
+sign('car-park', 'car-park-walk', [99, 123], 180, 'car-park');
 sign('level-1', 'l1-concourse', [96, 26], 90, 'lifts');
 sign('level-2', 'l2-concourse', [96, 26], 90, 'lifts');
 

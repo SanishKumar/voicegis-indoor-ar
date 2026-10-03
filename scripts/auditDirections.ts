@@ -1,7 +1,8 @@
 /*
- * Reads every trip a venue can give - each public place to each other - and
- * reports the ones a visitor would find wrong: no route, a turn back the way
- * they came, the same sentence twice.
+ * Reads every trip a venue can give - from each public place and each check-in
+ * sign to each public place - and reports the ones a visitor would find
+ * wrong: no route, a route that cannot be drawn on the map, a turn back the
+ * way they came, the same sentence twice.
  *
  *   npx tsx scripts/auditDirections.ts meridian-park-campus
  *
@@ -14,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import { calculateCompiledRoute } from '../src/engine/compiledRoutePolicy';
 import { createCompiledBuildingRuntime } from '../src/data/compiledBuilding';
+import { checkInFromScan, scannableAnchors } from '../src/capture/anchorCheckIn';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const venueId = process.argv[2];
@@ -26,6 +28,17 @@ const buildingPackage = JSON.parse(
 ) as CompiledBuildingPackage;
 const runtime = createCompiledBuildingRuntime(buildingPackage);
 const places = runtime.getPOIs().map((node) => node.id);
+// Where a route can start: any public place, and wherever each sign puts a visitor.
+const starts = places.map((id) => ({ id, name: id.slice(4) }));
+for (const anchor of scannableAnchors(buildingPackage.localizationAnchors)) {
+  const scan = checkInFromScan(
+    anchor.payload,
+    buildingPackage.localizationAnchors,
+    buildingPackage.routing.nodes,
+  );
+  if (scan.ok) starts.push({ id: scan.nodeId, name: `sign ${anchor.id}` });
+  else console.log(`sign ${anchor.id} gives no start: ${scan.reason}`);
+}
 
 const faults = new Map<string, string[]>();
 const fault = (what: string, trip: string) => {
@@ -36,17 +49,23 @@ const fault = (what: string, trip: string) => {
 let trips = 0;
 let longest = { metres: 0, steps: 0, trip: '' };
 for (const profile of ['fastest', 'step-free'] as const) {
-  for (const from of places) {
+  for (const start of starts) {
     for (const to of places) {
-      if (from === to) continue;
+      if (start.id === to) continue;
       trips += 1;
-      const trip = `${from.slice(4)} -> ${to.slice(4)} (${profile})`;
-      const route = calculateCompiledRoute(runtime, from, to, {
+      const trip = `${start.name} -> ${to.slice(4)} (${profile})`;
+      const route = calculateCompiledRoute(runtime, start.id, to, {
         accessibleOnly: profile === 'step-free',
       });
       if (!route.found) {
         fault('no route', trip);
         continue;
+      }
+      if (route.displayClearance?.status === 'withheld') {
+        const why = (route.displayClearance.issues ?? [])
+          .map((issue) => `${issue.code} at ${issue.sourceId}`)
+          .join(', ');
+        fault(`cannot be drawn: ${why}`, trip);
       }
       if (route.totalDistance > longest.metres) {
         longest = { metres: route.totalDistance, steps: route.steps.length, trip };
@@ -64,7 +83,9 @@ for (const profile of ['fastest', 'step-free'] as const) {
   }
 }
 
-console.log(`${venueId}: ${places.length} places, ${trips} trips`);
+console.log(
+  `${venueId}: ${places.length} places, ${starts.length - places.length} signs, ${trips} trips`,
+);
 console.log(`longest: ${Math.round(longest.metres)} m in ${longest.steps} steps, ${longest.trip}`);
 if (faults.size === 0) {
   console.log('nothing wrong found');

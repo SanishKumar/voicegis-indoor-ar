@@ -360,8 +360,11 @@ export function generateRouteSteps(
   const steps: RouteStep[] = [
     {
       type: STEP_TYPE.START,
+      // A corridor is set off along; a room is where the start is standing.
       instruction: continuesElsewhere
-        ? `Start at ${startName} and continue on ${firstCorridor}`
+        ? isWay(segments[0].spaceType)
+          ? `Start at ${startName} and continue on ${firstCorridor}`
+          : `Start at ${startName} in ${firstCorridor}`
         : `Start at ${startName}`,
       distance: 0,
       nodeId: path[0].id,

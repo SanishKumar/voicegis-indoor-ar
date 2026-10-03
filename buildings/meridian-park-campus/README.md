@@ -89,9 +89,15 @@ npm run directions:audit -- meridian-park-campus
 npm run route -- meridian-park-campus poi-l2-dialysis poi-w-gym
 ```
 
-The first reads all 3,612 trips - each public place to each other, fastest and
-step-free - and lists any with no route, a turn back, or the same sentence
-twice. The second prints one trip as a visitor is told it.
+The first reads all 4,300 trips - from each public place and each of the eight
+signs to each public place, fastest and step-free - and lists any with no
+route, a route that cannot be drawn on the map, a turn back, or the same
+sentence twice. The second prints one trip as a visitor is told it.
+
+A sign starts its routes in the space it hangs in: at the nearest point along
+a corridor, or the middle of a room. So a sign goes where the visitor who
+scans it stands. The car park's is on the walk by its way out, not in the car
+park, whose middle is forty metres back.
 
 ## Opening it
 

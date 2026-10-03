@@ -100,10 +100,10 @@
       "kind": "qr",
       "payload": "voicegis://meridian/g/car-park",
       "position": [
-        94,
+        99,
         123
       ],
-      "spaceId": "car-park"
+      "spaceId": "car-park-walk"
     },
     {
       "floorId": "g",
@@ -191,7 +191,7 @@
     }
   ],
   "manifest": {
-    "contentHash": "4f93459bdae55fa7d3de14bc54cda37168213c2186abb298342db7efe93ed624",
+    "contentHash": "abbedcc0418e2f68ed709648693feee4c4c4a11c9c1ccbe7794919303ac5b177",
     "hashAlgorithm": "sha256"
   },
   "packageVersion": "0.2.0",

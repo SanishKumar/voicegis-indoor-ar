@@ -37,7 +37,14 @@ export interface RoutingNodeLike {
   id: string;
   floorId: string;
   position: [number, number];
+  /** What the node is: the middle of a space, a point along a corridor, a doorway. */
+  kind?: string;
+  /** For the middle of a space or a point along a corridor, the space. */
+  sourceId?: string;
 }
+
+/** Nodes nobody stands at: the line of a doorway, the inside of a lift. */
+const NOT_A_PLACE_TO_STAND = ['portal', 'connector-stop'];
 
 export type CheckInFailure =
   /** Nothing in this venue publishes that payload. */
@@ -81,17 +88,45 @@ export function checkInFromScan(
     return { ok: false, reason: 'not-a-checkin-code' };
   }
 
+  /*
+   * Where a route from this sign starts. The nearest node of any kind was the
+   * rule, and for a sign hung beside a door the nearest node is the doorway.
+   * A doorway is a line in a wall, not somewhere a person stands: a route
+   * begun on one cannot be drawn clear of that wall, so every route from six
+   * of a campus's eight signs was given as words with no line on the map.
+   *
+   * A sign says which space it hangs in, so the route starts in that space:
+   * at the nearest point along it if it is a corridor, at its middle if it is
+   * a room. A sign that names no space, or a package that does not say what
+   * its nodes are, falls back to the nearest node that is not a doorway, and
+   * then to the nearest of any.
+   */
+  const onFloor = nodes.filter((node) => node.floorId === anchor.floorId);
+  const inItsSpace = onFloor.filter(
+    (node) =>
+      anchor.spaceId !== undefined &&
+      node.sourceId === anchor.spaceId &&
+      (node.kind === 'space' || node.kind === 'waypoint'),
+  );
+  const standable = onFloor.filter(
+    (node) => node.kind === undefined || !NOT_A_PLACE_TO_STAND.includes(node.kind),
+  );
+  const candidates =
+    inItsSpace.length > 0 ? inItsSpace : standable.length > 0 ? standable : onFloor;
+
   let best: RoutingNodeLike | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
-  for (const node of nodes) {
-    if (node.floorId !== anchor.floorId) continue;
+  for (const node of candidates) {
     const distance = Math.hypot(
       node.position[0] - anchor.position[0],
       node.position[1] - anchor.position[1],
     );
     // Ties broken by id so the same scan always produces the same route, rather
     // than depending on the order the package happened to serialise nodes in.
-    if (distance < bestDistance || (distance === bestDistance && best !== null && node.id < best.id)) {
+    if (
+      distance < bestDistance ||
+      (distance === bestDistance && best !== null && node.id < best.id)
+    ) {
       best = node;
       bestDistance = distance;
     }
