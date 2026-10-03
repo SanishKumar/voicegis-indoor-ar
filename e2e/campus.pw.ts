@@ -111,6 +111,9 @@ test('a sign indoors opens the map among the rooms round it, and the outside is 
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await checkInAt(page, 'g/emergency-entrance');
+  // Told which building, not only which floor: every building has a ground floor.
+  await expect(page.locator('.checkin-toast')).toContainText('Emergency Centre · Ground');
+  await expect(page.locator('.compiled-map-location')).toContainText('Emergency Centre · Ground');
 
   // In the Emergency Centre: its rooms are named and the buildings are not.
   await expect.poll(() => shownLabels(page), { timeout: 15_000 }).toContain('Triage');
@@ -297,4 +300,31 @@ test('a first visit by the code on a sign needs only a destination, and its rout
       Number(await page.locator('.compiled-map-canvas').getAttribute('data-route-segments')),
     )
     .toBeGreaterThan(0);
+});
+
+test('a visitor on the wrong map can choose the place, and it stays chosen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Opened with no link to say which place: the catalog's default.
+  await page.goto('/#/visitor');
+  await expect(page.getByRole('heading', { name: 'Where are you going?' })).toBeVisible();
+  await expect(page.locator('.onboard-eyebrow')).toHaveText('Asterion University Medical Center');
+
+  await page.getByRole('button', { name: /Somewhere else\? Choose the place/ }).click();
+  await expect(page.getByRole('heading', { name: 'Which place?' })).toBeFocused();
+  await expect(
+    page.getByRole('button', { name: /^Asterion University Medical Center, .* showing now$/ }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: /^Meridian Park Medical Campus, 3 floors/ }).click();
+
+  // Back at the first question, for the place just chosen.
+  await expect(page.getByRole('heading', { name: 'Where are you going?' })).toBeVisible();
+  await expect(page.locator('.onboard-eyebrow')).toHaveText('Meridian Park Medical Campus');
+
+  // It is remembered, without a link that names it.
+  await page.reload();
+  await expect(page.locator('.onboard-eyebrow')).toHaveText('Meridian Park Medical Campus');
+  await page.getByRole('button', { name: /Browse the map instead/ }).click();
+  await expect
+    .poll(() => shownLabels(page), { timeout: 15_000 })
+    .toEqual(expect.arrayContaining(['Main Hospital', 'Wellness Pavilion']));
 });

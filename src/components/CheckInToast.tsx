@@ -29,6 +29,8 @@ interface NavigationBinding {
   venue: {
     getSpaceById(id: string): { name?: string } | null;
     getFloorById(id: string): { name?: string } | null;
+    getNodeById(id: string): { x: number; y: number } | null;
+    whereAt(position: readonly [number, number], floorId: string): string;
   };
 }
 
@@ -69,7 +71,11 @@ export default function CheckInToast() {
 
   const label = describeCheckIn(checkIn, {
     space: (id) => venue.getSpaceById(id)?.name ?? null,
-    floor: (id) => venue.getFloorById(id)?.name ?? null,
+    // Which building as well as which floor, where there is more than one.
+    floor: (id) => {
+      const node = venue.getNodeById(checkIn.nodeId);
+      return node ? venue.whereAt([node.x, node.y], id) : (venue.getFloorById(id)?.name ?? null);
+    },
   });
 
   return (

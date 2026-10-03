@@ -1,12 +1,13 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { ChevronRight, QrCode, Search } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
+import { useVenue } from '../context/VenueContext.jsx';
 import { searchPOIs } from '../engine/searchIndex.js';
 import QrCheckIn from './QrCheckIn.tsx';
 import { sharedOrientation } from '../ar/sharedOrientation';
 import { scanProblemText } from '../capture/scanProblemText.ts';
 
-const STEP = { DESTINATION: 0, POSITION: 1 };
+const STEP = { DESTINATION: 0, POSITION: 1, PLACE: 2 };
 
 /**
  * Onboarding, asked in the order a visitor can actually answer.
@@ -22,6 +23,11 @@ const STEP = { DESTINATION: 0, POSITION: 1 };
  * destination is all that is left to do. Asking them where they are after
  * they have just scanned where they are is the app not listening.
  *
+ * Where more than one place is published, which place this is can be changed
+ * from here. A place is normally opened by its own link, but a visitor who
+ * followed the wrong one, or none, had no way to the right map short of
+ * editing the address.
+ *
  * There is no longer a "Skip". Skipping used to leave the runtime with no start
  * and therefore no route, so it was an exit that led nowhere. Browsing the map
  * without a route is still available, but it is named for what it does.
@@ -33,6 +39,9 @@ const STEP = { DESTINATION: 0, POSITION: 1 };
  */
 export default function WelcomeScreen({ onComplete }) {
   const { actions, venue, checkIn } = useNavigation();
+  const { catalog, activateFromUrl } = useVenue();
+  const [placeProblem, setPlaceProblem] = useState(null);
+  const [openingPlace, setOpeningPlace] = useState(null);
   const [step, setStep] = useState(STEP.DESTINATION);
   const [destination, setDestination] = useState(null);
   const [query, setQuery] = useState('');
@@ -73,6 +82,34 @@ export default function WelcomeScreen({ onComplete }) {
   const checkedInAt = checkIn
     ? (venue.getSpaceById(checkIn.spaceId)?.name ?? venue.getFloorById(checkIn.floorId)?.name)
     : null;
+
+  const thisPlace = venue.buildingPackage.building.id;
+  const otherPlaces = catalog.length > 1;
+
+  /** Opens another published place. The app starts again on its map. */
+  const choosePlace = async (entry) => {
+    if (entry.id === thisPlace) {
+      setStep(STEP.DESTINATION);
+      return;
+    }
+    setPlaceProblem(null);
+    setOpeningPlace(entry.id);
+    try {
+      await activateFromUrl(entry.packageUrl, {
+        expectation: { buildingId: entry.id, contentHash: entry.defaultRelease.contentHash },
+      });
+      // A link that named a place would otherwise bring it back on the next
+      // reload, over the one just chosen.
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('venue')) {
+        url.searchParams.delete('venue');
+        window.history.replaceState(null, '', url);
+      }
+    } catch {
+      setPlaceProblem(`${entry.name} could not be opened. The map you had is still here.`);
+      setOpeningPlace(null);
+    }
+  };
 
   const chooseDestination = (node) => {
     if (checkIn) {
@@ -180,6 +217,80 @@ export default function WelcomeScreen({ onComplete }) {
 
               <button type="button" className="onboard-ghost" onClick={onComplete}>
                 Browse the map instead
+                <span className="onboard-ghost-mark" aria-hidden="true" />
+              </button>
+              {otherPlaces && (
+                <button
+                  type="button"
+                  className="onboard-ghost"
+                  onClick={() => {
+                    setPlaceProblem(null);
+                    setStep(STEP.PLACE);
+                  }}
+                >
+                  Somewhere else? Choose the place
+                  <span className="onboard-ghost-mark" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+        {step === STEP.PLACE && (
+          <section className="onboard-step" aria-labelledby="welcome-step-heading">
+            <p className="onboard-eyebrow">Showing</p>
+            <p className="onboard-chip">{venue.buildingPackage.building.name}</p>
+            <h2
+              ref={stepHeadingRef}
+              className="onboard-title"
+              id="welcome-step-heading"
+              tabIndex={-1}
+            >
+              Which <span className="onboard-title-accent">place?</span>
+            </h2>
+            <p className="onboard-sub">Each place has its own map and its own signs.</p>
+
+            <div className="onboard-pane">
+              <p className="onboard-label">Places</p>
+              <ul className="onboard-list">
+                {catalog.map((entry) => {
+                  const { floors, pois } = entry.defaultRelease.summary;
+                  const size = `${floors} ${floors === 1 ? 'floor' : 'floors'} · ${pois} places`;
+                  const showing = entry.id === thisPlace;
+                  return (
+                    <li key={entry.id}>
+                      <button
+                        type="button"
+                        className="onboard-row"
+                        aria-label={`${entry.name}, ${size}${showing ? ', showing now' : ''}`}
+                        aria-current={showing ? 'true' : undefined}
+                        disabled={openingPlace !== null}
+                        onClick={() => void choosePlace(entry)}
+                      >
+                        <span className="onboard-row-text">
+                          <span className="onboard-row-name">{entry.name}</span>
+                          <span className="onboard-row-meta">
+                            {showing ? `Showing now · ${size}` : size}
+                          </span>
+                        </span>
+                        <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {placeProblem && (
+                <p className="onboard-empty" role="alert">
+                  {placeProblem}
+                </p>
+              )}
+
+              <button
+                type="button"
+                className="onboard-ghost"
+                onClick={() => setStep(STEP.DESTINATION)}
+              >
+                Back
                 <span className="onboard-ghost-mark" aria-hidden="true" />
               </button>
             </div>

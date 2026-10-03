@@ -1,6 +1,6 @@
 # Visitor readiness and remaining work
 
-Current software checkpoint: 1 October 2026. Visitor scope first. This
+Current software checkpoint: 3 October 2026. Visitor scope first. This
 document describes the implemented software at this checkpoint, not a claim
 that it has been deployed or qualified on physical devices. Earlier
 entries in the experience plan are historical slice reports.
@@ -63,6 +63,22 @@ entries in the experience plan are historical slice reports.
   facts and spoken guidance. Journey/search
   text scales, short-screen panels scroll, and keyboard dismissal restores
   focus. See [interaction coverage and limits](visitor-interaction-accessibility.md).
+
+- A venue of several buildings: a presentational site (grounds, buildings,
+  what stands on them) round routable outdoor walks, an outside view that
+  becomes rooms on coming in, and a view that opens where a check-in puts the
+  visitor. Rooms in every venue are furnished by what they are for, clear of
+  every door, pin and routable line. See
+  [the models](design-system.md#the-models).
+- Written directions name a turn for where it leads, and every trip a venue
+  can give is read by test: from each public place and each check-in sign to
+  each public place, fastest and step-free, 7,238 trips over the four bundled
+  venues, for a missing route, a route that cannot be drawn, a turn back and a
+  repeated sentence. `npm run directions:audit -- <venue>` lists them for one
+  venue. A sign starts its routes in the space it hangs in, never on a doorway.
+- A first visit by a sign's link needs only a destination; a visitor on the
+  wrong map can choose the place from the first screen; and a place says which
+  building it is in.
 
 These are implementation/automated-test results. They do not establish
 real-building positioning accuracy, camera alignment, usability or reliable
@@ -131,7 +147,10 @@ privacy checks above remain separate release work.
 
 The complete 162-case operator suite was measured with CI's one-worker settings:
 14.6 minutes for a green run, after an initial 15.8-minute review run exposed
-narrow-screen defects. The aggregate Playwright budget is now 20 minutes and
+narrow-screen defects. The suite has since grown with the campus cases, which
+draw a larger scene; the figure for the current suite is whatever the latest
+hosted Quality run reports, and a run that nears the budget is a reason to
+look at the slowest cases, not to raise it without looking. The aggregate Playwright budget is now 20 minutes and
 the enclosing quality job 30 minutes. Per-test limits, assertions and zero
 retries are unchanged. Hosted CI performance remains independently observable;
 local timing is not a guaranteed duration on GitHub's runners.

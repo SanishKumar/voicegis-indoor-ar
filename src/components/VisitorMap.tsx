@@ -181,6 +181,7 @@ interface NavigationValue {
   venue: {
     buildingPackage: Parameters<typeof createVenueScene>[2];
     getNodeById(id: string): unknown;
+    whereAt(position: readonly [number, number], floorId: string): string;
   };
 }
 
@@ -686,7 +687,7 @@ export default function VisitorMap({
             {location.basis === 'qr' ? `Last check-in · ${location.label}` : location.label}
           </strong>
           <span>
-            {floors.find((floor) => floor.id === location.floorId)?.name} ·{' '}
+            {venue.whereAt(location.position, location.floorId)} ·{' '}
             {location.basis === 'qr' ? 'Not tracked between check-ins' : 'Not a measured position'}
           </span>
         </div>

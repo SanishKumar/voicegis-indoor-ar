@@ -103,6 +103,41 @@ means a flaky camera cannot take the demo down.
    switching with Chromium's network disabled. It separately proves that a
    corrupted IndexedDB package is refused.
 
+## The campus: from a room in one building to a room in another
+
+The catalog opens on Asterion, one building. The second demo is Meridian Park
+Medical Campus: three buildings round a garden, with the walks between them
+routed like corridors. Reach it from the first screen with **Somewhere else?
+Choose the place**, or by its link:
+
+```text
+http://localhost:3000/?venue=/venues/meridian-park-campus.package.json#/visitor
+```
+
+1. **Outside.** With nowhere to stand yet, the map is the whole site: each
+   building a block with its name on it, among the lawns, the pond and the car
+   park. Press a building and its roof comes off to show its rooms, furnished
+   by what they are for.
+2. **By a sign.** Open the link a sign inside the Emergency Centre would carry:
+
+   ```text
+   http://localhost:3000/?venue=/venues/meridian-park-campus.package.json&checkin=voicegis://meridian/g/emergency-entrance#/visitor
+   ```
+
+   On a first visit the app says _You are at Emergency Entrance_ and asks only
+   where to go. It does not ask where you are.
+
+3. **Between buildings.** Ask for the Rehabilitation Gym. The route leaves the
+   Emergency Centre, follows the West Garden Walk, goes round the fountain and
+   into the Wellness Pavilion, 162 m, with each place labelled by its building.
+4. **Between floors and buildings.** Set the start to the Dialysis Unit on
+   Level 2 and ask for the gym again: 201 m, down the Main Stairs, out through
+   the Main Entrance Hall and across. In 3D, **Route overview** stacks the
+   floors and frames the whole trip. Step-free takes the Main Lifts instead.
+
+Like Asterion, the campus is a constructed model. Its distances are properties
+of that model and its furniture is illustration, not survey.
+
 ## Why the codes are generated, not authored
 
 `npm run codes` regenerates `public/check-in-codes.html` from the compiled

@@ -164,6 +164,12 @@ export interface CompiledBuildingRuntime {
   getPOIsByCategory(category: string): VisitorPoiNode[];
   getFloorById(id: string): CompiledBuildingPackage['floors'][number] | null;
   getSpaceById(id: string): CompiledBuildingPackage['spaces'][number] | null;
+  /**
+   * Where a point on a floor is, as a visitor is told it: the floor's name in
+   * one building; which building and which floor of it, or the grounds, where
+   * there are several.
+   */
+  whereAt(position: readonly [number, number], floorId: string): string;
   getDefaultStartNodeId(): string;
 }
 
@@ -239,10 +245,10 @@ export function createCompiledBuildingRuntime(
     return `${space.name} · ${floor?.name ?? poi.floorId}`;
   }
 
-  function whereIs(poi: PoiSource, floorName: string) {
+  function whereAt([x, y]: readonly [number, number], floorId: string) {
+    const floorName = floorsById.get(floorId)?.name ?? floorId;
     const site = buildingPackage.site;
     if (!site) return floorName;
-    const [x, y] = poi.position;
     const building = site.buildings.find((candidate) => {
       let inside = false;
       const ring = candidate.footprint;
@@ -272,7 +278,7 @@ export function createCompiledBuildingRuntime(
       floorName: floor.name,
       spaceId: space.id,
       spaceName: space.name,
-      where: whereIs(poi, floor.name),
+      where: whereAt(poi.position, floor.id),
       public: poi.public && space.public,
       accessible: poi.accessible && space.accessible,
       aliases: poi.aliases ?? [],
@@ -341,6 +347,7 @@ export function createCompiledBuildingRuntime(
     getPOIsByCategory: (category) => getPOIs().filter((node) => node.poi.category === category),
     getFloorById: (id) => floorsById.get(id) ?? null,
     getSpaceById: (id) => spacesById.get(id) ?? null,
+    whereAt,
     getDefaultStartNodeId,
   };
 }
