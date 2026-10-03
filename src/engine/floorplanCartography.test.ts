@@ -171,7 +171,9 @@ describe('floorplan cartography derivation', () => {
       'secondary',
       'separate',
     ]);
-    expect(placeCartographicLabels(candidates).find((l) => l.id === 'primary')?.anchorIndex).toBe(0);
+    expect(placeCartographicLabels(candidates).find((l) => l.id === 'primary')?.anchorIndex).toBe(
+      0,
+    );
     expect(
       placeCartographicLabels(candidates).find((l) => l.id === 'secondary')?.anchorIndex,
     ).toBeGreaterThan(0);
@@ -203,6 +205,52 @@ describe('floorplan cartography derivation', () => {
     // as a dot rather than vanishing from the map.
     expect(resolution.placed).toEqual([]);
     expect(resolution.collapsed.map((label) => label.id)).toEqual(['boxed']);
+  });
+
+  it('keeps an edge destination on screen without clamping it back under controls', () => {
+    const bounds = (minX: number, minY: number, maxX: number, maxY: number) => ({
+      minX,
+      minY,
+      maxX,
+      maxY,
+      width: maxX - minX,
+      height: maxY - minY,
+      center: [(minX + maxX) / 2, (minY + maxY) / 2] as [number, number],
+    });
+    const destination = {
+      id: 'destination',
+      center: [286, 164] as [number, number],
+      width: 160,
+      height: 24,
+      priority: 100,
+      placementArea: bounds(6, 6, 314, 734),
+    };
+    const placed = resolveCartographicLabels(
+      [destination],
+      [bounds(0, 0, 320, 122), bounds(14, 130, 221, 184), bounds(264, 140, 308, 184)],
+      6,
+    ).placed;
+    expect(placed).toHaveLength(1);
+    expect(placed[0].bounds.maxX).toBeLessThanOrEqual(314);
+    expect(placed[0].bounds.minY).toBeGreaterThanOrEqual(190);
+  });
+
+  it('does not pull a panned-away destination onto the screen', () => {
+    const resolution = resolveCartographicLabels([
+      {
+        id: 'offscreen-destination',
+        center: [350, 200],
+        width: 160,
+        height: 24,
+        priority: 100,
+        placementArea: getCartographicBounds([
+          [6, 6],
+          [314, 734],
+        ]),
+      },
+    ]);
+    expect(resolution.placed).toEqual([]);
+    expect(resolution.collapsed.map((label) => label.id)).toEqual(['offscreen-destination']);
   });
 
   it('nudges a colliding label to a free anchor before collapsing it', () => {
@@ -243,7 +291,13 @@ describe('floorplan cartography derivation', () => {
 
   it('always draws a required label regardless of zoom or collision', () => {
     const candidates = [
-      { id: 'blocker', center: [50, 50] as [number, number], width: 400, height: 400, priority: 10 },
+      {
+        id: 'blocker',
+        center: [50, 50] as [number, number],
+        width: 400,
+        height: 400,
+        priority: 10,
+      },
       {
         id: 'destination',
         center: [55, 50] as [number, number],

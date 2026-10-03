@@ -31,7 +31,9 @@ async function importPolicy(page: Page, id: string, lifetime = 60_000) {
 async function confirmStart(page: Page) {
   await page.getByRole('button', { name: 'Choose current location', exact: true }).click();
   await page.getByRole('textbox', { name: 'Search starting locations' }).fill('General Pediatrics');
-  await page.locator('.lp-result-item').filter({ hasText: 'General Pediatrics' }).click();
+  const result = page.locator('.lp-result-item').filter({ hasText: 'General Pediatrics' });
+  await expectCenterHitTarget(result);
+  await result.click();
   await expect(page.locator('.jr')).toHaveAttribute('data-journey', 'guiding');
 }
 async function policyJourney(page: Page) {
@@ -48,6 +50,9 @@ test('closure expiry pauses offline, preserves intent and needs a new location a
   page,
   context,
 }, testInfo) => {
+  // Two policy imports plus offline recovery exercise several complete screens.
+  // Keep locator/hit-target deadlines strict, but allow the whole journey time.
+  test.slow();
   await policyJourney(page);
   await page.getByRole('button', { name: 'Next instruction', exact: true }).click();
   await context.setOffline(true);

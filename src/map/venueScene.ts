@@ -401,7 +401,7 @@ export function createVenueScene(
   renderer.toneMapping = ACESFilmicToneMapping;
   // The film curve rolls white off to a light grey. The model is meant to read
   // as white against the sky, so it is exposed up to where its lit faces are.
-  renderer.toneMappingExposure = 1.55;
+  renderer.toneMappingExposure = buildingPackage.site ? 1.1 : 1.55;
 
   const scene = new Scene();
   const cameraRig = createVisitorCamera(span, initialView);
@@ -652,11 +652,15 @@ export function createVenueScene(
 
   const site = buildingPackage.site ?? null;
   const scenery = site
-    ? createSiteScenery(site, (point, height) => vec([point[0], point[1]], height))
+    ? createSiteScenery(
+        site,
+        (point, height) => vec([point[0], point[1]], height),
+        buildingPackage.portals,
+      )
     : null;
   /** 1 from far off, with the roofs on; 0 close to, among the rooms. */
   let siteFar = scenery ? 1 : 0;
-  /** How many metres of the venue fit in the uncovered height of the canvas. */
+  /** Metres across the shorter uncovered dimension; independent of phone orientation. */
   let metresVisible = REFERENCE_METRES_VISIBLE;
   /** How much wider than true the route is drawn, so it survives the outside view. */
   let routeWidth = 1;
@@ -699,11 +703,16 @@ export function createVenueScene(
     // rotateX sends the extrusion to -Y, so the slab already hangs below zero
     // with its top face at zero. Lifting it would bury everything on it.
     slab.rotateX(Math.PI / 2);
+    // Extrude's top bevel reaches above its nominal zero. The campus's road
+    // and lawns are lower than that bevel; keep the actual plate top at zero.
+    // Otherwise a more solid plate buries the entire landscaped ground.
+    if (onSite) slab.translate(0, -0.24, 0);
     const slabMesh = new Mesh(slab, [
-      track(glass(SLAB_TOP, SLAB_OPACITY)),
-      track(glass(SLAB_SIDE, SLAB_OPACITY + 0.2)),
+      track(glass(onSite ? 0xe8e9df : SLAB_TOP, onSite ? 0.94 : SLAB_OPACITY)),
+      track(glass(onSite ? 0xcbd5cd : SLAB_SIDE, onSite ? 0.98 : SLAB_OPACITY + 0.2)),
     ]);
     slabMesh.receiveShadow = true;
+    if (onSite) slabMesh.name = 'campus-base';
     group.add(slabMesh);
 
     if (onSite && scenery) {
@@ -1423,7 +1432,8 @@ export function createVenueScene(
   function elementFor(id: string, text: string) {
     const existing = labelElements.get(id);
     if (existing !== undefined) return existing;
-    const element = document.createElement('span');
+    const building = id.startsWith('building:');
+    const element = document.createElement(building ? 'button' : 'span');
     element.className = id.startsWith('poi:')
       ? 'map-pill map-pill-poi'
       : id.startsWith('building:')
@@ -1431,6 +1441,15 @@ export function createVenueScene(
         : 'map-pill';
     element.textContent = text;
     element.style.opacity = '0';
+    element.style.visibility = 'hidden';
+    if (element instanceof HTMLButtonElement) {
+      element.type = 'button';
+      element.setAttribute('aria-label', `Explore ${text}`);
+      element.title = `Explore rooms in ${text}`;
+      element.addEventListener('click', () => {
+        if (enterBuilding(id.slice('building:'.length))) canvas.focus({ preventScroll: true });
+      });
+    } else element.setAttribute('aria-hidden', 'true');
     labelLayer.appendChild(element);
     labelElements.set(id, element);
     return element;
@@ -1482,6 +1501,7 @@ export function createVenueScene(
     for (const [id, element] of labelElements) {
       if (view === undefined || !view.labels.some((label) => label.id === id)) {
         element.style.opacity = '0';
+        element.style.visibility = 'hidden';
       }
     }
     if (view === undefined) return;
@@ -1490,7 +1510,11 @@ export function createVenueScene(
     for (const label of view.labels) {
       const element = elementFor(label.id, label.text);
       // From outside, a building is its name; inside, it is its rooms.
-      if (label.shown !== undefined && (label.shown === 'far') !== siteFar > 0.5) {
+      if (
+        label.id !== destinationId &&
+        label.shown !== undefined &&
+        (label.shown === 'far') !== siteFar > 0.5
+      ) {
         element.style.opacity = '0';
         continue;
       }
@@ -1516,6 +1540,19 @@ export function createVenueScene(
         height: size[1],
         priority: label.id === destinationId ? DESTINATION_PRIORITY : label.priority,
         minScale: label.id === destinationId ? 0 : label.minScale,
+        ...(label.id === destinationId || label.id.startsWith('building:')
+          ? {
+              placementArea: {
+                minX: 6,
+                minY: 6,
+                maxX: width - 6,
+                maxY: height - 6,
+                width: width - 12,
+                height: height - 12,
+                center: [width / 2, height / 2] as [number, number],
+              },
+            }
+          : {}),
       });
     }
 
@@ -1554,15 +1591,10 @@ export function createVenueScene(
       // anchor is free and reports where it put it; drawing at the original
       // centre throws that away and puts the labels back on top of each other -
       // which is exactly what a room and its POI of the same name did.
-      let { minX, maxX } = label.bounds;
+      const { minX, maxX } = label.bounds;
       const { minY, maxY } = label.bounds;
-      // A building's name is slid back on to the screen if its building is at
-      // the edge: from outside, the names are the map.
-      if (label.id.startsWith('building:') && maxX - minX < width - 12) {
-        const shift = minX < 6 ? 6 - minX : maxX > width - 6 ? width - 6 - maxX : 0;
-        minX += shift;
-        maxX += shift;
-      }
+      // Screen-constrained labels were clamped before collision testing. Moving
+      // them afterwards can put a name back on top of another label/control.
       // Anything else that would leave the canvas is dropped rather than clipped.
       if (minX < 2 || minY < 2 || maxX > width - 2 || maxY > height - 2) {
         element.style.opacity = '0';
@@ -1570,12 +1602,17 @@ export function createVenueScene(
       }
       element.style.transform = `translate(${Math.round(minX)}px, ${Math.round(minY)}px)`;
       element.style.opacity = '1';
+      element.style.visibility = 'visible';
       element.classList.toggle('map-pill-destination', label.id === destinationId);
       placed.add(label.id);
       labelBounds.set(label.id, { minX, minY, maxX, maxY });
     }
     for (const [id, element] of labelElements) {
-      if (!placed.has(id)) element.style.opacity = '0';
+      if (!placed.has(id)) {
+        element.style.opacity = '0';
+        // Unplaced labels must not remain clickable or keyboard-focusable.
+        element.style.visibility = 'hidden';
+      }
     }
   }
 
@@ -1785,19 +1822,31 @@ export function createVenueScene(
       .intersectObject(scenery.group, true)
       .find((entry) => typeof entry.object.userData.siteBuildingId === 'string');
     if (hit === undefined) return false;
-    const building = scenery.buildings.find(
-      (entry) => entry.id === hit.object.userData.siteBuildingId,
-    );
+    return enterBuilding(hit.object.userData.siteBuildingId);
+  }
+
+  function enterBuilding(id: string): boolean {
+    if (scenery === null || site === null || activeFloorId !== site.floorId) return false;
+    const building = scenery.buildings.find((entry) => entry.id === id);
     if (building === undefined) return false;
-    // The building, with a little of the grounds round it for bearings.
+    // Enter among rooms, not merely closer to the same roof. A hospital can be
+    // over 100 m wide: fitting its entire footprint on a phone remains an
+    // exterior view. Start with a readable neighbourhood, then let people pan.
+    const xs = building.footprint.map(([x]) => x);
+    const ys = building.footprint.map(([, y]) => y);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
     cameraRig.fit(
-      building.footprint.map(([x, y]) => {
+      [
+        [Math.max(Math.min(...xs), cx - 30), Math.max(Math.min(...ys), cy - 30)],
+        [Math.min(Math.max(...xs), cx + 30), Math.min(Math.max(...ys), cy + 30)],
+      ].map(([x, y]) => {
         const world = vec([x, y]);
         return [world.x, 0, world.z] as const;
       }),
       canvas.clientWidth,
       canvas.clientHeight,
-      { padding: 1.3 },
+      { padding: 1.1 },
     );
     invalidate();
     return true;
@@ -2201,8 +2250,14 @@ export function createVenueScene(
         puck.scale.setScalar(cameraRig.worldUnitsPerPixel(width, height) * PUCK_PIXELS);
       if (scenery) {
         const unitsPerPixel = cameraRig.worldUnitsPerPixel(width, height);
-        metresVisible = unitsPerPixel * cameraRig.visibleHeight(width, height);
-        const next = scenery.setView(metresVisible, routePoints.length >= 2);
+        metresVisible =
+          unitsPerPixel *
+          Math.min(cameraRig.visibleWidth(width, height), cameraRig.visibleHeight(width, height));
+        const next = scenery.setView(
+          metresVisible,
+          routePoints.length >= 2,
+          site ? (floors.get(site.floorId)?.currentOpacity ?? 1) : 1,
+        );
         // Upstairs there is no outside to see the building from.
         siteFar = site !== null && activeFloorId === site.floorId ? next.far : 0;
         if (next.changed) invalidate();
@@ -2306,6 +2361,9 @@ export function createVenueScene(
       userMoveListeners.clear();
       graphicsListeners.clear();
       window.cancelAnimationFrame(hoverFrame);
+      // Scenery owns shared geometry/materials and instance buffers. Detach it
+      // before the general scene sweep so those resources are not disposed twice.
+      scenery?.group.removeFromParent();
       scenery?.dispose();
       tubeGeometry.dispose();
       jointGeometry.dispose();

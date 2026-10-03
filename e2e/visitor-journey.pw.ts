@@ -104,7 +104,11 @@ test('a first-time visitor names a destination, then a start, and gets a route',
 
   await expect(page.locator('.compiled-map')).toBeVisible();
   await expect(page.getByLabel('Fastest available route')).toBeVisible();
-  await expect(page.getByText('Outpatient Pharmacy', { exact: true }).first()).toBeVisible();
+  await expect(
+    page
+      .getByRole('region', { name: 'Directions to Outpatient Pharmacy' })
+      .getByText('Outpatient Pharmacy', { exact: true }),
+  ).toBeVisible();
 });
 
 test('a missing camera explains the failure and preserves the route on return', async ({

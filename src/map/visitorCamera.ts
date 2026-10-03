@@ -147,6 +147,8 @@ export function createVisitorCamera(span: number, saved = defaultMapView()) {
     worldUnitsPerPixel: (width: number, height: number) => unitsPerPixel(width, height),
     /** Height of the uncovered area, in CSS pixels. */
     visibleHeight: (width: number, height: number) => visible(width, height).h,
+    /** Width of the uncovered area, in CSS pixels. */
+    visibleWidth: (width: number, height: number) => visible(width, height).w,
 
     /** True once the visitor has moved the camera themselves since the last fit or recenter. */
     wasMovedByUser: () => userMoved,

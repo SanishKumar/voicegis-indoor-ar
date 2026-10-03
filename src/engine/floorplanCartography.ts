@@ -59,6 +59,8 @@ export interface CartographicLabelCandidate {
    * labels stay collapsed until the map is zoomed in far enough to carry them.
    */
   minScale?: number;
+  /** Optional screen bounds. Clamp each trial before collision testing, not afterwards. */
+  placementArea?: CartographicBounds;
 }
 
 export interface CartographicLabelPlacement extends CartographicLabelCandidate {
@@ -88,6 +90,13 @@ const LABEL_ANCHOR_OFFSETS: Array<[number, number]> = [
   [0, 1.5],
   [1.15, 0],
   [-1.15, 0],
+];
+// A screen-edge label can lose both side anchors to clamping. Give it a second
+// vertical row so a destination beside a floor button can clear that control.
+const SCREEN_LABEL_ANCHOR_OFFSETS: Array<[number, number]> = [
+  ...LABEL_ANCHOR_OFFSETS,
+  [0, -2.5],
+  [0, 2.5],
 ];
 
 export interface CartographicWallRun extends WallSegment {
@@ -249,6 +258,17 @@ function labelBounds(
     candidate.center[0] + offset[0] * candidate.width,
     candidate.center[1] + offset[1] * candidate.height,
   ];
+  const area = candidate.placementArea;
+  if (area && candidate.width <= area.width && candidate.height <= area.height) {
+    center[0] = Math.max(
+      area.minX + candidate.width / 2,
+      Math.min(area.maxX - candidate.width / 2, center[0]),
+    );
+    center[1] = Math.max(
+      area.minY + candidate.height / 2,
+      Math.min(area.maxY - candidate.height / 2, center[1]),
+    );
+  }
   const minX = center[0] - candidate.width / 2;
   const minY = center[1] - candidate.height / 2;
   const maxX = center[0] + candidate.width / 2;
@@ -300,6 +320,21 @@ export function resolveCartographicLabels(
     )
     .forEach((candidate) => {
       const required = candidate.required === true;
+      const area = candidate.placementArea;
+      if (
+        area &&
+        (candidate.width > area.width ||
+          candidate.height > area.height ||
+          candidate.center[0] < area.minX ||
+          candidate.center[0] > area.maxX ||
+          candidate.center[1] < area.minY ||
+          candidate.center[1] > area.maxY)
+      ) {
+        // Keep the name of an on-screen feature inside the viewport, but never
+        // pull a panned-away building/destination back onto the visible map.
+        collapsed.push(candidate);
+        return;
+      }
       if (!required && candidate.minScale !== undefined && scale < candidate.minScale) {
         collapsed.push(candidate);
         return;
@@ -310,7 +345,8 @@ export function resolveCartographicLabels(
         placed.push({ ...candidate, bounds, anchorIndex: 0 });
         return;
       }
-      const anchorIndex = LABEL_ANCHOR_OFFSETS.findIndex(
+      const offsets = area ? SCREEN_LABEL_ANCHOR_OFFSETS : LABEL_ANCHOR_OFFSETS;
+      const anchorIndex = offsets.findIndex(
         (offset) =>
           !occupied.some((occupiedBounds) =>
             boundsOverlap(labelBounds(candidate, offset), occupiedBounds, padding),
@@ -320,7 +356,7 @@ export function resolveCartographicLabels(
         collapsed.push(candidate);
         return;
       }
-      const bounds = labelBounds(candidate, LABEL_ANCHOR_OFFSETS[anchorIndex]);
+      const bounds = labelBounds(candidate, offsets[anchorIndex]);
       occupied.push(bounds);
       placed.push({ ...candidate, bounds, anchorIndex });
     });

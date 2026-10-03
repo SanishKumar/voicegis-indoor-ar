@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Mesh, Vector3 } from 'three';
+import { Box3, InstancedMesh, Matrix4, Mesh, Vector3 } from 'three';
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import campusPackageJson from '../../buildings/meridian-park-campus/compiled/building.package.json';
 import { createSiteScenery } from './siteScenery';
@@ -83,6 +83,14 @@ describe('the outside of a venue with grounds', () => {
     expect(material.opacity).toBeLessThan(0.25);
     expect(material.depthWrite).toBe(false);
     expect(roof.castShadow).toBe(false);
+    for (const part of roofs(scenery)) {
+      const surfaces = Array.isArray(part.material) ? part.material : [part.material];
+      for (const surface of surfaces) {
+        expect(surface.opacity).toBeLessThan(0.25);
+        expect(surface.depthWrite).toBe(false);
+      }
+      expect(part.castShadow).toBe(false);
+    }
     scenery.dispose();
   });
 
@@ -91,6 +99,17 @@ describe('the outside of a venue with grounds', () => {
     scenery.setView(170, false);
     expect(scenery.setView(170, false).changed).toBe(false);
     expect(scenery.setView(170, true).changed).toBe(true);
+    scenery.dispose();
+  });
+
+  it('fades the entire exterior with its storey and cannot regain shadows during a route', () => {
+    const scenery = createSiteScenery(site, toWorld, CAMPUS.portals);
+    scenery.setView(170, true, 0.22);
+    expect(roofMaterial(scenery).opacity).toBeCloseTo(0.16 * 0.22);
+    // The scene toggles a storey's shadows while it comes back into view.
+    for (const roof of roofs(scenery)) roof.castShadow = true;
+    expect(scenery.setView(170, true, 1).changed).toBe(true);
+    for (const roof of roofs(scenery)) expect(roof.castShadow).toBe(false);
     scenery.dispose();
   });
 
@@ -103,6 +122,39 @@ describe('the outside of a venue with grounds', () => {
       if ((object as Mesh).isMesh) orders.push(object.renderOrder);
     });
     expect(orders.filter((order) => order < 0).length).toBeGreaterThanOrEqual(site.grounds.length);
+    scenery.dispose();
+  });
+
+  it('draws road and bay markings above the bevels of opaque ground tiles', () => {
+    const scenery = createSiteScenery(site, toWorld);
+    for (const [kind, expectedTop] of [
+      ['road', 0.1],
+      ['parking', 0.14],
+    ] as const) {
+      const ground = scenery.group.getObjectByName(`site-ground-${kind}`)!;
+      const surface = new Box3().setFromObject(ground);
+      expect(surface.max.y).toBeCloseTo(expectedTop);
+      const marks = scenery.group.children[scenery.group.children.indexOf(ground) + 1];
+      expect(new Box3().setFromObject(marks).max.y).toBeGreaterThan(surface.max.y + 0.01);
+    }
+    scenery.dispose();
+  });
+
+  it('keeps illustrative parked cars inside bays and out of the central aisle', () => {
+    const scenery = createSiteScenery(site, toWorld);
+    const cars = scenery.group.getObjectByName('parking-car-bodies') as InstancedMesh;
+    expect(cars.count).toBeGreaterThan(20);
+    const matrix = new Matrix4();
+    cars.geometry.computeBoundingBox();
+    for (let index = 0; index < cars.count; index++) {
+      cars.getMatrixAt(index, matrix);
+      const box = cars.geometry.boundingBox!.clone().applyMatrix4(matrix);
+      expect(box.min.x).toBeGreaterThan(24);
+      expect(box.max.x).toBeLessThan(96);
+      expect(box.min.z).toBeGreaterThan(112);
+      expect(box.max.z).toBeLessThan(134);
+      expect(box.max.z < 120 || box.min.z > 126).toBe(true);
+    }
     scenery.dispose();
   });
 });

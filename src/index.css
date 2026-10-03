@@ -2159,6 +2159,9 @@ body {
 
 .visitor-map-stage {
   isolation: isolate;
+  /* Closed panels animate beyond the stage. Unlike hidden, clip cannot be
+     scrolled by focus, which otherwise moves the entire map off screen. */
+  overflow: clip;
   background: var(--surface-clear);
 }
 
@@ -6724,6 +6727,32 @@ body {
   box-shadow: 0 3px 12px rgba(15, 33, 71, 0.22);
   color: var(--color-ink);
   font-size: var(--text-control);
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+  pointer-events: auto;
+  cursor: pointer;
+  appearance: none;
+}
+
+.map-pill-building:hover {
+  background: #fff;
+  border-color: var(--color-ink);
+}
+
+.map-pill-building:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 3px;
+}
+
+.compiled-map-zoom button:has(.map-campus-reset-label) {
+  width: auto;
+  gap: 6px;
+  padding-inline: 10px;
+}
+
+.map-campus-reset-label {
+  font-size: var(--text-caption);
 }
 
 .map-pill-destination,
@@ -7650,7 +7679,8 @@ body {
 
 .surface-nav {
   position: relative;
-  z-index: 1200;
+  /* Navigation belongs below modal dialogs, not above their tappable results. */
+  z-index: var(--z-nav);
   min-width: 0;
   min-height: 0;
   display: flex;

@@ -545,7 +545,7 @@ export default function VisitorMap({
         }
         aria-label={`${presentation.mode === '2d' ? '2D plan' : '3D model'} of ${floors.find((floor) => floor.id === state.activeFloorId)?.name ?? 'the venue'}`}
       />
-      <div ref={labelRef} className="compiled-map-labels" aria-hidden="true" />
+      <div ref={labelRef} className="compiled-map-labels" />
       <div
         className="compiled-map-presentation"
         role="group"
@@ -727,6 +727,7 @@ export default function VisitorMap({
             }}
           >
             <Maximize size={16} strokeWidth={2} aria-hidden="true" />
+            {buildingPackage.site && <span className="map-campus-reset-label">Campus</span>}
           </button>
         )}
       </div>

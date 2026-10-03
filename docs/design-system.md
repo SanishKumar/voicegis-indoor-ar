@@ -227,24 +227,34 @@ them (`src/map/siteScenery.ts`). It is a picture and nothing else. What a
 visitor can walk on outside - a promenade, a court, a garden path - is a space
 like any corridor, and that is what routes use.
 
-- **Outside, a building is a roof.** From far enough out to see the grounds,
-  each building is a pale block with a set-back crown, taller for more
-  storeys, standing on a plinth, and it is named once. Its rooms and their
-  names are not drawn.
+- **Outside, a building has an envelope.** From far enough out to see the
+  grounds, each building has storey-height glazed bays, pale facade fins,
+  roof eaves and a raised glazed lantern. Entrance canopies face out from
+  actual ground-floor portals; they do not invent entrances or change routes.
+  The building is named once. Its rooms and their names are not drawn.
 - **Inside, the roof is gone.** Coming in closer than about 70 m of ground
-  across the view takes the roofs away and brings the rooms and their names
-  back. Pressing a building from outside goes in to it. The change is a fade
-  between 115 m and 70 m, and nothing is switched.
+  across the shorter uncovered dimension takes the envelopes away and brings
+  the rooms and their names back. This works in portrait as well as landscape.
+  Pressing a building opens a room-scale neighbourhood, not its entire broad
+  footprint; pan to explore the rest. The change is a fade between 115 m and
+  70 m, and nothing is switched.
 - **A route is never under a roof.** While a route is showing, roofs are a
   ghost of themselves, so the line can be followed through a building from
   any distance. The route also keeps a least width on screen: its true width
   is a person's, which from across a campus is less than a pixel.
 - **Grounds are flat colour under the glass.** Lawn is mint, planting a
   deeper green, water blue and a little raised, paving white, a car park
-  slate with its bays marked, a road darker with a dashed centre. Outdoor
-  walks are warm white where indoor ones are cool. Trees, lamps, benches, the
-  fountain and the statue are a few rounded solids each, drawn as instances.
-- **A venue with one building has no site** and is drawn exactly as before.
+  slate with its bays marked and parked cars, a road darker with a dashed
+  centre. The opaque ground surfaces sit above the campus plate; markings
+  sit above their bevels. Outdoor walks are warm white where indoor ones are
+  cool. Trees have varied, overlapping crowns; benches have seats, backs and
+  legs; the fountain has a circular paved apron within its island. These are
+  illustrations, not measured obstacles, and never affect routing.
+- **Keep rendering bounded.** Glazing, fins, tree crowns and cars are instanced
+  per material; the view stays demand-rendered and all instance buffers are
+  released with the scene. Campus exposure is lower than the indoor glass
+  model so planting and facades retain their colours.
+- **A venue with one building has no site** and keeps its existing rendering.
 
 Which of the two views a visitor is given follows from where they are:
 
@@ -258,7 +268,7 @@ Which of the two views a visitor is given follows from where they are:
 
 Sixty metres across is inside the distance at which the roofs come off, so
 coming in to a visitor always arrives among the rooms, on a phone as on a
-desk. _Reset the map view_ goes back out to the whole site and _Recenter_
+desk. The _Campus_ control (_Reset the map view_) goes back out to the whole site and _Recenter_
 comes back in. A view the visitor chose and came back to is restored and left
 alone.
 
@@ -282,6 +292,20 @@ Four kinds, and they look different because they are different:
 They are light because a dark tag on every room turned the model into a wall
 of labels with a building behind it. The collision pass decides which are
 shown; a label is either readable in full or not drawn.
+
+Building tags are real buttons, at least 44px high, named _Explore [building]_
+for assistive technology. Enter/Space opens the building and hands focus to the
+map. Labels that lose their place are hidden from focus and hit testing.
+Closed panels cannot scroll the enclosing map stage when a control is focused.
+The active destination stays named in the exterior overview. Building and
+destination tags are constrained to the viewport before collision checks, with
+extra vertical placements to clear phone controls. Panned-away features are
+not pulled back onto the visible map.
+
+The campus is a lightweight navigable architectural illustration, not a
+photorealistic render or a surveyed hospital. The example package demonstrates
+cross-building and multi-floor journeys; real-world accuracy still requires a
+measured venue, installed signs and handset validation.
 
 ### Tapping a place
 

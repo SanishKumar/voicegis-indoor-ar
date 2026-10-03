@@ -63,6 +63,41 @@ test('pressing a building goes in to it', async ({ page }) => {
   await expect(page.locator('.poi-card-overlay.open')).toHaveCount(0);
 });
 
+test('a building opens into rooms on a phone and is operable by keyboard', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openCampus(page);
+  await page.getByRole('button', { name: '3D model', exact: true }).click();
+  const entrance = page.getByRole('button', { name: 'Explore Main Hospital', exact: true });
+  await expect(entrance).toBeVisible();
+  const bounds = await entrance.boundingBox();
+  expect(bounds!.height).toBeGreaterThanOrEqual(44);
+  await entrance.press('Enter');
+  await expect.poll(() => shownLabels(page)).toContain('Imaging & Radiology');
+  await expect(entrance).toBeHidden();
+  await expect(page.locator('.compiled-map-canvas')).toBeFocused();
+  await expect(
+    page.getByRole('button', { name: /Change start location. Current: Main Gate/ }),
+  ).toBeVisible();
+  await expect(page.locator('.poi-card-overlay.open')).toHaveCount(0);
+
+  // Resizing and focusing a control must not scroll the map's enclosing stage.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.getByRole('button', { name: 'Reset the map view' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Explore Main Hospital', exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(() => page.locator('.visitor-map-stage').evaluate((stage) => stage.scrollTop))
+    .toBe(0);
+  await expect(
+    page.getByRole('button', { name: 'Search rooms and departments', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: '3D model', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});
+
 /** Opens the campus by the link printed on one of its signs. */
 async function checkInAt(page: Page, sign: string) {
   await precompleteOnboarding(page);
@@ -147,4 +182,10 @@ test('a route leaves one building, crosses the garden and enters another', async
   await expect(steps).toContainText('West Garden Walk');
   await expect(steps).toContainText('Fountain Court');
   await expect(steps).toContainText('East Garden Walk');
+
+  await page.getByRole('button', { name: '3D model', exact: true }).click();
+  await expect.poll(() => shownLabels(page)).toContain('Rehabilitation Gym');
+  await expect(
+    page.locator('.map-pill-destination', { hasText: 'Rehabilitation Gym' }),
+  ).toBeVisible();
 });

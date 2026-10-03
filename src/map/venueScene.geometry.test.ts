@@ -9,9 +9,11 @@ import {
   MeshStandardMaterial,
   DirectionalLight,
   WebGLRenderTarget,
+  Box3,
 } from 'three';
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import referencePackage from '../../buildings/reference-medical-centre/compiled/building.package.json';
+import campusPackage from '../../buildings/meridian-park-campus/compiled/building.package.json';
 import { createVenueScene, type VenueScene } from './venueScene';
 
 // Only the GPU is replaced. The scene, transforms and route geometries are real
@@ -92,6 +94,22 @@ function routeCentreLines(): Vector3[][] {
 }
 
 describe('visitor route geometry', () => {
+  it('keeps the campus base below lawns, paving and markings instead of burying them in its bevel', () => {
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      campusPackage as unknown as CompiledBuildingPackage,
+    );
+    scene.frame();
+    const base = observed.scene!.getObjectByName('campus-base')!;
+    expect(new Box3().setFromObject(base).max.y).toBeCloseTo(0, 5);
+    for (const name of ['site-ground-road', 'site-ground-parking', 'site-ground-lawn']) {
+      expect(
+        new Box3().setFromObject(observed.scene!.getObjectByName(name)!).max.y,
+      ).toBeGreaterThan(0);
+    }
+  });
   it('observes drawn frames, not idle RAFs, and publishes one automatic downshift', () => {
     // jsdom has no font layout. Nonzero sizes let the scene cache labels instead
     // of deliberately retrying their pending layout on every frame.
