@@ -2757,7 +2757,7 @@
       "name": "Visitor Car Park",
       "category": "service",
       "position": [
-        84,
+        60,
         123
       ],
       "public": true,
@@ -2977,7 +2977,7 @@
       "category": "entrance",
       "position": [
         105,
-        42
+        39
       ],
       "public": true,
       "accessible": true,
@@ -3338,7 +3338,7 @@
       "name": "Emergency Entrance",
       "category": "emergency",
       "position": [
-        46,
+        45,
         84
       ],
       "public": true,
@@ -3437,7 +3437,7 @@
       "name": "Wellness Pavilion Entrance",
       "category": "entrance",
       "position": [
-        164,
+        165,
         84
       ],
       "public": true,

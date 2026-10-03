@@ -41,6 +41,11 @@ export interface GraphEdge {
   to: string;
   distance: number;
   corridor?: string;
+  /**
+   * What kind of space the edge crosses, where the venue says: a corridor is
+   * walked along, a room is walked into. Left out, it is taken for a corridor.
+   */
+  spaceType?: string;
   accessible?: boolean;
   restricted?: boolean;
   kind?: 'within-space' | 'vertical-connector';
@@ -237,7 +242,27 @@ function getTurnType(previousBearing: number, nextBearing: number): StepType {
   return STEP_TYPE.U_TURN;
 }
 
-function turnInstruction(type: StepType, corridor?: string) {
+/**
+ * How far a turn can run in the space it was made in and still be only the
+ * step through a doorway: across half a concourse to the door of a room.
+ */
+const DOORWAY_JOG_METERS = 8;
+
+/**
+ * A last hop shorter than this, from the middle of a room to a pin in it, is
+ * the arrival and not a manoeuvre: "turn right, 1 m" and then "arrive".
+ */
+const ARRIVAL_HOP_METERS = 2.5;
+
+/** A corridor, a walk, a concourse: somewhere walked along and not into. */
+const isWay = (spaceType: string | undefined) =>
+  spaceType === undefined || spaceType === 'corridor';
+
+function turnInstruction(
+  type: StepType,
+  corridor?: string,
+  preposition: 'onto' | 'into' | 'along' = 'onto',
+) {
   const actions: Record<StepType, string> = {
     [STEP_TYPE.TURN_LEFT]: 'Turn left',
     [STEP_TYPE.TURN_RIGHT]: 'Turn right',
@@ -254,7 +279,7 @@ function turnInstruction(type: StepType, corridor?: string) {
   };
   const action = actions[type];
 
-  return corridor ? `${action} onto ${corridor}` : action;
+  return corridor ? `${action} ${preposition} ${corridor}` : action;
 }
 
 export function generateRouteSteps(
@@ -283,6 +308,7 @@ export function generateRouteSteps(
       to,
       bearing: getBearing(from, to),
       corridor: edge?.corridor,
+      spaceType: edge?.spaceType,
       distance: edge?.distance ?? 0,
       edge,
     };
@@ -427,8 +453,10 @@ export function generateRouteSteps(
     if (previousBearing === null) {
       steps.push({
         type: STEP_TYPE.STRAIGHT,
+        // Off a lift or a stair the visitor is already in its hall: it is
+        // walked through, not into.
         instruction: segment.corridor
-          ? `Continue on ${segment.corridor}`
+          ? `Continue ${isWay(segment.spaceType) ? 'on' : 'through'} ${segment.corridor}`
           : `Continue on ${segment.to.floorName ?? 'this floor'}`,
         distance: segment.distance,
         nodeId: segment.from.id,
@@ -449,7 +477,7 @@ export function generateRouteSteps(
         if (activeStepIndex >= 0) steps[activeStepIndex].distance = activeStepDistance;
         steps.push({
           type: STEP_TYPE.STRAIGHT,
-          instruction: `Continue on ${segment.corridor}`,
+          instruction: `Continue ${isWay(segment.spaceType) ? 'on' : 'into'} ${segment.corridor}`,
           distance: segment.distance,
           nodeId: segment.from.id,
           bearing: segment.bearing,
@@ -466,10 +494,46 @@ export function generateRouteSteps(
       continue;
     }
 
+    // The step from the middle of a room to the pin in it is part of arriving
+    // there. Only that step: a short last leg between two junctions is a leg.
+    if (
+      index === segments.length - 1 &&
+      segment.distance < ARRIVAL_HOP_METERS &&
+      segment.from.type === 'space' &&
+      segment.to.type === 'poi' &&
+      activeStepIndex >= 0
+    ) {
+      activeStepDistance += segment.distance;
+      continue;
+    }
+
     if (activeStepIndex >= 0) steps[activeStepIndex].distance = activeStepDistance;
+    /*
+     * A turn is named for where it leads. Made inside a corridor and staying
+     * in it, it is a turn along that corridor, not "onto" the corridor the
+     * visitor is already in. And when it only crosses to a doorway - a few
+     * metres over a concourse and straight on into a room - it is a turn into
+     * the room: said as two steps it was "turn right onto the concourse",
+     * while standing in the concourse, "then continue on the pharmacy".
+     */
+    const next = segments[index + 1];
+    const staysPut = segment.corridor !== undefined && segment.corridor === activeCorridor;
+    const leadsOn =
+      staysPut &&
+      segment.distance <= DOORWAY_JOG_METERS &&
+      next !== undefined &&
+      next.edge?.kind !== 'vertical-connector' &&
+      next.corridor !== undefined &&
+      next.corridor !== segment.corridor &&
+      getTurnType(segment.bearing, next.bearing) === STEP_TYPE.STRAIGHT;
+    const named = leadsOn && next !== undefined ? next : segment;
     steps.push({
       type: turnType,
-      instruction: turnInstruction(turnType, segment.corridor),
+      instruction: turnInstruction(
+        turnType,
+        named.corridor,
+        staysPut && !leadsOn ? 'along' : isWay(named.spaceType) ? 'onto' : 'into',
+      ),
       distance: segment.distance,
       nodeId: segment.from.id,
       bearing: segment.bearing,
@@ -478,7 +542,8 @@ export function generateRouteSteps(
     activeStepIndex = steps.length - 1;
     activeStepDistance = segment.distance;
     previousBearing = segment.bearing;
-    activeCorridor = segment.corridor;
+    // Named already, so walking straight on into it is not said again.
+    activeCorridor = named.corridor;
   }
 
   if (activeStepIndex >= 0) steps[activeStepIndex].distance = activeStepDistance;

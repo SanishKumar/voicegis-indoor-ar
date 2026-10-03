@@ -278,6 +278,10 @@ export function createCompiledBuildingRuntime(
         : edge.spaceId
           ? spacesById.get(edge.spaceId)?.name
           : undefined,
+    spaceType:
+      edge.kind !== 'vertical-connector' && edge.spaceId
+        ? spacesById.get(edge.spaceId)?.type
+        : undefined,
     accessible: edge.accessible,
     restricted: edge.restricted,
     kind: edge.kind,

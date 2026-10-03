@@ -76,6 +76,23 @@ whole site one press away on _Reset the map view_.
 `docs/design-system.md` has the rules; the drawing is
 `src/map/siteScenery.ts`.
 
+## Checking its directions
+
+A place is reached through the middle of its space. One pinned somewhere else
+in a large space - the car park by its way out, an entrance just inside its
+door - sends every route in to the middle and back, with a "turn around" in
+the written steps. So places sit in the middle of their spaces unless there is
+a reason, and every trip is read before a change is kept:
+
+```bash
+npm run directions:audit -- meridian-park-campus
+npm run route -- meridian-park-campus poi-l2-dialysis poi-w-gym
+```
+
+The first reads all 3,612 trips - each public place to each other, fastest and
+step-free - and lists any with no route, a turn back, or the same sentence
+twice. The second prints one trip as a visitor is told it.
+
 ## Opening it
 
 The catalog's default venue is unchanged. This one opens by link:

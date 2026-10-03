@@ -191,7 +191,7 @@
     }
   ],
   "manifest": {
-    "contentHash": "052f28005fa125e25cd370e83ce54e7bc154254648c7040f8ee618df37c9b55e",
+    "contentHash": "4f93459bdae55fa7d3de14bc54cda37168213c2186abb298342db7efe93ed624",
     "hashAlgorithm": "sha256"
   },
   "packageVersion": "0.2.0",
@@ -207,7 +207,7 @@
       "id": "poi-car-park",
       "name": "Visitor Car Park",
       "position": [
-        84,
+        60,
         123
       ],
       "public": true,
@@ -306,7 +306,7 @@
       "id": "poi-emergency-entrance",
       "name": "Emergency Entrance",
       "position": [
-        46,
+        45,
         84
       ],
       "public": true,
@@ -789,7 +789,7 @@
       "name": "Hospital Main Entrance",
       "position": [
         105,
-        42
+        39
       ],
       "public": true,
       "spaceId": "g-hall"
@@ -822,7 +822,7 @@
       "id": "poi-pavilion-entrance",
       "name": "Wellness Pavilion Entrance",
       "position": [
-        164,
+        165,
         84
       ],
       "public": true,
@@ -1993,7 +1993,7 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 24,
+        "distanceMeters": 0.01,
         "floorIds": [
           "g"
         ],
@@ -2077,7 +2077,7 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 1,
+        "distanceMeters": 0.01,
         "floorIds": [
           "g"
         ],
@@ -2483,7 +2483,7 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 3,
+        "distanceMeters": 0.01,
         "floorIds": [
           "g"
         ],
@@ -2511,7 +2511,7 @@
       },
       {
         "accessible": true,
-        "distanceMeters": 1,
+        "distanceMeters": 0.01,
         "floorIds": [
           "g"
         ],
@@ -5236,7 +5236,7 @@
         "id": "poi:poi-car-park",
         "kind": "poi",
         "position": [
-          84,
+          60,
           123
         ],
         "sourceId": "poi-car-park"
@@ -5296,7 +5296,7 @@
         "id": "poi:poi-emergency-entrance",
         "kind": "poi",
         "position": [
-          46,
+          45,
           84
         ],
         "sourceId": "poi-emergency-entrance"
@@ -5587,7 +5587,7 @@
         "kind": "poi",
         "position": [
           105,
-          42
+          39
         ],
         "sourceId": "poi-main-entrance"
       },
@@ -5606,7 +5606,7 @@
         "id": "poi:poi-pavilion-entrance",
         "kind": "poi",
         "position": [
-          164,
+          165,
           84
         ],
         "sourceId": "poi-pavilion-entrance"

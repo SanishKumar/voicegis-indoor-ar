@@ -25,6 +25,8 @@ export interface Landmark {
   position: readonly [number, number];
   /** The room the place is in, when the package names one. */
   outline?: ReadonlyArray<readonly [number, number]>;
+  /** What that room is called. */
+  spaceName?: string;
 }
 
 export interface LandmarkOptions {
@@ -70,15 +72,17 @@ export function landmarksFrom(buildingPackage: {
     public?: boolean;
     spaceId?: string;
   }>;
-  spaces?: ReadonlyArray<{ id: string; polygon: ReadonlyArray<Point> }>;
+  spaces?: ReadonlyArray<{ id: string; name?: string; polygon: ReadonlyArray<Point> }>;
 }): Landmark[] {
   const outlines = new Map(
     (buildingPackage.spaces ?? []).map((space) => [space.id, space.polygon]),
   );
+  const names = new Map((buildingPackage.spaces ?? []).map((space) => [space.id, space.name]));
   return buildingPackage.pois
     .filter((poi) => poi.public !== false && poi.name.trim() !== '')
     .map((poi) => {
       const outline = poi.spaceId === undefined ? undefined : outlines.get(poi.spaceId);
+      const spaceName = poi.spaceId === undefined ? undefined : names.get(poi.spaceId);
       return {
         id: poi.id,
         name: poi.name,
@@ -87,6 +91,7 @@ export function landmarksFrom(buildingPackage: {
         ...(outline && outline.length >= 3
           ? { outline: outline.map((p) => [p[0], p[1]] as const) }
           : {}),
+        ...(spaceName ? { spaceName } : {}),
       };
     });
 }
@@ -167,11 +172,58 @@ function stepAnchors(steps: readonly RouteStep[], path: readonly GraphNode[]) {
   });
 }
 
+/**
+ * A turn's manoeuvre, and where it leads with the word that says how:
+ * "Turn right" and " onto East Corridor", or " into Pharmacy". A turn "along"
+ * the corridor it is made in leads nowhere new, and once it is said to be at
+ * a place the corridor has nothing to add.
+ */
 function splitCorridor(instruction: string) {
-  const onto = instruction.indexOf(' onto ');
-  return onto === -1
-    ? { head: instruction, corridor: null }
-    : { head: instruction.slice(0, onto), corridor: instruction.slice(onto + 6) };
+  const leading = / (onto|into|along) /.exec(instruction);
+  if (leading === null) return { head: instruction, leads: '' };
+  return {
+    head: instruction.slice(0, leading.index),
+    leads: leading[1] === 'along' ? '' : instruction.slice(leading.index),
+  };
+}
+
+/**
+ * Whether a step already says where a place is. "Turn left into Emergency
+ * Entrance" is not improved by "at Emergency Entrance", nor "continue into
+ * Main Entrance Hall" by "past Hospital Main Entrance", which is in it.
+ */
+function alreadyNames(instruction: string, landmark: Landmark) {
+  // A turn along a corridor names the corridor it is in, which is no news:
+  // a place in that corridor is exactly what such a turn should be said at.
+  const said = instruction.replace(/ along .+$/, '');
+  return (
+    said.includes(landmark.name) ||
+    (landmark.spaceName !== undefined && said.includes(landmark.spaceName))
+  );
+}
+
+/**
+ * "Turn right" a second time running is "turn right again", and a third "a
+ * third time": round three sides of a court is three sentences, not one said
+ * three times.
+ */
+function withoutEchoes(steps: RouteStep[]) {
+  let run = 0;
+  return steps.map((step, index) => {
+    const before = steps[index - 1];
+    if (before === undefined || before.instruction !== step.instruction || !TURNS.has(step.type)) {
+      run = 0;
+      return step;
+    }
+    run += 1;
+    return {
+      ...step,
+      instruction: step.instruction.replace(
+        /^(Turn (?:left|right|around)|Bear (?:left|right))/,
+        run === 1 ? '$1 again' : run === 2 ? '$1 a third time' : '$1 once more',
+      ),
+    };
+  });
 }
 
 export function describeWithLandmarks(
@@ -181,6 +233,15 @@ export function describeWithLandmarks(
   options: LandmarkOptions = {},
 ): RouteStep[] {
   if (steps.length === 0 || path.length === 0) return [...steps];
+  return withoutEchoes(placedByLandmarks(steps, path, landmarks, options));
+}
+
+function placedByLandmarks(
+  steps: readonly RouteStep[],
+  path: readonly GraphNode[],
+  landmarks: readonly Landmark[],
+  options: LandmarkOptions,
+): RouteStep[] {
   const config = { ...DEFAULTS, ...options };
   const anchors = stepAnchors(steps, path);
   const first = path[0];
@@ -255,12 +316,9 @@ export function describeWithLandmarks(
       const landmark = nearestTo(node);
       const repeat = landmark !== null && landmark.id === namedAtPreviousTurn;
       namedAtPreviousTurn = landmark?.id ?? null;
-      if (landmark === null || repeat) return step;
-      const { head, corridor } = splitCorridor(step.instruction);
-      return {
-        ...step,
-        instruction: `${head} at ${landmark.name}${corridor ? ` onto ${corridor}` : ''}`,
-      };
+      if (landmark === null || repeat || alreadyNames(step.instruction, landmark)) return step;
+      const { head, leads } = splitCorridor(step.instruction);
+      return { ...step, instruction: `${head} at ${landmark.name}${leads}` };
     }
     namedAtPreviousTurn = null;
 
@@ -280,7 +338,10 @@ export function describeWithLandmarks(
         nextStep !== undefined && TURNS.has(nextStep.type) && nextNode !== undefined
           ? nearestTo(nextNode)
           : null;
-      const candidates = passed.filter((entry) => entry.landmark.id !== nextNamed?.id);
+      const candidates = passed.filter(
+        (entry) =>
+          entry.landmark.id !== nextNamed?.id && !alreadyNames(step.instruction, entry.landmark),
+      );
       if (candidates.length === 0) return step;
       if (step.type === STEP_TYPE.START) {
         const towards = candidates.reduce((a, b) => (a.along <= b.along ? a : b));

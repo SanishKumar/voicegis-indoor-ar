@@ -177,8 +177,11 @@ poi('fountain', 'court-north', 'Central Fountain', 'landmark', {
   at: [105, 76],
   aliases: ['fountain', 'fountain court'],
 });
+// In the middle of it. A place is reached through the middle of its space, so
+// one pinned by the way out sent everybody leaving the car park 24 m into it
+// and back again.
 poi('car-park', 'car-park', 'Visitor Car Park', 'service', {
-  at: [84, 123],
+  at: [60, 123],
   aliases: ['parking', 'car park'],
 });
 poi('statue', 'healing-garden', "Founders' Statue", 'landmark', {
@@ -238,8 +241,10 @@ function row(floorId, concourse, rooms, y0, y1) {
 }
 row('g', 'g-concourse', groundNorth, 10, 24);
 row('g', 'g-concourse', groundSouth, 32, 44);
+// In the middle of the hall, as every place is in the middle of its space
+// unless there is a reason. Pinned just inside the door, it was passed on the
+// way in to the middle and then walked back to.
 poi('main-entrance', 'g-hall', 'Hospital Main Entrance', 'entrance', {
-  at: [105, 42],
   aliases: ['hospital entrance', 'main hospital'],
 });
 
@@ -334,7 +339,6 @@ for (const [id, name, x0, y0, x1, y1, category, aliases] of [
   poi(id, id, name, category, { aliases });
 }
 poi('emergency-entrance', 'e-entrance', 'Emergency Entrance', 'emergency', {
-  at: [46, 84],
   aliases: ['emergency', 'a&e entrance'],
 });
 
@@ -355,7 +359,6 @@ for (const [id, name, x0, y0, x1, y1, category, aliases] of [
   poi(id, id, name, category, { aliases });
 }
 poi('pavilion-entrance', 'w-entrance', 'Wellness Pavilion Entrance', 'entrance', {
-  at: [164, 84],
   aliases: ['pavilion', 'rehabilitation'],
 });
 

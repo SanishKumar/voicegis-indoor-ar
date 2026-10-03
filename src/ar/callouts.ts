@@ -81,9 +81,9 @@ const CONNECTOR_KICKER: Partial<Record<RouteStep['type'], string>> = {
   escalator: 'Escalator',
 };
 
-/** The corridor a turn leads onto, else the place it is at, else the manoeuvre itself. */
+/** Where a turn leads, else the place it is at, else the manoeuvre itself. */
 function turnTitle(step: RouteStep) {
-  const onto = / onto (.+)$/.exec(step.instruction);
+  const onto = / (?:onto|into|along) (.+)$/.exec(step.instruction);
   if (onto) return onto[1];
   const at = / at (.+)$/.exec(step.instruction);
   if (at) return at[1];
@@ -116,7 +116,7 @@ export function shortStepTitle(step: RouteStep): string {
   }
   // "…continue on Family Care Concourse, towards Women's Imaging" is a
   // corridor and then a reason; the corridor is the part being walked.
-  const on = / on (.+?)(?:,| · |$)/.exec(step.instruction);
+  const on = / (?:on|into|through) (.+?)(?:,| · |$)/.exec(step.instruction);
   if (on) return on[1];
   return step.instruction;
 }

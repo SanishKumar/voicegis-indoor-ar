@@ -60,16 +60,16 @@
       "id": "meridian-park-campus",
       "name": "Meridian Park Medical Campus",
       "description": "Three-building hospital campus with gardens, a fountain court and a car park",
-      "defaultReleaseId": "0.2.0+052f28005fa1",
+      "defaultReleaseId": "0.2.0+4f93459bdae5",
       "releases": [
         {
-          "releaseId": "0.2.0+052f28005fa1",
+          "releaseId": "0.2.0+4f93459bdae5",
           "status": "stable",
           "publishedAt": "2026-10-02T12:00:00+05:30",
           "packageVersion": "0.2.0",
           "compilerVersion": "0.2.0",
           "sourceSchemaVersion": "0.1.0",
-          "contentHash": "052f28005fa125e25cd370e83ce54e7bc154254648c7040f8ee618df37c9b55e",
+          "contentHash": "4f93459bdae55fa7d3de14bc54cda37168213c2186abb298342db7efe93ed624",
           "packageUrl": "/venues/meridian-park-campus.package.json",
           "notes": "First multi-building venue: walkable grounds between a main hospital and two pavilions.",
           "summary": {
