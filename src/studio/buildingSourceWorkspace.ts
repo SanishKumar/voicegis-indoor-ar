@@ -43,6 +43,10 @@ export function sourceFromVenuePackage(buildingPackage: CompiledBuildingPackage)
     verticalConnectors: structuredClone(buildingPackage.verticalConnectors),
     pois: structuredClone(buildingPackage.pois),
     localizationAnchors: structuredClone(buildingPackage.localizationAnchors),
+    // A venue's grounds and the buildings on them. Left out, a campus opened
+    // here and compiled again came back as rooms standing in nothing, and
+    // activating that was one press away. Absent where a venue has none.
+    ...(buildingPackage.site ? { site: structuredClone(buildingPackage.site) } : {}),
   };
 }
 

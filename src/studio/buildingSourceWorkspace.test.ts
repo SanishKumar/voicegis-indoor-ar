@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import example from '../../packages/spatial-schema/examples/minimal-two-floor.json';
 import asterionPackage from '../../buildings/asterion-medical-center/compiled/building.package.json';
 import harborPackage from '../../buildings/harbor-exchange/compiled/building.package.json';
+import campusPackage from '../../buildings/meridian-park-campus/compiled/building.package.json';
 import { compileBuildingInBrowser } from '@voicegis/map-compiler/browser';
 import {
   formatBuildingSource,
@@ -84,10 +85,21 @@ describe('Venue Studio BuildingSource workspace', () => {
   it.each([
     ['Asterion', asterionPackage],
     ['Harbor Exchange', harborPackage],
+    ['Meridian Park', campusPackage],
   ])('recompiles the active %s package to the exact same hash', async (_name, buildingPackage) => {
     const source = sourceFromVenuePackage(buildingPackage as never);
     const result = await compileBuildingInBrowser(source);
 
     expect(result.package?.manifest.contentHash).toBe(buildingPackage.manifest.contentHash);
+  });
+
+  it('keeps the grounds of a venue that has them, and invents none for one that has not', () => {
+    const campus = sourceFromVenuePackage(campusPackage as never);
+    expect(campus.site?.buildings.map((building) => building.id).sort()).toEqual([
+      'emergency-centre',
+      'main-hospital',
+      'wellness-pavilion',
+    ]);
+    expect(sourceFromVenuePackage(asterionPackage as never)).not.toHaveProperty('site');
   });
 });
