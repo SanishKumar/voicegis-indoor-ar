@@ -151,6 +151,74 @@
   pointer-events: none;
 }
 
+/*
+ * The name of the map just come in to, the way a game names an area on the
+ * way through its door: up for a moment over the part of the map nothing else
+ * covers, and never in the way of a press.
+ */
+.map-area-card {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: calc(
+    var(--map-inset-top, 0px) + (100% - var(--map-inset-top, 0px) - var(--map-inset-bottom, 0px)) *
+      0.3
+  );
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 32px);
+  padding: 10px 20px;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius-cards);
+  background: var(--glass-fill-strong);
+  box-shadow: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  backdrop-filter: var(--glass-blur-light);
+  color: var(--color-whiteout);
+  text-align: center;
+  pointer-events: none;
+  animation: map-area-card 2600ms ease both;
+}
+
+.map-area-card span {
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+  color: var(--color-whiteout-soft);
+}
+
+.map-area-card strong {
+  font-size: 1.125rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+@keyframes map-area-card {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 8px));
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-area-card {
+    animation: none;
+  }
+}
+
 .compiled-map-location span {
   display: block;
   font-size: 12px;

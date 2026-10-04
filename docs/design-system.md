@@ -272,16 +272,15 @@ like any corridor, and that is what routes use.
   roof eaves and a raised glazed lantern. Entrance canopies face out from
   actual ground-floor portals; they do not invent entrances or change routes.
   The building is named once. Its rooms and their names are not drawn.
-- **Inside, the roof is gone.** Coming in closer than about 70 m of ground
-  across the shorter uncovered dimension takes the envelopes away and brings
-  the rooms and their names back. This works in portrait as well as landscape.
-  Pressing a building opens a room-scale neighbourhood, not its entire broad
-  footprint; pan to explore the rest. The change is a fade between 115 m and
-  70 m, and nothing is switched.
-- **A route is never under a roof.** While a route is showing, roofs are a
-  ghost of themselves, so the line can be followed through a building from
-  any distance. The route also keeps a least width on screen: its true width
-  is a person's, which from across a campus is less than a pixel.
+- **Inside, the roof is gone,** one building at a time. Each building has
+  its own roof, and it is off for the building the visitor is in or has gone
+  in to look at. Pressing a building opens a room-scale neighbourhood, not
+  its entire broad footprint; pan to explore the rest.
+- **A route is never under a roof.** A building the route passes through is
+  seen through from outside, so the line can be followed in and out of it.
+  A building it does not touch stays solid. The route also keeps a least
+  width on screen: its true width is a person's, which from across a campus
+  is less than a pixel.
 - **Grounds are flat colour under the glass.** Lawn is mint, planting a
   deeper green, water blue and a little raised, paving white, a car park
   slate with its bays marked and parked cars, a road darker with a dashed
@@ -296,15 +295,44 @@ like any corridor, and that is what routes use.
   model so planting and facades retain their colours.
 - **A venue with one building has no site** and keeps its existing rendering.
 
-Which of the two views a visitor is given follows from where they are:
+#### The maps connect
 
-| Where the visitor is               | The map shows                                 |
-| ---------------------------------- | --------------------------------------------- |
-| Not known yet, or out of doors     | The whole site: the outside view              |
-| Inside a building, at a sign       | That building round them, up to 30 m each way |
-| On an upper floor                  | That floor, which is one building, round them |
-| Looking at a floor that isn't here | That floor, fitted: never an empty screen     |
-| A route is showing                 | The route. None of the above moves it         |
+A venue with grounds is several maps that share one drawing, the way a game
+has an outside and interiors: the grounds, and each building. One of them is
+open at a time, and the rule for which is the rule a game uses. It is the one
+the visitor is in.
+
+| What happens                              | The map                                                              |
+| ----------------------------------------- | -------------------------------------------------------------------- |
+| Nobody is on the map, or they are outside | The grounds: every building closed, with its name on it              |
+| The visitor's marker walks in at a door   | That building opens; its name comes up: _Entering Main Hospital_     |
+| It walks out again                        | The building closes behind it: _Leaving Main Hospital · The grounds_ |
+| A sign is scanned indoors                 | That building is open, round the sign, up to 30 m each way           |
+| A building is pressed from outside        | It opens, for looking at: _Inside Main Hospital_                     |
+| The floor changes                         | The floor is named under its building's name                         |
+| The trip ends                             | Home: where the visitor is known to be, the right way up             |
+
+What is shown round the map follows from which map it is:
+
+- **Floors belong to a building.** The floor buttons are the floors of the
+  building the map is in, and a building of one storey has none. Out on the
+  grounds there is nothing to choose: "Level 1" is not a floor of a garden,
+  and of three buildings it would not say which. A route offers the floors it
+  crosses, as it always has.
+- **Walking past a building does not open it.** With nobody on the map, any
+  building opens when the camera comes within about 70 m, fading from 115 m.
+  With a visitor on it, only the building they are in does: the others stay
+  closed however close the walk passes, and the camera is drawn back out of
+  doors to take in the buildings a walk runs between.
+- **The name of a map is said once, on the way in.** It comes up over the
+  part of the map nothing covers for a couple of seconds and is announced to
+  a screen reader. It is never in the way of a press.
+- **A view of the site is fitted to the room the map has.** A trip's sheet
+  goes away a moment after the trip does; the home view is fitted again once
+  it has, and not left cropped to the strip that was showing.
+
+The scene decides which map is open (`getZone`, `onZoneChange` in
+`venueScene.ts`); the map component only shows what follows from it.
 
 **A trip between buildings is seen whole in the route overview.** A route
 from a room upstairs in one building to a room in another is three things at

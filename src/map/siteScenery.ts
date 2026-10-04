@@ -71,8 +71,14 @@ const GROUND: Record<GroundKind, GroundStyle> = {
 const ROOF_FAR_METRES = 115;
 const ROOF_NEAR_METRES = 70;
 const ROOF_OPACITY = 0.94;
-/** With a route showing, a roof is only a ghost, so the route is never hidden in a building. */
-const ROOF_GHOST_OPACITY = 0.16;
+/**
+ * A building a route passes through, seen from outside it: there, but seen
+ * through, so the line can be followed in and out of it. Solid enough to read
+ * as a building the visitor is not in.
+ */
+const ROOF_ROUTE_OPACITY = 0.4;
+/** How quickly a roof comes off or goes back on, as a visitor walks in or out. */
+const ROOF_TAU_MS = 180;
 
 export interface SiteBuildingView {
   id: string;
@@ -93,15 +99,40 @@ export interface SiteScenery {
   /** The building a plan point is in, or null in the grounds. */
   buildingAt(point: Point): SiteBuildingView | null;
   /**
-   * How much of the roofs to show: 1 from far off, 0 close to. Returns the
-   * amount applied, and whether anything changed.
+   * Says how each building is to be drawn, and returns how far out the view
+   * is: 1 from far off, 0 close to. The roofs then ease to it in `advance`.
    */
-  setView(
-    metresVisible: number,
-    routeShowing: boolean,
-    floorOpacity?: number,
-  ): { far: number; changed: boolean };
+  setView(view: SiteView): { far: number };
+  /** Whether a building is showing its rooms and not its roof. */
+  isOpen(buildingId: string): boolean;
+  /**
+   * Moves every roof towards where it should be. True while any is still
+   * moving, or moved this time: the scene has to be drawn again.
+   */
+  advance(elapsedMs: number, immediate?: boolean): boolean;
   dispose(): void;
+}
+
+/*
+ * The grounds and each building are separate maps that share one drawing, the
+ * way a game has an outside and interiors. Which of them is open is decided
+ * by where the visitor is, not only by how close the camera has come.
+ */
+export interface SiteView {
+  /** How many metres of the site are across the view. */
+  metresVisible: number;
+  /** The building the visitor is in, or has gone in to look at. Its roof is off. */
+  entered?: string | null;
+  /** Buildings a route passes through. Seen from outside, they are seen through. */
+  onRoute?: ReadonlySet<string>;
+  /**
+   * With nobody on the map, any building opens when the camera comes close.
+   * With a visitor on it, only the building they are in does: walking past a
+   * building does not take its roof off.
+   */
+  opensOnApproach?: boolean;
+  /** The ground floor's own opacity, when it is a ghost in the stack. */
+  floorOpacity?: number;
 }
 
 function insideRing([x, y]: Point, ring: readonly Point[]) {
@@ -429,7 +460,11 @@ export function createSiteScenery(
   // ----------------------------------------------------------- the buildings
   const roofGroup = new Group();
   group.add(roofGroup);
-  const roofMaterials: MeshStandardMaterial[] = [];
+  /** One roof to a building, each with its own materials, so each can open alone. */
+  const roofs = new Map<
+    string,
+    { group: Group; materials: MeshStandardMaterial[]; shown: number; wanted: number }
+  >();
   const buildings: SiteBuildingView[] = [];
 
   for (const building of site.buildings) {
@@ -449,8 +484,13 @@ export function createSiteScenery(
       toWorld,
     );
     const height = architecture.height;
-    roofGroup.add(...architecture.group.children);
-    roofMaterials.push(...architecture.materials);
+    roofGroup.add(architecture.group);
+    roofs.set(building.id, {
+      group: architecture.group,
+      materials: architecture.materials,
+      shown: ROOF_OPACITY,
+      wanted: ROOF_OPACITY,
+    });
     disposables.push(architecture);
 
     const xs = footprint.map((point) => point[0]);
@@ -466,12 +506,35 @@ export function createSiteScenery(
     });
   }
 
-  let applied = -1;
-  let appliedGhost: boolean | null = null;
-  let appliedFloorOpacity = -1;
+  let far = 1;
+  let entered: string | null = null;
+  let opensOnApproach = true;
+  let floorOpacity = 1;
+  /** What was last put on the materials, so an unchanged roof costs nothing. */
+  let painted = '';
 
   const buildingAt = (point: Point) =>
     buildings.find((building) => insideRing(point, building.footprint)) ?? null;
+
+  const isOpen = (buildingId: string) => buildingId === entered || (opensOnApproach && far <= 0.5);
+
+  /** Puts each roof's present opacity on its materials. */
+  const paint = () => {
+    const key = [...roofs.values()].map((roof) => roof.shown.toFixed(3)).join() + floorOpacity;
+    if (key === painted) return false;
+    painted = key;
+    for (const roof of roofs.values()) {
+      const opacity = roof.shown * floorOpacity;
+      for (const material of roof.materials) {
+        material.opacity = opacity;
+        // A ghost must not hide what is inside it from the depth buffer.
+        material.depthWrite = opacity > 0.6;
+      }
+      roof.group.visible = opacity > 0.01;
+      for (const part of roof.group.children) (part as Mesh).castShadow = opacity > 0.6;
+    }
+    return true;
+  };
 
   return {
     group,
@@ -479,23 +542,38 @@ export function createSiteScenery(
     buildings,
     buildingAt,
     isIndoors: (point) => buildingAt(point) !== null,
+    isOpen,
 
-    setView(metresVisible, routeShowing, floorOpacity = 1) {
-      const far = Number(smoothstep(ROOF_NEAR_METRES, ROOF_FAR_METRES, metresVisible).toFixed(3));
-      if (far === applied && routeShowing === appliedGhost && floorOpacity === appliedFloorOpacity)
-        return { far, changed: false };
-      applied = far;
-      appliedGhost = routeShowing;
-      appliedFloorOpacity = floorOpacity;
-      const opacity = far * (routeShowing ? ROOF_GHOST_OPACITY : ROOF_OPACITY) * floorOpacity;
-      for (const material of roofMaterials) {
-        material.opacity = opacity;
-        // A ghost must not hide what is inside it from the depth buffer.
-        material.depthWrite = opacity > 0.6;
+    setView(view) {
+      far = Number(smoothstep(ROOF_NEAR_METRES, ROOF_FAR_METRES, view.metresVisible).toFixed(3));
+      entered = view.entered ?? null;
+      opensOnApproach = view.opensOnApproach ?? true;
+      floorOpacity = view.floorOpacity ?? 1;
+      for (const [id, roof] of roofs) {
+        // From outside: on, unless the camera coming close is what opens it.
+        const closed = opensOnApproach ? far : 1;
+        roof.wanted =
+          id === entered
+            ? 0
+            : view.onRoute?.has(id)
+              ? closed * ROOF_ROUTE_OPACITY
+              : closed * ROOF_OPACITY;
       }
-      roofGroup.visible = opacity > 0.01;
-      for (const roof of roofGroup.children) (roof as Mesh).castShadow = opacity > 0.6;
-      return { far, changed: true };
+      return { far };
+    },
+
+    advance(elapsedMs, immediate = false) {
+      const ease = immediate ? 1 : 1 - Math.exp(-Math.max(0, elapsedMs) / ROOF_TAU_MS);
+      let moving = false;
+      for (const roof of roofs.values()) {
+        if (roof.shown === roof.wanted) continue;
+        const next = roof.shown + (roof.wanted - roof.shown) * ease;
+        // Once what is left cannot be seen, it has arrived: an eased move that
+        // only ever gets closer keeps the whole scene redrawing.
+        roof.shown = Math.abs(roof.wanted - next) < 0.004 ? roof.wanted : next;
+        if (roof.shown !== roof.wanted) moving = true;
+      }
+      return paint() || moving;
     },
 
     dispose() {

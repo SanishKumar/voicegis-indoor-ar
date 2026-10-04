@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { expect, precompleteOnboarding, test } from './support';
+import { expect, precompleteOnboarding, test, waitForMapAtRest } from './support';
 
 /*
  * A venue with grounds: several buildings, and open ground between them.
@@ -140,17 +140,101 @@ test('a sign out of doors opens on the whole site', async ({ page }) => {
   expect(await shownLabels(page)).not.toContain('Triage');
 });
 
-test('a floor that is not under the view is brought into it', async ({ page }) => {
+test('the floors offered are those of the building the map is in', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await checkInAt(page, 'g/emergency-entrance');
-  await expect.poll(() => shownLabels(page), { timeout: 15_000 }).toContain('Triage');
+  await openCampus(page);
+  const map = page.locator('.compiled-map');
+  const floorButtons = page.locator('.compiled-map-floor');
 
-  // Level 1 exists only over the Main Hospital, across the site from here.
-  // Left where it was, the view would be of nothing.
+  // Out on the grounds there is no floor to choose: "Level 1" is not a floor
+  // of a garden, and of three buildings it would not say which.
+  await expect(map).toHaveAttribute('data-zone', 'grounds');
+  await expect(floorButtons).toHaveCount(0);
+
+  // Going in to the hospital brings its three floors, and says where this is.
+  await page.getByRole('button', { name: 'Explore Main Hospital', exact: true }).click();
+  await expect(map).toHaveAttribute('data-zone', 'main-hospital');
+  await expect(page.locator('.map-area-card')).toContainText('Main Hospital');
+  await expect(page.getByRole('group', { name: 'Floors of Main Hospital' })).toBeVisible();
+  await expect(floorButtons).toHaveCount(3);
+
+  // A floor upstairs is still the hospital's map, and is named as it opens.
   await page.getByRole('button', { name: /^Show Level 1/ }).click();
+  await expect(page.locator('.map-area-card')).toContainText('Level 1');
+  // The view stays over the middle of the building, as it does in any building.
   await expect
     .poll(() => shownLabels(page), { timeout: 15_000 })
-    .toEqual(expect.arrayContaining(['Maternity Unit', 'Day Surgery']));
+    .toEqual(expect.arrayContaining(["Children's Ward", 'Day Surgery']));
+  await expect(map).toHaveAttribute('data-zone', 'main-hospital');
+
+  // Back down and out to the campus: the floors go with the building.
+  await page.getByRole('button', { name: /^Show Ground/ }).click();
+  await page.getByRole('button', { name: 'Reset the map view' }).click();
+  await expect(map).toHaveAttribute('data-zone', 'grounds');
+  await expect(floorButtons).toHaveCount(0);
+  await expect.poll(() => shownLabels(page), { timeout: 15_000 }).toContain('Main Hospital');
+});
+
+test('a building of one storey offers no floors', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await checkInAt(page, 'g/emergency-entrance');
+  await expect(page.locator('.compiled-map')).toHaveAttribute('data-zone', 'emergency-centre');
+  await expect.poll(() => shownLabels(page), { timeout: 15_000 }).toContain('Triage');
+  await expect(page.locator('.compiled-map-floor')).toHaveCount(0);
+});
+
+test('walking through a door changes the map: out to the grounds, and in to another building', async ({
+  page,
+}) => {
+  test.slow();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openCampus(page);
+  await page.getByRole('button', { name: 'Search rooms and departments', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search rooms and departments' }).fill('Triage');
+  await page.getByRole('button', { name: 'View details for Triage', exact: true }).click();
+  await page.getByRole('button', { name: 'Set Triage as starting point' }).click();
+  await page
+    .getByRole('textbox', { name: 'Search rooms and departments' })
+    .fill('Rehabilitation Gym');
+  await page.getByRole('button', { name: 'Navigate to Rehabilitation Gym' }).click();
+  const directions = page.getByRole('region', { name: 'Directions to Rehabilitation Gym' });
+  await expect(directions).toBeVisible();
+  // The model, where a building left behind is still in the picture.
+  await page.getByRole('button', { name: '3D model', exact: true }).click();
+  const map = page.locator('.compiled-map');
+  const card = page.locator('.map-area-card');
+
+  // The trip starts in the Emergency Centre, so that is the map that is open:
+  // its rooms are named, and the buildings round it are closed and named.
+  await expect(map).toHaveAttribute('data-zone', 'emergency-centre');
+  await expect
+    .poll(() => shownLabels(page), { timeout: 15_000 })
+    .toEqual(expect.arrayContaining(['Main Hospital', 'Wellness Pavilion']));
+  expect(await shownLabels(page)).not.toContain('Emergency Centre');
+
+  // Step by step to the door, and through it.
+  const next = directions.getByRole('button', { name: 'Next instruction' });
+  const zone = () => map.getAttribute('data-zone');
+  const walkUntil = async (wanted: string) => {
+    for (let step = 0; step < 20 && (await zone()) !== wanted; step += 1) await next.click();
+    await expect(map).toHaveAttribute('data-zone', wanted);
+  };
+  await walkUntil('grounds');
+  await expect(card).toContainText('Leaving Emergency Centre');
+  await expect(card).toContainText('The grounds');
+  // Seen from outside it is a building again, with its name on it.
+  await expect.poll(() => shownLabels(page), { timeout: 15_000 }).toContain('Emergency Centre');
+  expect(await shownLabels(page)).not.toContain('Triage');
+
+  // On across the garden and in at the pavilion's door.
+  await walkUntil('wellness-pavilion');
+  await expect(card).toContainText('Entering');
+  await expect(card).toContainText('Wellness Pavilion');
+  await expect
+    .poll(() => shownLabels(page), { timeout: 15_000 })
+    .not.toContain('Wellness Pavilion');
+  // The title is for the moment of coming in, and then gets out of the way.
+  await expect(card).toHaveCount(0, { timeout: 10_000 });
 });
 
 test('a route leaves one building, crosses the garden and enters another', async ({ page }) => {
@@ -327,4 +411,55 @@ test('a visitor on the wrong map can choose the place, and it stays chosen', asy
   await expect
     .poll(() => shownLabels(page), { timeout: 15_000 })
     .toEqual(expect.arrayContaining(['Main Hospital', 'Wellness Pavilion']));
+});
+
+test('a trip that is over brings the map home: to where the visitor is, the right way up', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await checkInAt(page, 'g/emergency-entrance');
+  await page.locator('.checkin-toast').getByRole('button', { name: 'Dismiss' }).click();
+  const map = page.locator('.compiled-map');
+  const canvas = page.locator('.compiled-map-canvas');
+  await expect(map).toHaveAttribute('data-zone', 'emergency-centre');
+  // At rest: the view is fitted again to the room the check-in message left.
+  await waitForMapAtRest(page);
+  const home = Number(await canvas.getAttribute('data-camera-scale'));
+
+  await page.getByRole('button', { name: 'Search rooms and departments', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: 'Search rooms and departments' })
+    .fill('Rehabilitation Gym');
+  await page.getByRole('button', { name: 'Navigate to Rehabilitation Gym' }).click();
+  const directions = page.getByRole('region', { name: 'Directions to Rehabilitation Gym' });
+  await expect(directions).toBeVisible();
+
+  // Out at the door and along the garden walk: the map has left the building
+  // and turned to the way of travel.
+  const next = directions.getByRole('button', { name: 'Next instruction' });
+  for (let step = 0; step < 8; step += 1) {
+    if ((await map.getAttribute('data-zone')) === 'grounds') break;
+    await next.click();
+  }
+  await expect(map).toHaveAttribute('data-zone', 'grounds');
+  await expect(canvas).toHaveAttribute('data-camera-follow', 'following');
+  await expect(canvas).not.toHaveAttribute('data-camera-bearing', /^-?0\.0000$/);
+
+  await page.getByRole('button', { name: 'End route' }).click();
+
+  // Not left out on the walk, close in and turned to the last heading. The
+  // visitor's known place is still the sign they scanned, in the Emergency
+  // Centre, and that is the map that opens: the right way up,
+  await expect(map).toHaveAttribute('data-zone', 'emergency-centre');
+  await expect(canvas).toHaveAttribute('data-camera-bearing', /^-?0\.0000$/);
+  await expect.poll(() => shownLabels(page), { timeout: 15_000 }).toContain('Triage');
+  // and fitted to the room the map has once the trip's sheet has gone, which
+  // is the view the check-in opened on. Fitted under the sheet, as it was at
+  // first, it came out a third closer in and cropped at the sides.
+  await expect
+    .poll(async () => {
+      const scale = Number(await canvas.getAttribute('data-camera-scale'));
+      return Math.abs(scale - home) / home;
+    })
+    .toBeLessThan(0.02);
 });

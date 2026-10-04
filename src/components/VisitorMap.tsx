@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type MutableRefObject, type RefObje
 import { createPortal } from 'react-dom';
 import { Camera, LocateFixed, Maximize, Minus, Plus, SlidersHorizontal } from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
-import { createVenueScene, type VenueScene } from '../map/venueScene';
+import { createVenueScene, type SceneZone, type VenueScene } from '../map/venueScene';
 import type { MapGraphicsSetting, MapGraphicsSnapshot } from '../map/visitorRenderQuality';
 import { logField } from '../fieldTest/fieldLog';
 import { resolveVisitorLocation } from '../navigation/visitorLocation';
@@ -22,6 +22,15 @@ import './visitorJourney.css';
 
 /** How close the camera sits while following a walk-through. */
 const FOLLOW_SCALE = 0.36;
+/** How long the name of a map just entered stays up. */
+const AREA_CARD_MS = 2600;
+
+/** The name of the map the visitor has just come in to, and how they came. */
+interface AreaCard {
+  key: number;
+  kicker: string;
+  name: string;
+}
 
 /**
  * How much of the map the interface covers, measured from the elements that
@@ -225,6 +234,16 @@ export default function VisitorMap({
   const [attempt, setAttempt] = useState(0);
   const [graphics, setGraphics] = useState<MapGraphicsSnapshot | null>(null);
   const [graphicsOpen, setGraphicsOpen] = useState(false);
+  /*
+   * A venue with grounds is several maps that connect: the grounds, and each
+   * building. Which one is open is the scene's to say - it follows the marker
+   * through doors - and what is shown round the map follows from it: the
+   * floors offered are that building's, and coming in to a map names it.
+   */
+  const [zone, setZone] = useState<SceneZone | null>(null);
+  const zoneRef = useRef<SceneZone | null>(null);
+  const [areaCard, setAreaCard] = useState<AreaCard | null>(null);
+  const areaCardCount = useRef(0);
   const graphicsButtonRef = useRef<HTMLButtonElement>(null);
   const graphicsPanelRef = useRef<HTMLDivElement>(null);
   const graphicsId = useId();
@@ -282,6 +301,7 @@ export default function VisitorMap({
     let frame = 0;
     let contextLost = false;
     let unsubscribeGraphics: (() => void) | undefined;
+    let unsubscribeZone: (() => void) | undefined;
     const onLost = (event: Event) => {
       event.preventDefault();
       contextLost = true;
@@ -324,6 +344,28 @@ export default function VisitorMap({
         };
         publishGraphics(scene.getGraphics());
         unsubscribeGraphics = scene.onGraphicsChange(publishGraphics);
+        zoneRef.current = scene.getZone();
+        setZone(zoneRef.current);
+        unsubscribeZone = scene.onZoneChange((next, why) => {
+          const left = zoneRef.current;
+          zoneRef.current = next;
+          setZone(next);
+          areaCardCount.current += 1;
+          setAreaCard({
+            key: areaCardCount.current,
+            // Walked through a door, or gone to look: said differently, because
+            // only one of them says where the visitor is.
+            kicker:
+              next !== null
+                ? why === 'walked'
+                  ? 'Entering'
+                  : 'Inside'
+                : left !== null
+                  ? `Leaving ${left.name}`
+                  : 'Outside',
+            name: next !== null ? next.name : 'The grounds',
+          });
+        });
         const remembered = viewMemory.current?.venueHash === venueHash ? viewMemory.current : null;
         if (remembered) {
           framedRouteRef.current = remembered.framedRoute;
@@ -365,6 +407,7 @@ export default function VisitorMap({
       }
       sceneRef.current = null;
       unsubscribeGraphics?.();
+      unsubscribeZone?.();
       setReady(false);
       scene?.dispose();
     };
@@ -384,6 +427,33 @@ export default function VisitorMap({
     const last = state.route?.found ? state.route.path[state.route.path.length - 1] : undefined;
     sceneRef.current?.setDestination(last === undefined ? null : String(last.id));
   }, [ready, state.activeFloorId, state.route, attempt, buildingPackage]);
+
+  // A change of floor inside a building is a change of map too, and is named
+  // the same way. Only where there are several maps to be in.
+  const hasSite = buildingPackage.site !== undefined;
+  const shownFloorRef = useRef<string | null>(null);
+  useEffect(() => {
+    const floorId = String(state.activeFloorId);
+    const before = shownFloorRef.current;
+    shownFloorRef.current = floorId;
+    if (!ready || !hasSite || before === null || before === floorId) return;
+    const floor = buildingPackage.floors.find((entry) => entry.id === floorId);
+    if (floor === undefined) return;
+    areaCardCount.current += 1;
+    setAreaCard({
+      key: areaCardCount.current,
+      kicker: zoneRef.current?.name ?? 'The grounds',
+      // The floor every building stands on is named for the site: "Ground ·
+      // Campus". Under a building's name it is that building's ground floor.
+      name: floorId === buildingPackage.site?.floorId ? floor.name.split(' · ')[0] : floor.name,
+    });
+  }, [ready, hasSite, state.activeFloorId, buildingPackage]);
+
+  useEffect(() => {
+    if (areaCard === null) return undefined;
+    const timer = window.setTimeout(() => setAreaCard(null), AREA_CARD_MS);
+    return () => window.clearTimeout(timer);
+  }, [areaCard]);
 
   useEffect(() => {
     if (!ready) return;
@@ -469,6 +539,17 @@ export default function VisitorMap({
     sceneRef.current?.frameRoute({ northUp: leftTracking || stackChanged });
   }, [ready, route, tracking, stackOpen, insets, state.activeFloorId, attempt]);
 
+  // A trip that is over leaves the map where the walk ended. It comes home:
+  // to where the visitor is known to be, the right way up.
+  const wasJourneyRef = useRef(journey);
+  useEffect(() => {
+    const was = wasJourneyRef.current;
+    wasJourneyRef.current = journey;
+    if (!ready || !was || journey) return;
+    sceneRef.current?.goHome();
+    if (sceneRef.current) setPresentation(sceneRef.current.getView());
+  }, [ready, journey]);
+
   useEffect(() => {
     if (!ready) return;
     // Inside a journey the guidance marker stands in for the start.
@@ -492,6 +573,25 @@ export default function VisitorMap({
     attempt,
     buildingPackage,
   ]);
+
+  /*
+   * The floors offered. On a route, the floors it crosses. Otherwise, in one
+   * building, all of them; and where there are several buildings, the floors
+   * of the one the map is in. Out on the grounds there is nothing to choose:
+   * "Level 1" is not a floor of a garden, and of three buildings it would not
+   * say which.
+   */
+  const floorChoices = [...floors]
+    .filter((floor) => {
+      const id = String(floor.id);
+      if (journey && route) {
+        return id === String(state.activeFloorId) || routeFloorIds.includes(id);
+      }
+      return !hasSite || (zone !== null && zone.floorIds.includes(id));
+    })
+    .sort((left, right) => right.level - left.level);
+  // One floor is not a choice.
+  if (hasSite && floorChoices.length < 2) floorChoices.length = 0;
 
   const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     // Letting go after dragging the map is not a tap on whatever happens to be
@@ -540,6 +640,7 @@ export default function VisitorMap({
       className="compiled-map"
       data-route-clearance={state.route?.displayClearance?.status ?? 'not-checked'}
       data-route-floors={routeFloorCount}
+      data-zone={hasSite ? (zone?.id ?? 'grounds') : undefined}
       data-camera-owner={userMoved ? 'visitor' : 'guidance'}
       data-location-floor={locationFloor}
       data-location-basis={locationBasis}
@@ -558,6 +659,12 @@ export default function VisitorMap({
         aria-label={`${presentation.mode === '2d' ? '2D plan' : '3D model'} of ${floors.find((floor) => floor.id === state.activeFloorId)?.name ?? 'the venue'}`}
       />
       <div ref={labelRef} className="compiled-map-labels" />
+      {areaCard && (
+        <div key={areaCard.key} className="map-area-card" role="status">
+          <span>{areaCard.kicker}</span>
+          <strong>{areaCard.name}</strong>
+        </div>
+      )}
       <div
         className="compiled-map-presentation"
         role="group"
@@ -744,17 +851,13 @@ export default function VisitorMap({
         )}
       </div>
 
-      <div className="compiled-map-floors" role="group" aria-label="Floors">
-        {[...floors]
-          .filter(
-            (floor) =>
-              !journey ||
-              !route ||
-              String(floor.id) === String(state.activeFloorId) ||
-              routeFloorIds.includes(String(floor.id)),
-          )
-          .sort((left, right) => right.level - left.level)
-          .map((floor) => {
+      {floorChoices.length > 0 && (
+        <div
+          className="compiled-map-floors"
+          role="group"
+          aria-label={zone ? `Floors of ${zone.name}` : 'Floors'}
+        >
+          {floorChoices.map((floor) => {
             const active = String(floor.id) === String(state.activeFloorId);
             return (
               <button
@@ -769,7 +872,8 @@ export default function VisitorMap({
               </button>
             );
           })}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

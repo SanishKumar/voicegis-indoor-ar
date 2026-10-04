@@ -17,11 +17,6 @@ function roofs(scenery: ReturnType<typeof createSiteScenery>) {
   return found;
 }
 
-function roofMaterial(scenery: ReturnType<typeof createSiteScenery>) {
-  const material = roofs(scenery)[0].material;
-  return Array.isArray(material) ? material[0] : material;
-}
-
 describe('the outside of a venue with grounds', () => {
   it('gives every building a roof and a name above it', () => {
     const scenery = createSiteScenery(site, toWorld);
@@ -51,65 +46,133 @@ describe('the outside of a venue with grounds', () => {
     scenery.dispose();
   });
 
+  /** One roof part of a building, and the material it is drawn in. */
+  const roofOf = (scenery: ReturnType<typeof createSiteScenery>, id: string) => {
+    const part = roofs(scenery).find((roof) => roof.userData.siteBuildingId === id)!;
+    const material = Array.isArray(part.material) ? part.material[0] : part.material;
+    return { part, material, group: part.parent! };
+  };
+  /** Says how the site is to be drawn and lets the roofs get there at once. */
+  const show = (
+    scenery: ReturnType<typeof createSiteScenery>,
+    view: Parameters<ReturnType<typeof createSiteScenery>['setView']>[0],
+  ) => {
+    const result = scenery.setView(view);
+    scenery.advance(0, true);
+    return result;
+  };
+
   it('shows the roofs from far off and lifts them away close to', () => {
     const scenery = createSiteScenery(site, toWorld);
-    const material = () => roofMaterial(scenery);
+    const hospital = () => roofOf(scenery, 'main-hospital');
 
     // The whole campus in view: solid roofs, casting shadows.
-    expect(scenery.setView(170, false)).toEqual({ far: 1, changed: true });
-    expect(material().opacity).toBeGreaterThan(0.9);
-    expect(roofs(scenery)[0].castShadow).toBe(true);
-    expect(roofs(scenery)[0].parent!.visible).toBe(true);
+    expect(show(scenery, { metresVisible: 170 }).far).toBe(1);
+    expect(hospital().material.opacity).toBeGreaterThan(0.9);
+    expect(hospital().part.castShadow).toBe(true);
+    expect(hospital().group.visible).toBe(true);
+    expect(scenery.isOpen('main-hospital')).toBe(false);
 
-    // One building filling the screen: no roofs at all.
-    expect(scenery.setView(45, false).far).toBe(0);
-    expect(roofs(scenery)[0].parent!.visible).toBe(false);
+    // One building filling the screen, and nobody on the map: no roofs at all.
+    expect(show(scenery, { metresVisible: 45 }).far).toBe(0);
+    expect(hospital().group.visible).toBe(false);
+    expect(scenery.isOpen('main-hospital')).toBe(true);
 
     // On the way in, part-way: neither on nor off.
-    const between = scenery.setView(92, false).far;
+    const between = show(scenery, { metresVisible: 92 }).far;
     expect(between).toBeGreaterThan(0);
     expect(between).toBeLessThan(1);
     scenery.dispose();
   });
 
-  it('never hides a route inside a building', () => {
+  it('opens the building the visitor is in and leaves the others closed', () => {
     const scenery = createSiteScenery(site, toWorld);
-    scenery.setView(170, true);
-    const roof = roofs(scenery)[0];
-    const material = roofMaterial(scenery);
+    // Seen from right across the site, so nothing is open for being close.
+    show(scenery, { metresVisible: 170, entered: 'emergency-centre' });
 
-    // A ghost: there, but seen through, and not shading or occluding the route.
-    expect(material.opacity).toBeGreaterThan(0);
-    expect(material.opacity).toBeLessThan(0.25);
-    expect(material.depthWrite).toBe(false);
-    expect(roof.castShadow).toBe(false);
-    for (const part of roofs(scenery)) {
-      const surfaces = Array.isArray(part.material) ? part.material : [part.material];
-      for (const surface of surfaces) {
-        expect(surface.opacity).toBeLessThan(0.25);
-        expect(surface.depthWrite).toBe(false);
-      }
-      expect(part.castShadow).toBe(false);
+    expect(scenery.isOpen('emergency-centre')).toBe(true);
+    expect(roofOf(scenery, 'emergency-centre').group.visible).toBe(false);
+    for (const other of ['main-hospital', 'wellness-pavilion']) {
+      expect(scenery.isOpen(other), other).toBe(false);
+      expect(roofOf(scenery, other).material.opacity, other).toBeGreaterThan(0.9);
+    }
+
+    // Walking out and across to the pavilion: one closes as the other opens.
+    show(scenery, { metresVisible: 170, entered: 'wellness-pavilion' });
+    expect(scenery.isOpen('emergency-centre')).toBe(false);
+    expect(roofOf(scenery, 'emergency-centre').material.opacity).toBeGreaterThan(0.9);
+    expect(roofOf(scenery, 'wellness-pavilion').group.visible).toBe(false);
+    scenery.dispose();
+  });
+
+  it('does not take the roof off a building for being walked past', () => {
+    const scenery = createSiteScenery(site, toWorld);
+    // A visitor on the grounds, with the camera close in on their walk.
+    show(scenery, { metresVisible: 40, entered: null, opensOnApproach: false });
+    for (const id of ['main-hospital', 'emergency-centre', 'wellness-pavilion']) {
+      expect(scenery.isOpen(id), id).toBe(false);
+      expect(roofOf(scenery, id).material.opacity, id).toBeGreaterThan(0.9);
     }
     scenery.dispose();
   });
 
-  it('reports no change when asked for the view it already has', () => {
+  it('never hides a route inside a building', () => {
     const scenery = createSiteScenery(site, toWorld);
-    scenery.setView(170, false);
-    expect(scenery.setView(170, false).changed).toBe(false);
-    expect(scenery.setView(170, true).changed).toBe(true);
+    show(scenery, {
+      metresVisible: 170,
+      onRoute: new Set(['emergency-centre', 'wellness-pavilion']),
+    });
+
+    // A building on the route: there, but seen through, and not shading or
+    // occluding the line that runs through it.
+    for (const id of ['emergency-centre', 'wellness-pavilion']) {
+      for (const part of roofs(scenery).filter((roof) => roof.userData.siteBuildingId === id)) {
+        const surfaces = Array.isArray(part.material) ? part.material : [part.material];
+        for (const surface of surfaces) {
+          expect(surface.opacity).toBeGreaterThan(0);
+          expect(surface.opacity).toBeLessThan(0.5);
+          expect(surface.depthWrite).toBe(false);
+        }
+        expect(part.castShadow).toBe(false);
+      }
+    }
+    // One the route does not touch is as solid as ever.
+    expect(roofOf(scenery, 'main-hospital').material.opacity).toBeGreaterThan(0.9);
+    scenery.dispose();
+  });
+
+  it('takes a roof off over a moment, and then is still', () => {
+    const scenery = createSiteScenery(site, toWorld);
+    show(scenery, { metresVisible: 170 });
+    expect(scenery.advance(16)).toBe(false);
+
+    scenery.setView({ metresVisible: 170, entered: 'main-hospital' });
+    // Part-way after one frame, not snapped.
+    expect(scenery.advance(16)).toBe(true);
+    const partWay = roofOf(scenery, 'main-hospital').material.opacity;
+    expect(partWay).toBeGreaterThan(0);
+    expect(partWay).toBeLessThan(0.94);
+
+    // It arrives, and once it has there is nothing more to draw.
+    for (let frame = 0; frame < 120; frame += 1) scenery.advance(16);
+    expect(roofOf(scenery, 'main-hospital').group.visible).toBe(false);
+    expect(scenery.advance(16)).toBe(false);
     scenery.dispose();
   });
 
   it('fades the entire exterior with its storey and cannot regain shadows during a route', () => {
     const scenery = createSiteScenery(site, toWorld, CAMPUS.portals);
-    scenery.setView(170, true, 0.22);
-    expect(roofMaterial(scenery).opacity).toBeCloseTo(0.16 * 0.22);
+    const onRoute = new Set(['main-hospital']);
+    show(scenery, { metresVisible: 170, onRoute, floorOpacity: 0.22 });
+    expect(roofOf(scenery, 'main-hospital').material.opacity).toBeCloseTo(0.4 * 0.22);
     // The scene toggles a storey's shadows while it comes back into view.
     for (const roof of roofs(scenery)) roof.castShadow = true;
-    expect(scenery.setView(170, true, 1).changed).toBe(true);
-    for (const roof of roofs(scenery)) expect(roof.castShadow).toBe(false);
+    show(scenery, { metresVisible: 170, onRoute, floorOpacity: 1 });
+    for (const roof of roofs(scenery).filter(
+      (part) => part.userData.siteBuildingId === 'main-hospital',
+    )) {
+      expect(roof.castShadow).toBe(false);
+    }
     scenery.dispose();
   });
 

@@ -130,6 +130,63 @@ describe('visitor route geometry', () => {
     // Each piece in its own colour, on the one material.
     for (const mesh of furniture) expect(mesh.instanceColor).not.toBeNull();
   });
+  it('moves from the grounds map to a building map as the marker goes through a door', () => {
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      campusPackage as unknown as CompiledBuildingPackage,
+    );
+    const changes: Array<[string | null, string]> = [];
+    scene.onZoneChange((zone, why) => changes.push([zone?.id ?? null, why]));
+    const walkTo = (x: number, y: number, floorId = 'g') => {
+      scene.setPuck({ x, y, floorId, heading: [1, 0] });
+      scene.frame();
+    };
+
+    // Nobody on the map yet: the grounds.
+    expect(scene.getZone()).toBeNull();
+    expect(canvas.dataset.zone).toBe('grounds');
+
+    // Along the Emergency Centre's corridor: its map, and it has one floor.
+    walkTo(30, 84);
+    expect(scene.getZone()).toEqual({
+      id: 'emergency-centre',
+      name: 'Emergency Centre',
+      floorIds: ['g'],
+    });
+    // Several strides inside one building are one building.
+    walkTo(34, 84);
+    walkTo(38, 84);
+
+    // Out at its door on to the West Garden Walk.
+    walkTo(70, 84);
+    expect(scene.getZone()).toBeNull();
+    expect(canvas.dataset.zone).toBe('grounds');
+
+    // In at the hospital's entrance: its map, with the floors above it.
+    walkTo(105, 40);
+    expect(scene.getZone()).toMatchObject({ id: 'main-hospital', floorIds: ['g', 'l1', 'l2'] });
+    // Up the stairs is still the hospital.
+    walkTo(103, 15, 'l2');
+    expect(scene.getZone()?.id).toBe('main-hospital');
+
+    // Told once at each door, and each time as a walk and not a choice.
+    expect(changes).toEqual([
+      ['emergency-centre', 'walked'],
+      [null, 'walked'],
+      ['main-hospital', 'walked'],
+    ]);
+  });
+  it('leaves a venue of one building with no maps to move between', () => {
+    const changes: unknown[] = [];
+    scene.onZoneChange((zone) => changes.push(zone));
+    scene.setPuck({ x: 4, y: 4, floorId: 'g', heading: [1, 0] });
+    scene.frame();
+    expect(scene.getZone()).toBeNull();
+    expect(canvas.dataset.zone).toBeUndefined();
+    expect(changes).toEqual([]);
+  });
   it('opens the stack with the grounds readable under ghosted storeys, and names where the trip ends', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(80);
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(24);

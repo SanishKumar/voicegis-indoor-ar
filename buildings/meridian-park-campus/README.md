@@ -63,10 +63,16 @@ third step points it at the package just published.
 ## How it is drawn
 
 From outside, the three buildings are roofs with their names on them, among
-the lawns, the pond and the car park. Coming in close, or pressing a building,
-takes the roofs off and shows the rooms. While a route is showing the roofs
-are a ghost, so the line can be followed from one building, across the
-grounds and into another.
+the lawns, the pond and the car park. Going in to a building, or pressing it,
+takes its roof off and shows its rooms; the other two keep theirs. A building
+a route passes through is seen through from outside, so the line can be
+followed from one building, across the grounds and into another.
+
+The grounds and each building are maps that connect. Walking through a door
+is what moves from one to the next: the building entered opens and is named,
+the one left closes behind, and the floor buttons are those of the building
+the map is in. Opened in the Studio and compiled again, the campus comes back
+with its grounds: the `site` block is part of the source the Studio derives.
 
 Where the map opens depends on where the visitor is. With no check-in, or one
 at an outdoor sign such as the Main Gate, it opens on the whole site. A

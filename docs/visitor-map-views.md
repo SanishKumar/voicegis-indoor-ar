@@ -21,6 +21,13 @@ request. It changes presentation, not the localization or routing policy.
   frames every floor the route crosses and does not follow the marker; closing
   it gives the marker the camera back. The destination is named in the
   overview even when it is on another floor than the one in hand.
+- In a venue with grounds the map is one of several that connect: the grounds
+  and each building. The one open follows the visitor's marker through doors,
+  and the floor buttons are the floors of the building it is in. See
+  [the maps connect](design-system.md#the-maps-connect).
+- A trip that ends brings the camera home: to the visitor's last known place,
+  north up, fitted to the room the map has once the sheet has gone. A walk
+  otherwise leaves it close in and turned to its last heading.
 - **Expand map** temporarily hides the directions sheet without unmounting it.
   **Show directions** restores it and keyboard focus. A new route automatically
   returns to directions rather than hiding new guidance.
