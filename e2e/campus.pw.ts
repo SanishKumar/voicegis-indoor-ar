@@ -183,6 +183,99 @@ test('a building of one storey offers no floors', async ({ page }) => {
   await expect(page.locator('.compiled-map-floor')).toHaveCount(0);
 });
 
+async function openCrossCampusRoute(page: Page) {
+  await openCampus(page);
+  await page.getByRole('button', { name: 'Search rooms and departments', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search rooms and departments' }).fill('Triage');
+  await page.getByRole('button', { name: 'View details for Triage', exact: true }).click();
+  await page.getByRole('button', { name: 'Set Triage as starting point' }).click();
+  await page
+    .getByRole('textbox', { name: 'Search rooms and departments' })
+    .fill('Rehabilitation Gym');
+  await page.getByRole('button', { name: 'Navigate to Rehabilitation Gym' }).click();
+  await expect(
+    page.getByRole('region', { name: 'Directions to Rehabilitation Gym' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: '3D model', exact: true }).click();
+}
+
+test('exploring a different building survives a camera round-trip without moving the visitor', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      value: async () => new MediaStream(),
+    });
+  });
+  await openCrossCampusRoute(page);
+  const map = page.locator('.compiled-map');
+  const canvas = page.locator('.compiled-map-canvas');
+  await expect(map).toHaveAttribute('data-zone', 'emergency-centre');
+  await page.getByRole('button', { name: 'Explore Main Hospital', exact: true }).click();
+  await expect(map).toHaveAttribute('data-zone', 'main-hospital');
+  await expect(map).toHaveAttribute('data-camera-owner', 'visitor');
+  await waitForMapAtRest(page);
+  const target = await canvas.getAttribute('data-camera-target');
+  const scale = await canvas.getAttribute('data-camera-scale');
+  // The marker takes another step inside Emergency while the visitor browses
+  // Main Hospital. That must not steal the chosen camera or building.
+  await page.getByRole('button', { name: 'Next instruction', exact: true }).click();
+  await expect(map).toHaveAttribute('data-zone', 'main-hospital');
+  await expect(canvas).toHaveAttribute('data-camera-target', target!);
+  const instruction = await page.locator('.jr-banner-copy').innerText();
+
+  await page.getByRole('button', { name: 'Camera view', exact: true }).click();
+  await page.getByRole('button', { name: 'Exit to plan', exact: true }).click();
+  await expect(map).toHaveAttribute('data-zone', 'main-hospital');
+  await expect(canvas).toHaveAttribute('data-camera-target', target!);
+  await expect(canvas).toHaveAttribute('data-camera-scale', scale!);
+  await expect(page.locator('.jr-banner-copy')).toHaveText(instruction, { useInnerText: true });
+
+  // Recenter is an explicit return to the visitor, not just a camera move
+  // into the roof of a building whose map is still closed.
+  await page.getByRole('button', { name: 'Recenter on guidance', exact: true }).click();
+  await expect(map).toHaveAttribute('data-zone', 'emergency-centre');
+  await expect(page.locator('.compiled-map-floor')).toHaveCount(0);
+  await expect(map).toHaveAttribute('data-camera-owner', 'guidance');
+});
+
+test('retrying a lost map display keeps the building being explored', async ({ page }) => {
+  await openCrossCampusRoute(page);
+  const map = page.locator('.compiled-map');
+  await page.getByRole('button', { name: 'Explore Main Hospital', exact: true }).click();
+  await expect(map).toHaveAttribute('data-zone', 'main-hospital');
+  const canvas = page.locator('.compiled-map-canvas');
+  await waitForMapAtRest(page);
+  const target = await canvas.getAttribute('data-camera-target');
+  // Exercise the Retry scene-recreation path with a recovered device. A real
+  // GPU context held lost by WEBGL_lose_context cannot be recreated until
+  // that extension restores it; the map-view suite covers that recovery.
+  await canvas.dispatchEvent('webglcontextlost', { cancelable: true });
+  await expect(map).toHaveAttribute('data-render-status', 'lost');
+  await page.getByRole('button', { name: 'Retry map display', exact: true }).click();
+  await expect(map).toHaveAttribute('data-render-status', 'ready');
+  await expect(map).toHaveAttribute('data-zone', 'main-hospital');
+  await expect(canvas).toHaveAttribute('data-camera-target', target!);
+});
+
+test('Campus exits an upper floor to the grounds without changing the chosen start', async ({
+  page,
+}) => {
+  await openCampus(page);
+  const map = page.locator('.compiled-map');
+  await page.getByRole('button', { name: 'Explore Main Hospital', exact: true }).click();
+  await page.getByRole('button', { name: /^Show Level 1/ }).click();
+  await expect(page.locator('.compiled-map-canvas')).toHaveAttribute('aria-label', /Level 1/);
+  await page.getByRole('button', { name: 'Reset the map view', exact: true }).click();
+  await expect(map).toHaveAttribute('data-zone', 'grounds');
+  await expect(page.locator('.compiled-map-canvas')).toHaveAttribute('aria-label', /Ground/);
+  await expect(page.locator('.compiled-map-floor')).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: /Change start location. Current: Main Gate/ }),
+  ).toBeVisible();
+  await expect.poll(() => shownLabels(page)).toContain('Main Hospital');
+});
+
 test('walking through a door changes the map: out to the grounds, and in to another building', async ({
   page,
 }) => {

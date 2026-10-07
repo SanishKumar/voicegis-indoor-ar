@@ -152,9 +152,9 @@ export function createVisitorCamera(span: number, saved = defaultMapView()) {
 
     /** True once the visitor has moved the camera themselves since the last fit or recenter. */
     wasMovedByUser: () => userMoved,
-    /** Restore that fact for a camera rebuilt around a view the visitor chose. */
-    markMovedByUser() {
-      goal = null;
+    /** Own the camera; an explicit building choice may retain its new fit transition. */
+    markMovedByUser(preserveTransition = false) {
+      if (!preserveTransition) goal = null;
       userMoved = true;
     },
     isAnimating: () => goal !== null,

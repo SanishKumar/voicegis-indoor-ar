@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
 import {
   ContactShadows,
   Edges,
@@ -9,7 +9,7 @@ import {
   Line,
   OrbitControls,
 } from '@react-three/drei';
-import { Shape } from 'three';
+import { Group, PerspectiveCamera, Shape } from 'three';
 import {
   Accessibility,
   Building2,
@@ -33,6 +33,9 @@ import { routeConnectorRuns, routeFloorIds } from '../engine/floorplanModel';
 import type { GraphNode, RouteResult } from '../engine/routingCore';
 import { getNearestBoundaryAngle, getPolygonBounds } from '../engine/spatialTwinArchitecture';
 import { buildFloorWallTopology, type WallBody } from '../engine/wallTopology';
+import { inspectorCameraView } from '../engine/inspectorCamera';
+import { createInspectorSiteScenery } from '../map/inspectorSiteScenery';
+import InspectorLabelLayout from './InspectorLabelLayout';
 import {
   CARTOGRAPHIC_THEME,
   spaceSurface,
@@ -536,10 +539,12 @@ function PoiLabels({
   floorSelection,
   bounds,
   exploded,
+  destinationPoiId,
 }: {
   floorSelection: FloorSelection;
   bounds: BuildingBounds;
   exploded: boolean;
+  destinationPoiId?: string;
 }) {
   const buildingPackage = useSpatialPackage();
   const floorsById = useMemo(
@@ -566,8 +571,18 @@ function PoiLabels({
           bounds,
         );
         return (
-          <Html key={poi.id} position={position} center distanceFactor={18}>
-            <div className="twin-poi-label">{poi.name}</div>
+          // Screen-space type: fitting a large campus must not shrink names
+          // into unreadable world-space glyphs. Position still follows the model.
+          <Html key={poi.id} position={position} center>
+            <div
+              className="twin-poi-label"
+              data-inspector-label-id={`poi-${poi.id}`}
+              data-inspector-label-priority={
+                poi.id === destinationPoiId ? 100 : poi.category === 'entrance' ? 60 : 30
+              }
+            >
+              {poi.name}
+            </div>
           </Html>
         );
       })}
@@ -750,13 +765,12 @@ function ActiveRouteOverlay({
             (firstPoint[2] + lastPoint[2]) / 2,
           ];
           return (
-            <Html
-              key={`connector-label-${run.connectorId}`}
-              position={labelPosition}
-              center
-              distanceFactor={17}
-            >
-              <div className="twin-connector-label">
+            <Html key={`connector-label-${run.connectorId}`} position={labelPosition} center>
+              <div
+                className="twin-connector-label"
+                data-inspector-label-id={`connector-${run.connectorId}`}
+                data-inspector-label-priority={80}
+              >
                 <strong>{connector?.name ?? run.connectorId}</strong>
                 <span>
                   {connector?.kind ?? 'connector'} · {run.fromFloorId.toUpperCase()} →{' '}
@@ -807,8 +821,14 @@ function ActiveRouteOverlay({
             <torusGeometry args={[0.34, 0.11, 12, 28]} />
             <meshBasicMaterial color="#2b7fff" depthTest={false} />
           </mesh>
-          <Html position={[0, 0.75, 0]} center distanceFactor={18}>
-            <div className="twin-route-label">Destination</div>
+          <Html position={[0, 0.75, 0]} center>
+            <div
+              className="twin-route-label"
+              data-inspector-label-id="route-destination"
+              data-inspector-label-priority={95}
+            >
+              Destination
+            </div>
           </Html>
         </group>
       )}
@@ -865,6 +885,53 @@ interface TwinSceneProps {
   onClearSelection: () => void;
 }
 
+/** Construct after mount and detach before disposal, including StrictMode's remount. */
+function InspectorSiteGrounds({ exploded }: { exploded: boolean }) {
+  const buildingPackage = useSpatialPackage();
+  const group = useRef<Group>(null);
+  const invalidate = useThree((state) => state.invalidate);
+  useEffect(() => {
+    const parent = group.current;
+    if (!parent) return undefined;
+    const scenery = createInspectorSiteScenery(buildingPackage, exploded);
+    if (!scenery) return undefined;
+    parent.add(scenery.group);
+    invalidate();
+    return () => scenery.dispose();
+  }, [buildingPackage, exploded, invalidate]);
+  // This subtree owns its shared/instanced resources; R3F must not dispose them a second time.
+  return <group ref={group} dispose={null} />;
+}
+
+function InspectorCameraControls({ targetY }: { targetY: number }) {
+  const buildingPackage = useSpatialPackage();
+  const { get, size, invalidate } = useThree();
+  const view = useMemo(
+    () => inspectorCameraView(buildingPackage, size.width / Math.max(1, size.height), targetY),
+    [buildingPackage, size.width, size.height, targetY],
+  );
+  useEffect(() => {
+    const { camera } = get();
+    if (!(camera instanceof PerspectiveCamera)) return;
+    camera.position.set(...view.position);
+    camera.far = view.far;
+    camera.lookAt(...view.target);
+    camera.updateProjectionMatrix();
+    invalidate();
+  }, [get, view, invalidate]);
+  return (
+    <OrbitControls
+      makeDefault
+      enableDamping
+      dampingFactor={0.08}
+      target={view.target}
+      minDistance={9}
+      maxDistance={view.maxDistance}
+      maxPolarAngle={Math.PI / 2.05}
+    />
+  );
+}
+
 function TwinScene({
   floorSelection,
   exploded,
@@ -903,6 +970,7 @@ function TwinScene({
   const orbitTargetY =
     visibleFloors.reduce((total, floor) => total + visualFloorElevation(floor, exploded) + 1.2, 0) /
     Math.max(1, visibleFloors.length);
+  const framing = inspectorCameraView(buildingPackage);
 
   return (
     <>
@@ -918,7 +986,7 @@ function TwinScene({
       <directionalLight position={[-12, 14, -16]} intensity={0.48} color="#c7d6ea" />
 
       <gridHelper
-        args={[104, 104, '#ffffff', '#ffffff']}
+        args={[framing.groundSpan, 104, '#ffffff', '#ffffff']}
         position={[0, -0.18, 0]}
         material-transparent
         material-opacity={0.14}
@@ -929,7 +997,7 @@ function TwinScene({
         onClick={onClearSelection}
         receiveShadow
       >
-        <planeGeometry args={[104, 104]} />
+        <planeGeometry args={[framing.groundSpan, framing.groundSpan]} />
         {/* Still there to take the click that clears a selection; it draws nothing. */}
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
@@ -937,6 +1005,9 @@ function TwinScene({
       {visibleFloors.map((floor) => (
         <FloorGeometry key={floor.id} floor={floor} bounds={bounds} exploded={exploded} />
       ))}
+      {visibleFloors.some((floor) => floor.id === buildingPackage.site?.floorId) && (
+        <InspectorSiteGrounds exploded={exploded} />
+      )}
       {visibleSpaces.map((space) => {
         const floor = floorsById.get(space.floorId);
         if (!floor) return null;
@@ -992,7 +1063,12 @@ function TwinScene({
           )),
         )}
       {showLabels && (
-        <PoiLabels floorSelection={floorSelection} bounds={bounds} exploded={exploded} />
+        <PoiLabels
+          floorSelection={floorSelection}
+          bounds={bounds}
+          exploded={exploded}
+          destinationPoiId={activeRoute?.found ? activeRoute.path.at(-1)?.sourceId : undefined}
+        />
       )}
       {showRouting && (
         <RoutingOverlay
@@ -1018,21 +1094,14 @@ function TwinScene({
         />
       )}
 
-      <OrbitControls
-        makeDefault
-        enableDamping
-        dampingFactor={0.08}
-        target={[0, orbitTargetY, 0]}
-        minDistance={9}
-        maxDistance={128}
-        maxPolarAngle={Math.PI / 2.05}
-      />
+      <InspectorCameraControls targetY={orbitTargetY} />
+      <InspectorLabelLayout />
       <ContactShadows
         position={[0, -0.17, 0]}
         opacity={0.45}
-        scale={84}
+        scale={framing.shadowSpan}
         blur={2.6}
-        far={24}
+        far={framing.shadowHeight}
         frames={1}
       />
       <GizmoHelper alignment="bottom-right" margin={[76, 76]}>
@@ -1140,15 +1209,7 @@ export default function SpatialTwinViewer() {
     }
   };
   const graphSummary = useMemo(() => getGraphSummary(buildingPackage), [buildingPackage]);
-  const buildingBounds = useMemo(() => computeBuildingBounds(buildingPackage), [buildingPackage]);
-  const explodedHeight = Math.max(
-    ...buildingPackage.floors.map((floor) => visualFloorElevation(floor, true) + floor.clearHeight),
-  );
-  const cameraPosition: [number, number, number] = [
-    buildingBounds.width * 0.92,
-    Math.max(40, explodedHeight + 20),
-    buildingBounds.depth * 1.85,
-  ];
+  const cameraView = useMemo(() => inspectorCameraView(buildingPackage), [buildingPackage]);
 
   const selectedPortals = selectedSpace
     ? buildingPackage.portals.filter((portal) => portal.connects.includes(selectedSpace.id))
@@ -1250,7 +1311,12 @@ export default function SpatialTwinViewer() {
               </span>
             </div>
             <Canvas
-              camera={{ position: cameraPosition, fov: 42, near: 0.1, far: 220 }}
+              camera={{
+                position: cameraView.position,
+                fov: cameraView.fov,
+                near: 0.1,
+                far: cameraView.far,
+              }}
               dpr={[1, 1.5]}
               frameloop="demand"
               shadows

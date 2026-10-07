@@ -187,13 +187,42 @@ test('Inspector chrome keeps readable foreground and background contrast', async
    * model's labels move with the camera, and one can sit under a pane.
    */
   const contrast = async (selector: string) => {
-    await page.locator(selector).first().scrollIntoViewIfNeeded();
+    await page.locator(`${selector}:visible`).first().scrollIntoViewIfNeeded();
     const runs = await measureTextContrast(page, selector);
     expect(runs.length, `${selector} has no text that is visible and on top`).toBeGreaterThan(0);
     return Math.min(...runs.map((run) => run.ratio));
   };
 
-  await expect(page.locator('.twin-poi-label').first()).toBeVisible();
+  await expect(page.locator('.twin-poi-label:visible').first()).toBeVisible();
+  // Fitting a large venue must not shrink the HTML room names to unreadable
+  // world-space glyphs. Measure their rendered text, including ancestor scale.
+  await expect
+    .poll(() =>
+      page.locator('.twin-poi-label').evaluateAll((labels) =>
+        labels.every((label) => {
+          const range = document.createRange();
+          range.selectNodeContents(label);
+          return range.getBoundingClientRect().height >= 12;
+        }),
+      ),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      page.locator('.twin-poi-label:visible').evaluateAll((labels) => {
+        const boxes = labels.map((label) => label.getBoundingClientRect());
+        return boxes.flatMap((box, index) =>
+          boxes
+            .slice(index + 1)
+            .filter(
+              (other) =>
+                Math.min(box.right, other.right) > Math.max(box.left, other.left) &&
+                Math.min(box.bottom, other.bottom) > Math.max(box.top, other.top),
+            ),
+        ).length;
+      }),
+    )
+    .toBe(0);
   expect(await contrast('.twin-poi-label')).toBeGreaterThanOrEqual(4.5);
   expect(await contrast('.twin-empty-inspector h2')).toBeGreaterThanOrEqual(4.5);
   // The card's own words. Its toggle beside them is an icon with no text to measure.

@@ -114,6 +114,20 @@ describe('one camera, two presentations', () => {
       expect(rig.view.scale).toBeLessThanOrEqual(2.4);
     }
   });
+  it('lets an explicit building fit retain its transition while the visitor owns the camera', () => {
+    const rig = createVisitorCamera(100);
+    rig.fit([[20, 0, 30]], 800, 600);
+    rig.markMovedByUser(true);
+    expect(rig.wasMovedByUser()).toBe(true);
+    expect(rig.isAnimating()).toBe(true);
+    rig.update(800, 600, 16, true);
+    expect(rig.snapshot().target).toEqual([20, 30]);
+    expect(rig.wasMovedByUser()).toBe(true);
+    // Default restore behavior still discards any obsolete fit goal.
+    rig.fit([[40, 0, 50]], 800, 600);
+    rig.markMovedByUser();
+    expect(rig.isAnimating()).toBe(false);
+  });
 });
 
 it('does not join two disconnected visits to a floor or skip connector entries', () => {

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Braces,
@@ -40,11 +40,7 @@ import {
   type StudioDxfImportOutcome,
   type StudioDxfImportReport,
 } from '../studio/dxfImportWorkspace';
-import {
-  createVenuePackageArtifact,
-  formatArtifactSize,
-  type VenuePackageArtifact,
-} from '../studio/venuePackageArtifact';
+import { createVenuePackageArtifact, formatArtifactSize } from '../studio/venuePackageArtifact';
 import type { CompiledBuildingRuntime } from '../data/compiledBuilding';
 import type { RuntimePackageSummary } from '../data/runtimeActivationHistory';
 import type { VenueVersionCatalog } from '../data/venueVersionCatalog';
@@ -53,6 +49,7 @@ import BuildingSourceFloorCanvas from './BuildingSourceFloorCanvas';
 import DxfLayerMappingPanel from './DxfLayerMappingPanel';
 import VenuePublishDryRunPanel from './VenuePublishDryRunPanel';
 import VenueVersionCatalogPanel from './VenueVersionCatalogPanel';
+import { studioDraftMemory, type StudioDraftSession } from '../studio/studioDraftMemory';
 
 interface VenueRuntimeControls {
   status: {
@@ -102,26 +99,32 @@ export default function BuildingSourceWorkspace() {
     () => formatBuildingSource(sourceFromVenuePackage(venue.buildingPackage)),
     [venue],
   );
-  const [draftText, setDraftText] = useState(initialText);
-  const [draftName, setDraftName] = useState(`${venue.buildingPackage.building.id}.json`);
-  const [editorMode, setEditorMode] = useState<'visual' | 'json'>('visual');
-  const [visualHistory, setVisualHistory] = useState<string[]>([]);
-  const [fileMessage, setFileMessage] = useState<string | null>(null);
-  const [dxfImportReport, setDxfImportReport] = useState<StudioDxfImportReport | null>(null);
+  const draftKey = venue.buildingPackage.manifest.contentHash;
+  const [savedSession] = useState(() => studioDraftMemory.read(draftKey));
+  const [draftText, setDraftText] = useState(savedSession?.draftText ?? initialText);
+  const [draftName, setDraftName] = useState(
+    savedSession?.draftName ?? `${venue.buildingPackage.building.id}.json`,
+  );
+  const [editorMode, setEditorMode] = useState<'visual' | 'json'>(
+    savedSession?.editorMode ?? 'visual',
+  );
+  const [visualHistory, setVisualHistory] = useState<string[]>(savedSession?.visualHistory ?? []);
+  const [fileMessage, setFileMessage] = useState<string | null>(savedSession?.fileMessage ?? null);
+  const [dxfImportReport, setDxfImportReport] = useState<StudioDxfImportReport | null>(
+    savedSession?.dxfImportReport ?? null,
+  );
   const [dxfMappingSession, setDxfMappingSession] = useState<{
     fileName: string;
     text: string;
     inspection: DxfInspectionResult;
-  } | null>(null);
+  } | null>(savedSession?.dxfMappingSession ?? null);
   const [compiling, setCompiling] = useState(false);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [activationArmed, setActivationArmed] = useState(false);
-  const [compilePreview, setCompilePreview] = useState<{
-    draftText: string;
-    result: BrowserCompilationResult;
-    artifact: VenuePackageArtifact;
-  } | null>(null);
+  const [compilePreview, setCompilePreview] = useState<StudioDraftSession['compilePreview']>(
+    savedSession?.compilePreview ?? null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dxfInputRef = useRef<HTMLInputElement>(null);
   const validation = useMemo(() => validateBuildingSourceDraft(draftText), [draftText]);
@@ -134,6 +137,29 @@ export default function BuildingSourceWorkspace() {
   const previewArtifact = compilePreview?.artifact ?? null;
   const matchesActivePackage =
     previewPackage?.manifest.contentHash === venue.buildingPackage.manifest.contentHash;
+
+  useEffect(() => {
+    studioDraftMemory.remember(draftKey, {
+      draftText,
+      draftName,
+      editorMode,
+      visualHistory,
+      fileMessage,
+      dxfImportReport,
+      dxfMappingSession,
+      compilePreview,
+    });
+  }, [
+    draftKey,
+    draftText,
+    draftName,
+    editorMode,
+    visualHistory,
+    fileMessage,
+    dxfImportReport,
+    dxfMappingSession,
+    compilePreview,
+  ]);
 
   const resetDraft = () => {
     setDraftText(initialText);
@@ -329,7 +355,10 @@ export default function BuildingSourceWorkspace() {
           aria-label="BuildingSource JSON editor"
         >
           <div className="studio-panel-toolbar">
-            <div className="studio-file-identity">
+            <div
+              className="studio-file-identity"
+              title="Drafts survive switching tools in this tab. Reloading or closing the tab clears them."
+            >
               <FileJson size={18} />
               <span>
                 <strong>{draftName}</strong>

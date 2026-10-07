@@ -31,9 +31,12 @@ request. It changes presentation, not the localization or routing policy.
 - **Expand map** temporarily hides the directions sheet without unmounting it.
   **Show directions** restores it and keyboard focus. A new route automatically
   returns to directions rather than hiding new guidance.
-- Camera-preview round trips preserve the camera presentation, scoped to the
-  package hash. A venue change starts with the default plan. A page reload does
-  not restore a camera session. The Inspector remains a separate operator tool.
+- Camera-preview and display-retry round trips preserve the camera presentation,
+  the explored building, and the marker's last observed building. This memory
+  is scoped to the package hash and current check-in/chosen start. A newer scan
+  (even of the same sign) or a changed start takes precedence over browsing.
+  A venue change starts with the default plan. A page reload does not restore a
+  camera session. The Inspector remains a separate operator tool.
 - Route, instruction, arrival state and check-in remain owned by the journey.
   A camera target is a browsing position, never a measured visitor position.
 
@@ -101,10 +104,51 @@ to accommodate that test-selection error.
 
 ## Deliberately open
 
-Physical-device frame-time/memory profiling, adaptive quality tiers, independent
-route-clearance checks and real-user usability trials remain required. A stroke
-following a graph edge is not proof that its full visual width stays inside every
-surveyed corridor. The existing model furniture is illustrative, not surveyed.
-The broader compact-sheet/cartographic redesign remains in phase 4. Automatic
-tracking is still disabled; interrupted IMU continuity/reset semantics is next
-after this slice is reviewed.
+The verification counts above describe the original presentation slice, not the
+current product. Adaptive quality, authored route-clearance checks and automatic
+tracking have subsequently been implemented. Current software and physical
+validation limits are recorded in [visitor readiness](visitor-readiness.md).
+Physical-device frame-time/memory profiling and real-user usability trials
+remain required. Authored clearance is not proof of surveyed traversability;
+the model furniture is illustrative, not surveyed.
+
+## Connected campus and operator review — 5 October 2026
+
+An explicit building exploration owns the camera while its fit eases into place;
+new movement in the same physical building does not steal it. Recenter restores
+both the marker's building scope and guidance ownership. A known checkpoint
+keeps other buildings closed and selectable, rather than opening every roof at
+close zoom. Campus returns from any viewed storey to the grounds without
+changing the visitor's physical location. Room-selection highlights restore
+their original colours across floor changes.
+
+The operator Inspector now frames the complete venue at its actual viewport
+aspect, with proportional clipping and orbit limits. Authored campus grounds
+are reused in the semantic cutaway, with building envelopes hidden so rooms
+remain inspectable. Screen-space labels stay readable; a measured collision
+pass prioritises the destination, connectors and entrances, and hides names
+that overlap or leave the viewport instead of shrinking them. Studio drafts
+and local compiled previews survive tool
+switching in bounded, content-hash-keyed memory. Reloading/closing the tab clears
+that memory. Activation confirmation and publishing authority are never saved;
+stale compiled candidates remain blocked.
+
+Deterministic regression tests cover the former continuity, camera, selection
+and draft-loss failures. Production-browser flows cover door transitions,
+camera/retry round trips, upstairs-to-campus navigation, keyboard interaction,
+cross-building and cross-floor journeys, and the Studio compile/activate/visitor/
+rollback cycle. These are synthetic software checks, not handset/venue accuracy
+or AR qualification.
+
+Final verification: `npm run check` passes **1,833 tests across 144 files**, lint,
+types, all four venue hashes, replay, QR generation and the public build. The
+affected operator-build browser suite passes **114/114**, across desktop and
+mobile Chromium, without skips or retries:
+
+```text
+node scripts/runBrowserSmoke.js e2e/campus.pw.ts e2e/operator-campus.pw.ts e2e/visitor-map-views.pw.ts e2e/visitor-journey.pw.ts e2e/layout.pw.ts e2e/closure-recovery.pw.ts e2e/keyboard-accessibility.pw.ts
+```
+
+The complete browser suite, separate offline installation/sub-path suite and
+handset sensor tests were not rerun in this slice. Passing these flow checks is
+not a claim that live positioning or AR alignment is physically qualified.

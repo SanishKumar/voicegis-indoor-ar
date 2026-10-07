@@ -2,8 +2,14 @@ import { useEffect, useId, useRef, useState, type MutableRefObject, type RefObje
 import { createPortal } from 'react-dom';
 import { Camera, LocateFixed, Maximize, Minus, Plus, SlidersHorizontal } from 'lucide-react';
 import { useNavigation, VIEW_TYPE } from '../context/NavigationContext.jsx';
-import { createVenueScene, type SceneZone, type VenueScene } from '../map/venueScene';
+import {
+  createVenueScene,
+  type SceneZone,
+  type SceneZoneMemory,
+  type VenueScene,
+} from '../map/venueScene';
 import type { MapGraphicsSetting, MapGraphicsSnapshot } from '../map/visitorRenderQuality';
+import { mapCheckpointKey } from '../map/visitorMapMemory';
 import { logField } from '../fieldTest/fieldLog';
 import { resolveVisitorLocation } from '../navigation/visitorLocation';
 import type { LocationBasis } from '../navigation/visitorJourney';
@@ -161,6 +167,9 @@ export interface MapMemory {
   framedRoute: unknown;
   userMoved: boolean;
   graphics?: MapGraphicsSnapshot;
+  zone?: SceneZoneMemory;
+  /** A new scan or chosen start takes precedence over an old browsing view. */
+  checkpointKey?: string;
 }
 
 interface NavigationValue {
@@ -181,7 +190,7 @@ interface NavigationValue {
       | null;
     progressMeters: number;
   };
-  checkIn: CheckInRecord | null;
+  checkIn: (CheckInRecord & { scannedAt?: number }) | null;
   actions: {
     setFloor(floorId: string): void;
     selectPOI(node: unknown): void;
@@ -284,6 +293,11 @@ export default function VisitorMap({
   const locationY = location?.position[1];
   const locationFloor = location?.floorId;
   const locationBasis = location?.basis;
+  const checkpointKey = mapCheckpointKey(state, checkIn);
+  const checkpointKeyRef = useRef(checkpointKey);
+  useEffect(() => {
+    checkpointKeyRef.current = checkpointKey;
+  }, [checkpointKey]);
 
   // Overview is explicitly requested; a cross-floor route alone never opens it.
   const routeFloorCount = new Set(
@@ -320,13 +334,20 @@ export default function VisitorMap({
     const tick = () => {
       if (!scene) {
         try {
-          const saved = viewMemory.current?.venueHash === venueHash ? viewMemory.current : null;
+          const memory = viewMemory.current?.venueHash === venueHash ? viewMemory.current : null;
+          const saved =
+            memory &&
+            (memory.checkpointKey === undefined ||
+              memory.checkpointKey === checkpointKeyRef.current)
+              ? memory
+              : null;
           scene = createVenueScene(
             canvas,
             labelLayer,
             buildingPackage,
             saved?.view,
-            saved?.graphics,
+            memory?.graphics,
+            saved?.zone,
           );
         } catch {
           setRenderStatus('unavailable');
@@ -366,7 +387,19 @@ export default function VisitorMap({
             name: next !== null ? next.name : 'The grounds',
           });
         });
-        const remembered = viewMemory.current?.venueHash === venueHash ? viewMemory.current : null;
+        const memory = viewMemory.current?.venueHash === venueHash ? viewMemory.current : null;
+        const remembered =
+          memory &&
+          (memory.checkpointKey === undefined || memory.checkpointKey === checkpointKeyRef.current)
+            ? memory
+            : null;
+        // A new scan/start while the map was away releases the old browsing
+        // camera as well as its zone. It does not change tracking or progress.
+        if (!remembered) {
+          framedRouteRef.current = null;
+          userMovedRef.current = false;
+          setUserMoved(false);
+        }
         if (remembered) {
           framedRouteRef.current = remembered.framedRoute;
           if (remembered.userMoved) {
@@ -403,6 +436,8 @@ export default function VisitorMap({
           framedRoute: framedRouteRef.current,
           userMoved: scene.wasMovedByUser(),
           graphics: scene.getGraphics(),
+          zone: scene.getZoneMemory(),
+          checkpointKey: checkpointKeyRef.current,
         };
       }
       sceneRef.current = null;
@@ -841,6 +876,12 @@ export default function VisitorMap({
             type="button"
             aria-label="Reset the map view"
             onClick={() => {
+              // Campus means the grounds, even while browsing a storey above
+              // them. This is only the viewed floor, not a position update.
+              if (buildingPackage.site) {
+                actions.setFloor(buildingPackage.site.floorId);
+                sceneRef.current?.setActiveFloor(buildingPackage.site.floorId);
+              }
               sceneRef.current?.resetView();
               if (sceneRef.current) setPresentation(sceneRef.current.getView());
             }}

@@ -279,6 +279,13 @@ export interface SceneZone {
   floorIds: string[];
 }
 
+/** Presentation only: which map is open, and the marker's last observed building. */
+export interface SceneZoneMemory {
+  zone: string | null;
+  /** `undefined` means no marker has been observed; `null` means known grounds. */
+  markerZone?: string | null;
+}
+
 export interface VenueScene {
   getGraphics(): MapGraphicsSnapshot;
   setGraphics(setting: MapGraphicsSetting): void;
@@ -328,6 +335,7 @@ export interface VenueScene {
   enterBuildingAt(clientX: number, clientY: number): boolean;
   /** The building whose map is open, or null on the grounds and in a venue without any. */
   getZone(): SceneZone | null;
+  getZoneMemory(): SceneZoneMemory;
   /**
    * Told when the map moves from one to another: `walked` when the visitor's
    * marker went through a door, `chosen` when they pressed a building or left.
@@ -392,6 +400,7 @@ export function createVenueScene(
   buildingPackage: CompiledBuildingPackage,
   initialView?: VisitorMapView,
   initialGraphics?: MapGraphicsSnapshot,
+  initialZone?: SceneZoneMemory,
 ): VenueScene {
   const outline = buildingPackage.floors.flatMap((floor) => floor.outline as Coordinate[]);
   const xs = outline.map((point) => point[0]);
@@ -731,9 +740,16 @@ export function createVenueScene(
    * visitor's marker through doors, and is otherwise wherever the visitor has
    * put it: pressing a building goes in, the way back out is the whole site.
    */
-  let zone: string | null = null;
+  const knownBuilding = (id: string | null | undefined) =>
+    id !== undefined && id !== null && scenery?.buildings.some((entry) => entry.id === id);
+  let zone: string | null = knownBuilding(initialZone?.zone) ? initialZone!.zone : null;
   /** The building the marker was last seen in, so going through a door is noticed once. */
-  let markerZone: string | null | undefined;
+  let markerZone: string | null | undefined =
+    site !== null && initialZone?.markerZone === null
+      ? null
+      : knownBuilding(initialZone?.markerZone)
+        ? initialZone!.markerZone
+        : undefined;
   /** Buildings the route passes through. */
   let routeBuildings: ReadonlySet<string> = new Set();
   const zoneListeners = new Set<(zone: SceneZone | null, why: 'walked' | 'chosen') => void>();
@@ -759,7 +775,7 @@ export function createVenueScene(
     invalidate();
     for (const listener of zoneListeners) listener(describeZone(next), why);
   };
-  if (scenery !== null) canvas.dataset.zone = 'grounds';
+  if (scenery !== null) canvas.dataset.zone = zone ?? 'grounds';
   /** Whether what is under a building's roof is hidden by it, on the floor in hand. */
   const underRoof = (building: string | null) =>
     building !== null &&
@@ -1074,7 +1090,7 @@ export function createVenueScene(
   let activeFloorId = buildingPackage.floors[0]?.id ?? '';
   let routePoints: ReadonlyArray<{ x: number; y: number; floor: string }> = [];
   let routeFloors: string[] = [];
-  let selectedSpaceId: string | null = null;
+  let selectedSpace: { mesh: Mesh; color: number } | null = null;
   let destinationId: string | null = null;
 
   const locationGroup = new Group();
@@ -1422,6 +1438,12 @@ export function createVenueScene(
   let follow: SceneFollow | null = null;
   const userMoveListeners = new Set<(moved: boolean) => void>();
   let reportedUserMove = false;
+  const publishUserMove = () => {
+    const moved = cameraRig.wasMovedByUser();
+    if (moved === reportedUserMove) return;
+    reportedUserMove = moved;
+    for (const listener of userMoveListeners) listener(moved);
+  };
 
   function placePuck(immediate: boolean, elapsedMs: number) {
     const floor = puckTarget ? floors.get(puckTarget.floorId) : undefined;
@@ -1963,6 +1985,10 @@ export function createVenueScene(
       canvas.clientHeight,
       { padding: 1.1 },
     );
+    // Choosing to explore is a visitor camera action, not guidance's next
+    // target. Keep this fit easing while new strides continue elsewhere.
+    cameraRig.markMovedByUser(true);
+    publishUserMove();
     invalidate();
     return true;
   }
@@ -2122,6 +2148,9 @@ export function createVenueScene(
     },
 
     recenter() {
+      if (site !== null && puckTarget) {
+        setZone(buildingOf([puckTarget.x, puckTarget.y], puckTarget.floorId), 'chosen');
+      }
       if (follow && puckTarget) {
         // Following resumes on the next frame, now the visitor no longer owns the camera.
         const world = vec([puckTarget.x, puckTarget.y]);
@@ -2271,21 +2300,17 @@ export function createVenueScene(
 
     setSelectedSpace(spaceId) {
       invalidate();
-      const view = floors.get(activeFloorId);
-      if (view === undefined) return;
-      if (selectedSpaceId !== null) {
-        const previous = view.spaceMeshes.get(selectedSpaceId);
-        const space = buildingPackage.spaces.find((entry) => entry.id === selectedSpaceId);
-        if (previous && space) {
-          (previous.material as MeshStandardMaterial).color.setHex(
-            SPACE_FILL[space.type] ?? SPACE_FILL.room,
-          );
-        }
+      if (selectedSpace !== null) {
+        (selectedSpace.mesh.material as MeshStandardMaterial).color.setHex(selectedSpace.color);
+        selectedSpace = null;
       }
-      selectedSpaceId = spaceId;
       if (spaceId === null) return;
-      const mesh = view.spaceMeshes.get(spaceId);
-      if (mesh) (mesh.material as MeshStandardMaterial).color.setHex(SELECTED_FILL);
+      const mesh = floors.get(activeFloorId)?.spaceMeshes.get(spaceId);
+      if (mesh) {
+        const material = mesh.material as MeshStandardMaterial;
+        selectedSpace = { mesh, color: material.color.getHex() };
+        material.color.setHex(SELECTED_FILL);
+      }
     },
 
     wasDragged() {
@@ -2318,6 +2343,7 @@ export function createVenueScene(
     pickPoi,
     enterBuildingAt,
     getZone: () => describeZone(zone),
+    getZoneMemory: () => ({ zone, markerZone }),
     onZoneChange(listener) {
       zoneListeners.add(listener);
       return () => {
@@ -2418,11 +2444,8 @@ export function createVenueScene(
             (scenery !== null && zone === null ? OUTDOOR_FOLLOW_WIDEN : 1),
         });
       }
+      publishUserMove();
       const moved = cameraRig.wasMovedByUser();
-      if (moved !== reportedUserMove) {
-        reportedUserMove = moved;
-        for (const listener of userMoveListeners) listener(moved);
-      }
       const pose = cameraRig.update(width, height, elapsed, motionPreference.matches);
       lastFrame = now;
       if (puckTarget)
@@ -2437,7 +2460,7 @@ export function createVenueScene(
           entered: zone,
           onRoute: routeBuildings,
           // With a visitor on the map, only the building they are in is open.
-          opensOnApproach: puckTarget === null,
+          opensOnApproach: puckTarget === null && location === null,
           floorOpacity: site ? (floors.get(site.floorId)?.currentOpacity ?? 1) : 1,
         });
         // Upstairs there is no outside to see the building from.

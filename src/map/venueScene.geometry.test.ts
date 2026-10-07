@@ -187,6 +187,209 @@ describe('visitor route geometry', () => {
     expect(canvas.dataset.zone).toBeUndefined();
     expect(changes).toEqual([]);
   });
+  it('keeps an explicitly explored building in view while the marker strides in another building', () => {
+    const labels = document.createElement('div');
+    scene.dispose();
+    scene = createVenueScene(canvas, labels, campusPackage as unknown as CompiledBuildingPackage);
+    const marker = { x: 30, y: 84, floorId: 'g', heading: [1, 0] as [number, number] };
+    scene.setPuck(marker);
+    scene.setFollow({ headingUp: true, scale: 0.36, lookahead: 0.22 });
+    scene.frame();
+    const ownerChanged = vi.fn();
+    scene.onUserMove(ownerChanged);
+    labels.querySelector<HTMLButtonElement>('[aria-label="Explore Main Hospital"]')!.click();
+    expect(scene.wasMovedByUser()).toBe(true);
+    scene.frame();
+    const explored = scene.getView();
+    scene.setPuck({ ...marker, x: 34 });
+    scene.frame();
+    expect(scene.getView().target).toEqual(explored.target);
+    expect(scene.getZone()?.id).toBe('main-hospital');
+    expect(ownerChanged).toHaveBeenCalledWith(true);
+  });
+  it('recenter opens the marker building rather than leaving an explored building active', () => {
+    const labels = document.createElement('div');
+    scene.dispose();
+    scene = createVenueScene(canvas, labels, campusPackage as unknown as CompiledBuildingPackage);
+    scene.setPuck({ x: 30, y: 84, floorId: 'g', heading: [1, 0] });
+    scene.setFollow({ headingUp: true, scale: 0.36, lookahead: 0.22 });
+    scene.frame();
+    labels.querySelector<HTMLButtonElement>('[aria-label="Explore Main Hospital"]')!.click();
+    expect(scene.getZone()?.id).toBe('main-hospital');
+    scene.recenter();
+    expect(scene.getZone()?.id).toBe('emergency-centre');
+    expect(scene.wasMovedByUser()).toBe(false);
+    scene.frame();
+    expect(canvas.dataset.cameraFollow).toBe('following');
+  });
+  it('keeps other buildings closed and selectable near a known checkpoint without a route', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(80);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(24);
+    const labels = document.createElement('div');
+    scene.dispose();
+    scene = createVenueScene(canvas, labels, campusPackage as unknown as CompiledBuildingPackage);
+    scene.frame();
+    labels.querySelector<HTMLButtonElement>('[aria-label="Explore Main Hospital"]')!.click();
+    scene.frame();
+    const closeView = scene.getView();
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      labels,
+      campusPackage as unknown as CompiledBuildingPackage,
+      closeView,
+      undefined,
+      { zone: 'emergency-centre' },
+    );
+    scene.setLocation({ position: [30, 84], floorId: 'g', basis: 'qr' });
+    scene.frame();
+    expect(scene.getZone()?.id).toBe('emergency-centre');
+    const hospital = labels.querySelector<HTMLButtonElement>(
+      '[aria-label="Explore Main Hospital"]',
+    );
+    expect(hospital?.style.visibility).toBe('visible');
+    hospital!.click();
+    expect(scene.getZone()).toMatchObject({ id: 'main-hospital', floorIds: ['g', 'l1', 'l2'] });
+  });
+  it('clears the previous room highlight when a different floor supplies the next selection', () => {
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      campusPackage as unknown as CompiledBuildingPackage,
+    );
+    scene.frame();
+    const roomMesh = (id: string) => {
+      let found: Mesh | undefined;
+      observed.scene!.traverse((object) => {
+        if (object instanceof Mesh && object.userData.spaceId === id) found = object;
+      });
+      return found!;
+    };
+    const ground = roomMesh('e-triage');
+    const original = (ground.material as MeshStandardMaterial).color.getHex();
+    scene.setSelectedSpace('e-triage');
+    expect((ground.material as MeshStandardMaterial).color.getHex()).toBe(0x2b7fff);
+    scene.setActiveFloor('l1');
+    scene.setSelectedSpace('l1-childrens');
+    expect((ground.material as MeshStandardMaterial).color.getHex()).toBe(original);
+    const upstairs = roomMesh('l1-childrens');
+    expect((upstairs.material as MeshStandardMaterial).color.getHex()).toBe(0x2b7fff);
+    scene.setActiveFloor('g');
+    scene.setSelectedSpace(null);
+    expect((upstairs.material as MeshStandardMaterial).color.getHex()).not.toBe(0x2b7fff);
+  });
+  it('restores the explored building without treating the same marker as a new doorway crossing', () => {
+    const labels = document.createElement('div');
+    scene.dispose();
+    scene = createVenueScene(canvas, labels, campusPackage as unknown as CompiledBuildingPackage);
+    const marker = { x: 30, y: 84, floorId: 'g', heading: [1, 0] as [number, number] };
+    scene.setPuck(marker);
+    scene.frame();
+    labels.querySelector<HTMLButtonElement>('[aria-label="Explore Main Hospital"]')!.click();
+    expect(scene.getZone()?.id).toBe('main-hospital');
+    const view = scene.getView();
+    const zoneMemory = scene.getZoneMemory();
+    expect(zoneMemory).toEqual({ zone: 'main-hospital', markerZone: 'emergency-centre' });
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      campusPackage as unknown as CompiledBuildingPackage,
+      view,
+      undefined,
+      zoneMemory,
+    );
+    expect(scene.getZone()?.id).toBe('main-hospital');
+    scene.setPuck(marker);
+    expect(scene.getZone()?.id).toBe('main-hospital');
+    // An actual new crossing after the return still changes the map.
+    scene.setPuck({ ...marker, x: 70 });
+    expect(scene.getZone()).toBeNull();
+    scene.setPuck({ ...marker, x: 105, y: 40 });
+    expect(scene.getZone()?.id).toBe('main-hospital');
+  });
+  it('remembers an explicitly chosen grounds view separately from an unobserved marker', () => {
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      campusPackage as unknown as CompiledBuildingPackage,
+    );
+    const marker = { x: 30, y: 84, floorId: 'g', heading: [1, 0] as [number, number] };
+    scene.setPuck(marker);
+    scene.resetView();
+    const view = scene.getView();
+    const zoneMemory = scene.getZoneMemory();
+    expect(zoneMemory).toEqual({ zone: null, markerZone: 'emergency-centre' });
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      campusPackage as unknown as CompiledBuildingPackage,
+      view,
+      undefined,
+      zoneMemory,
+    );
+    scene.setPuck(marker);
+    expect(scene.getZone()).toBeNull();
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      campusPackage as unknown as CompiledBuildingPackage,
+      view,
+      undefined,
+      { zone: null },
+    );
+    // No previous observation is not proof the visitor is out of doors.
+    scene.setPuck(marker);
+    expect(scene.getZone()?.id).toBe('emergency-centre');
+  });
+  it('restores a known grounds marker without confusing it with an unobserved marker', () => {
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      campusPackage as unknown as CompiledBuildingPackage,
+      undefined,
+      undefined,
+      { zone: 'main-hospital', markerZone: null },
+    );
+    const marker = { x: 70, y: 84, floorId: 'g', heading: [1, 0] as [number, number] };
+    scene.setPuck(marker);
+    expect(scene.getZone()?.id).toBe('main-hospital');
+    // Removing the route removes its observation, not the visitor's chosen map.
+    scene.setPuck(null);
+    expect(scene.getZoneMemory()).toEqual({ zone: 'main-hospital', markerZone: undefined });
+    scene.setPuck(marker);
+    expect(scene.getZone()).toBeNull();
+  });
+  it('does not restore foreign building names into a campus or a single-building scene', () => {
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      campusPackage as unknown as CompiledBuildingPackage,
+      undefined,
+      undefined,
+      { zone: 'foreign-building', markerZone: 'foreign-building' },
+    );
+    expect(scene.getZoneMemory()).toEqual({ zone: null, markerZone: undefined });
+    scene.setPuck({ x: 30, y: 84, floorId: 'g', heading: [1, 0] });
+    expect(scene.getZone()?.id).toBe('emergency-centre');
+    scene.dispose();
+    scene = createVenueScene(
+      canvas,
+      document.createElement('div'),
+      referencePackage as CompiledBuildingPackage,
+      undefined,
+      undefined,
+      { zone: 'main-hospital', markerZone: null },
+    );
+    expect(scene.getZoneMemory()).toEqual({ zone: null, markerZone: undefined });
+    expect(scene.getZone()).toBeNull();
+  });
   it('opens the stack with the grounds readable under ghosted storeys, and names where the trip ends', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(80);
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(24);
