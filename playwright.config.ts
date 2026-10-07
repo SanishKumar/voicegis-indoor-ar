@@ -15,9 +15,9 @@ export default defineConfig({
   retries: 0,
   workers: process.env.CI ? 1 : 2,
   timeout: 30_000,
-  // The expanded 162-case operator suite took 15.8 minutes locally with one
-  // worker. Sensor walks require real elapsed time. Leave headroom for CI
-  // variation without relaxing per-test limits, assertions or retries.
+  // CI gives desktop, mobile and offline checks separate jobs. Sensor walks
+  // require real elapsed time, so each invocation retains its own total budget
+  // alongside the per-test limits and zero retries.
   globalTimeout: process.env.CI ? 20 * 60_000 : undefined,
   expect: {
     timeout: 15_000,

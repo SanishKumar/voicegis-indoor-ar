@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   # A local reusable workflow comes from the same commit as this workflow.
-  # Both quality jobs must succeed before a Pages artifact can be built.
+  # All quality checks must succeed before a Pages artifact can be built.
   quality:
     name: Validate selected revision
     uses: ./.github/workflows/quality.yml

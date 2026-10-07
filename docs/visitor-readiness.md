@@ -150,10 +150,15 @@ The complete 162-case operator suite was measured with CI's one-worker settings:
 narrow-screen defects. The suite has since grown with the campus cases, which
 draw a larger scene; the figure for the current suite is whatever the latest
 hosted Quality run reports, and a run that nears the budget is a reason to
-look at the slowest cases, not to raise it without looking. The aggregate Playwright budget is now 20 minutes and
-the enclosing quality job 30 minutes. Per-test limits, assertions and zero
-retries are unchanged. Hosted CI performance remains independently observable;
-local timing is not a guaranteed duration on GitHub's runners.
+look at the slowest cases, not to raise it without looking.
+
+Each Playwright invocation retains a 20-minute budget and its enclosing job a
+30-minute limit. As of 6 October, desktop, mobile and offline checks run as three
+independent CI jobs. The existing **Browser smoke** check requires all three to
+succeed, including when a job is cancelled or skipped. Per-test limits,
+assertions and zero retries are unchanged. Hosted CI performance remains
+independently observable; local timing is not a guaranteed duration on GitHub's
+runners.
 
 ### 5. Sign inventory and venue-pilot tooling
 

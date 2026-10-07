@@ -25,6 +25,13 @@ npm run test:browser
 npm run build
 ```
 
+On GitHub Actions, the same browser coverage is split into three independent
+jobs: desktop Chromium, mobile Chromium, and public offline/sub-path checks.
+Each uses one worker and the existing per-test deadlines. The required
+**Browser smoke** check aggregates all three and fails if any failed, was
+cancelled or was skipped. Diagnostics are named by suite. This avoids placing
+both device projects inside one shared 20-minute Playwright budget.
+
 The offline browser job performs a successful online installation, clears
 Chromium's ordinary HTTP cache, closes the page, disables Chromium's network,
 and opens a fresh page. It confirms the document and script came from the
@@ -135,8 +142,8 @@ repository's project site and deploys it. It runs **only when started by hand**
 2. Start the workflow from the branch or tag to publish. Its selected commit
    is fixed for that run. The **Validate selected revision** job calls the same
    Quality workflow used by pushes and pull requests, running `npm run check`
-   and the complete production browser command, including public offline and
-   project-subfolder tests.
+   and all production browser cases across desktop, mobile, public offline and
+   project-subfolder jobs.
 3. The site appears at `https://<owner>.github.io/<repository>/`, for example
    `https://sanishkumar.github.io/voicegis-indoor-ar/#/visitor`.
 

@@ -32,12 +32,23 @@ jobs:
       - name: Run quality gate
         run: npm run check
 
-  browser-smoke:
-    name: Browser smoke
+  browser-tests:
+    name: Browser checks (${{ matrix.suite }})
     runs-on: ubuntu-latest
-    # Installation, builds and public offline/sub-path runs need headroom
-    # around the expanded operator suite's separate 20-minute global budget.
+    # Each device project gets its own runner and Playwright budget. The
+    # growing campus suite must not consume the other project's time or keep
+    # the offline checks from running. Every invocation still uses one worker.
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: desktop
+            command: npm run test:browser:operator -- --project=desktop-chromium
+          - suite: mobile
+            command: npm run test:browser:operator -- --project=mobile-chromium
+          - suite: offline
+            command: npm run test:browser:offline
 
     steps:
       - name: Check out repository
@@ -58,15 +69,29 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run production browser smoke
-        run: npm run test:browser
+        run: ${{ matrix.command }}
 
       - name: Upload browser diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.suite }}
           path: |
             playwright-report/
             test-results/
           if-no-files-found: ignore
           retention-days: 14
+
+  # Preserve the existing required-check name. A failed, cancelled or skipped
+  # matrix must not produce a green aggregate or permit Pages publication.
+  browser-smoke:
+    name: Browser smoke
+    if: always()
+    needs: browser-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every browser suite to pass
+        env:
+          BROWSER_RESULT: ${{ needs.browser-tests.result }}
+        run: test "$BROWSER_RESULT" = "success"
