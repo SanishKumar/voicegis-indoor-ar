@@ -29,6 +29,52 @@ location, then use Recenter to return to your journey.
 
 ![A route from Main Gate, around the fountain and into Cardiology Clinic](docs/media/campus-route.jpg)
 
+## On a phone
+
+The same trip, from the campus grounds into the hospital:
+
+<table>
+  <tr>
+    <th>Campus to room</th>
+    <th>Outdoor route</th>
+    <th>Inside the hospital</th>
+  </tr>
+  <tr>
+    <td><img src="docs/media/mobile-walkthrough.gif" width="240" alt="Mobile walkthrough: explore the campus, search for Cardiology, fold the route panel and preview the journey into the hospital"></td>
+    <td><img src="docs/media/mobile-route.jpg" width="240" alt="Mobile 3D route through the campus garden with a compact directions panel"></td>
+    <td><img src="docs/media/mobile-indoor.jpg" width="240" alt="Mobile indoor route to Cardiology Clinic, with rooms and corridor labels"></td>
+  </tr>
+</table>
+
+Tap **Less / More**, or swipe the panel handle down / up, to make room for the
+map. Search, place details, the start picker, directions and camera controls
+can all fold without losing your selection or trip. Important warnings,
+recovery actions and exit controls stay available. The operator's Inspector
+and Studio detail panels fold too.
+
+_Captured at a 390 px phone viewport. The animation uses instruction preview,
+not live walking. [Campus still](docs/media/mobile-campus.jpg)._
+
+## Camera and AR guidance
+
+The camera view helps you find the route's direction. On supported phones,
+**Start AR** opens world-tracked guidance: confirm a detected floor surface,
+then follow the route drawn by the app. Losing position pauses guidance and
+asks for recovery instead of continuing with a guessed location.
+
+<table>
+  <tr><th>Camera direction overlay</th><th>Immersive AR route</th></tr>
+  <tr>
+    <td><img src="docs/media/mobile-camera.jpg" width="280" alt="Actual camera guidance interface over a labelled simulated hospital corridor"></td>
+    <td><img src="docs/media/mobile-ar.jpg" width="280" alt="Actual immersive AR renderer showing floor chevrons over a labelled simulated hospital corridor, with compact controls"></td>
+  </tr>
+</table>
+
+_These two images show the running app with a generated corridor background
+and simulated sensors. They demonstrate the interface and renderer, not
+verified real-world alignment or obstacle detection. See
+[capture details](docs/media/README.md) and [current limits](#current-limits)._
+
 ## Run it locally
 
 Use Node.js 22+ and npm.

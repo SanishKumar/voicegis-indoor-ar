@@ -300,6 +300,11 @@ test('walking through a door changes the map: out to the grounds, and in to anot
   // The trip starts in the Emergency Centre, so that is the map that is open:
   // its rooms are named, and the buildings round it are closed and named.
   await expect(map).toHaveAttribute('data-zone', 'emergency-centre');
+  // On a phone, expanded trip details can legitimately displace a building
+  // label to keep the destination readable. Fold them before checking the
+  // wider campus context; this must not change the trip or open building.
+  await page.getByRole('button', { name: 'Collapse route details' }).click();
+  await expect(map).toHaveAttribute('data-zone', 'emergency-centre');
   await expect
     .poll(() => shownLabels(page), { timeout: 15_000 })
     .toEqual(expect.arrayContaining(['Main Hospital', 'Wellness Pavilion']));

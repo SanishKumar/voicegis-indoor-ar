@@ -12,9 +12,12 @@ import QrCheckIn from './QrCheckIn.tsx';
 import { useDialogFocus } from './useDialogFocus.ts';
 import { scanProblemText } from '../capture/scanProblemText.ts';
 import { sharedOrientation } from '../ar/sharedOrientation';
+import MobilePanelHandle from './MobilePanelHandle';
+import { useMobilePanel } from './useMobilePanel';
 
 export default function LocationPicker({ isOpen, onClose }) {
   const { actions, venue } = useNavigation();
+  const panel = useMobilePanel(isOpen);
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -73,13 +76,16 @@ export default function LocationPicker({ isOpen, onClose }) {
   // Escape used to be handled here on its own. It now comes with focus
   // containment and restoration, because a dialog that closes on Escape but
   // never took focus was only ever half a dialog.
-  const { containerRef } = useDialogFocus(isOpen, { onEscape: onClose });
+  const { containerRef } = useDialogFocus(isOpen, {
+    onEscape: onClose,
+    trapFocus: !panel.collapsed,
+  });
 
   if (!isOpen) return null;
 
   return (
     <div
-      className="location-picker-overlay"
+      className={`location-picker-overlay${panel.collapsed ? ' mobile-panel-overlay-folded' : ''}`}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -87,11 +93,17 @@ export default function LocationPicker({ isOpen, onClose }) {
       <div
         ref={containerRef}
         className="location-picker animate-slide-up"
+        data-panel-collapsed={panel.collapsed}
         role="dialog"
-        aria-modal="true"
+        aria-modal={panel.collapsed ? undefined : 'true'}
         aria-labelledby="location-picker-title"
         tabIndex={-1}
       >
+        <MobilePanelHandle
+          panel={panel}
+          label="location picker"
+          controls="lp-search lp-categories lp-results"
+        />
         {/* Header */}
         <div className="lp-header">
           <div>
@@ -122,7 +134,7 @@ export default function LocationPicker({ isOpen, onClose }) {
         </button>
 
         {/* Search */}
-        <div className="lp-search">
+        <div className="lp-search mobile-panel-details" id="lp-search">
           <Search size={18} className="lp-search-icon" />
           <input
             type="text"
@@ -136,7 +148,7 @@ export default function LocationPicker({ isOpen, onClose }) {
         </div>
 
         {/* Category Chips */}
-        <div className="lp-categories">
+        <div className="lp-categories mobile-panel-details" id="lp-categories">
           {Object.values(venue.categories)
             .filter((cat) => availableCategories.has(cat.id))
             .map((cat) => (
@@ -152,7 +164,7 @@ export default function LocationPicker({ isOpen, onClose }) {
         </div>
 
         {/* Results List */}
-        <div className="lp-results">
+        <div className="lp-results mobile-panel-details" id="lp-results">
           {filteredPOIs.length === 0 && (
             <div className="lp-empty">
               <MapPin size={32} />

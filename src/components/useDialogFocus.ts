@@ -109,6 +109,8 @@ function focusableWithin(container: HTMLElement): HTMLElement[] {
 }
 
 export interface DialogFocusOptions {
+  /** A folded mobile sheet remains open, but releases the map and keyboard. */
+  trapFocus?: boolean;
   /** Called on Escape. Omit if the dialog should not close that way. */
   onEscape?: () => void;
   /** A meaningful first control, when DOM order is not the right default. */
@@ -124,7 +126,7 @@ export interface DialogFocusOptions {
  */
 export function useDialogFocus<T extends HTMLElement>(
   active: boolean,
-  { onEscape, initialFocusRef }: DialogFocusOptions = {},
+  { onEscape, initialFocusRef, trapFocus = true }: DialogFocusOptions = {},
 ) {
   const containerRef = useRef<T | null>(null);
   /**
@@ -143,6 +145,10 @@ export function useDialogFocus<T extends HTMLElement>(
   // Held in a ref so the effect does not restart when the caller passes a new
   // closure each render, which would re-run the whole trap on every keystroke.
   const escapeRef = useRef(onEscape);
+  const trapRef = useRef(trapFocus);
+  useEffect(() => {
+    trapRef.current = trapFocus;
+  }, [trapFocus]);
   useEffect(() => {
     escapeRef.current = onEscape;
   }, [onEscape]);
@@ -216,7 +222,7 @@ export function useDialogFocus<T extends HTMLElement>(
         escapeRef.current?.();
         return;
       }
-      if (event.key !== 'Tab') return;
+      if (event.key !== 'Tab' || !trapRef.current) return;
 
       const focusable = focusableWithin(container);
       if (focusable.length === 0) {

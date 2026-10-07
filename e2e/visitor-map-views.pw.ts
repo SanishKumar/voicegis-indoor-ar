@@ -99,8 +99,11 @@ test('2D and 3D use one scene and preserve the inspected journey', async ({ page
     .getByRole('group', { name: 'Floors', exact: true })
     .locator('[aria-pressed="true"]')
     .getAttribute('aria-label');
+  const beforeZoom = await canvas.getAttribute('data-camera-scale');
   await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
-  // The camera eases; read the zoom the visitor chose once it has landed.
+  // Zoom changes the rig immediately, but its DOM diagnostics publish on the
+  // next rendered frame. "settled" can still describe the previous frame.
+  await expect(canvas).not.toHaveAttribute('data-camera-scale', beforeZoom!);
   await expect(canvas).toHaveAttribute('data-camera-transition', 'settled');
   const zoom = await canvas.getAttribute('data-camera-scale');
   await canvas.evaluate((element) => element.setAttribute('data-same-scene', 'yes'));

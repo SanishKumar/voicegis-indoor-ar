@@ -16,6 +16,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import MobilePanelHandle from './MobilePanelHandle';
+import { useMobilePanel } from './useMobilePanel';
 import {
   Box,
   Camera,
@@ -239,6 +241,8 @@ function placeCallouts(elements, callouts, projector, width, height, topInset) {
 
 function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signHeading }) {
   const { route, navStatus, progressMeters, locationBasis, destinationNodeId } = state;
+  const cameraPanel = useMobilePanel(destinationNodeId);
+  const immersivePanel = useMobilePanel(destinationNodeId);
   const routeIsCurrent = actions.isRouteCurrent;
   const navigating = navStatus === NAV_STATUS.NAVIGATING || navStatus === NAV_STATUS.ARRIVED;
   const found = navigating && Boolean(route?.found) && route.steps.length > 0;
@@ -1174,10 +1178,17 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
       )}
 
       {found && (
-        <footer className="ar-sheet" ref={sheetRef}>
-          {!cameraError && copy && <p className="ar-sheet-instruction">{copy.text}</p>}
+        <footer className="ar-sheet" ref={sheetRef} data-panel-collapsed={cameraPanel.collapsed}>
+          <MobilePanelHandle
+            panel={cameraPanel}
+            label="camera controls"
+            controls="camera-control-list"
+          />
+          {!cameraError && copy && (
+            <p className="ar-sheet-instruction mobile-panel-details">{copy.text}</p>
+          )}
           {!cameraError && guidance && (
-            <div className="ar-sheet-facts">
+            <div className="ar-sheet-facts mobile-panel-details" id="camera-trip-facts">
               <div>
                 {copy?.announcementKey ? (
                   copy.lead
@@ -1196,7 +1207,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
               </div>
             </div>
           )}
-          <div className="camera-preview-controls">
+          <div className="camera-preview-controls" id="camera-control-list">
             {!cameraError && arAvailable && !arSession && (
               <button
                 className="camera-preview-control is-primary"
@@ -1223,7 +1234,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
             )}
             {!cameraError && !arSession && (canTrack || live) && (
               <button
-                className={`camera-preview-control${trackLeads ? ' is-primary' : ''}`}
+                className={`camera-preview-control camera-essential${trackLeads ? ' is-primary' : ''}`}
                 aria-pressed={live}
                 onClick={() => (live ? tracking.stop() : tracking.start())}
               >
@@ -1242,7 +1253,11 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
                 {voice ? 'Mute' : 'Speak'}
               </button>
             )}
-            <button className="camera-preview-control" onClick={exit} id="btn-exit-camera-preview">
+            <button
+              className="camera-preview-control camera-essential"
+              onClick={exit}
+              id="btn-exit-camera-preview"
+            >
               <MapIcon size={16} />
               Exit to plan
             </button>
@@ -1264,9 +1279,14 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
               <p className="camera-ar-overlay-note" aria-live="polite" hidden={!prompt.note}>
                 {prompt.note}
               </p>
-              <div className="ar-sheet is-overlay">
+              <div className="ar-sheet is-overlay" data-panel-collapsed={immersivePanel.collapsed}>
+                <MobilePanelHandle
+                  panel={immersivePanel}
+                  label="AR controls"
+                  controls="ar-trip-facts"
+                />
                 {guidance && (
-                  <div className="ar-sheet-facts">
+                  <div className="ar-sheet-facts mobile-panel-details" id="ar-trip-facts">
                     <div>
                       {copy?.announcementKey ? (
                         copy.lead
@@ -1288,7 +1308,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
                 <div className="camera-preview-controls">
                   {prompt.action && (
                     <button
-                      className={`camera-preview-control${prompt.leads === 'action' ? ' is-primary' : ''}`}
+                      className={`camera-preview-control camera-essential${prompt.leads === 'action' ? ' is-primary' : ''}`}
                       onClick={() => {
                         const kind = prompt.action?.kind;
                         logField('ar-action', { action: kind ?? null });
@@ -1316,7 +1336,7 @@ function CameraGuidance({ state, actions, venue, tracking, voice, onVoice, signH
                     </button>
                   )}
                   <button
-                    className={`camera-preview-control${prompt.leads === 'leave' ? ' is-primary' : ''}`}
+                    className={`camera-preview-control camera-essential${prompt.leads === 'leave' ? ' is-primary' : ''}`}
                     onClick={() => {
                       logField('ar-action', { action: 'leave' });
                       void arSession?.end();

@@ -161,6 +161,25 @@
   outline-offset: 2px;
 }
 
+@media (max-width: 899px) {
+  /* Put the empty-search recovery above its longer explanation. The folding
+     handle must not push the only useful next action below the results fold. */
+  #search-panel .search-empty {
+    display: flex;
+    flex-direction: column;
+    padding-top: 0;
+  }
+
+  #search-panel .search-empty-icon {
+    display: none;
+  }
+
+  #search-panel .search-empty p {
+    order: 2;
+    margin-top: 12px;
+  }
+}
+
 @media (max-width: 420px) {
   #search-panel .search-result-item {
     align-items: start;

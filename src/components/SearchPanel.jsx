@@ -12,12 +12,15 @@ import { searchPOIs, getAvailableCategories } from '../engine/searchIndex.js';
 import { formatDistance } from '../data/buildingConfig.js';
 import { useDialogFocus } from './useDialogFocus.ts';
 import './SearchPanel.css';
+import MobilePanelHandle from './MobilePanelHandle';
+import { useMobilePanel } from './useMobilePanel';
 
 const RESULTS_PER_PAGE = 10;
 
 export default function SearchPanel() {
   const { state, actions, previewRoute, venue } = useNavigation();
   const [isOpen, setIsOpen] = useState(false);
+  const panel = useMobilePanel(isOpen);
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
   const [shownCount, setShownCount] = useState(RESULTS_PER_PAGE);
@@ -103,6 +106,7 @@ export default function SearchPanel() {
   const { containerRef } = useDialogFocus(isOpen && !routeOwnsFocus, {
     onEscape: dismissPanel,
     initialFocusRef: inputRef,
+    trapFocus: !panel.collapsed,
   });
 
   const handleResultClick = useCallback(
@@ -204,7 +208,7 @@ export default function SearchPanel() {
 
       {/* Backdrop */}
       <div
-        className={`search-overlay ${isOpen ? 'open' : ''}`}
+        className={`search-overlay ${isOpen ? 'open' : ''}${panel.collapsed ? ' mobile-panel-overlay-folded' : ''}`}
         onClick={dismissPanel}
         id="search-overlay"
         aria-hidden="true"
@@ -225,14 +229,19 @@ export default function SearchPanel() {
         ref={containerRef}
         className={`search-panel ${isOpen ? 'open' : ''}`}
         id="search-panel"
+        data-panel-collapsed={panel.collapsed}
         role="dialog"
-        aria-modal={isOpen && !state.selectedPOI ? 'true' : undefined}
+        aria-modal={isOpen && !state.selectedPOI && !panel.collapsed ? 'true' : undefined}
         aria-labelledby="search-panel-title"
         aria-hidden={state.selectedPOI ? 'true' : undefined}
         tabIndex={-1}
         inert={isOpen && !state.selectedPOI ? undefined : ''}
       >
-        <div className="search-panel-handle" />
+        <MobilePanelHandle
+          panel={panel}
+          label="destination search"
+          controls="search-input-wrapper category-chips search-results"
+        />
 
         <div className="search-panel-heading">
           <div>
@@ -244,7 +253,7 @@ export default function SearchPanel() {
           </button>
         </div>
 
-        <div className="search-input-wrapper">
+        <div className="search-input-wrapper mobile-panel-details" id="search-input-wrapper">
           <Search size={18} aria-hidden="true" />
           <input
             ref={inputRef}
@@ -273,7 +282,7 @@ export default function SearchPanel() {
           )}
         </div>
 
-        <div className="search-section-label">
+        <div className="search-section-label mobile-panel-details">
           <span>Browse by category</span>
           {(query || activeCategory) && (
             <button type="button" className="search-reset-filters" onClick={clearFilters}>
@@ -283,7 +292,7 @@ export default function SearchPanel() {
         </div>
 
         <div
-          className="category-chips"
+          className="category-chips mobile-panel-details"
           id="category-chips"
           role="group"
           aria-label="Destination categories"
@@ -307,7 +316,7 @@ export default function SearchPanel() {
         </div>
 
         <p
-          className="search-results-summary"
+          className="search-results-summary mobile-panel-details"
           id="search-results-summary"
           role="status"
           aria-label="Search results"
@@ -323,7 +332,7 @@ export default function SearchPanel() {
         </p>
 
         {/* Results */}
-        <div className="search-results" id="search-results" ref={resultsRef}>
+        <div className="search-results mobile-panel-details" id="search-results" ref={resultsRef}>
           {results.length > 0 ? (
             <>
               <ul className="search-result-list" aria-label="Destination results">

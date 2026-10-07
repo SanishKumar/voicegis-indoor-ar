@@ -1,0 +1,102 @@
+.mobile-panel-handle {
+  display: none;
+}
+
+@media (max-width: 680px) {
+  .inspector-surface .twin-stage {
+    /* Leave the space selector above the operator dock, including the handle. */
+    grid-template-rows: minmax(280px, 48dvh) auto;
+  }
+}
+.mobile-panel-contents {
+  display: contents;
+}
+
+@media (max-width: 899px) {
+  .mobile-panel-handle {
+    display: flex;
+    flex: none;
+    /* Stay in the scroll flow: a sticky 44px handle can cover every action
+       when large text or a landscape keyboard leaves a very short sheet. */
+    position: relative;
+    z-index: 3;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 6px 12px;
+    border: 1px solid var(--color-hairline-strong);
+    border-radius: var(--radius-buttons);
+    background: rgb(38, 57, 98);
+    color: var(--color-whiteout);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .mobile-panel-grip {
+    width: 28px;
+    height: 3px;
+    border-radius: 3px;
+    background: currentColor;
+    opacity: 0.7;
+  }
+
+  .mobile-panel-handle:focus-visible {
+    outline: 2px solid var(--color-whiteout);
+    outline-offset: -4px;
+  }
+
+  [data-panel-collapsed='true'] .mobile-panel-details {
+    display: none !important;
+  }
+
+  /* Folded pickers are non-modal: their scrim must not eat map gestures. */
+  .visitor-shell .search-overlay.mobile-panel-overlay-folded,
+  .visitor-shell .poi-card-overlay.mobile-panel-overlay-folded,
+  .visitor-shell .location-picker-overlay.mobile-panel-overlay-folded {
+    pointer-events: none;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .mobile-panel-overlay-folded > [data-panel-collapsed] {
+    pointer-events: auto;
+  }
+
+  .visitor-shell .search-panel[data-panel-collapsed='true'],
+  .visitor-shell .location-picker[data-panel-collapsed='true'],
+  .visitor-shell .poi-card[data-panel-collapsed='true'] {
+    height: auto;
+    min-height: 0;
+    max-height: 40dvh;
+    overflow-y: auto;
+  }
+
+  .jr-sheet[data-panel-collapsed='true'] .jr-trip-time {
+    font-size: 1.25rem;
+  }
+
+  .jr-sheet[data-panel-collapsed='true'] .jr-trip-to > span {
+    display: none;
+  }
+
+  .ar-sheet {
+    max-height: 48dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .twin-inspector[data-panel-collapsed='true'] {
+    min-height: 0;
+  }
+
+  .ar-sheet[data-panel-collapsed='true']
+    .camera-preview-controls
+    > :not(.is-primary):not(.camera-essential) {
+    display: none;
+  }
+}

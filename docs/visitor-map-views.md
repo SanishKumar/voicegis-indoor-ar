@@ -40,6 +40,28 @@ request. It changes presentation, not the localization or routing policy.
 - Route, instruction, arrival state and check-in remain owned by the journey.
   A camera target is a browsing position, never a measured visitor position.
 
+## Mobile panels
+
+Below 900 px, map and camera detail panels have a shared **Less / More** handle.
+Tap it, press Enter/Space, or swipe vertically on the handle. Folding is
+presentation only: it does not restart a journey, change a location, stop
+tracking or clear a query. A new destination resets its panel to expanded;
+desktop layouts show their full contents.
+
+Search, destination details and the start picker release the background map
+and keyboard focus trap while folded. Their close controls remain reachable.
+Directions retain the trip summary, next/previous controls, tracking status,
+warnings and recovery actions. Camera and immersive AR retain their primary
+action, floor confirmation/recovery and exit controls. The operator Inspector
+and Studio validation panel follow the same interaction without discarding
+the selected space or draft. Full-screen onboarding and the QR scanner retain
+their existing close/back flows; they are not map detail sheets.
+
+`mobile-panels.pw.ts` covers narrow layouts, keyboard and pointer operation,
+preserved queries/progress/drafts, map hit targets, 2D/3D continuity and desktop
+resize. The camera and floor-placement browser tests also fold their sheets
+before checking recovery, floor confirmation and exit controls.
+
 ## Rendering and recovery
 
 Plan +X/+Y map to world +X/+Z, with world +Y used for elevation, so the default

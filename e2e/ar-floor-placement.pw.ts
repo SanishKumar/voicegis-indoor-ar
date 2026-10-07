@@ -181,6 +181,8 @@ for (const { surfaceDetection, manualAlignment } of [
       });
       await expect(overlay).toHaveAttribute('data-ar-prompt', 'floor-confirm');
       const confirm = overlay.getByRole('button', { name: 'This is the floor' });
+      await overlay.getByRole('button', { name: 'Collapse AR controls' }).click();
+      await expect(overlay.locator('#ar-trip-facts')).toBeHidden();
       await expectCenterHitTarget(confirm);
       await expectInsideViewport(confirm);
       await page.screenshot({ path: testInfo.outputPath('confirm-floor-320.png') });

@@ -34,6 +34,8 @@ import ManeuverIcon from './ManeuverIcon.jsx';
 import { speechAvailable } from './useSpokenGuidance.js';
 import { useJourneyLayout } from './useJourneyLayout.js';
 import './journey.css';
+import MobilePanelHandle from '../MobilePanelHandle';
+import { useMobilePanel } from '../useMobilePanel';
 
 /**
  * Everything on screen while a route exists: an instruction banner across the
@@ -71,6 +73,7 @@ export default function JourneyChrome({
     operationalFreshness,
   } = useNavigation();
   const { route, navStatus, destinationNodeId, progressMeters } = state;
+  const panel = useMobilePanel(destinationNodeId);
   const [stepsOpen, setStepsOpen] = useState(false);
   const [offline, setOffline] = useState(() => navigator.onLine === false);
   const regionRef = useRef(null);
@@ -155,12 +158,17 @@ export default function JourneyChrome({
           className="jr-sheet"
           data-map-inset=""
           id="route-pending-panel"
+          data-panel-collapsed={panel.collapsed}
           role="status"
           aria-label={`Calculating route to ${destinationName}`}
           aria-live="polite"
           tabIndex={-1}
         >
           <div className="map-recovery-slot" ref={onRecoverySlot} />
+          <MobilePanelHandle panel={panel} label="route details" controls="route-pending-details" />
+          <p id="route-pending-details" className="jr-note mobile-panel-details">
+            Checking the venue paths.
+          </p>
           <div className="jr-trip">
             <div className="jr-trip-main">
               <p className="jr-trip-title">Checking the paths to {destinationName}…</p>
@@ -195,13 +203,17 @@ export default function JourneyChrome({
           className="jr-sheet"
           data-map-inset=""
           id="route-policy-panel"
+          data-panel-collapsed={panel.collapsed}
           role="alert"
           aria-label="Directions paused"
           tabIndex={-1}
         >
           <div className="map-recovery-slot" ref={onRecoverySlot} />
-          <p className="jr-trip-title">Your trip to {destinationName} is saved</p>
-          <p className="jr-note">
+          <MobilePanelHandle panel={panel} label="route details" controls="route-policy-details" />
+          <p className="jr-trip-title mobile-panel-details">
+            Your trip to {destinationName} is saved
+          </p>
+          <p className="jr-note mobile-panel-details" id="route-policy-details">
             {accessibleRouting ? 'Step-free route' : 'Fastest available route'}
           </p>
           <p className="jr-note">{operationalProblem(reason, offline)}</p>
@@ -263,11 +275,15 @@ export default function JourneyChrome({
           className="jr-sheet"
           data-map-inset=""
           id="route-failure-panel"
+          data-panel-collapsed={panel.collapsed}
           role="alert"
           tabIndex={-1}
         >
           <div className="map-recovery-slot" ref={onRecoverySlot} />
-          <p className="jr-trip-title">No compliant route</p>
+          <MobilePanelHandle panel={panel} label="route details" controls="route-failure-details" />
+          <p className="jr-trip-title mobile-panel-details" id="route-failure-details">
+            No compliant route
+          </p>
           <p className="jr-note">
             {closure
               ? 'No step-free route is available under the active operational closures.'
@@ -482,6 +498,7 @@ export default function JourneyChrome({
         className="jr-sheet"
         data-map-inset=""
         id="nav-panel"
+        data-panel-collapsed={panel.collapsed}
         role="region"
         aria-label={`Directions to ${destinationName}`}
         data-step-index={state.previewStepIndex}
@@ -489,6 +506,11 @@ export default function JourneyChrome({
         tabIndex={-1}
       >
         <div className="map-recovery-slot" ref={onRecoverySlot} />
+        <MobilePanelHandle
+          panel={panel}
+          label="route details"
+          controls="route-meta nav-steps-list"
+        />
         <div className="jr-venue">{venue.config.name}</div>
 
         {route.displayClearance?.status === 'withheld' && (
@@ -524,14 +546,18 @@ export default function JourneyChrome({
         </div>
 
         {(destinationLocation || destinationDescription) && (
-          <details className="jr-destination-context" open={arrived || atEnd || liveArrived}>
+          <details
+            id="route-destination-details"
+            className="jr-destination-context mobile-panel-details"
+            open={arrived || atEnd || liveArrived}
+          >
             <summary>Destination details</summary>
             {destinationLocation && <p className="jr-note">{destinationLocation}</p>}
             {destinationDescription && <p className="jr-note">{destinationDescription}</p>}
           </details>
         )}
 
-        <div className="jr-meta">
+        <div className="jr-meta mobile-panel-details" id="route-meta">
           <div className="jr-meta-copy">
             <p className="jr-via" aria-label={routeProfile}>
               <span>{routeProfile === 'Step-free route' ? 'Step-free' : 'Fastest'}</span>
@@ -669,12 +695,15 @@ export default function JourneyChrome({
             aria-expanded={stepsOpen}
             aria-controls="nav-steps-list"
             aria-label={stepsOpen ? 'Hide all steps' : `Show all ${steps.length} steps`}
-            onClick={() => setStepsOpen((open) => !open)}
+            onClick={() => {
+              panel.setCollapsed(false);
+              setStepsOpen((open) => !open);
+            }}
           >
             {stepsOpen ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
           </button>
         </div>
-        <div className="jr-steps" id="nav-steps-list" hidden={!stepsOpen}>
+        <div className="jr-steps mobile-panel-details" id="nav-steps-list" hidden={!stepsOpen}>
           {arrived ? (
             <p className="jr-note">
               Arrival was confirmed by you. These steps are a route preview, not your tracked

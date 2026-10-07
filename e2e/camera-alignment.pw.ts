@@ -91,6 +91,11 @@ test('camera alignment follows real-time attitude, expires silence and never adv
     attitude.quietMotion = false;
   });
   await page.setViewportSize({ width: 320, height: 700 });
+  await page.getByRole('button', { name: 'Collapse camera controls' }).click();
+  await expect(page.locator('#camera-trip-facts')).toBeHidden();
+  await expectCenterHitTarget(page.getByRole('button', { name: 'Exit to plan' }));
+  await expect(view).toHaveAttribute('data-heading-source', 'aligned');
+  await page.getByRole('button', { name: 'Expand camera controls' }).click();
   await expectCenterHitTarget(page.getByRole('button', { name: 'Re-align', exact: true }));
   await expectInsideViewport(page.getByRole('button', { name: 'Exit to plan' }));
   await page.screenshot({ path: testInfo.outputPath('aligned-camera-320.png') });

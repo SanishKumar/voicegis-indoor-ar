@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import MobilePanelHandle from './MobilePanelHandle';
+import { useMobilePanel } from './useMobilePanel';
 import { Canvas, useThree } from '@react-three/fiber';
 import {
   ContactShadows,
@@ -1141,6 +1143,7 @@ function ToggleButton({ active, label, onClick }: ToggleButtonProps) {
 export default function SpatialTwinViewer() {
   const { state, venue } = useNavigation() as unknown as SpatialNavigatorContextValue;
   const buildingPackage = venue.buildingPackage;
+  const panel = useMobilePanel(buildingPackage.manifest.contentHash);
   const connectorsById = useMemo(
     () =>
       new Map(
@@ -1338,144 +1341,159 @@ export default function SpatialTwinViewer() {
             </Canvas>
           </div>
 
-          <aside className="twin-inspector" aria-label="Semantic space inspector">
-            <div className="twin-space-browser">
-              <label htmlFor="twin-space-select">Inspect a space</label>
-              <select
-                id="twin-space-select"
-                value={selectedSpaceId ?? ''}
-                onChange={(event) => setSelectedSpaceId(event.target.value || null)}
-              >
-                <option value="">No space selected</option>
-                {visibleSpacesByFloor.map(({ floor, spaces }) => (
-                  <optgroup key={floor.id} label={floor.name}>
-                    {spaces.map((space) => (
-                      <option key={space.id} value={space.id}>
-                        {space.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-              <p id="twin-model-help" className="twin-model-help">
-                Pointer: drag to orbit and scroll to zoom. Keyboard: use this selector to highlight
-                a modeled space and inspect the same compiled metadata.
-              </p>
-              <p
-                className="twin-selection-status"
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                {selectionStatus}
-              </p>
-            </div>
-            {selectedSpace ? (
-              <>
-                <div className="twin-inspector-header">
-                  <span className="twin-space-type">{selectedSpace.type.replace('-', ' ')}</span>
-                  <h2>{selectedSpace.name}</h2>
-                  <code>{selectedSpace.id}</code>
-                </div>
-                <dl className="twin-property-grid">
-                  <div>
-                    <dt>Floor</dt>
-                    <dd>{selectedFloor?.name}</dd>
-                  </div>
-                  <div>
-                    <dt>Access</dt>
-                    <dd>{selectedSpaceIsRestricted ? 'Restricted' : 'Public'}</dd>
-                  </div>
-                  <div>
-                    <dt>Mobility</dt>
-                    <dd>{selectedSpace.accessible ? 'Accessible' : 'Not accessible'}</dd>
-                  </div>
-                  <div>
-                    <dt>Boundary</dt>
-                    <dd>{selectedSpace.polygon.length} vertices</dd>
-                  </div>
-                </dl>
-                <div className="twin-related-data">
-                  <h3>Compiled relationships</h3>
-                  <p>{selectedPortals.length} portals</p>
-                  <p>{selectedPois.length} points of interest</p>
-                  <p>{selectedAnchors.length} localization anchors</p>
-                </div>
-                {selectedPois.length > 0 && (
-                  <div className="twin-tag-list">
-                    {selectedPois.map((poi) => (
-                      <span key={poi.id}>{poi.name}</span>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : activeRoute?.found ? (
-              <div className="twin-route-inspector">
-                <span className="twin-space-type">Active route</span>
-                <h2>{destinationName}</h2>
-                <p className="twin-route-journey-copy">
-                  {activeRouteFloors.map(floorLabel).join(' → ')}
-                  {activeConnectorRuns.map((run) => {
-                    const connector = connectorsById.get(run.connectorId);
-                    return ` via ${connector?.name ?? run.connectorId}`;
-                  })}
+          <aside
+            className="twin-inspector"
+            aria-label="Semantic space inspector"
+            data-panel-collapsed={panel.collapsed}
+          >
+            <MobilePanelHandle
+              panel={panel}
+              label="space inspector"
+              controls="space-inspector-details"
+            />
+            <div
+              className="mobile-panel-contents mobile-panel-details"
+              id="space-inspector-details"
+            >
+              <div className="twin-space-browser">
+                <label htmlFor="twin-space-select">Inspect a space</label>
+                <select
+                  id="twin-space-select"
+                  value={selectedSpaceId ?? ''}
+                  onChange={(event) => setSelectedSpaceId(event.target.value || null)}
+                >
+                  <option value="">No space selected</option>
+                  {visibleSpacesByFloor.map(({ floor, spaces }) => (
+                    <optgroup key={floor.id} label={floor.name}>
+                      {spaces.map((space) => (
+                        <option key={space.id} value={space.id}>
+                          {space.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <p id="twin-model-help" className="twin-model-help">
+                  Pointer: drag to orbit and scroll to zoom. Keyboard: use this selector to
+                  highlight a modeled space and inspect the same compiled metadata.
                 </p>
-                <div className="twin-route-current">
-                  <span>
-                    Preview instruction{' '}
-                    {Math.min(state.previewStepIndex + 1, activeRoute.steps.length)} of{' '}
-                    {activeRoute.steps.length}
-                  </span>
-                  <strong>
-                    {activeRoute.steps[state.previewStepIndex]?.instruction ?? 'Route ready'}
-                  </strong>
-                </div>
-                <dl className="twin-property-grid">
-                  <div>
-                    <dt>Distance</dt>
-                    <dd>{Math.round(activeRoute.totalDistance)} m</dd>
-                  </div>
-                  <div>
-                    <dt>Floors</dt>
-                    <dd>{activeRouteFloors.length}</dd>
-                  </div>
-                </dl>
-                <p className="twin-route-note">
-                  Orange marks walking segments. Violet is anchored to the selected lift or stair.
+                <p
+                  className="twin-selection-status"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {selectionStatus}
                 </p>
               </div>
-            ) : (
-              <div className="twin-empty-inspector">
-                <ScanLine size={24} />
-                <h2>Inspect a semantic space</h2>
-                <p>
-                  Select any extruded area to trace its source metadata and compiled relationships.
-                </p>
-              </div>
-            )}
+              {selectedSpace ? (
+                <>
+                  <div className="twin-inspector-header">
+                    <span className="twin-space-type">{selectedSpace.type.replace('-', ' ')}</span>
+                    <h2>{selectedSpace.name}</h2>
+                    <code>{selectedSpace.id}</code>
+                  </div>
+                  <dl className="twin-property-grid">
+                    <div>
+                      <dt>Floor</dt>
+                      <dd>{selectedFloor?.name}</dd>
+                    </div>
+                    <div>
+                      <dt>Access</dt>
+                      <dd>{selectedSpaceIsRestricted ? 'Restricted' : 'Public'}</dd>
+                    </div>
+                    <div>
+                      <dt>Mobility</dt>
+                      <dd>{selectedSpace.accessible ? 'Accessible' : 'Not accessible'}</dd>
+                    </div>
+                    <div>
+                      <dt>Boundary</dt>
+                      <dd>{selectedSpace.polygon.length} vertices</dd>
+                    </div>
+                  </dl>
+                  <div className="twin-related-data">
+                    <h3>Compiled relationships</h3>
+                    <p>{selectedPortals.length} portals</p>
+                    <p>{selectedPois.length} points of interest</p>
+                    <p>{selectedAnchors.length} localization anchors</p>
+                  </div>
+                  {selectedPois.length > 0 && (
+                    <div className="twin-tag-list">
+                      {selectedPois.map((poi) => (
+                        <span key={poi.id}>{poi.name}</span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : activeRoute?.found ? (
+                <div className="twin-route-inspector">
+                  <span className="twin-space-type">Active route</span>
+                  <h2>{destinationName}</h2>
+                  <p className="twin-route-journey-copy">
+                    {activeRouteFloors.map(floorLabel).join(' → ')}
+                    {activeConnectorRuns.map((run) => {
+                      const connector = connectorsById.get(run.connectorId);
+                      return ` via ${connector?.name ?? run.connectorId}`;
+                    })}
+                  </p>
+                  <div className="twin-route-current">
+                    <span>
+                      Preview instruction{' '}
+                      {Math.min(state.previewStepIndex + 1, activeRoute.steps.length)} of{' '}
+                      {activeRoute.steps.length}
+                    </span>
+                    <strong>
+                      {activeRoute.steps[state.previewStepIndex]?.instruction ?? 'Route ready'}
+                    </strong>
+                  </div>
+                  <dl className="twin-property-grid">
+                    <div>
+                      <dt>Distance</dt>
+                      <dd>{Math.round(activeRoute.totalDistance)} m</dd>
+                    </div>
+                    <div>
+                      <dt>Floors</dt>
+                      <dd>{activeRouteFloors.length}</dd>
+                    </div>
+                  </dl>
+                  <p className="twin-route-note">
+                    Orange marks walking segments. Violet is anchored to the selected lift or stair.
+                  </p>
+                </div>
+              ) : (
+                <div className="twin-empty-inspector">
+                  <ScanLine size={24} />
+                  <h2>Inspect a semantic space</h2>
+                  <p>
+                    Select any extruded area to trace its source metadata and compiled
+                    relationships.
+                  </p>
+                </div>
+              )}
 
-            <div className="twin-package-facts">
-              <div>
-                <Layers size={15} />
-                <span>{buildingPackage.spaces.length} spaces</span>
-              </div>
-              <div>
-                <Route size={15} />
-                <span>
-                  {graphSummary.nodeCount} nodes / {graphSummary.edgeCount} edges
-                </span>
-              </div>
-              <div>
-                <Accessibility size={15} />
-                <span>{graphSummary.accessibleEdgeCount} accessible edges</span>
-              </div>
-              <div>
-                <LockKeyhole size={15} />
-                <span>{graphSummary.restrictedEdgeCount} restricted edges</span>
-              </div>
-              <div title={buildingPackage.manifest.contentHash}>
-                <Database size={15} />
-                <code>{buildingPackage.manifest.contentHash.slice(0, 12)}</code>
+              <div className="twin-package-facts">
+                <div>
+                  <Layers size={15} />
+                  <span>{buildingPackage.spaces.length} spaces</span>
+                </div>
+                <div>
+                  <Route size={15} />
+                  <span>
+                    {graphSummary.nodeCount} nodes / {graphSummary.edgeCount} edges
+                  </span>
+                </div>
+                <div>
+                  <Accessibility size={15} />
+                  <span>{graphSummary.accessibleEdgeCount} accessible edges</span>
+                </div>
+                <div>
+                  <LockKeyhole size={15} />
+                  <span>{graphSummary.restrictedEdgeCount} restricted edges</span>
+                </div>
+                <div title={buildingPackage.manifest.contentHash}>
+                  <Database size={15} />
+                  <code>{buildingPackage.manifest.contentHash.slice(0, 12)}</code>
+                </div>
               </div>
             </div>
           </aside>

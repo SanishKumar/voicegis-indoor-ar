@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import MobilePanelHandle from './MobilePanelHandle';
+import { useMobilePanel } from './useMobilePanel';
 import {
   AlertTriangle,
   Braces,
@@ -100,6 +102,7 @@ export default function BuildingSourceWorkspace() {
     [venue],
   );
   const draftKey = venue.buildingPackage.manifest.contentHash;
+  const panel = useMobilePanel(draftKey);
   const [savedSession] = useState(() => studioDraftMemory.read(draftKey));
   const [draftText, setDraftText] = useState(savedSession?.draftText ?? initialText);
   const [draftName, setDraftName] = useState(
@@ -528,7 +531,16 @@ export default function BuildingSourceWorkspace() {
           )}
         </section>
 
-        <aside className="studio-validation-panel" aria-label="BuildingSource validation results">
+        <aside
+          className="studio-validation-panel"
+          aria-label="BuildingSource validation results"
+          data-panel-collapsed={panel.collapsed}
+        >
+          <MobilePanelHandle
+            panel={panel}
+            label="validation details"
+            controls="studio-validation-details"
+          />
           <section
             className={`studio-validation-hero ${validation.valid ? 'valid' : 'invalid'}`}
             aria-live="polite"
@@ -543,348 +555,355 @@ export default function BuildingSourceWorkspace() {
             </div>
           </section>
 
-          <section className="studio-pipeline" aria-label="Venue creation pipeline">
-            <div className="active">
-              <span>01</span>
-              <strong>Importer</strong>
-              <small>
-                {dxfImportReport?.accepted
-                  ? 'DXF import staged'
-                  : dxfMappingSession
-                    ? 'Layer mapping open'
-                    : 'CAD mapping ready'}
-              </small>
-            </div>
-            <div className="active">
-              <span>02</span>
-              <strong>BuildingSource</strong>
-              <small>Current slice</small>
-            </div>
-            <div className={previewPackage && !previewStale ? 'active' : undefined}>
-              <span>03</span>
-              <strong>Compiler</strong>
-              <small>
-                {previewPackage && !previewStale ? 'Preview complete' : 'Current slice'}
-              </small>
-            </div>
-            <div className={previewArtifact && !previewStale ? 'active' : undefined}>
-              <span>04</span>
-              <strong>VenuePackage</strong>
-              <small>
-                {previewArtifact && !previewStale ? 'Verified artifact' : 'Not generated yet'}
-              </small>
-            </div>
-            <div className="active">
-              <span>05</span>
-              <strong>Runtime</strong>
-              <small>
-                {matchesActivePackage ? 'Preview is active' : 'Verified package active'}
-              </small>
-            </div>
-          </section>
-
-          <section className="studio-compile-section" aria-label="Compilation preview">
-            <div className="studio-section-heading">
-              <div>
-                <span>Deterministic compiler</span>
-                <h2>VenuePackage preview</h2>
+          <div
+            className="mobile-panel-contents mobile-panel-details"
+            id="studio-validation-details"
+          >
+            <section className="studio-pipeline" aria-label="Venue creation pipeline">
+              <div className="active">
+                <span>01</span>
+                <strong>Importer</strong>
+                <small>
+                  {dxfImportReport?.accepted
+                    ? 'DXF import staged'
+                    : dxfMappingSession
+                      ? 'Layer mapping open'
+                      : 'CAD mapping ready'}
+                </small>
               </div>
-              <button
-                type="button"
-                className="studio-compile-button"
-                onClick={() => void compileDraft()}
-                disabled={!validation.valid || compiling}
-              >
-                <Play size={14} />
-                {compiling ? 'Compiling…' : previewPackage ? 'Compile again' : 'Compile preview'}
-              </button>
-            </div>
+              <div className="active">
+                <span>02</span>
+                <strong>BuildingSource</strong>
+                <small>Current slice</small>
+              </div>
+              <div className={previewPackage && !previewStale ? 'active' : undefined}>
+                <span>03</span>
+                <strong>Compiler</strong>
+                <small>
+                  {previewPackage && !previewStale ? 'Preview complete' : 'Current slice'}
+                </small>
+              </div>
+              <div className={previewArtifact && !previewStale ? 'active' : undefined}>
+                <span>04</span>
+                <strong>VenuePackage</strong>
+                <small>
+                  {previewArtifact && !previewStale ? 'Verified artifact' : 'Not generated yet'}
+                </small>
+              </div>
+              <div className="active">
+                <span>05</span>
+                <strong>Runtime</strong>
+                <small>
+                  {matchesActivePackage ? 'Preview is active' : 'Verified package active'}
+                </small>
+              </div>
+            </section>
 
-            {!previewPackage && !compileError && (
-              <div className="studio-compile-empty">
-                <PackageCheck size={20} />
+            <section className="studio-compile-section" aria-label="Compilation preview">
+              <div className="studio-section-heading">
                 <div>
-                  <strong>No package preview yet</strong>
-                  <p>
-                    Compile a valid draft to generate routing topology, a validation report, and a
-                    SHA-256 package hash.
-                  </p>
+                  <span>Deterministic compiler</span>
+                  <h2>VenuePackage preview</h2>
                 </div>
-              </div>
-            )}
-
-            {compileError && (
-              <div className="studio-compile-error" role="alert">
-                <AlertTriangle size={17} />
-                {compileError}
-              </div>
-            )}
-
-            {previewPackage && (
-              <div className={`studio-package-preview ${previewStale ? 'stale' : ''}`}>
-                <div className="studio-package-hash">
-                  <div>
-                    <span>{previewStale ? 'Preview out of date' : 'SHA-256 content hash'}</span>
-                    <code>{previewPackage.manifest.contentHash}</code>
-                  </div>
-                  {previewStale ? <AlertTriangle size={19} /> : <CheckCircle2 size={19} />}
-                </div>
-                <div className="studio-package-facts">
-                  <div>
-                    <PackageCheck size={14} />
-                    <span>
-                      Package
-                      <strong>{previewPackage.packageVersion}</strong>
-                    </span>
-                  </div>
-                  <div>
-                    <Braces size={14} />
-                    <span>
-                      Compiler
-                      <strong>{previewPackage.compilerVersion}</strong>
-                    </span>
-                  </div>
-                  <div>
-                    <Network size={14} />
-                    <span>
-                      Graph
-                      <strong>
-                        {previewPackage.routing.nodes.length} nodes ·{' '}
-                        {previewPackage.routing.edges.length} edges
-                      </strong>
-                    </span>
-                  </div>
-                  <div>
-                    <GitCompare size={14} />
-                    <span>
-                      Active package
-                      <strong>{matchesActivePackage ? 'Exact hash match' : 'Draft differs'}</strong>
-                    </span>
-                  </div>
-                </div>
-                <p>
-                  {previewStale
-                    ? 'The draft changed after this preview. Compile again before trusting its hash.'
-                    : `${compilePreview?.result.report.summary.errors ?? 0} errors · ${compilePreview?.result.report.summary.warnings ?? 0} warnings · preview remains local`}
-                </p>
-
-                {previewArtifact && (
-                  <div className="studio-artifact-actions">
-                    <button
-                      type="button"
-                      className="studio-download-button"
-                      onClick={downloadArtifact}
-                      disabled={previewStale}
-                    >
-                      <Download size={14} />
-                      Download verified package
-                    </button>
-                    <details className="studio-artifact-review">
-                      <summary>
-                        <Eye size={14} />
-                        Review artifact
-                        <span>{formatArtifactSize(previewArtifact.byteLength)}</span>
-                      </summary>
-                      <div className="studio-artifact-meta">
-                        <span>
-                          File
-                          <strong>{previewArtifact.fileName}</strong>
-                        </span>
-                        <span>
-                          Runtime contract
-                          <strong>Verified</strong>
-                        </span>
-                        <span>
-                          Artifact SHA-256
-                          <strong title={previewArtifact.artifactHash}>
-                            {previewArtifact.artifactHash.slice(0, 12)}
-                          </strong>
-                        </span>
-                      </div>
-                      <pre tabIndex={0}>{previewArtifact.text}</pre>
-                    </details>
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-
-          <section className="studio-runtime-section" aria-label="Runtime activation controls">
-            <div className="studio-section-heading">
-              <div>
-                <span>Controlled runtime boundary</span>
-                <h2>Activation and rollback</h2>
-              </div>
-              <span className={`studio-runtime-state ${runtimeStatus.state}`}>
-                {runtimeStatus.state}
-              </span>
-            </div>
-
-            <div className="studio-active-runtime">
-              <ShieldCheck size={17} />
-              <span>
-                Active now
-                <strong>{venue.buildingPackage.building.name}</strong>
-              </span>
-              <code title={venue.buildingPackage.manifest.contentHash}>
-                {venue.buildingPackage.manifest.contentHash.slice(0, 12)}
-              </code>
-            </div>
-
-            {rollbackCandidate && (
-              <div className="studio-rollback-candidate">
-                <History size={17} />
-                <span>
-                  One rollback available
-                  <strong>{rollbackCandidate.buildingName}</strong>
-                  <small>{rollbackCandidate.contentHash.slice(0, 12)}</small>
-                </span>
                 <button
                   type="button"
-                  onClick={() => void rollbackRuntime()}
-                  disabled={runtimeStatus.state === 'switching'}
+                  className="studio-compile-button"
+                  onClick={() => void compileDraft()}
+                  disabled={!validation.valid || compiling}
                 >
-                  <RotateCcw size={13} />
-                  Roll back
+                  <Play size={14} />
+                  {compiling ? 'Compiling…' : previewPackage ? 'Compile again' : 'Compile preview'}
                 </button>
               </div>
-            )}
 
-            {!previewPackage ? (
-              <div className="studio-runtime-empty">
-                <Power size={17} />
-                Compile a valid draft to stage a verified runtime candidate.
-              </div>
-            ) : previewStale ? (
-              <div className="studio-runtime-empty warning">
-                <AlertTriangle size={17} />
-                The compiled candidate is stale. Compile the current draft again.
-              </div>
-            ) : matchesActivePackage ? (
-              <div className="studio-runtime-empty valid">
-                <CheckCircle2 size={17} />
-                This verified preview is already the active runtime package.
-              </div>
-            ) : (
-              <div className="studio-staged-runtime">
-                <div>
-                  <PackageCheck size={17} />
-                  <span>
-                    Verified candidate
-                    <strong>{previewPackage.building.name}</strong>
-                    <small>{previewPackage.manifest.contentHash.slice(0, 12)}</small>
-                  </span>
-                  {!activationArmed && (
-                    <button
-                      type="button"
-                      onClick={() => setActivationArmed(true)}
-                      disabled={runtimeStatus.state === 'switching'}
-                    >
-                      Review activation
-                    </button>
-                  )}
+              {!previewPackage && !compileError && (
+                <div className="studio-compile-empty">
+                  <PackageCheck size={20} />
+                  <div>
+                    <strong>No package preview yet</strong>
+                    <p>
+                      Compile a valid draft to generate routing topology, a validation report, and a
+                      SHA-256 package hash.
+                    </p>
+                  </div>
                 </div>
+              )}
 
-                {activationArmed && (
-                  <div className="studio-activation-confirm" role="alert">
-                    <AlertTriangle size={17} />
+              {compileError && (
+                <div className="studio-compile-error" role="alert">
+                  <AlertTriangle size={17} />
+                  {compileError}
+                </div>
+              )}
+
+              {previewPackage && (
+                <div className={`studio-package-preview ${previewStale ? 'stale' : ''}`}>
+                  <div className="studio-package-hash">
                     <div>
-                      <strong>Activate this package now?</strong>
-                      <p>
-                        The runtime will reset its route, selected POI, active floor, closure
-                        overlay, and localization session. The current package will be retained for
-                        one rollback.
-                      </p>
+                      <span>{previewStale ? 'Preview out of date' : 'SHA-256 content hash'}</span>
+                      <code>{previewPackage.manifest.contentHash}</code>
+                    </div>
+                    {previewStale ? <AlertTriangle size={19} /> : <CheckCircle2 size={19} />}
+                  </div>
+                  <div className="studio-package-facts">
+                    <div>
+                      <PackageCheck size={14} />
                       <span>
-                        <button type="button" onClick={() => setActivationArmed(false)}>
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          className="confirm"
-                          onClick={() => void activatePreview()}
-                          disabled={runtimeStatus.state === 'switching'}
-                        >
-                          <Power size={13} />
-                          {runtimeStatus.state === 'switching'
-                            ? 'Activating…'
-                            : 'Activate verified package'}
-                        </button>
+                        Package
+                        <strong>{previewPackage.packageVersion}</strong>
+                      </span>
+                    </div>
+                    <div>
+                      <Braces size={14} />
+                      <span>
+                        Compiler
+                        <strong>{previewPackage.compilerVersion}</strong>
+                      </span>
+                    </div>
+                    <div>
+                      <Network size={14} />
+                      <span>
+                        Graph
+                        <strong>
+                          {previewPackage.routing.nodes.length} nodes ·{' '}
+                          {previewPackage.routing.edges.length} edges
+                        </strong>
+                      </span>
+                    </div>
+                    <div>
+                      <GitCompare size={14} />
+                      <span>
+                        Active package
+                        <strong>
+                          {matchesActivePackage ? 'Exact hash match' : 'Draft differs'}
+                        </strong>
                       </span>
                     </div>
                   </div>
-                )}
-              </div>
-            )}
+                  <p>
+                    {previewStale
+                      ? 'The draft changed after this preview. Compile again before trusting its hash.'
+                      : `${compilePreview?.result.report.summary.errors ?? 0} errors · ${compilePreview?.result.report.summary.warnings ?? 0} warnings · preview remains local`}
+                  </p>
 
-            {(runtimeError || runtimeStatus.error) && (
-              <div className="studio-runtime-error" role="alert">
-                <AlertTriangle size={15} />
-                {runtimeError ?? runtimeStatus.error}
-              </div>
-            )}
-            <p className="studio-runtime-detail">{runtimeStatus.detail}</p>
-          </section>
-
-          <VenueVersionCatalogPanel
-            catalog={versionCatalog}
-            activeHash={venue.buildingPackage.manifest.contentHash}
-            rollbackHash={rollbackCandidate?.contentHash ?? null}
-          />
-
-          <VenuePublishDryRunPanel
-            key={previewPackage?.manifest.contentHash ?? 'no-preview'}
-            candidatePackage={previewPackage}
-            artifact={previewArtifact}
-            catalog={versionCatalog}
-            stale={previewStale}
-          />
-
-          {validation.stats && (
-            <section className="studio-source-stats" aria-label="BuildingSource summary">
-              {Object.entries(validation.stats).map(([label, value]) => (
-                <div key={label}>
-                  <strong>{value}</strong>
-                  <span>{label}</span>
-                </div>
-              ))}
-            </section>
-          )}
-
-          <section className="studio-issues">
-            <div className="studio-section-heading">
-              <div>
-                <span>Validation report</span>
-                <h2>{validation.issues.length === 0 ? 'No issues' : 'Issues to resolve'}</h2>
-              </div>
-              <div className="studio-issue-counts">
-                <span>{errorCount} errors</span>
-                <span>{warningCount} warnings</span>
-              </div>
-            </div>
-
-            {validation.issues.length === 0 ? (
-              <div className="studio-empty-issues">
-                <CheckCircle2 size={18} />
-                Schema and deterministic semantic validation both passed.
-              </div>
-            ) : (
-              <ol>
-                {validation.issues.map((issue, index) => (
-                  <li key={`${issue.stage}-${issue.code}-${issue.path}-${index}`}>
-                    <span className={`studio-issue-severity ${issue.severity}`}>
-                      {issue.severity}
-                    </span>
-                    <div>
-                      <strong>{issue.code}</strong>
-                      <code>{issue.path}</code>
-                      <p>{issue.message}</p>
+                  {previewArtifact && (
+                    <div className="studio-artifact-actions">
+                      <button
+                        type="button"
+                        className="studio-download-button"
+                        onClick={downloadArtifact}
+                        disabled={previewStale}
+                      >
+                        <Download size={14} />
+                        Download verified package
+                      </button>
+                      <details className="studio-artifact-review">
+                        <summary>
+                          <Eye size={14} />
+                          Review artifact
+                          <span>{formatArtifactSize(previewArtifact.byteLength)}</span>
+                        </summary>
+                        <div className="studio-artifact-meta">
+                          <span>
+                            File
+                            <strong>{previewArtifact.fileName}</strong>
+                          </span>
+                          <span>
+                            Runtime contract
+                            <strong>Verified</strong>
+                          </span>
+                          <span>
+                            Artifact SHA-256
+                            <strong title={previewArtifact.artifactHash}>
+                              {previewArtifact.artifactHash.slice(0, 12)}
+                            </strong>
+                          </span>
+                        </div>
+                        <pre tabIndex={0}>{previewArtifact.text}</pre>
+                      </details>
                     </div>
-                  </li>
+                  )}
+                </div>
+              )}
+            </section>
+
+            <section className="studio-runtime-section" aria-label="Runtime activation controls">
+              <div className="studio-section-heading">
+                <div>
+                  <span>Controlled runtime boundary</span>
+                  <h2>Activation and rollback</h2>
+                </div>
+                <span className={`studio-runtime-state ${runtimeStatus.state}`}>
+                  {runtimeStatus.state}
+                </span>
+              </div>
+
+              <div className="studio-active-runtime">
+                <ShieldCheck size={17} />
+                <span>
+                  Active now
+                  <strong>{venue.buildingPackage.building.name}</strong>
+                </span>
+                <code title={venue.buildingPackage.manifest.contentHash}>
+                  {venue.buildingPackage.manifest.contentHash.slice(0, 12)}
+                </code>
+              </div>
+
+              {rollbackCandidate && (
+                <div className="studio-rollback-candidate">
+                  <History size={17} />
+                  <span>
+                    One rollback available
+                    <strong>{rollbackCandidate.buildingName}</strong>
+                    <small>{rollbackCandidate.contentHash.slice(0, 12)}</small>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void rollbackRuntime()}
+                    disabled={runtimeStatus.state === 'switching'}
+                  >
+                    <RotateCcw size={13} />
+                    Roll back
+                  </button>
+                </div>
+              )}
+
+              {!previewPackage ? (
+                <div className="studio-runtime-empty">
+                  <Power size={17} />
+                  Compile a valid draft to stage a verified runtime candidate.
+                </div>
+              ) : previewStale ? (
+                <div className="studio-runtime-empty warning">
+                  <AlertTriangle size={17} />
+                  The compiled candidate is stale. Compile the current draft again.
+                </div>
+              ) : matchesActivePackage ? (
+                <div className="studio-runtime-empty valid">
+                  <CheckCircle2 size={17} />
+                  This verified preview is already the active runtime package.
+                </div>
+              ) : (
+                <div className="studio-staged-runtime">
+                  <div>
+                    <PackageCheck size={17} />
+                    <span>
+                      Verified candidate
+                      <strong>{previewPackage.building.name}</strong>
+                      <small>{previewPackage.manifest.contentHash.slice(0, 12)}</small>
+                    </span>
+                    {!activationArmed && (
+                      <button
+                        type="button"
+                        onClick={() => setActivationArmed(true)}
+                        disabled={runtimeStatus.state === 'switching'}
+                      >
+                        Review activation
+                      </button>
+                    )}
+                  </div>
+
+                  {activationArmed && (
+                    <div className="studio-activation-confirm" role="alert">
+                      <AlertTriangle size={17} />
+                      <div>
+                        <strong>Activate this package now?</strong>
+                        <p>
+                          The runtime will reset its route, selected POI, active floor, closure
+                          overlay, and localization session. The current package will be retained
+                          for one rollback.
+                        </p>
+                        <span>
+                          <button type="button" onClick={() => setActivationArmed(false)}>
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="confirm"
+                            onClick={() => void activatePreview()}
+                            disabled={runtimeStatus.state === 'switching'}
+                          >
+                            <Power size={13} />
+                            {runtimeStatus.state === 'switching'
+                              ? 'Activating…'
+                              : 'Activate verified package'}
+                          </button>
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(runtimeError || runtimeStatus.error) && (
+                <div className="studio-runtime-error" role="alert">
+                  <AlertTriangle size={15} />
+                  {runtimeError ?? runtimeStatus.error}
+                </div>
+              )}
+              <p className="studio-runtime-detail">{runtimeStatus.detail}</p>
+            </section>
+
+            <VenueVersionCatalogPanel
+              catalog={versionCatalog}
+              activeHash={venue.buildingPackage.manifest.contentHash}
+              rollbackHash={rollbackCandidate?.contentHash ?? null}
+            />
+
+            <VenuePublishDryRunPanel
+              key={previewPackage?.manifest.contentHash ?? 'no-preview'}
+              candidatePackage={previewPackage}
+              artifact={previewArtifact}
+              catalog={versionCatalog}
+              stale={previewStale}
+            />
+
+            {validation.stats && (
+              <section className="studio-source-stats" aria-label="BuildingSource summary">
+                {Object.entries(validation.stats).map(([label, value]) => (
+                  <div key={label}>
+                    <strong>{value}</strong>
+                    <span>{label}</span>
+                  </div>
                 ))}
-              </ol>
+              </section>
             )}
-          </section>
+
+            <section className="studio-issues">
+              <div className="studio-section-heading">
+                <div>
+                  <span>Validation report</span>
+                  <h2>{validation.issues.length === 0 ? 'No issues' : 'Issues to resolve'}</h2>
+                </div>
+                <div className="studio-issue-counts">
+                  <span>{errorCount} errors</span>
+                  <span>{warningCount} warnings</span>
+                </div>
+              </div>
+
+              {validation.issues.length === 0 ? (
+                <div className="studio-empty-issues">
+                  <CheckCircle2 size={18} />
+                  Schema and deterministic semantic validation both passed.
+                </div>
+              ) : (
+                <ol>
+                  {validation.issues.map((issue, index) => (
+                    <li key={`${issue.stage}-${issue.code}-${issue.path}-${index}`}>
+                      <span className={`studio-issue-severity ${issue.severity}`}>
+                        {issue.severity}
+                      </span>
+                      <div>
+                        <strong>{issue.code}</strong>
+                        <code>{issue.path}</code>
+                        <p>{issue.message}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+          </div>
         </aside>
       </div>
     </main>

@@ -9,10 +9,13 @@ import { X, Navigation, MapPin, Clock } from 'lucide-react';
 import { useDialogFocus } from './useDialogFocus.ts';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
+import MobilePanelHandle from './MobilePanelHandle';
+import { useMobilePanel } from './useMobilePanel';
 
 export default function POICard() {
   const { state, actions, previewRoute, venue } = useNavigation();
   const { selectedPOI, startNodeId } = state;
+  const panel = useMobilePanel(selectedPOI?.id);
 
   // Escape was handled here alone, which made this a dialog in name only: it
   // announced aria-modal and then left focus on the document behind it, so a
@@ -20,6 +23,7 @@ export default function POICard() {
   // shared trap also means one Escape closes this and not whatever is under it.
   const { containerRef } = useDialogFocus(Boolean(selectedPOI), {
     onEscape: actions.clearSelectedPOI,
+    trapFocus: !panel.collapsed,
   });
 
   if (!selectedPOI) return null;
@@ -47,7 +51,7 @@ export default function POICard() {
 
   return (
     <div
-      className={`poi-card-overlay ${selectedPOI ? 'open' : ''}`}
+      className={`poi-card-overlay ${selectedPOI ? 'open' : ''}${panel.collapsed ? ' mobile-panel-overlay-folded' : ''}`}
       onClick={(e) => {
         if (e.target === e.currentTarget) actions.clearSelectedPOI();
       }}
@@ -57,11 +61,17 @@ export default function POICard() {
         ref={containerRef}
         className="poi-card animate-slide-up"
         id="poi-card"
+        data-panel-collapsed={panel.collapsed}
         role="dialog"
-        aria-modal="true"
+        aria-modal={panel.collapsed ? undefined : 'true'}
         aria-labelledby="poi-card-title"
         tabIndex={-1}
       >
+        <MobilePanelHandle
+          panel={panel}
+          label="destination details"
+          controls="poi-card-description"
+        />
         {/*
          * The close button used to be floated above the header with a negative
          * bottom margin, which dragged the header up underneath it. It is a
@@ -96,13 +106,13 @@ export default function POICard() {
         </div>
 
         {/* Description */}
-        <p className="poi-card-desc">
+        <p className="poi-card-desc mobile-panel-details" id="poi-card-description">
           {poi.description} · {poi.accessible ? 'Accessible' : 'Not accessible'}
         </p>
 
         {/* Meta Info */}
         {distanceInfo && (
-          <div className="poi-card-meta">
+          <div className="poi-card-meta mobile-panel-details" id="poi-card-meta">
             <div className="poi-card-meta-item">
               <MapPin size={14} />
               {formatDistance(distanceInfo.distance)} by route
