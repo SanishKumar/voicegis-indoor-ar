@@ -1,152 +1,37 @@
-# VoiceGIS Indoor Navigation
+# VoiceGIS
 
 [![Quality](https://github.com/SanishKumar/voicegis-indoor-ar/actions/workflows/quality.yml/badge.svg)](https://github.com/SanishKumar/voicegis-indoor-ar/actions/workflows/quality.yml)
 
-Verified venue packages, QR known-point check-in, fail-closed accessible routing,
-and a cold-offline visitor application — all evaluated on the device.
+Find your way from the campus gate to the right room.
 
-The repository includes the deterministic compiler and routing engine, the public
-visitor application, an offline package registry, operator inspection and
-authoring tools, a localization replay core, and two unrelated runtime-switchable
-venue benchmarks.
+VoiceGIS is a browser-based wayfinding app for campuses and large buildings.
+Search for a destination, choose a start or scan a check-in sign, and follow a
+route through outdoor paths, building entrances and floors. The 2D plan and 3D
+view share the same journey, so switching views keeps your place.
 
-> **Delivered scope:** QR check-in is a discrete position fix. Opt-in walking
-> tracking, spoken guidance and experimental WebXR floor guidance are implemented,
-> but real-device/venue accuracy is not qualified. The ordinary camera overlay
-> uses estimated height/FOV; it is not world-anchored AR. The bundled venues
-> are synthetic. See [current visitor readiness and remaining work](docs/visitor-readiness.md).
+![VoiceGIS walkthrough: explore the campus, enter the hospital, change floors and preview a route](docs/media/voicegis-walkthrough.gif)
 
-## Delivered flagship
+_Campus exploration and route preview in the included Meridian Park venue.
+[View a still image](docs/media/campus.jpg)._
 
-- A `BuildingSource` compiles into an immutable, content-addressed
-  `VenuePackage`; malformed topology and undeclared accessibility are refused.
-- A published QR code resolves to a package-declared known point without a
-  beacon, RF fingerprint, lookup service, or camera footage leaving the device.
-- Standard and wheelchair profiles use the same deterministic routing core and
-  fail closed under restrictions, inaccessible edges, and operational closures.
-- The production visitor bundle can cold-reload and route after one verified
-  online installation while its browser cache remains intact.
-- Every route carries a receipt naming the package hash, profile, closures,
-  connector choice, and excluded edges.
-- Imported closure information expires during a trip and pauses obsolete
-  guidance until policy and location are renewed. This is not a live closure
-  feed; see [the policy lifetime contract](docs/operational-policy-lifetime.md).
+## From the grounds to the room
 
-## Try it in 60 seconds
+The campus map opens into the building you enter. Outside, buildings and
+landmarks help you find your bearings; inside, rooms, corridors and floor
+controls take over. You can explore another building without changing your
+location, then use Recenter to return to your journey.
 
-```bash
-npm run dev
-```
+- Search rooms, departments, services and entrances, with their building and floor.
+- Plan the fastest or a step-free route using the venue's access rules and closures.
+- Switch between 2D and 3D, inspect the whole trip, or preview it one instruction at a time.
+- Scan a venue's QR sign to establish a known location. Written and spoken directions use the same route.
+- Use an installed visitor build offline after its first successful online load, while the browser retains its cache.
 
-Open `http://localhost:3000/check-in-codes.html` in a second window, then in the
-app choose **Plan a route → Scan a check-in code** and point the camera at one.
-You are checked in at the point the package declares, and can be routed step-free
-to any published public destination — when the selected profile can prove a route
-— with no beacons, no RF fingerprinting and no positioning service. Check-in and
-routing run against the compiled package on the device.
+![A route from Main Gate, around the fountain and into Cardiology Clinic](docs/media/campus-route.jpg)
 
-The bundled venues are synthetic fixtures, and each code still has to be
-physically placed where the package says it is. The deployable visitor build can
-cold-reload after one completed online installation while the browser retains
-the verified cache; a first-ever visit still needs a connection. Full script and
-the exact limits: [the 60-second demo](docs/demo.md).
+## Run it locally
 
-## Core capabilities
-
-### QR check-in
-
-A code at a junction resolves against the anchors inside the compiled venue
-package, giving a position fix on the right floor with no beacons and no lookup
-service. Codes are generated from the package (`npm run codes`, gated by
-`codes:check`), so the sheet in this repository can only encode payloads the
-venue publishes, and every payload is round-trip tested through the decoder iOS
-uses.
-
-That guarantee stops at the printer. A sign already on a wall is outside version
-control, so recompiling a venue can strand it while the repository stays
-consistent; reprinting after a venue change is a field procedure.
-
-The fix is only as good as the sign's placement, which is a physical measurement
-per code and is not automated. Accuracy against a real building has not been
-measured; the bundled venues are synthetic.
-
-### Spatial package compiler
-
-- Versioned TypeScript model and JSON Schema for floors, spaces, portals, POIs, connectors, and localization anchors
-- Semantic validation for geometry, connectivity, accessibility, restrictions, and reachability
-- Deterministic compilation with a content-addressed package manifest
-- One compiled package shared by routing, search, the visitor venue map, and the 3D inspector
-
-### Routing and operations
-
-- Multi-floor A* routing in a persistent Web Worker
-- Standard and wheelchair routing profiles
-- Fail-closed restricted and inaccessible edges
-- Versioned closures for corridors and vertical connectors
-- Route receipts containing the package hash, routing profile, applied closures, connector selection, and exclusion counts
-
-### Navigation clients
-
-- Interactive lit venue map with modeled spaces, openings, furniture, floor stacking, labels, and route decision points
-- React Three Fiber spatial twin with floor isolation, exploded view, semantic inspection, graph overlays, anchors, and active routes
-- Camera guidance view with route progress, optional device-heading alignment, and readiness diagnostics
-- Shared 2D/3D visitor journey with selectable/adaptive graphics detail
-- Experimental opt-in walking/XR tracking and approximate sign-derived direction; confidence holds and explicit recovery
-- Spoken turn instructions (not voice commands)
-- Public POI search with aliases and floor-aware results
-
-### Package and localization runtime
-
-- SHA-256 package verification
-- Atomic active/previous package state in IndexedDB
-- Deterministic localization observation replay
-- Covariance-aware estimates and explicit quality states
-- Route matching with uncertainty gates and relocalization recovery rules
-
-## Architecture
-
-```mermaid
-flowchart LR
-  Source["Building source"] --> Compiler["Schema validation + compiler"]
-  Compiler --> Package["Content-addressed package"]
-  Package --> Map["Visitor venue map"]
-  Package --> Twin["3D spatial twin"]
-  Package --> Search["POI search"]
-  Package --> Worker["Routing worker"]
-  Package --> Registry["Verified offline registry"]
-  Worker --> Policy["Constraint-aware A*"]
-  Replay["Observation recording"] --> Localization["Localization + route matching"]
-```
-
-The authored building source is compiled before runtime. Clients load a verified
-package artifact by URL or file and do not repair malformed topology
-independently.
-
-## Included venues
-
-`buildings/asterion-medical-center` contains the Asterion University Medical Center benchmark:
-
-- 4 floors
-- 60 semantic spaces
-- 56 modeled portals
-- 32 public POIs and 4 restricted operational POIs
-- 4 vertical-circulation systems
-- 9 localization anchors
-- 216 routing nodes and 224 edges
-
-The package includes a reproducible public-lift outage used to exercise standard and wheelchair routing behavior. A smaller two-floor building is retained as a stable compiler and localization regression fixture.
-
-`buildings/harbor-exchange` is a structurally different two-floor ferry, market,
-and community venue with a lift, stair, escalator, ten public destinations, and
-three localization anchors. Inspector can switch between both compiled packages
-at runtime without a rebuild.
-
-## Run locally
-
-Requirements:
-
-- Node.js 22+
-- npm
+Use Node.js 22+ and npm.
 
 ```bash
 git clone https://github.com/SanishKumar/voicegis-indoor-ar.git
@@ -155,100 +40,123 @@ npm ci
 npm run dev
 ```
 
-The development server prints the local URL after startup.
-
-## Useful commands
-
-| Command                          | Purpose                                                                                                     |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `npm run check`                  | Run lint, type checking, tests, deterministic package checks, replay verification, and the production build |
-| `npm test`                       | Run the Vitest suite                                                                                        |
-| `npm run test:browser`           | Run operator journeys plus the public build's real cold-offline browser gate                                |
-| `npm run test:browser:operator`  | Run the engineering/operator production-browser journeys                                                    |
-| `npm run test:browser:offline`   | Prove cold-offline load, floor switching, routing, cache repair, and atomic worker updates in Chromium      |
-| `npm run test:browser:headed`    | Run the operator production-browser journeys with a visible Chromium window                                 |
-| `npm run compile:asterion`       | Recompile the Asterion building package                                                                     |
-| `npm run compile:asterion:check` | Verify that the committed Asterion package is reproducible                                                  |
-| `npm run compile:harbor:check`   | Verify that the committed Harbor Exchange package is reproducible                                           |
-| `npm run venues:sync:check`      | Verify browser-served package artifacts match compiler output                                               |
-| `npm run replay:reference`       | Regenerate the reference localization replay report                                                         |
-| `npm run replay:check`           | Verify the committed replay report byte-for-byte                                                            |
-| `npm run codes`                  | Regenerate the printable check-in code sheet from the compiled venue packages                               |
-| `npm run dev:mobile`             | Serve over HTTPS on the LAN so a phone can reach `#/recorder` and use its motion sensors                    |
-| `npm run evidence`               | Seal a capture and its predeclared manifest into an evidence artifact, or verify one                        |
-| `npm run build`                  | Create the public visitor application and its offline cache in `dist/`                                      |
-| `npm run build:operator`         | Create the Inspector/Studio/Recorder engineering build                                                      |
-
-The browser suite needs a one-time local `npx playwright install chromium`.
-CI installs Chromium independently and keeps this gate separate from
-`npm run check`, so a browser-installation failure cannot hide a compiler or
-unit-test failure.
-
-The visitor build is a static HTTPS site, hosted at a domain root or under a
-sub-path such as a GitHub Pages project site. Its generated service
-worker caches the visitor JavaScript entry graph and bundled venue releases;
-Inspector, Studio, and Recorder route components and rendering dependencies are
-outside that graph. The shared venue provider still contains unexposed package
-activation/rollback helpers, and the shared stylesheet still contains operator
-selectors, so this is a UI/rendering split rather than a minimal privilege
-boundary. See [deployment](docs/deployment.md) for cache headers, update order,
-and the exact offline boundary.
-
-The public shell defers map/camera rendering code and enforces a startup
-JavaScript budget during builds. See [visitor performance](docs/visitor-performance.md)
-for the loading/recovery behavior, byte limits and remaining handset measurements.
-
-Route graphics now have a conservative authored-wall/opening clearance check.
-Width failures preserve written directions while withholding route graphics;
-an inconsistent centerline rejects the route. This is not surveyed mobility
-clearance or dynamic obstacle avoidance. See [route graphic clearance](docs/route-graphic-clearance.md).
-
-Visitor search exposes all public matches with recovery actions, and arrival is
-explicitly distinguished from preview completion or tracked proximity. Short
-screens and enlarged text use scrollable instruction/search panels. See
-[interaction and accessibility scope](docs/visitor-interaction-accessibility.md).
-
-## Repository structure
+Open the address printed by Vite (normally `http://localhost:3000`). Choose
+**Somewhere else? Choose the place** on the welcome screen to select
+**Meridian Park Medical Campus**, or open the campus directly:
 
 ```text
-buildings/
-├── asterion-medical-center/     four-level application benchmark
-├── harbor-exchange/              two-level non-medical venue
-└── reference-medical-centre/    compact compiler regression fixture
-
-packages/
-├── spatial-schema/              shared spatial types and JSON Schema
-├── map-compiler/                validation and deterministic graph compiler
-└── localization-core/           observation replay and estimate pipeline
-
-src/
-├── capture/                     handset sensor adapter driving a capture session
-├── components/                  plan, spatial twin, search, and guidance UI
-├── context/                     navigation state and user preferences
-├── data/                        compiled-package runtime adapter
-└── engine/                      routing, topology, search, and view models
-
-recordings/                      deterministic localization fixtures
-docs/                            architecture decisions and technical reports
+http://localhost:3000/?venue=/venues/meridian-park-campus.package.json#/visitor
 ```
 
-## Integration scope
+To reproduce the route above, choose **Browse the map instead**, search for
+**Cardiology Clinic**, and navigate from the default **Main Gate** start.
+Use **3D** to see the buildings and **Campus** to return from an indoor view.
 
-Asterion is a synthetic benchmark bundled for development and testing. Deploying the system for a venue requires authorized building data, calibrated coordinate transforms, validated accessibility attributes, and physical route testing.
+For a QR check-in, open `/check-in-codes.html` on another screen and scan a code
+for the venue you selected. Phone camera and motion features need HTTPS;
+`npm run dev:mobile` provides a local HTTPS server. See the
+[phone testing guide](docs/field-testing.md) for setup and diagnostics.
 
-The camera guidance view is screen-aligned and can optionally compare device heading with route bearing. World-anchored guidance requires live localization and a surveyed building-to-device transform.
+## Maintain the map
 
-## Technical documentation
+The development app includes an operator workbench:
 
-- [Architecture overview](docs/architecture/overview.md)
-- [VenuePackage runtime contract](docs/architecture/venue-package-contract.md)
-- [Asterion assumption audit](docs/architecture/asterion-assumption-audit.md)
-- [Architecture decision records](docs/adr/)
-- [Reference localization replay](docs/localization/reference-replay.md)
-- [Sealing and checking an evidence artifact](docs/localization/evidence-artifact.md)
-- [Recording a walk on a phone](docs/localization/recording-on-a-phone.md)
-- [The 60-second demo](docs/demo.md)
+- **Inspector** (`#/inspector`): isolate floors, inspect spaces, and examine routes, graph connections and check-in anchors.
+- **Studio** (`#/studio`): edit the building source, import DXF data, compile a preview, activate a verified package and roll back. Unpublished drafts survive switching tools in the same tab.
+- **Recorder** (`#/recorder`): capture sensor observations for replay and investigation.
+
+![Operator Inspector showing the campus grounds, floor controls and semantic space selection](docs/media/inspector.jpg)
+
+These tools use the same venue data as the visitor app. The public production
+build leaves the operator screens out.
+
+## How the data fits together
+
+```text
+Building source / DXF
+        ↓
+Schema and geometry checks → deterministic compiler
+        ↓
+Verified venue package
+        ├── destination search and QR check-in
+        ├── routing worker and turn instructions
+        ├── 2D / 3D visitor map
+        └── Inspector, Studio and offline storage
+```
+
+A package describes floors, spaces, doors, destinations, connectors and
+check-in points, plus grounds and building footprints for a campus. Routing
+runs on the device. Restricted paths, declared closures and inaccessible
+connections are excluded according to the selected profile. A route receipt
+records the package version and rules used to calculate it.
+
+The app uses React, TypeScript, Three.js and React Three Fiber. The compiler,
+spatial schema, DXF importer and localization core live in `packages/`.
+Venue sources and their compiled outputs live in `buildings/`.
+
+## Included venues
+
+All four are synthetic examples used for development and testing.
+
+| Venue                                  | Layout                                                                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Meridian Park Medical Campus**       | Main hospital, emergency centre and wellness pavilion connected by gardens and outdoor paths; three floor levels and 63 spaces. |
+| **Asterion University Medical Center** | Four-floor hospital with 60 spaces, lifts, stairs and a reproducible lift-outage scenario.                                      |
+| **Harbor Exchange**                    | Two-floor ferry, market and community venue with a lift, stairs and an escalator.                                               |
+| **Reference Medical Centre**           | Small compiler and localization regression fixture.                                                                             |
+
+The first three can be selected in the app. The reference venue is kept as a
+test fixture.
+
+## Current limits
+
+The map, route planning, check-in, authoring and offline flows have automated
+coverage. Deploying to a real venue still requires surveyed data, correctly
+placed signs and physical route checks.
+
+Walking tracking and WebXR guidance are experimental. Their accuracy has not
+been qualified in a real venue. WebXR uses a confirmed floor surface on
+supported devices; the ordinary camera view is an estimated overlay. The app
+does not yet detect and avoid moving obstacles. Imported closures are
+supported, but there is no production live closure service.
+
+The [readiness notes](docs/visitor-readiness.md) separate implemented features,
+remaining software work and physical testing. The
+[field guide](docs/field-testing.md) explains how to collect a useful phone report.
+
+## Build and verify
+
+```bash
+npm run check                 # lint, types, unit tests, venue/replay checks, public build
+npx playwright install chromium
+npm run test:browser          # production browser journeys, offline and sub-path tests
+
+npm run build                # public visitor build → dist/
+npm run build:operator       # operator workbench build → dist/
+```
+
+Both build commands write to `dist/`; build the intended version before serving
+or deploying it. The visitor build can be hosted as a static HTTPS site at a
+domain root or under a subfolder. GitHub Pages publication is started manually
+and runs the quality checks first. See [deployment](docs/deployment.md).
+
+To edit an included venue, change its `buildings/<venue>/source/building.json`,
+then run the matching compiler command, `npm run venues:sync` and `npm run codes`.
+For example:
+
+```bash
+npm run compile:campus
+npm run venues:sync
+npm run codes
+npm run check
+```
+
+Further reading: [architecture](docs/architecture/overview.md) ·
+[venue package contract](docs/architecture/venue-package-contract.md) ·
+[map views](docs/visitor-map-views.md) ·
+[route clearance](docs/route-graphic-clearance.md) ·
+[accessibility](docs/visitor-interaction-accessibility.md).
 
 ## License
 
-No open-source license has been selected. The repository is all-rights-reserved by default.
+No open-source license has been selected. All rights reserved.
