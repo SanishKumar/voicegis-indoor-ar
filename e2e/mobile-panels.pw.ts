@@ -41,14 +41,19 @@ for (const width of [320, 390]) {
     expect((await sheet.boundingBox())!.height).toBeLessThan(expandedHeight - 50);
     await expect(page.locator('.jr-meta')).toBeHidden();
     await expectCenterHitTarget(page.getByRole('button', { name: 'End route', exact: true }));
+    const canvas = page.locator('.compiled-map-canvas');
+    await expect(canvas).toHaveAttribute('data-route-progress', '0.00');
     await page.getByRole('button', { name: 'Next instruction', exact: true }).click();
-    const progress = await page.locator('.compiled-map-canvas').getAttribute('data-route-progress');
+    await expect(sheet).toHaveAttribute('data-step-index', '1');
+    // React updates the instruction before the renderer publishes its next
+    // frame. Wait for this fixture's first turn (24 m), not a stale 0 m frame.
+    await expect(canvas).toHaveAttribute('data-route-progress', '24.00');
     await page.getByRole('button', { name: '3D model', exact: true }).click();
+    await expect(canvas).toHaveAttribute('data-camera-mode', '3d');
+    await expect(canvas).toHaveAttribute('data-camera-transition', 'settled');
     await expect(sheet).toHaveAttribute('data-panel-collapsed', 'true');
-    await expect(page.locator('.compiled-map-canvas')).toHaveAttribute(
-      'data-route-progress',
-      progress!,
-    );
+    await expect(sheet).toHaveAttribute('data-step-index', '1');
+    await expect(canvas).toHaveAttribute('data-route-progress', '24.00');
     await page.getByRole('button', { name: 'Expand route details' }).click();
     await page.getByRole('button', { name: /Change start location/ }).click();
     const location = page.getByRole('textbox', { name: 'Search starting locations' });
