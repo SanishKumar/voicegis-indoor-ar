@@ -46,7 +46,7 @@ export function fieldTestEnabled(): boolean {
   try {
     const flag = new URLSearchParams(window.location.search).get(FLAG);
     if (flag !== null) {
-      on = flag !== '0' && flag !== 'false';
+      on = flag === '1';
       sessionStorage.setItem(SESSION_KEY, on ? '1' : '0');
     } else {
       on = sessionStorage.getItem(SESSION_KEY) === '1';
@@ -85,6 +85,24 @@ export function fieldEvents(): readonly FieldEvent[] {
 export function clearFieldLog() {
   events.length = 0;
   for (const listener of listeners) listener();
+}
+
+/** Stop immediately, discard the buffer and keep a reload from opting in again. */
+export function stopFieldTest() {
+  enabled = false;
+  try {
+    sessionStorage.setItem(SESSION_KEY, '0');
+  } catch {
+    // Stopping this page must still work with storage blocked.
+  }
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set(FLAG, '0');
+    window.history.replaceState(window.history.state, '', url);
+  } catch {
+    // The in-memory switch remains off even if navigation is unavailable.
+  }
+  clearFieldLog();
 }
 
 export function subscribeFieldLog(listener: () => void): () => void {

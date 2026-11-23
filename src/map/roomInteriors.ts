@@ -20,8 +20,9 @@
 
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import { insetPolygon, type Point } from './softGeometry';
+import type { ClinicalShape } from './clinicalFurniture';
 
-export type FurnitureShape = 'box' | 'cylinder' | 'sphere' | 'ring';
+export type FurnitureShape = 'box' | 'cylinder' | 'sphere' | 'ring' | ClinicalShape;
 
 export interface FurniturePart {
   /** What it is a part of: "bed", "shelf", "lift". For tests and for reading a scene. */
@@ -35,6 +36,8 @@ export interface FurniturePart {
   size: readonly [number, number, number];
   /** A ring stands with its opening along plan y; turned, along plan x. */
   turned: boolean;
+  /** Rotation from the model's own forward direction, in plan quarter turns. */
+  turns?: number;
   color: number;
 }
 
@@ -59,17 +62,17 @@ export interface RoomToFurnish {
  * the pins, which are the only saturated things on a floor.
  */
 const WHITE = 0xf6f8fc;
-const LINEN = 0xe6ecf4;
-const MIST = 0xcbd8ea;
-const SKY = 0xa9c4e8;
-const SLATE = 0x8499b6;
-const DEEP = 0x61769a;
-const SAND = 0xe4dccf;
-const SAGE = 0x9fc3b4;
+const LINEN = 0xe8e4d9;
+const MIST = 0xbcc8c5;
+const SKY = 0x729a9d;
+const SLATE = 0x657779;
+const DEEP = 0x35494d;
+const SAND = 0xc39e76;
+const SAGE = 0x87987b;
 const WATER = 0x8ec7f7;
 
-/** Furniture is drawn lower than life, so a shelf does not stand in front of the route behind it. */
-const HEIGHT_SCALE = 0.72;
+/** Only the tallest fittings need lowering in a cutaway. Keep equipment in proportion. */
+const HEIGHT_SCALE = 0.9;
 /** How far a piece keeps from a wall. */
 const WALL_MARGIN = 0.5;
 /** How far a piece keeps from the middle of any line a route can take. */
@@ -80,6 +83,7 @@ const PIN_CLEARANCE = 0.8;
 const PIECE_GAP = 0.25;
 
 type LocalPart = {
+  reverse?: boolean;
   shape: FurnitureShape;
   /** Across, towards the front, and up, from the middle of the piece on the floor. */
   at: readonly [number, number, number];
@@ -115,13 +119,22 @@ const bed: Piece = {
   width: 1.9,
   depth: 2.15,
   parts: [
-    box([-0.3, 0, 0.21], [0.95, 2.0, 0.42], LINEN),
-    box([-0.3, 0.3, 0.46], [0.9, 1.3, 0.1], SKY),
-    box([-0.3, -0.72, 0.47], [0.6, 0.36, 0.1], WHITE),
-    box([-0.3, -1.0, 0.42], [0.98, 0.08, 0.84], MIST),
+    box([-0.3, 0, 0.54], [1.04, 2.06, 1.08], WHITE, 'hospitalBed'),
+    // Linens sit on the mattress deck, below the source model's side rails.
+    box([-0.3, -0.65, 0.64], [0.73, 0.43, 0.16], WHITE, 'sphere'),
+    box([-0.3, 0.27, 0.584], [0.78, 1.15, 0.06], SKY),
+    box([-0.3, -0.27, 0.62], [0.79, 0.13, 0.025], MIST),
+    box([0.53, 0.48, 0.91], [0.45, 0.45, 1.82], WHITE, 'ivStand'),
     // The cabinet beside it, and the curtain that makes a bay of it.
     box([0.5, -0.78, 0.26], [0.42, 0.42, 0.52], WHITE),
-    box([0.9, -0.1, 0.62], [0.05, 1.9, 1.24], MIST),
+    box([0.5, -0.78, 0.53], [0.45, 0.44, 0.035], SAND),
+    box([0.5, -0.56, 0.35], [0.32, 0.028, 0.035], SLATE),
+    box([0.9, -0.55, 0.96], [0.05, 0.98, 1.34], MIST),
+    ...spaced(5, 0.19).map((offset) =>
+      box([0.87, -0.55 + offset, 0.96], [0.045, 0.08, 1.34], 0xa4b8ac),
+    ),
+    box([0.9, -0.1, 1.68], [0.05, 1.9, 0.045], SLATE),
+    cylinder([0.9, 0.8, 0.84], 0.06, 1.68, SLATE),
   ],
 };
 
@@ -143,9 +156,9 @@ const desk: Piece = {
   width: 1.6,
   depth: 1.45,
   parts: [
-    box([0, -0.36, 0.36], [1.5, 0.7, 0.72], LINEN),
-    box([0, -0.52, 0.88], [0.5, 0.06, 0.32], DEEP),
-    cylinder([0, 0.38, 0.23], 0.5, 0.46, SLATE),
+    box([0, -0.36, 0.385], [1.4, 0.7, 0.77], WHITE, 'workDesk'),
+    box([0, -0.48, 0.975], [0.59, 0.15, 0.41], WHITE, 'deskMonitor'),
+    box([0, 0.38, 0.48], [0.56, 0.6, 0.96], WHITE, 'taskChair'),
   ],
 };
 
@@ -155,12 +168,12 @@ const deskPair: Piece = {
   width: 1.6,
   depth: 2.6,
   parts: [
-    box([0, -0.36, 0.36], [1.5, 0.7, 0.72], LINEN),
-    box([0, 0.36, 0.36], [1.5, 0.7, 0.72], LINEN),
-    box([0, -0.06, 0.88], [0.5, 0.06, 0.32], DEEP),
-    box([0, 0.06, 0.88], [0.5, 0.06, 0.32], DEEP),
-    cylinder([0, -1.02, 0.23], 0.5, 0.46, SLATE),
-    cylinder([0, 1.02, 0.23], 0.5, 0.46, SLATE),
+    { ...box([0, -0.36, 0.385], [1.4, 0.7, 0.77], WHITE, 'workDesk'), reverse: true },
+    box([0, 0.36, 0.385], [1.4, 0.7, 0.77], WHITE, 'workDesk'),
+    { ...box([0, -0.12, 0.975], [0.59, 0.15, 0.41], WHITE, 'deskMonitor'), reverse: true },
+    box([0, 0.12, 0.975], [0.59, 0.15, 0.41], WHITE, 'deskMonitor'),
+    { ...box([0, -1.02, 0.48], [0.55, 0.54, 0.96], WHITE, 'taskChair'), reverse: true },
+    box([0, 1.02, 0.48], [0.55, 0.54, 0.96], WHITE, 'taskChair'),
   ],
 };
 
@@ -184,9 +197,12 @@ const seatRow = (seats: number): Piece => ({
   width: seats * 0.58,
   depth: 0.72,
   parts: [
-    box([0, 0.06, 0.2], [seats * 0.58, 0.55, 0.4], SKY),
-    box([0, -0.27, 0.48], [seats * 0.58, 0.1, 0.5], SLATE),
-    ...spaced(seats - 1, 0.58).map((x) => box([x, 0.06, 0.43], [0.05, 0.5, 0.1], MIST)),
+    ...spaced(Math.floor(seats / 2), 1.16).map((x) =>
+      box([x - (seats % 2) * 0.29, 0, 0.44], [1.14, 0.72, 0.88], WHITE, 'waitingSeats'),
+    ),
+    ...(seats % 2
+      ? [box([(seats - 1) * 0.29, 0, 0.44], [0.54, 0.64, 0.88], WHITE, 'taskChair')]
+      : []),
   ],
 });
 
@@ -218,16 +234,9 @@ const shelfIsland = (length: number): Piece => ({
 
 const cafeTable: Piece = {
   name: 'table',
-  width: 1.9,
-  depth: 1.9,
-  parts: [
-    cylinder([0, 0, 0.55], 0.92, 0.06, WHITE),
-    cylinder([0, 0, 0.27], 0.14, 0.52, SLATE),
-    cylinder([0.66, 0, 0.17], 0.38, 0.34, SAND),
-    cylinder([-0.66, 0, 0.17], 0.38, 0.34, SAND),
-    cylinder([0, 0.66, 0.17], 0.38, 0.34, SAND),
-    cylinder([0, -0.66, 0.17], 0.38, 0.34, SAND),
-  ],
+  width: 1.5,
+  depth: 1.5,
+  parts: [box([0, 0, 0.395], [1.32, 1.32, 0.79], WHITE, 'canteenTable')],
 };
 
 const scanner: Piece = {
@@ -260,9 +269,10 @@ const consultingBay: Piece = {
   width: 3.3,
   depth: 2.1,
   parts: [
-    box([-0.75, -0.66, 0.36], [1.5, 0.7, 0.72], LINEN),
-    box([-0.75, -0.82, 0.88], [0.5, 0.06, 0.32], DEEP),
-    cylinder([-0.75, 0.06, 0.23], 0.5, 0.46, SLATE),
+    box([-0.75, -0.66, 0.385], [1.4, 0.7, 0.77], WHITE, 'workDesk'),
+    box([-0.75, -0.78, 0.975], [0.59, 0.15, 0.41], WHITE, 'deskMonitor'),
+    box([-0.75, 0.06, 0.48], [0.54, 0.58, 0.96], WHITE, 'taskChair'),
+    box([0.0, 0.52, 0.43], [0.43, 0.72, 0.86], WHITE, 'instrumentCart'),
     box([0.8, 0, 0.3], [0.62, 1.8, 0.6], LINEN),
     box([0.8, 0, 0.64], [0.7, 1.9, 0.08], SKY),
     box([0.8, -0.72, 0.71], [0.5, 0.34, 0.08], WHITE),
@@ -393,6 +403,13 @@ const plant: Piece = {
     cylinder([0, 0, 0.24], 0.5, 0.48, MIST),
     box([0, 0, 0.78], [0.72, 0.72, 0.84], SAGE, 'sphere'),
   ],
+};
+
+const wasteBin: Piece = {
+  name: 'bin',
+  width: 0.55,
+  depth: 0.55,
+  parts: [box([0, 0, 0.4], [0.53, 0.54, 0.8], WHITE, 'wasteBin')],
 };
 
 const planterBox: Piece = {
@@ -631,6 +648,7 @@ export function furnishRoom(room: RoomToFurnish): FurniturePart[] {
               part.size[2] * HEIGHT_SCALE,
             ],
         turned: sideways,
+        turns: part.reverse ? (turns + 2) % 4 : turns,
         color: part.color,
       });
     }
@@ -856,6 +874,7 @@ export function furnishRoom(room: RoomToFurnish): FurniturePart[] {
     case 'cafe':
       centred(backs[0], counter(3.2));
       fill(cafeTable, 0.6, 0.6, 12, 0, 1.3);
+      corners(wasteBin, 1);
       corners(plant);
       break;
     case 'imaging':
@@ -885,6 +904,17 @@ export function furnishRoom(room: RoomToFurnish): FurniturePart[] {
       break;
     case 'front-desk':
       if (!centred(facing, counter(3.2))) centred(backs[0], counter(3.2));
+      along(
+        backs[0],
+        {
+          name: 'wheelchair',
+          width: 0.8,
+          depth: 1.05,
+          parts: [box([0, 0, 0.48], [0.69, 0.98, 0.96], WHITE, 'wheelchair')],
+        },
+        0.6,
+        2,
+      );
       fill(seatRow(4), 1.2, 1.3, 6);
       corners(plant);
       break;

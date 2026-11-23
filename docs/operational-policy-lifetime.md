@@ -63,16 +63,7 @@ import controls also show current policy failure instead of indefinitely
 calling an earlier import active. Opt-in field reports record policy changes
 and pauses only, not per-frame data or automatic uploads.
 
-## Coverage and remaining backend boundary
-
-Pure lease tests cover interval boundaries, clock faults, invalid policy and
-immutable ownership. Provider tests cover delayed results, foreground return,
-policy replacement/removal, cancellation, profile retention and reacquisition.
-AR tests cover stale-start permission races and frame retirement before
-displacement. Recovery UI tests cover focus, offline wording and explicit
-location choices. `e2e/closure-recovery.pw.ts` uses the existing operator import
-UI in a production build to exercise Visitor recovery and media cleanup at
-desktop/mobile widths; it adds no Visitor test-only policy hook.
+## Operations backend
 
 The public app currently uses authored venue restrictions without a live
 policy feed. Authenticated publication, revision ordering, rollback/replay
@@ -80,20 +71,3 @@ prevention, delivery failures, policy-required venue configuration and trusted
 freshness across reload/offline sessions are **not implemented by this slice**.
 Expiry guards must not be advertised as a working live operations backend.
 Real-device/browser lifecycle qualification also remains open.
-
-## Local verification
-
-- `npm run check`: lint, types, **1,577 tests in 126 files**, all
-  venue/replay/print-sheet checks and the public build pass. The public static
-  entry remains within budget: 431.4 KiB raw / 140.3 KiB gzip.
-- The new closure browser flow passes on desktop and mobile: offline expiry,
-  updated-policy reacquisition, camera release and an explicit fastest-route
-  choice after step-free routing is blocked. Small-phone recovery was also
-  inspected visually at 320 px.
-- **52/52** targeted public-build browser cases pass for Visitor journeys,
-  camera alignment, AR floor placement, offline use and deferred-view recovery.
-- A pre-existing async lazy-import focus test now waits for the focus effect,
-  retaining the same assertion. Browser recovery/focus assertions also pass.
-- The full operator browser suite, hosted CI and real handsets were not
-  requalified. The existing large deferred-Three chunk warning remains.
-  All changes are local; nothing was committed, pushed or deployed.

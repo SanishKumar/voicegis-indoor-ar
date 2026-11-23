@@ -16,62 +16,6 @@ worker correctly keeps serving its complete cached revision, so the operator
 entry document would not load until every visitor registration and cache had
 been removed out of band.
 
-## Required gate
-
-```bash
-npm ci
-npm run check
-npm run test:browser
-npm run build
-```
-
-On GitHub Actions, the same browser coverage is split into three independent
-jobs: desktop Chromium, mobile Chromium, and public offline/sub-path checks.
-Each uses one worker and the existing per-test deadlines. The required
-**Browser smoke** check aggregates all three and fails if any failed, was
-cancelled or was skipped. Diagnostics are named by suite. This avoids placing
-both device projects inside one shared 20-minute Playwright budget.
-
-The offline browser job performs a successful online installation, clears
-Chromium's ordinary HTTP cache, closes the page, disables Chromium's network,
-and opens a fresh page. It confirms the document and script came from the
-worker before switching floors, checking in, and computing a route. It also
-proves an evicted precache is reported unavailable and repaired only from the
-current build bytes, a re-hashed IndexedDB fallback works when venue HTTP
-responses are absent, and a self-consistent package stored under another
-venue's identity is refused.
-
-A separate isolated-output run exercises the worker lifecycle itself: a bad
-first install settles to an online-only UI, a complete replacement waits while
-the old client continues to receive one coherent old revision, and a later
-replacement with a digest mismatch becomes redundant without displacing the
-active known-good cache.
-
-The same serial run now changes the executable JavaScript bootstrap and its
-content-addressed URL across two release fixtures, while still loading the
-actual production app. With several tabs open, reloading, closing one tab and
-opening another must all preserve the active revision. Closing every client
-allows the update to activate; a fresh page then executes the new bootstrap
-offline with Chromium's ordinary HTTP cache cleared. Republishing the earlier
-complete fixture exercises operational rollback through the same waiting and
-activation lifecycle, not through `skipWaiting` or cache reuse alone.
-
-A separate case evicts a deferred camera module from the waiting cache. With
-the network off, activation retains earlier cache bytes but the new shell
-reports offline availability as incomplete. Reconnecting to wrong module bytes
-cannot repair it; restoring its exact bytes recovers verified offline startup.
-Activation is observed on the candidate worker, without a fixed sleep or an
-extra polling tab that could keep the old worker alive.
-
-The offline-worker unit file passes 15 cases, including eight activation cases.
-Those activation checks verify complete-cache cleanup, exact-byte repair before
-cleanup, and retention of earlier caches when current bytes are missing,
-corrupt, unreadable, or unavailable from the matching release. They also check
-that newer repair bytes are refused and incomplete-cache availability stays
-false. The browser cases above add real Chromium lifecycle coverage. Their
-versioned bootstraps are synthetic releases, not a claim that production
-deployment, all storage-eviction patterns or every browser have been qualified.
-
 ## Hosting contract
 
 Serve the contents of `dist/` over HTTPS, at the domain root or under a
@@ -85,9 +29,7 @@ The page, its assets, the offline worker's scope and cache keys, and venue
 requests then all live under that path. Catalog package URLs stay root-relative
 (`/venues/…`): they are the packages' identities in the catalog and in storage,
 and are resolved under the base only when fetched, so the committed catalog and
-venue hashes are the same for every host. `npm run test:browser:offline` builds
-under `/voicegis-indoor-ar/` and proves the shell boots, installs, reopens a
-check-in link offline, and requests nothing outside its path.
+venue hashes are the same for every host.
 
 Host one deployment of this app per origin. An activating worker deletes other
 `voicegis-visitor-` caches only after verifying or repairing its own complete
@@ -139,29 +81,10 @@ repository's project site and deploys it. It runs **only when started by hand**
 (Actions → Publish visitor build → Run workflow); pushing never publishes.
 
 1. Once, in the repository: Settings → Pages → Source: **GitHub Actions**.
-2. Start the workflow from the branch or tag to publish. Its selected commit
-   is fixed for that run. The **Validate selected revision** job calls the same
-   Quality workflow used by pushes and pull requests, running `npm run check`
-   and all production browser cases across desktop, mobile, public offline and
-   project-subfolder jobs.
-3. The site appears at `https://<owner>.github.io/<repository>/`, for example
-   `https://sanishkumar.github.io/voicegis-indoor-ar/#/visitor`.
-
-The quality jobs and the Pages build explicitly check out `github.sha`, the
-commit selected for that run. The reusable Quality workflow also comes from
-that commit. Moving the branch while a run is checking cannot change the source
-built for publication. A failed, cancelled or skipped quality job prevents the
-build and upload; deployment then depends on that successful build. Browser
-diagnostics remain available when a check fails. Publishing therefore repeats
-validation even if an earlier Quality run was green. Allow time for the full
-browser suite before the Pages build starts.
-
-This dependency uses GitHub's [reusable-workflow commit binding](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows#calling-a-reusable-workflow)
-and [job dependency rules](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds).
-It validates the selected source revision. The final Pages artifact is rebuilt
-for the project path after those checks; it is not an artifact reused from an
-earlier run. Older commits that predate this workflow change keep their earlier
-publishing behavior, so start new releases from a revision containing this gate.
+2. Start the workflow from the branch or tag to publish. It validates and
+   builds the selected commit, then uploads that build for the project path.
+3. Open `https://<owner>.github.io/<repository>/`. For this project the visitor
+   entry is `https://sanishkumar.github.io/voicegis-indoor-ar/#/visitor`.
 
 Pages chooses its own response headers (currently a ten-minute `max-age` on
 everything) and does not honour the table above. The worker is registered with

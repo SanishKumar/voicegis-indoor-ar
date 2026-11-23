@@ -16,6 +16,54 @@ async function openCampus(page: Page) {
   await expect(page.getByText('Meridian Park Medical Campus').first()).toBeVisible();
 }
 
+test('architectural references open on request and return to the same campus map', async ({
+  page,
+}) => {
+  // This journey renders both the campus and the furnished floor on the CI software GPU.
+  test.slow();
+  const requested: string[] = [];
+  const floors: string[] = [];
+  page.on('request', (request) => {
+    if (/hospital-interior[^/]*\.glb(?:$|\?)/.test(request.url())) floors.push(request.url());
+  });
+  await page.route('https://sketchfab.com/models/**/embed*', async (route) => {
+    requested.push(new URL(route.request().url()).pathname);
+    await route.fulfill({ contentType: 'text/html', body: '<title>Model viewer</title>' });
+  });
+  await openCampus(page);
+  await page.getByRole('button', { name: '3D model', exact: true }).click();
+  await page.getByRole('button', { name: 'Graphics detail' }).click();
+  const opener = page.getByRole('button', { name: 'Explore hospital models' });
+  await expect(opener).toBeVisible();
+  expect(requested).toEqual([]);
+  expect(floors).toEqual([]);
+  await opener.click();
+  const viewer = page.getByRole('dialog');
+  await expect(viewer).toHaveAccessibleName('Hospital interior');
+  const floor = viewer.getByRole('group', { name: 'Interactive hospital floor' });
+  await expect(viewer.getByRole('button', { name: 'Fit whole floor' })).toBeVisible();
+  await expect(floor).toBeVisible();
+  expect(floors.some((url) => new URL(url).origin === new URL(page.url()).origin)).toBe(true);
+  expect(requested).toEqual([]);
+  await viewer.getByRole('button', { name: 'Zoom in on floor model' }).click();
+  await floor.press('ArrowLeft');
+  await floor.press('Shift+ArrowRight');
+  await floor.press('Home');
+  await viewer.getByRole('button', { name: 'Flower-shaped Hospital' }).click();
+  await expect(viewer).toHaveAccessibleName('Flower-shaped Hospital');
+  await expect.poll(() => requested.at(-1)).toBe('/models/76c92f1057bc44bb9eb96488cae51ca7/embed');
+  await page.context().setOffline(true);
+  await expect(viewer.getByRole('status')).toContainText('Connect to the internet');
+  await expect(viewer.locator('iframe')).toHaveCount(0);
+  await viewer.getByRole('button', { name: 'Close model' }).click();
+  await expect(opener).toBeFocused();
+  await expect(page.locator('iframe')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '3D model', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});
+
 /** The labels actually drawn. One that lost its place is still in the page, at no opacity. */
 function shownLabels(page: Page) {
   return page
@@ -458,7 +506,7 @@ test('a first visit by the code on a sign needs only a destination, and its rout
 
   await expect(page.getByRole('heading', { name: 'Where are you going?' })).toBeVisible();
   // The sign said where the visitor is, and they are told it was heard.
-  await expect(page.locator('.onboard-sub')).toContainText('You are at Emergency Entrance');
+  await expect(page.locator('.onboard-sub')).toHaveText('Checked in at Emergency Entrance');
   await page.getByRole('textbox', { name: 'Search destination rooms' }).fill('Rehabilitation Gym');
   // Which building a place is in, because every building has a ground floor.
   await page
@@ -491,7 +539,7 @@ test('a visitor on the wrong map can choose the place, and it stays chosen', asy
   await expect(page.getByRole('heading', { name: 'Where are you going?' })).toBeVisible();
   await expect(page.locator('.onboard-eyebrow')).toHaveText('Asterion University Medical Center');
 
-  await page.getByRole('button', { name: /Somewhere else\? Choose the place/ }).click();
+  await page.getByRole('button', { name: 'Change venue', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Which place?' })).toBeFocused();
   await expect(
     page.getByRole('button', { name: /^Asterion University Medical Center, .* showing now$/ }),

@@ -156,40 +156,15 @@ actually does:
 
 Scan reconstruction was correctly left out and remains out.
 
-## Production browser smoke gate — delivered
+## Offline use
 
-The unit gate did not exercise the visitor journey. Three defects reached
-review through a green build — a blank map after visiting the 3D surface, a
-scanner that stopped its own successor's camera, and navigation controls that
-overlapped on a phone — and none was the kind a DOM-free unit test could see.
+After a complete online installation, the service worker can serve the visitor
+app and its bundled venues offline. IndexedDB fallback verifies the package
+bytes and the expected venue identity. A replacement waits until the previous
+revision's clients close. If installation fails, the previous complete
+revision stays available. The visitor status bar reports offline readiness
+only after both the shell and the active venue are available.
 
-The separate `npm run test:browser` gate now builds the production bundle and
-runs Chromium at 1280×800 and 375×812. It covers:
-
-- first-run onboarding through a real route;
-- a verified check-in and the connector change between fastest and step-free
-  routing;
-- visible refusal of a foreign-venue check-in link;
-- all surface round-trips back to a non-empty visitor map;
-- surface-navigation hit testing, document scroll ownership and horizontal
-  overflow;
-- camera-control geometry at both 375 px and 320 px widths; and
-- topmost-only Escape handling and focus restoration for nested dialogs.
-
-Uncaught page exceptions and console errors fail the suite. The visitor shell
-uses the system font stack and makes no Google Fonts request. Traces and
-screenshots are retained on failure, and CI runs the browser gate independently
-from the deterministic Node gate.
-
-The public-build browser job clears the ordinary HTTP cache, closes the network,
-opens a fresh page, and confirms its document and script came from the generated
-service worker before switching floors, checking in, and routing. It exercises
-cache eviction and exact-revision repair, removes venue responses to reach the
-independently verified IndexedDB fallback, and swaps in a different but
-self-consistent venue package to prove identity is bound as well as bytes. A
-separate run proves complete updates wait, failed installs do not displace the
-known-good revision, and the UI never calls a worker merely being active
-"offline ready." This remains browser coverage, not field validation: Chromium
-cannot prove Safari camera permissions, phone motion sensors, QR recognition
-under corridor lighting, or the cache headers of a host that has not been
-deployed.
+Camera permissions, sensor behavior and sign readability need verification on
+the devices and in the building where the service will operate. See
+[Deploying the visitor build](../deployment.md) for the hosting and update requirements.

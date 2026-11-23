@@ -80,37 +80,8 @@ one row. The vertical version's last option could otherwise disappear beneath
 the directions sheet. This keeps graphics selection in the map band without
 raising it above safety/recovery guidance.
 
-## Evidence and limits
+## Device support
 
-Focused tests cover search totals/paging/recovery, authored destination data,
-explicit confirmation, preserved intent and focus, and banner resize cleanup.
-Production-browser cases exercise 320 px layouts, 200% root text at 320×568,
-short landscape, real Tab traversal, system high contrast, nested dialog
-return and arrival/search focus recovery.
-
-Slice verification on 1 October 2026, before the full-suite release review:
-
-- `npm run check`: lint, types, 1,629 unit tests in 131 files, unchanged
-  venue/replay/QR artifacts and the public build pass. Public startup
-  JavaScript is 444.1 KiB raw / 144.9 KiB gzip, within its 500 / 170 KiB limits.
-- 108/108 public production-browser cases pass across both screen sizes in
-  visitor accessibility, search, journeys, map views/graphics, route clearance,
-  deferred-view recovery, offline, camera alignment, AR floor placement and
-  live tracking.
-- 20/20 additional public keyboard/onboarding, narrow-camera and header
-  cases pass. The delayed-routing case blocks service workers only in that
-  test context so precaching cannot bypass its artificial download gate;
-  focus, cancellation and late-result rejection assertions are retained.
-- 6/6 closure-expiry/recovery cases pass using the existing operator import
-  UI to supply policy. These exercise Visitor recovery, not a new live feed.
-
-That checkpoint covered 134 distinct targeted browser cases with no retries
-or skips, not the entire operator suite or hosted CI. The subsequent full-suite
-timing, final focus fix and affected-suite revalidation are recorded in
-[the release-review checkpoint](visitor-experience-plan.md#release-review-and-pre-push-verification--1-october-2026).
-The existing deferred Three.js large-chunk warning remains.
-
-These are Chromium software checks at desktop and mobile viewport sizes.
 Actual Android/iOS text settings, TalkBack/VoiceOver announcements, switch
 input, software-keyboard resize behavior and real-venue usability still need
 qualification. There is no claim of WCAG conformance or parity with major map

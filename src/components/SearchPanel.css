@@ -4,10 +4,6 @@
   overscroll-behavior: contain;
 }
 
-#search-panel .search-panel-heading > div {
-  display: contents;
-}
-
 #search-panel .search-panel-heading {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 44px;
@@ -16,22 +12,11 @@
 }
 
 #search-panel .search-panel-heading h2 {
-  grid-column: 1 / -1;
-  grid-row: 2;
+  grid-column: 1;
+  grid-row: 1;
   font-size: 1.25rem;
   line-height: 1.2;
   overflow-wrap: anywhere;
-}
-
-#search-panel .search-panel-heading span {
-  grid-column: 1;
-  grid-row: 1;
-  font-size: 0.75rem;
-  /* One line. The venue is already named in the header above; a second line
-     here pushed the dialog's last action below the fold on a phone. */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 #search-panel .search-section-label,

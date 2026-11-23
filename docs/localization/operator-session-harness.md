@@ -77,19 +77,10 @@ The UI, preparation and live handset modules are forbidden in the public build
 graph, including its offline cache. A guessed `#/recorder` hash does not expose
 the diagnostic.
 
-## Verification and next boundary
+## Travel-heading calibration
 
-The factory has 11 synthetic tests; the UI has 27 tests using the real session
-with a small synthetic preparation substitute. The input reducer and subscription
-have 22 and 12 tests respectively. Production-browser tests cover the real
-verified Asterion package, refusal/reacquisition/expiry, lifecycle, Visitor-state
-isolation, no permission requests before opt-in, controlled denial/late grants,
-paired/partial input and 320 px controls.
-The public offline test checks that the panel is absent. See the visitor plan
-for complete gate results. These are software checks, not physical-device trials.
-
-Next: obtain a valid independently measured travel-heading source and physical
-handset timing/mobility data before qualifying live observations. Calibration
+Qualifying live observations requires an independently measured travel-heading source and physical
+handset timing and mobility data. Calibration
 remains explicitly unavailable in this panel.
 Do not manufacture calibrated heading from route geometry, a compass or a QR's
 authored orientation. Whole-venue off-route evidence, verified connectors,

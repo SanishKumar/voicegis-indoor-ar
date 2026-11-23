@@ -187,21 +187,10 @@ metre: a strict 1.5 m guard froze guidance after 17 m at 5°, 9 m at 10° and
   session redraws the route with it, so the arrows straighten with the marker.
 - A new placement (re-alignment, anchor, storey change) forgets the correction.
 
-Deterministic guidance replays now include a 48-case, 55 m matrix: placement
-errors -20/0/15/20°, 10/20 cm sway, 0.1/0.25/0.5 m reporting intervals at 1 m/s,
-and two sway phases. These stay guiding, settle, and estimate bias within 1° in
-those synthetic inputs. Tests also cover 0.3-0.9 m initial lane changes and later
-3/5/8/10/15/20° departures, which hold without changing a settled estimate.
-Synthetic XR frames separately exercise 20 cm sway and 3/8° departures through
-the actual frame-batching and route visibility code. Existing corners, floor
-changes, branches, wrong-way and pose-loss checks remain in place.
-
-These tests are software regressions, **not** handset accuracy measurements or
-recordings accepted by the localization evidence pipeline. A noisy estimate at
-the 30° acceptance boundary may be rejected; no tolerance was widened to promise
-that it must pass. The initial diagonal-walk ambiguity remains unresolved.
-The thresholds are provisional software guards, not surveyed corridor widths;
-an open hall walked diagonally for 3 m could be mistaken for direction error.
+A noisy estimate at the 30° acceptance boundary may be rejected. In an open
+hall, a 3 m diagonal walk immediately after placement can look like a heading
+error. The thresholds are provisional and still need validation against
+measured corridors.
 Handset runs record the estimate and its learning/settling/locked state in the
 field log (`ar-heading-correction`), including settling and locked zero-degree estimates.
 The log marks its basis as `initial-corridor-assumption`.
@@ -288,27 +277,13 @@ The walking hook uses this corroborated tilt too, avoiding a needless heading
 reset merely because the phone was still. Position uncertainty is preserved
 after Stop tracking and still blocks camera placement until a new check-in.
 
-## What it is not
+## Field limitations
 
-It is not an accuracy claim. The 8% drift figure, the 60° agreement band, the
-3 m corner window and the six/twelve stride thresholds are conservative
-software policy chosen so that Asterion's 48 m sign spacing keeps a
-scan-to-scan walk in the tracking tier. None of it has been measured on a
-physical handset in a real building, and the synthetic browser journeys in
-`e2e/live-tracking.pw.ts` prove the software's behaviour, not a phone's
-sensors. The recorder and the evidence artifact remain the only path to a
-figure that may be quoted.
+The 8% drift allowance, 60° agreement band, 3 m corner window and six/twelve
+stride thresholds are software policy chosen around Asterion’s 48 m sign
+spacing. They still need qualification in a surveyed venue. A publishable
+accuracy figure requires a measured walk and an accepted evidence artifact.
 
-It also cannot see the building. A visitor who leaves the route is told so
-and offered a scan; the route is not re-planned from a guessed position,
-because the tracker has no trustworthy position off the route to plan from.
-
-## Regression coverage for pose matching
-
-`routePoseMatcher.test.ts` covers rotation/translation invariance, normal and
-missed corners, retreat, crossings, parallel legs, ambiguous hairpins, repeated
-vertices, floor boundaries and invalid input. `liveTrackerDisplacement.test.ts`
-checks the full stream, including loss that survives source changes and clears
-only on an anchor. `arSession.test.ts` drives rendered frames through lateral
-departure and recovery; `arPrompt.test.ts` ensures the scan action stays visible.
-These are synthetic software checks, not a claim of real-handset accuracy.
+If a visitor leaves the route, the tracker asks for another scan. Replanning
+requires a trustworthy starting point. A change of motion source alone leaves
+the off-route hold in place.

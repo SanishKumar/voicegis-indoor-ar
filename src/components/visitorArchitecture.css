@@ -1,0 +1,282 @@
+/* Visitor wayfinding surfaces. The light background separates the model
+   from the solid navigation controls even when the device disables shadows. */
+.visitor-shell.visitor-shell,
+.onboard.onboard {
+  --glass-fill: #233d40;
+  --glass-fill-strong: #1c3438;
+  --glass-fill-chip: #223e42;
+  --glass-fill-control: #314c50;
+  --glass-fill-control-hover: #405e61;
+  --glass-line: #627778;
+  --glass-sheen: 0 2px 6px rgb(27 47 42 / 14%);
+  --glass-blur: none;
+  --radius-buttons: 8px;
+  --radius-inputs: 6px;
+  --radius-cards: 12px;
+  --font-control-tnt: var(--font-control);
+  --ed-display: var(--font-control);
+  background: #e8e8df;
+}
+
+.visitor-shell .compiled-map {
+  background: radial-gradient(ellipse at 55% 40%, #f5f4ed, #e2e3d8);
+}
+
+.visitor-shell .visitor-header {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid #496367;
+}
+
+.visitor-shell .visitor-brand-mark {
+  background: #e5ebe1;
+  color: #27494b;
+  border-color: transparent;
+}
+
+.visitor-shell .visitor-brand-copy strong {
+  font-weight: 620;
+  letter-spacing: -0.025em;
+}
+
+.visitor-shell .map-pill-building {
+  isolation: isolate;
+  padding-inline: 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  color: #19383c;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+/* Keep the entire 44px control tappable while exposing more of the roof. */
+.visitor-shell .map-pill-building::before {
+  content: '';
+  position: absolute;
+  inset: 8px 0;
+  z-index: -1;
+  border: 1px solid #a3b0a8;
+  border-radius: 4px;
+  background: #fafbf5;
+  box-shadow: 0 1px 4px rgb(26 48 43 / 18%);
+}
+
+.visitor-shell .map-pill-building:is(:hover, :focus-visible)::before {
+  border-color: #244b4c;
+}
+
+.visitor-shell .map-model-credit {
+  display: block;
+  grid-column: 1 / -1;
+  color: inherit;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.map-model-credit a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.onboard .onboard-content {
+  max-width: 580px;
+}
+.onboard .onboard-title,
+.onboard .onboard-title-accent {
+  font-family: var(--font-control);
+  font-weight: 620;
+  line-height: 1.07;
+  color: #1f393a;
+  letter-spacing: -0.055em;
+}
+.onboard .onboard-title {
+  font-size: clamp(2.2rem, 6vw, 3.65rem);
+}
+.onboard .onboard-title-accent {
+  font-size: 1em;
+}
+.onboard .onboard-eyebrow {
+  color: #395b5b;
+  font-weight: 650;
+}
+.onboard .onboard-sub {
+  color: #344c4e;
+}
+.onboard .onboard-title:focus-visible {
+  outline-color: #294e50;
+}
+.onboard .onboard-pane {
+  padding: clamp(14px, 2.4vw, 22px);
+}
+
+/* Printed-directory palette for reading surfaces. Map controls and the
+   current instruction keep the dark finish so either stands out over a plan. */
+.onboard .onboard-pane,
+.visitor-shell :is(.search-panel, .location-picker, .poi-card, .jr-sheet) {
+  --glass-fill-strong: #fcfdfb;
+  --glass-fill-control: #eff4f1;
+  --glass-fill-control-hover: #e1ece7;
+  --glass-line: #bbc9c2;
+  --color-whiteout: #173936;
+  --color-whiteout-soft: #415d57;
+  --color-whiteout-faint: #4e6660;
+  --color-sky-tint: #17594e;
+  --color-ink: #fff;
+  --surface-whiteout: #205b50;
+  --color-hairline: #d9e3dd;
+  --color-hairline-strong: #b0c3b9;
+  --ed-ink: var(--color-whiteout);
+  --ed-ink-soft: var(--color-whiteout-soft);
+  --ed-line: var(--color-hairline-strong);
+  --ed-blue: var(--color-sky-tint);
+  --ed-cream: var(--glass-fill-strong);
+  --visitor-line: var(--color-hairline);
+  --color-text-primary: var(--ed-ink);
+  --color-text-secondary: var(--ed-ink-soft);
+  --color-bg-primary: var(--glass-fill-control);
+  color: var(--ed-ink);
+  background: var(--glass-fill-strong);
+}
+.visitor-shell :is(.lp-scan-cta:hover, .poi-card-primary:hover),
+.onboard .onboard-pill:hover,
+.visitor-shell .jr-primary:hover:not(:disabled):not([aria-pressed='true']) {
+  background: #16483e;
+}
+.visitor-shell .jr-sheet .jr-actions {
+  background: var(--glass-fill-strong);
+}
+.visitor-shell .mobile-panel-handle {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-whiteout-soft);
+}
+.visitor-shell :is(.lp-clear-filters, .lp-search-clear, .search-clear-btn),
+.onboard .onboard-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-inputs);
+  background: transparent;
+  color: var(--ed-blue);
+  font: inherit;
+  cursor: pointer;
+}
+.visitor-shell .lp-clear-filters {
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+.onboard .onboard-venue,
+.onboard .onboard-venue .onboard-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.onboard .onboard-venue {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.onboard .onboard-venue .onboard-eyebrow {
+  flex: 1 1 170px;
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.onboard .onboard-venue svg { flex: none; }
+.onboard .onboard-change {
+  color: #20564c;
+  text-underline-offset: 3px;
+}
+.onboard .onboard-change:focus-visible { outline-color: #20564c; }
+.onboard .onboard-field { padding-block: 0; margin-bottom: 10px; }
+.onboard .onboard-field input { min-height: 48px; }
+.onboard .onboard-links { margin-block: 0 12px; }
+.onboard .onboard-row-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  background: var(--glass-fill-control);
+  color: var(--ed-blue);
+}
+.onboard .onboard-row { gap: 12px; min-height: 55px; padding-block: 8px; }
+.onboard .onboard-row-name { font-size: 1rem; font-weight: 620; }
+.onboard .onboard-row-meta { font-weight: 450; }
+.visitor-shell .visitor-status-bar {
+  --ed-ink: #263e39;
+  --ed-ink-soft: #3b5550;
+  margin: 0;
+  min-height: 30px;
+  padding-block: 4px;
+  border: 0;
+  border-top: 1px solid #bbc9c2;
+  border-radius: 0;
+  background: #f3f6f1;
+  box-shadow: none;
+}
+.visitor-shell .visitor-status-bar .status-item {
+  color: #3b5550;
+  font-size: 0.8125rem;
+}
+@media (min-width: 345px) {
+  .visitor-shell .visitor-status-bar .status-floor { display: flex; }
+}
+@media (max-width: 959px) {
+  .onboard .onboard-content { padding-top: max(18px, env(safe-area-inset-top)); }
+}
+@media (min-width: 900px) {
+  .visitor-shell .jr { background: #fcfdfb; }
+  .visitor-shell .jr-banner { background: var(--glass-fill-strong); }
+}
+
+.onboard[data-illustration='campus'] {
+  --venue-image: url('../styles/meridian-campus.jpg');
+}
+.onboard[data-illustration='floor'] {
+  --venue-image: url('../styles/asterion-floor.jpg');
+}
+
+/* On a phone the same rendering becomes the thumbnail for browsing.
+   The search field and destination list stay first. */
+@media (max-width: 959px) {
+  .onboard[data-illustration] .onboard-browse::before {
+    content: '';
+    width: 54px;
+    height: 36px;
+    border-radius: 4px;
+    background: #e8e8df var(--venue-image) center / cover;
+  }
+}
+@media (min-width: 960px) {
+  .onboard[data-illustration] .onboard-canvas {
+    inset: 0 auto 0 1.5%;
+    width: 53%;
+    background: var(--venue-image) center / contain no-repeat;
+    pointer-events: none;
+  }
+  .onboard[data-illustration='floor'] .onboard-canvas {
+    background-size: 160% auto;
+  }
+  .onboard[data-illustration] .onboard-content {
+    width: 43%;
+    margin: auto max(3vw, calc((100vw - 1520px) / 2)) auto auto;
+  }
+}
+
+[data-contrast='high'] :is(.visitor-shell.visitor-shell, .onboard.onboard) {
+  --glass-fill: #122629;
+  --glass-fill-strong: #0d2124;
+  --glass-fill-control: #233b40;
+  --glass-line: #c8d5d2;
+}

@@ -8025,8 +8025,8 @@ body {
    where the destination, the next corner and the places nearby actually are,
    a small plan in the corner turned the way the visitor faces, and a sheet at
    the bottom with what is left and the few controls. Over live video the
-   cards are panes of glass - a blue tint, a thin light border, white type -
-   and the one accent is the route's blue. Where there is no camera the sky
+   cards use dark teal surfaces with a thin light border and white type.
+   Blue identifies the route. Where there is no camera the sky
    is behind them instead.
    ========================================================================== */
 .camera-preview {
@@ -8036,8 +8036,8 @@ body {
   --ed-cream: var(--color-whiteout);
   --ed-ink-soft: var(--color-whiteout-soft);
   /* Glass over video is blurred lightly: it is repainted on every frame. */
-  --camera-pane: rgba(14, 34, 78, 0.74);
-  --camera-chip: rgba(14, 34, 78, 0.78);
+  --camera-pane: rgb(22 47 50 / 90%);
+  --camera-chip: rgb(22 47 50 / 86%);
   position: absolute;
   inset: 0;
   z-index: var(--z-camera-preview);

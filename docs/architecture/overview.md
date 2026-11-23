@@ -20,7 +20,7 @@ spatial compiler ──► versioned building package
                     navigation runtime
                  ┌────────────┼────────────┐
                  ▼            ▼            ▼
-              3D map      mobile AR*   voice*   (* intended)
+             2D/3D map     mobile AR    spoken directions
 ```
 
 ## System boundaries
@@ -91,15 +91,12 @@ the package boundary but have not been built.
 - A browser capture surface records a walk from the handset's own sensors. It is
   an instrument for measuring sensor behaviour, not live localization.
 
-**Intended, not built**
+**Visitor guidance**
 
-- A mobile client performing production localization and world-anchored AR.
-  There is no AR rendering: the camera view is a screen-aligned preview that can
-  compare device heading with route bearing.
-- A voice adapter converting grounded user intent into typed navigation
-  operations. Nothing in the repository uses a speech API, and the project's
-  name should not be read as a claim that it does.
-- A VR client reusing building packages for route rehearsal and training.
+The browser offers spoken turn instructions. On supported phones it can estimate
+walking progress and draw a route in immersive AR after floor confirmation
+and direction alignment. These features still need qualification in a surveyed
+building. Voice commands and VR rehearsal remain future work.
 
 ## Design rules
 
@@ -107,9 +104,8 @@ the package boundary but have not been built.
 2. Coordinate transforms are explicit, versioned data.
 3. Uncertainty is a first-class state, not an implementation detail.
 4. Accessibility constraints fail closed.
-5. LLM output cannot directly mutate safety-relevant navigation state.
+5. Changes to navigation state go through typed operations and venue policy.
 6. Physical-walk traces must be replayable without camera footage by default.
-7. Every marketing claim should map to a reproducible test or labeled prototype behavior.
 
 ## Venue Bootstrap v0
 

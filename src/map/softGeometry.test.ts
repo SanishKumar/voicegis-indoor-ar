@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cutOutline, insetPolygon, ribbon, roundCorners, type Point } from './softGeometry';
+import { cutawayWindows } from './cutawayWindows';
 
 const SQUARE: Point[] = [
   [0, 0],
@@ -9,6 +10,28 @@ const SQUARE: Point[] = [
 ];
 // The same room drawn the other way round, as a floor plan is free to do.
 const SQUARE_CLOCKWISE: Point[] = [...SQUARE].reverse();
+
+it('fits perimeter windows into intact wall runs on either side of an exterior door', () => {
+  const envelope: Point[] = [
+    [0, 0],
+    [30, 0],
+    [30, 25],
+    [0, 25],
+  ];
+  const room: Point[] = [
+    [5, 1],
+    [25, 1],
+    [25, 10],
+    [5, 10],
+  ];
+  const runs = cutOutline(room, [{ at: [15, 1], halfWidth: 1.2 }]);
+  const panes = cutawayWindows(runs, envelope);
+  expect(panes).toHaveLength(2);
+  for (const { at, halfWidth } of panes) {
+    expect(at[1]).toBe(1);
+    expect(Math.abs(at[0] - 15) - halfWidth).toBeGreaterThan(1.2);
+  }
+});
 // An L: one corner turns the other way.
 const L_SHAPE: Point[] = [
   [0, 0],

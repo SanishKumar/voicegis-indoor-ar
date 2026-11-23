@@ -36,7 +36,6 @@ export default function Header() {
           <Navigation2 size={18} strokeWidth={2} />
         </div>
         <div className="visitor-brand-copy">
-          <span>Indoor wayfinding</span>
           <strong>{venue.config.name}</strong>
         </div>
         {activeFloor && <span className="visitor-floor-context">{activeFloor.name}</span>}
@@ -54,13 +53,7 @@ export default function Header() {
             <MapPin size={16} strokeWidth={2} />
           </span>
           <span className="visitor-location-copy">
-            <small>
-              {state.locationBasis === 'qr'
-                ? 'Last check-in'
-                : state.locationBasis === 'selected'
-                  ? 'Selected start'
-                  : 'Default start'}
-            </small>
+            <small>{state.locationBasis === 'qr' ? 'Check-in' : 'Start'}</small>
             <strong>{locationLabel}</strong>
           </span>
         </button>

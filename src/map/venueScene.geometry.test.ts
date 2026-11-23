@@ -16,6 +16,7 @@ import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
 import referencePackage from '../../buildings/reference-medical-centre/compiled/building.package.json';
 import campusPackage from '../../buildings/meridian-park-campus/compiled/building.package.json';
 import { createVenueScene, type VenueScene } from './venueScene';
+import { clinicalShapes } from './clinicalFurniture';
 
 // Only the GPU is replaced. The scene, transforms and route geometries are real
 // Three objects; these tests make no jsdom layout/visibility claims.
@@ -125,7 +126,13 @@ describe('visitor route geometry', () => {
     });
     // One mesh for each kind of solid on each of three floors, not one a chair.
     expect(furniture.length).toBeGreaterThanOrEqual(3);
-    expect(furniture.length).toBeLessThanOrEqual(3 * 4);
+    expect(furniture.length).toBeLessThanOrEqual(3 * (4 + clinicalShapes.length));
+    for (const name of clinicalShapes) {
+      const detail = furniture.find((mesh) => mesh.name === `furniture-${name}`);
+      expect(detail, name).toBeDefined();
+      expect(detail!.geometry.hasAttribute('color')).toBe(true);
+      expect(detail!.geometry.index!.count / 3).toBeLessThan(2500);
+    }
     expect(furniture.reduce((total, mesh) => total + mesh.count, 0)).toBeGreaterThan(1500);
     // Each piece in its own colour, on the one material.
     for (const mesh of furniture) expect(mesh.instanceColor).not.toBeNull();
@@ -417,7 +424,7 @@ describe('visitor route geometry', () => {
     observed.scene!.traverse((object) => {
       if (object.name !== 'furniture-box') return;
       const material = (object as InstancedMesh).material as MeshStandardMaterial;
-      opacity.set(Math.round(object.parent!.position.y), material.opacity);
+      opacity.set(Math.round(object.getWorldPosition(new Vector3()).y), material.opacity);
     });
     const byHeight = [...opacity.entries()].sort((a, b) => a[0] - b[0]).map((entry) => entry[1]);
     expect(byHeight).toHaveLength(3);

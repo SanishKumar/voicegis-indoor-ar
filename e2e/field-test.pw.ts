@@ -8,7 +8,7 @@ import {
 
 test('the phone test log is opt-in, reports motion refusal and copies the complete report', async ({
   page,
-}) => {
+}, testInfo) => {
   await precompleteOnboarding(page);
   await page.addInitScript(() => {
     const request = () => Promise.resolve('denied');
@@ -56,8 +56,12 @@ test('the phone test log is opt-in, reports motion refusal and copies the comple
   await expect(report).toHaveValue(/venue asterion-medical-center/);
   await expectInsideViewport(dialog);
   const copy = dialog.getByRole('button', { name: 'Copy report', exact: true });
+  await expect(copy).toBeDisabled();
+  await dialog.getByRole('checkbox', { name: /reviewed this report/ }).check();
+  await copy.scrollIntoViewIfNeeded();
   await expectInsideViewport(copy);
   await expectCenterHitTarget(copy);
+  await page.screenshot({ path: testInfo.outputPath('field-report-review.png') });
   const text = await report.inputValue();
   await copy.click();
   await expect(dialog.getByRole('button', { name: 'Copied', exact: true })).toBeVisible();
@@ -68,10 +72,55 @@ test('the phone test log is opt-in, reports motion refusal and copies the comple
   ).toBe(text);
   await dialog.getByRole('button', { name: 'Clear', exact: true }).click();
   await expect(report).toHaveValue(/0 events/);
+  await expect(dialog.getByRole('checkbox')).not.toBeChecked();
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(dialog).toHaveCount(0);
 
   await page.goto('/?fieldtest=0#/visitor');
+  await expect(page.locator('.compiled-map')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Test log', exact: true })).toHaveCount(0);
+});
+
+test('a stalled AR probe and refused clipboard still allow reviewing and stopping diagnostics', async ({
+  page,
+}) => {
+  await precompleteOnboarding(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'xr', {
+      value: { isSessionSupported: () => new Promise(() => {}) },
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: async () => {
+          throw new Error('Clipboard not allowed');
+        },
+      },
+      configurable: true,
+    });
+  });
+  await page.setViewportSize({ width: 320, height: 480 });
+  await page.goto('/?fieldtest=1#/visitor');
+  await expect(page.locator('.compiled-map')).toBeVisible();
+  await page.getByRole('button', { name: 'Test log', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Field test log' });
+  const report = dialog.getByRole('textbox', { name: 'Field test report' });
+  await expect(report).toHaveValue(/immersive-ar unknown/);
+  await expectInsideViewport(dialog);
+  await dialog.getByRole('checkbox').check();
+  await dialog.getByRole('button', { name: 'Copy report', exact: true }).click();
+  await expect(dialog.getByRole('status')).toContainText('Clipboard unavailable');
+  await dialog.getByRole('button', { name: 'Refresh report' }).click();
+  await expect(dialog.getByRole('checkbox')).not.toBeChecked();
+  const stop = dialog.getByRole('button', { name: 'Stop logging and clear' });
+  await stop.scrollIntoViewIfNeeded();
+  await expectInsideViewport(stop);
+  await expectCenterHitTarget(stop);
+  await stop.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.compiled-map')).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('fieldtest')).toBe('0');
+  await page.reload();
   await expect(page.locator('.compiled-map')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Test log', exact: true })).toHaveCount(0);
 });

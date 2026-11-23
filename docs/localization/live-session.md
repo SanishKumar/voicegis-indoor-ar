@@ -118,19 +118,7 @@ the process cannot execute. On return, the owner must process lifecycle state an
 read the current snapshot before presenting guidance, not restore a cached active
 snapshot. The deterministic controller does not install browser listeners itself.
 
-## Verification and compatibility
-
-The 13 initial tests failed because the new session API did not yet exist; this
-is feature-absence proof, **not** a claim of 13 reproduced behavioral defects in
-the old replay code. Six follow-up regressions reproduced defects during session
-implementation before correction: pre-acquisition and overlapping strides,
-missing stride input, stopped-session timer cleanup, calibration returning success
-after route rejection, and timer cleanup after a consumer exception.
-
-The resulting 62 synthetic tests cover lifecycle/lease ownership, silent expiry,
-input age, motion intervals, same-time duplicates, floor reacquisition, matching,
-quality loss, calibration qualification, numeric validation and mutation isolation.
-See the visitor plan for complete gate results. No field accuracy was measured.
+## Compatibility
 
 This is separate from replay/evidence. Processor/policy remain **0.6.0/0.4.0**;
 capture/recording remain **0.2.0/0.2.0**. No report, recorded walk or venue artifact

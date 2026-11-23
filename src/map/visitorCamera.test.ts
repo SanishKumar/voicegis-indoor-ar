@@ -114,6 +114,22 @@ describe('one camera, two presentations', () => {
       expect(rig.view.scale).toBeLessThanOrEqual(2.4);
     }
   });
+  it('allows a room close-up while a route fit still includes its surroundings', () => {
+    const rig = createVisitorCamera(200);
+    rig.zoomBy(0.001);
+    const widthInMetres = () => rig.visibleWidth(390, 844) * rig.worldUnitsPerPixel(390, 844);
+    expect(widthInMetres()).toBeLessThan(7);
+    rig.fit(
+      [
+        [0, 0, 0],
+        [0, 0, 1],
+      ],
+      390,
+      844,
+    );
+    rig.update(390, 844, 16, true);
+    expect(widthInMetres()).toBeGreaterThan(16);
+  });
   it('lets an explicit building fit retain its transition while the visitor owns the camera', () => {
     const rig = createVisitorCamera(100);
     rig.fit([[20, 0, 30]], 800, 600);

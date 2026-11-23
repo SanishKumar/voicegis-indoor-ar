@@ -1,8 +1,5 @@
 # Visitor 2D/3D presentation
 
-This bounded slice was moved ahead of the interrupted-IMU work at the user's
-request. It changes presentation, not the localization or routing policy.
-
 ## Interaction and invariants
 
 - **2D** is a top-down orthographic plan. Drag, arrow keys and two-finger pan
@@ -57,11 +54,6 @@ and Studio validation panel follow the same interaction without discarding
 the selected space or draft. Full-screen onboarding and the QR scanner retain
 their existing close/back flows; they are not map detail sheets.
 
-`mobile-panels.pw.ts` covers narrow layouts, keyboard and pointer operation,
-preserved queries/progress/drafts, map hit targets, 2D/3D continuity and desktop
-resize. The camera and floor-placement browser tests also fold their sheets
-before checking recovery, floor confirmation and exit controls.
-
 ## Rendering and recovery
 
 Plan +X/+Y map to world +X/+Z, with world +Y used for elevation, so the default
@@ -79,62 +71,12 @@ Scene teardown removes pointer, wheel and keyboard listeners and disposes mesh
 resources and light-shadow render targets; failed capability checks do not
 allocate a renderer.
 
-The September 15 smoke repair places the recovery status/action in the visible
-directions panel's scroll flow when that panel is open, including expanded route
-details. Expanding the map places it back over the unobstructed map. Retry is no
-longer underneath a higher-stacking directions card. A 320 px header refinement
-keeps Cancel inside the viewport. Recovery still belongs to the same scene owner;
-it does not reset the journey or enable tracking.
+When directions are open, the display recovery message and **Retry** appear
+inside the scrollable directions panel. Expanding the map moves the recovery
+controls onto the map. **Cancel** remains reachable at 320 px. Retrying the
+display preserves the journey and the visitor’s tracking choice.
 
-## Verification
-
-- Camera math tests cover top-down axes, orthographic scale, centre/bearing/zoom
-  continuity, interruption reversal, reduced motion, elapsed-time interpolation,
-  panning, snapshot isolation and resize/zoom bounds.
-- Scene tests use real Three geometry with only the GPU replaced. They cover
-  right-angle centre lines, revisited floors and listener teardown. All three
-  failed against the actual pre-slice `HEAD` renderer, then passed after the
-  implementation was restored. They do not claim jsdom performs layout.
-- An additional shadow-target disposal regression failed before its cleanup
-  call was added, then passed. The full code gate now passes **820 tests across
-  82 files**, lint, types, all three venue hashes, replay, QR and public build.
-- The complete operator-build browser suite passed **84/84 tests**, with no
-  skips or retries. After the final shadow cleanup, the public-build map-view
-  and offline suites passed **26/26**, including visitor-only shell isolation.
-  The separate offline-install-failure suite was not rerun in this slice.
-- The new production-browser round-trip test first failed on the actual prior
-  UI because the 2D control did not exist. Browser coverage includes repeated
-  switching, shared journey facts, pan/zoom continuity, a 320 px layout, expanded
-  map/camera-preview round trips, focus restoration, reduced motion, actual
-  WebGL context loss/restoration, missing WebGL and retry.
-- Screenshots are generated for default 2D/3D and expanded 320 px views. These
-  are synthetic venue/browser checks, not field or handset performance evidence.
-
-Commands used for the final gates:
-
-```text
-npm run check
-node scripts/runBrowserSmoke.js --workers=1
-node scripts/runBrowserSmoke.js --public-build e2e/visitor-map-views.pw.ts e2e/offline.pw.ts --workers=1
-```
-
-An initial public-build command mistakenly selected `public-shell.pw.ts`, whose
-current tests deliberately require operator tooling. It was stopped after those
-expectations failed; the correct public shell contract is in `offline.pw.ts` and
-passed in the final run above. No production behavior or assertion was weakened
-to accommodate that test-selection error.
-
-## Deliberately open
-
-The verification counts above describe the original presentation slice, not the
-current product. Adaptive quality, authored route-clearance checks and automatic
-tracking have subsequently been implemented. Current software and physical
-validation limits are recorded in [visitor readiness](visitor-readiness.md).
-Physical-device frame-time/memory profiling and real-user usability trials
-remain required. Authored clearance is not proof of surveyed traversability;
-the model furniture is illustrative, not surveyed.
-
-## Connected campus and operator review — 5 October 2026
+## Connected campus and operator views
 
 An explicit building exploration owns the camera while its fit eases into place;
 new movement in the same physical building does not steal it. Recenter restores
@@ -155,22 +97,4 @@ switching in bounded, content-hash-keyed memory. Reloading/closing the tab clear
 that memory. Activation confirmation and publishing authority are never saved;
 stale compiled candidates remain blocked.
 
-Deterministic regression tests cover the former continuity, camera, selection
-and draft-loss failures. Production-browser flows cover door transitions,
-camera/retry round trips, upstairs-to-campus navigation, keyboard interaction,
-cross-building and cross-floor journeys, and the Studio compile/activate/visitor/
-rollback cycle. These are synthetic software checks, not handset/venue accuracy
-or AR qualification.
-
-Final verification: `npm run check` passes **1,833 tests across 144 files**, lint,
-types, all four venue hashes, replay, QR generation and the public build. The
-affected operator-build browser suite passes **114/114**, across desktop and
-mobile Chromium, without skips or retries:
-
-```text
-node scripts/runBrowserSmoke.js e2e/campus.pw.ts e2e/operator-campus.pw.ts e2e/visitor-map-views.pw.ts e2e/visitor-journey.pw.ts e2e/layout.pw.ts e2e/closure-recovery.pw.ts e2e/keyboard-accessibility.pw.ts
-```
-
-The complete browser suite, separate offline installation/sub-path suite and
-handset sensor tests were not rerun in this slice. Passing these flow checks is
-not a claim that live positioning or AR alignment is physically qualified.
+The 3D furnishings are an illustration of each room’s use. Deployment to a real venue requires surveyed geometry and a review of the routes on site.

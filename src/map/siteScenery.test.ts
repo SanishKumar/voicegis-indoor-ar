@@ -72,11 +72,13 @@ describe('the outside of a venue with grounds', () => {
     expect(hospital().part.castShadow).toBe(true);
     expect(hospital().group.visible).toBe(true);
     expect(scenery.isOpen('main-hospital')).toBe(false);
+    expect(scenery.coversInteriors()).toBe(true);
 
     // One building filling the screen, and nobody on the map: no roofs at all.
     expect(show(scenery, { metresVisible: 45 }).far).toBe(0);
     expect(hospital().group.visible).toBe(false);
     expect(scenery.isOpen('main-hospital')).toBe(true);
+    expect(scenery.coversInteriors()).toBe(false);
 
     // On the way in, part-way: neither on nor off.
     const between = show(scenery, { metresVisible: 92 }).far;
@@ -164,6 +166,7 @@ describe('the outside of a venue with grounds', () => {
     const scenery = createSiteScenery(site, toWorld, CAMPUS.portals);
     const onRoute = new Set(['main-hospital']);
     show(scenery, { metresVisible: 170, onRoute, floorOpacity: 0.22 });
+    expect(scenery.coversInteriors()).toBe(false);
     expect(roofOf(scenery, 'main-hospital').material.opacity).toBeCloseTo(0.4 * 0.22);
     // The scene toggles a storey's shadows while it comes back into view.
     for (const roof of roofs(scenery)) roof.castShadow = true;

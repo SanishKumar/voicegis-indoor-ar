@@ -38,7 +38,10 @@ import { resolveCartographicLabels, type CartographicBounds } from '../engine/fl
 import type { VisitorLocation } from '../navigation/visitorLocation';
 import { cumulativeDistances } from '../navigation/routeProgress';
 import { MAP_ROUTE_RADIUS_METERS } from '../engine/routeClearance';
-import { furnishRoom, roomsOfFloor, type FurniturePart } from './roomInteriors';
+import { furnishRoom, roomsOfFloor, roomUse, type FurniturePart } from './roomInteriors';
+import { cutawayWindows } from './cutawayWindows';
+import { clinicalGeometry, clinicalShapes } from './clinicalFurniture';
+import { withFinish } from './architecturalFinish';
 import { createSiteScenery } from './siteScenery';
 import { cutOutline, insetPolygon, ribbon, roundCorners } from './softGeometry';
 import {
@@ -59,54 +62,35 @@ import {
  * One authored scene, seen from a top-down plan or an orbitable 3D camera.
  * Neither presentation owns or advances the journey.
  *
- * The model floats in the sky behind the interface, so it is drawn as frosted
- * glass catching daylight: floor plates are translucent and the sky shows
- * through them, walls are white, shadows fall blue, and there is one
- * saturated thing on it - the route. The canvas itself is transparent; what
- * is behind the building is the sky.
- *
- * Nothing on it has a hard corner. The floor is a plate with a rounded
- * outline and a soft edge. Each room is a tray of its own: a rounded tile
- * pulled in from its neighbours, with a thin rim that follows the tile's
- * curve and opens where there is a door. Between two trays the plate shows
- * through as a seam of sky. A corridor is a tile with no rim, because it is
- * what you walk along, and the route turns its corners on a ball. A plan
- * drawn square reads as a diagram of a building. Drawn soft it reads as a place.
- *
- * There are no walls on the shared boundaries. A wall there has to be square,
- * since it belongs to both rooms, and it covered the rounding of each.
- *
- * This is only how the building is drawn. Routing, clearance and position
- * all work from the authored geometry, which none of this touches.
+ * Floors, cutaway walls and openings use the authored plan. Finishes and
+ * furnishing are illustrative. Routing and localization read the same
+ * venue package directly.
  */
 
 type Coordinate = [number, number];
 
 const SPACE_FILL: Record<string, number> = {
-  entrance: 0xffffff,
-  lobby: 0xffffff,
-  corridor: 0xffffff,
-  room: 0xeaf2fd,
-  service: 0xdbe7f8,
-  restricted: 0xbccbe2,
-  // The ways between floors are a clear sky blue: found at a glance, not shouted.
-  'vertical-circulation': 0x7fb0f5,
+  entrance: 0xe8dcc2,
+  lobby: 0xd5c7aa,
+  corridor: 0xf0eadc,
+  room: 0xc6d3ca,
+  service: 0xc3c8be,
+  restricted: 0x9aa7a5,
+  'vertical-circulation': 0x86b4c1,
 };
 /*
- * How much of the sky each kind of space lets through. Walkable space is the
- * most solid, so a route across it has something to sit on; a room is thinner
- * glass, and somewhere a visitor may not go is the thinnest.
+ * Separate the active floor's material finishes from the fading floors in a stack.
  */
 const SPACE_OPACITY: Record<string, number> = {
-  entrance: 0.84,
-  lobby: 0.84,
-  corridor: 0.88,
-  room: 0.5,
-  service: 0.42,
-  restricted: 0.3,
+  entrance: 0.98,
+  lobby: 0.96,
+  corridor: 0.98,
+  room: 0.94,
+  service: 0.94,
+  restricted: 0.9,
   'vertical-circulation': 0.92,
 };
-const SLAB_OPACITY = 0.3;
+const SLAB_OPACITY = 0.77;
 const SPACE_PRIORITY: Record<string, number> = {
   entrance: 8,
   lobby: 6,
@@ -132,9 +116,9 @@ const SPACE_MIN_SCALE: Record<string, number> = {
   restricted: 1.25,
   corridor: 1.8,
 };
-const WALL_FILL = 0xffffff;
-const SLAB_TOP = 0xffffff;
-const SLAB_SIDE = 0xdce8f8;
+const WALL_FILL = 0xe9e4d9;
+const SLAB_TOP = 0xd8d4c9;
+const SLAB_SIDE = 0xa5ada7;
 /*
  * The route is the one thing on the model a visitor is actually following, so
  * it carries the accent the rest of the product uses for the thing you act on.
@@ -152,10 +136,9 @@ const PUCK_PIXELS = 30;
 const SHAFT_COLOR = 0x8fb2e6;
 const SELECTED_FILL = 0x2b7fff;
 
-/* A rim, not a wall: thin, and low enough to see over into a room from the
-   tilted view, which is what lets the model feel open rather than boxed in. */
+/* A cutaway height keeps rooms, doors and route turns visible from above. */
 const WALL_THICKNESS = 0.16;
-const WALL_HEIGHT = 0.85;
+const WALL_HEIGHT = 1.48;
 /** How far the floor plate reaches beyond the building's outline, in metres. */
 const PLATE_OVERHANG = 0.45;
 /** How round the plate's own corners are. */
@@ -163,7 +146,7 @@ const PLATE_RADIUS = 1.8;
 /** How far a room's tile is pulled in from its boundary: half the seam between rooms. */
 const ROOM_INSET = 0.17;
 /** How round a room's corners are. A room smaller than this rounds by what it can. */
-const ROOM_RADIUS = 0.9;
+const ROOM_RADIUS = 0.3;
 /** How thick a room's tile is: enough to catch the light along its edge. */
 const ROOM_THICKNESS = 0.1;
 
@@ -433,9 +416,7 @@ export function createVenueScene(
   renderer.shadowMap.enabled = graphics.profile(window.devicePixelRatio).shadows;
   renderer.shadowMap.type = PCFShadowMap;
   renderer.toneMapping = ACESFilmicToneMapping;
-  // The film curve rolls white off to a light grey. The model is meant to read
-  // as white against the sky, so it is exposed up to where its lit faces are.
-  renderer.toneMappingExposure = buildingPackage.site ? 1.1 : 1.55;
+  renderer.toneMappingExposure = 1.04;
 
   const scene = new Scene();
   const cameraRig = createVisitorCamera(span, initialView);
@@ -471,11 +452,8 @@ export function createVenueScene(
   canvas.addEventListener('webglcontextrestored', onContextRestored);
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-  // Daylight: the sky's own blue from every side and a warm sun on top of it.
-  // Together they make white; where a wall blocks the sun only the blue is
-  // left, so shadows fall blue instead of grey.
-  scene.add(new HemisphereLight(0xc4d9ff, 0x9bb8e2, 1.25));
-  const key = new DirectionalLight(0xffeed8, 2.0);
+  scene.add(new HemisphereLight(0xf1f5ff, 0xa3ada7, 0.94));
+  const key = new DirectionalLight(0xffeed8, 2.25);
   key.position.set(span * 0.55, span * 1.2, span * 0.45);
   key.castShadow = renderer.shadowMap.enabled;
   key.shadow.mapSize.set(2048, 2048);
@@ -498,7 +476,7 @@ export function createVenueScene(
   });
   key.shadow.camera.updateProjectionMatrix();
   scene.add(key);
-  scene.add(new AmbientLight(0xffffff, 0.34));
+  scene.add(new AmbientLight(0xffffff, 0.19));
 
   /*
    * The building's own shadow on the page beneath it. It is a shadow and
@@ -596,10 +574,13 @@ export function createVenueScene(
     material.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, windowUniforms);
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vWallWorld;')
+        .replace(
+          '#include <common>',
+          '#include <common>\nvarying vec3 vWallWorld;\nvarying float vWallHeight;',
+        )
         .replace(
           '#include <project_vertex>',
-          '#include <project_vertex>\nvWallWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;',
+          '#include <project_vertex>\nvWallWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvWallHeight = position.y;',
         );
       shader.fragmentShader = shader.fragmentShader
         .replace(
@@ -610,6 +591,18 @@ export function createVenueScene(
             'uniform float uWindowRadius;',
             'uniform vec3 uViewDir;',
             'varying vec3 vWallWorld;',
+            'varying float vWallHeight;',
+          ].join('\n'),
+        )
+        .replace(
+          '#include <color_fragment>',
+          [
+            '#include <color_fragment>',
+            'float rail = 1.0 - smoothstep(0.035, 0.036 + fwidth(vWallHeight), abs(vWallHeight - 0.96));',
+            'float baseboard = 1.0 - smoothstep(0.39, 0.391 + fwidth(vWallHeight), vWallHeight);',
+            'float wainscot = 1.0 - smoothstep(0.95, 0.98, vWallHeight);',
+            'diffuseColor.rgb *= mix(vec3(1.0), vec3(0.79,0.88,0.866), wainscot);',
+            'diffuseColor.rgb *= mix(vec3(1.0), vec3(0.45,0.55,0.52), max(rail,baseboard)*0.63);',
           ].join('\n'),
         )
         .replace(
@@ -646,7 +639,8 @@ export function createVenueScene(
       at: portal.position,
       halfWidth: portal.width / 2 + 0.15,
     }));
-    for (const line of cutOutline(outline, openings)) {
+    const wallRuns = cutOutline(outline, openings);
+    for (const line of wallRuns) {
       const footprint = ribbon(line, WALL_THICKNESS / 2);
       if (footprint.length < 3) continue;
       const geometry = new ExtrudeGeometry(shapeFrom(footprint), {
@@ -656,8 +650,27 @@ export function createVenueScene(
       geometry.rotateX(Math.PI / 2);
       geometry.translate(0, WALL_HEIGHT + 0.03, 0);
       built.push(geometry);
+      for (const [end, inside] of [
+        [line[0], line[1]],
+        [line.at(-1)!, line.at(-2)!],
+      ]) {
+        if (
+          !openings.some(
+            ({ at, halfWidth }) =>
+              Math.abs(Math.hypot(end[0] - at[0], end[1] - at[1]) - halfWidth) < 0.055,
+          )
+        )
+          continue;
+        const jamb = new BoxGeometry(0.12, WALL_HEIGHT + 0.018, WALL_THICKNESS + 0.055);
+        jamb.rotateY(-Math.atan2(inside[1] - end[1], inside[0] - end[0]));
+        const position = vec([end[0], end[1]], 0.045 + WALL_HEIGHT / 2);
+        jamb.translate(position.x, position.y, position.z);
+        // Three merges only like-indexed geometries. The wall extrusion is unindexed.
+        built.push(jamb.toNonIndexed());
+        jamb.dispose();
+      }
     }
-    return built;
+    return { built, wallRuns };
   }
 
   interface FloorView {
@@ -701,6 +714,7 @@ export function createVenueScene(
   }
 
   const floors = new Map<string, FloorView>();
+  const groundFloorFurniture = new Group();
 
   const site = buildingPackage.site ?? null;
   const scenery = site
@@ -855,6 +869,8 @@ export function createVenueScene(
 
     const spaceMeshes = new Map<string, Mesh>();
     const spaceBuildings = new Map<string, string>();
+    const rooms = roomsOfFloor(buildingPackage, floor.id);
+    const uses = new Map(rooms.map((room) => [room.id, roomUse(room)]));
     for (const space of spaces) {
       const polygon = space.polygon as Coordinate[];
       const middle: Coordinate = [
@@ -896,6 +912,28 @@ export function createVenueScene(
       );
       mesh.receiveShadow = true;
       mesh.userData.spaceId = space.id;
+      if (!outdoors || space.type === 'corridor') {
+        const use = uses.get(space.id);
+        if (
+          !outdoors &&
+          (use === 'lounge' || use === 'office' || use === 'cafe' || use === 'classroom')
+        ) {
+          mesh.material.color.setHex(0xc7ac89);
+          withFinish(mesh.material, 'timber');
+        } else if (
+          !outdoors &&
+          (use === 'ward' ||
+            use === 'infusion' ||
+            use === 'clinic' ||
+            use === 'imaging' ||
+            use === 'laboratory')
+        ) {
+          mesh.material.color.setHex(0xbacac2);
+          withFinish(mesh.material, 'sheet');
+        } else {
+          withFinish(mesh.material, 'tile');
+        }
+      }
       group.add(mesh);
       spaceMeshes.set(space.id, mesh);
 
@@ -923,28 +961,72 @@ export function createVenueScene(
 
     // Merged per colour: one mesh per wall colour rather than one per segment,
     // which is the difference between tens of draw calls and hundreds.
-    const wallsByColor = new Map<number, ReturnType<typeof rimGeometries>>();
-    const addWalls = (points: ReadonlyArray<readonly [number, number]>, color: number) => {
-      const bucket = wallsByColor.get(color) ?? [];
-      bucket.push(...rimGeometries(points, portals));
-      wallsByColor.set(color, bucket);
+    const wallsByColor = new Map<number, BufferGeometry[]>();
+    const bucketFor = (color: number) => {
+      if (!wallsByColor.has(color)) wallsByColor.set(color, []);
+      return wallsByColor.get(color)!;
     };
     for (const space of spaces) {
       // What you walk along has no rim, and nor does anything in the open.
       if (space.type === 'corridor' || outdoorSpaces.has(space.id)) continue;
       // The rim runs just inside the edge of the room's tile, round its corners.
-      addWalls(
+      const { built, wallRuns } = rimGeometries(
         roundCorners(
           insetPolygon(space.polygon as Coordinate[], ROOM_INSET + WALL_THICKNESS / 2),
           ROOM_RADIUS - WALL_THICKNESS / 2,
           4,
         ) as Coordinate[],
-        WALL_FILL,
+        portals,
       );
+      bucketFor(WALL_FILL).push(...built);
+      // Both faces of the glazing sit just outside the wall surface. A window is
+      // part of the cutaway illustration. Its low sill remains visibly solid.
+      const buildingId = spaceBuildings.get(space.id);
+      const envelope = buildingId
+        ? site?.buildings.find((building) => building.id === buildingId)?.footprint
+        : floor.outline;
+      for (const window of cutawayWindows(wallRuns, (envelope ?? []) as Coordinate[])) {
+        const box = (
+          offset: number,
+          y: number,
+          width: number,
+          h: number,
+          depth: number,
+          tint: number,
+        ) => {
+          const panel = new BoxGeometry(width, h, depth);
+          panel.rotateY(-window.angle);
+          const at = vec(
+            [
+              window.at[0] + offset * Math.cos(window.angle),
+              window.at[1] + offset * Math.sin(window.angle),
+            ],
+            y,
+          );
+          panel.translate(at.x, at.y, at.z);
+          bucketFor(tint).push(panel);
+        };
+        const span = 2 * window.halfWidth;
+        const lights = Math.max(1, Math.ceil(span / 1.8));
+        box(0, 1.14, span, 0.63, WALL_THICKNESS + 0.012, 0x699298);
+        box(0, 0.81, span + 0.1, 0.055, WALL_THICKNESS + 0.06, 0xc4b29b);
+        for (let i = 0; i <= lights; i++) {
+          box(
+            -window.halfWidth + (i * span) / lights,
+            1.14,
+            0.055,
+            0.65,
+            WALL_THICKNESS + 0.034,
+            0x56696b,
+          );
+        }
+      }
     }
     for (const [color, geometries] of wallsByColor) {
       if (geometries.length === 0) continue;
-      const mesh = new Mesh(mergeGeometries(geometries), track(wallSurface(color)));
+      const merged = mergeGeometries(geometries);
+      geometries.forEach((geometry) => geometry.dispose());
+      const mesh = new Mesh(merged, track(wallSurface(color)));
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
@@ -958,7 +1040,7 @@ export function createVenueScene(
      * illustration, not survey, and it keeps clear of every door, every pin
      * and every line a route can be drawn along.
      */
-    const furniture: FurniturePart[] = roomsOfFloor(buildingPackage, floor.id)
+    const furniture: FurniturePart[] = rooms
       // The grounds have their own trees and benches, placed by the venue.
       .filter((room) => !outdoorSpaces.has(room.id))
       .flatMap(furnishRoom);
@@ -971,7 +1053,7 @@ export function createVenueScene(
      */
     const scratch = new Object3D();
     const tint = new Color();
-    for (const shape of ['box', 'cylinder', 'sphere', 'ring'] as const) {
+    for (const shape of ['box', 'cylinder', 'sphere', 'ring', ...clinicalShapes] as const) {
       const solids = furniture.filter((part) => part.shape === shape);
       if (solids.length === 0) continue;
       const geometry =
@@ -981,13 +1063,27 @@ export function createVenueScene(
             ? new CylinderGeometry(0.5, 0.5, 1, 14)
             : shape === 'sphere'
               ? new IcosahedronGeometry(0.5, 1)
-              : new TorusGeometry(0.5 - FURNITURE_RING_TUBE, FURNITURE_RING_TUBE, 10, 28);
-      const mesh = new InstancedMesh(geometry, track(surface(0xffffff)), solids.length);
+              : shape === 'ring'
+                ? new TorusGeometry(0.5 - FURNITURE_RING_TUBE, FURNITURE_RING_TUBE, 10, 28)
+                : clinicalGeometry(shape);
+      const detailed = geometry.hasAttribute('color');
+      const mesh = new InstancedMesh(
+        geometry,
+        track(surface(0xffffff, { vertexColors: detailed, flatShading: !detailed })),
+        solids.length,
+      );
       solids.forEach((part, index) => {
         scratch.position.copy(vec(part.position as Coordinate, FURNITURE_FLOOR + part.elevation));
         // A ring stands upright with its opening along plan y, or is turned to face along x.
         scratch.rotation.set(0, shape === 'ring' && part.turned ? Math.PI / 2 : 0, 0);
-        if (shape === 'ring') {
+        if (detailed) {
+          scratch.rotation.y = (-(part.turns ?? 0) * Math.PI) / 2;
+          scratch.scale.set(
+            part.size[part.turned ? 1 : 0],
+            part.size[2],
+            part.size[part.turned ? 0 : 1],
+          );
+        } else if (shape === 'ring') {
           scratch.scale.set(part.size[0], part.size[0], part.size[1] / (FURNITURE_RING_TUBE * 2));
         } else {
           scratch.scale.set(part.size[0], part.size[2], part.size[1]);
@@ -999,8 +1095,9 @@ export function createVenueScene(
       mesh.name = `furniture-${shape}`;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      group.add(mesh);
+      (onSite ? groundFloorFurniture : group).add(mesh);
     }
+    if (onSite) group.add(groundFloorFurniture);
 
     /*
      * A destination is a pin: a tapered body with its point on the floor and a
@@ -1750,34 +1847,40 @@ export function createVenueScene(
     }
   }
 
-  /*
-   * Orbit, pan and zoom, on pointer events so a mouse and a finger take the
-   * same path. A drag must not also select: the pointer is only treated as a
-   * click if it barely moved, otherwise letting go over a destination after
-   * dragging the map would open something the visitor never aimed at.
-   */
+  /* A tap owns no camera movement. Touch drags pan in both views, while a
+     two-finger twist rotates the 3D map around the centre of the gesture. */
   const DRAG_SLOP = 6;
   const pointers = new Map<number, { x: number; y: number; startX: number; startY: number }>();
   let dragged = false;
   let panning = false;
   let pinchDistance = 0;
+  let pinchAngle = 0;
 
-  const spread = () => {
+  const touchGeometry = () => {
     const [a, b] = [...pointers.values()];
-    return Math.hypot(a.x - b.x, a.y - b.y);
+    return { distance: Math.hypot(a.x - b.x, a.y - b.y), angle: Math.atan2(b.y - a.y, b.x - a.x) };
   };
 
   const pointerDown = (event: PointerEvent) => {
-    if (pointers.size === 0) dragged = false;
+    if (pointers.size >= 2 || event.button === 2) return;
+    if (pointers.size === 0) {
+      dragged = false;
+      panning =
+        cameraView.mode === '2d' ||
+        event.pointerType === 'touch' ||
+        event.shiftKey ||
+        event.button === 1;
+    }
     pointers.set(event.pointerId, {
       x: event.clientX,
       y: event.clientY,
       startX: event.clientX,
       startY: event.clientY,
     });
-    panning = cameraView.mode === '2d' || event.shiftKey || event.button === 1;
     if (pointers.size === 2) {
-      pinchDistance = spread();
+      const touch = touchGeometry();
+      pinchDistance = touch.distance;
+      pinchAngle = touch.angle;
       dragged = true;
     }
     canvas.setPointerCapture(event.pointerId);
@@ -1793,7 +1896,7 @@ export function createVenueScene(
   let hoverY = 0;
   const showHover = () => {
     hoverFrame = 0;
-    canvas.style.cursor = pickPoi(hoverX, hoverY) === null ? '' : 'pointer';
+    canvas.style.cursor = pickPoi(hoverX, hoverY) || pickBuilding(hoverX, hoverY) ? 'pointer' : '';
   };
 
   const pointerMove = (event: PointerEvent) => {
@@ -1806,20 +1909,25 @@ export function createVenueScene(
       }
       return;
     }
-    const dx = event.clientX - previous.x;
-    const dy = event.clientY - previous.y;
+    const dx = event.clientX - (dragged ? previous.x : previous.startX);
+    const dy = event.clientY - (dragged ? previous.y : previous.startY);
     pointers.set(event.pointerId, { ...previous, x: event.clientX, y: event.clientY });
     if (Math.hypot(event.clientX - previous.startX, event.clientY - previous.startY) > DRAG_SLOP)
       dragged = true;
+    if (!dragged) return;
 
     if (pointers.size === 2) {
       cameraRig.pan(dx / 2, dy / 2, canvas.clientWidth, canvas.clientHeight);
-      const next = spread();
-      if (pinchDistance > 0 && next > 0) {
-        cameraRig.zoomBy(pinchDistance / next);
-        dragged = true;
+      const touch = touchGeometry();
+      if (pinchDistance > 0 && touch.distance > 0) {
+        cameraRig.zoomBy(pinchDistance / touch.distance);
+        if (cameraView.mode === '3d') {
+          const turn = touch.angle - pinchAngle;
+          cameraRig.orbit(Math.atan2(Math.sin(turn), Math.cos(turn)), 0);
+        }
       }
-      pinchDistance = next;
+      pinchDistance = touch.distance;
+      pinchAngle = touch.angle;
       return;
     }
 
@@ -1857,6 +1965,10 @@ export function createVenueScene(
     const move = moves[event.key];
     if (!move) return;
     event.preventDefault();
+    if (event.shiftKey && cameraView.mode === '3d') {
+      cameraRig.orbit(move[0] * 0.003, move[1] * 0.003);
+      return;
+    }
     cameraRig.pan(move[0], move[1], canvas.clientWidth, canvas.clientHeight);
   };
   canvas.addEventListener('keydown', keyDown);
@@ -1941,10 +2053,10 @@ export function createVenueScene(
     return inRoom;
   }
 
-  function enterBuildingAt(clientX: number, clientY: number): boolean {
-    if (scenery === null || site === null || activeFloorId !== site.floorId) return false;
+  function pickBuilding(clientX: number, clientY: number): string | null {
+    if (dragged || scenery === null || site === null || activeFloorId !== site.floorId) return null;
     const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return false;
+    if (rect.width === 0 || rect.height === 0) return null;
     pointer.set(
       ((clientX - rect.left) / rect.width) * 2 - 1,
       -((clientY - rect.top) / rect.height) * 2 + 1,
@@ -1952,12 +2064,17 @@ export function createVenueScene(
     raycaster.setFromCamera(pointer, camera);
     const hit = raycaster
       .intersectObject(scenery.group, true)
-      .find((entry) => typeof entry.object.userData.siteBuildingId === 'string');
-    if (hit === undefined) return false;
-    const id = hit.object.userData.siteBuildingId as string;
-    // A roof that is off is not there to be pressed.
-    if (scenery.isOpen(id)) return false;
-    return enterBuilding(id);
+      .find(
+        ({ object }) =>
+          typeof object.userData.siteBuildingId === 'string' &&
+          !scenery.isOpen(object.userData.siteBuildingId),
+      );
+    return hit ? hit.object.userData.siteBuildingId : null;
+  }
+
+  function enterBuildingAt(clientX: number, clientY: number): boolean {
+    const building = pickBuilding(clientX, clientY);
+    return building !== null && enterBuilding(building);
   }
 
   function enterBuilding(id: string): boolean {
@@ -1974,13 +2091,12 @@ export function createVenueScene(
     const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
     const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
     cameraRig.fit(
-      [
-        [Math.max(Math.min(...xs), cx - 30), Math.max(Math.min(...ys), cy - 30)],
-        [Math.min(Math.max(...xs), cx + 30), Math.min(Math.max(...ys), cy + 30)],
-      ].map(([x, y]) => {
-        const world = vec([x, y]);
-        return [world.x, 0, world.z] as const;
-      }),
+      rectFrame(
+        Math.max(Math.min(...xs), cx - 30),
+        Math.min(Math.max(...xs), cx + 30),
+        Math.max(Math.min(...ys), cy - 30),
+        Math.min(Math.max(...ys), cy + 30),
+      ),
       canvas.clientWidth,
       canvas.clientHeight,
       { padding: 1.1 },
@@ -1991,6 +2107,17 @@ export function createVenueScene(
     publishUserMove();
     invalidate();
     return true;
+  }
+
+  function rectFrame(left: number, right: number, top: number, bottom: number) {
+    const a = vec([left, top]);
+    const b = vec([right, bottom]);
+    return [
+      [a.x, 0, a.z],
+      [b.x, 0, a.z],
+      [b.x, 0, b.z],
+      [a.x, 0, b.z],
+    ] as const;
   }
 
   /** Whether the middle of the view is over a floor, by the floor's bounds. */
@@ -2466,6 +2593,7 @@ export function createVenueScene(
         // Upstairs there is no outside to see the building from.
         siteFar = site !== null && activeFloorId === site.floorId ? next.far : 0;
         if (scenery.advance(elapsed, motionPreference.matches)) invalidate();
+        groundFloorFurniture.visible = !scenery.coversInteriors();
         // The route keeps a least width on screen. Its true width is the
         // width of a person, which from across a campus is under a pixel.
         const wanted = Math.max(
@@ -2584,6 +2712,7 @@ export function createVenueScene(
       labelElements.clear();
       scene.traverse((object) => {
         const mesh = object as Mesh;
+        if (mesh instanceof InstancedMesh) mesh.dispose();
         mesh.geometry?.dispose();
         const material = mesh.material;
         if (Array.isArray(material)) material.forEach((entry) => entry.dispose());

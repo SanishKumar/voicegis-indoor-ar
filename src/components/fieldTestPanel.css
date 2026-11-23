@@ -7,7 +7,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
+  min-height: 44px;
   padding: 6px 10px;
   border: 1px solid var(--glass-line);
   border-radius: var(--radius-buttons);
@@ -35,6 +35,7 @@
   gap: 10px;
   width: min(640px, 100%);
   max-height: 88dvh;
+  overflow-y: auto;
   padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
     max(16px, env(safe-area-inset-left));
   border: 1px solid var(--glass-line);
@@ -79,8 +80,8 @@
 }
 
 .field-test-text {
-  flex: 1;
-  min-height: 240px;
+  flex: 1 0 160px;
+  min-height: 160px;
   width: 100%;
   padding: 10px;
   border: 1px solid var(--color-hairline-strong);
@@ -95,6 +96,27 @@
     monospace;
   white-space: pre;
   resize: none;
+}
+
+.field-test-consent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: var(--text-caption);
+}
+
+.field-test-consent input {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.field-test-header,
+.field-test-note,
+.field-test-actions,
+.field-test-consent {
+  flex-shrink: 0;
 }
 
 .field-test-actions {

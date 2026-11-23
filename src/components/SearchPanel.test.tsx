@@ -99,7 +99,7 @@ describe('Visitor destination search', () => {
   it('recovers from an incompatible category without throwing away the search query', () => {
     render(<SearchPanel />);
     const input = open();
-    fireEvent.click(screen.getByRole('button', { name: 'pharmacy Pharmacy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pharmacy' }));
     fireEvent.change(input, { target: { value: 'Coffee Counter' } });
     expect(screen.getByRole('heading', { name: 'No destinations found' })).toBeTruthy();
     expect(screen.getByText('Your search has 1 match outside Pharmacy.')).toBeTruthy();
@@ -111,7 +111,7 @@ describe('Visitor destination search', () => {
     expect(document.activeElement).toBe(input);
     expect(screen.getByRole('button', { name: 'View details for Coffee Counter' })).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'pharmacy Pharmacy' }).getAttribute('aria-pressed'),
+      screen.getByRole('button', { name: 'Pharmacy' }).getAttribute('aria-pressed'),
     ).toBe('false');
     expect(actions.navigateTo).not.toHaveBeenCalled();
   });
@@ -124,7 +124,7 @@ describe('Visitor destination search', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try another search' }));
     expect((input as HTMLInputElement).value).toBe('');
     expect(document.activeElement).toBe(input);
-    fireEvent.click(screen.getByRole('button', { name: 'pharmacy Pharmacy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pharmacy' }));
     fireEvent.change(input, { target: { value: 'zzzzzzzzzzzzz' } });
     fireEvent.click(screen.getByRole('button', { name: 'Browse all destinations' }));
     expect((input as HTMLInputElement).value).toBe('');
@@ -132,7 +132,7 @@ describe('Visitor destination search', () => {
       '24 destinations',
     );
     expect(
-      screen.getByRole('button', { name: 'pharmacy Pharmacy' }).getAttribute('aria-pressed'),
+      screen.getByRole('button', { name: 'Pharmacy' }).getAttribute('aria-pressed'),
     ).toBe('false');
     expect(document.activeElement).toBe(input);
   });
@@ -141,7 +141,7 @@ describe('Visitor destination search', () => {
     render(<SearchPanel />);
     const input = open();
     fireEvent.click(screen.getByRole('button', { name: 'Show 10 more destinations' }));
-    fireEvent.click(screen.getByRole('button', { name: 'medical Medical' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Medical' }));
     expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(10);
     expect(screen.getByRole('status', { name: 'Search results' }).textContent).toContain(
       '22 destinations in Medical',
@@ -149,7 +149,7 @@ describe('Visitor destination search', () => {
     fireEvent.change(input, { target: { value: 'Room 01' } });
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
     expect(
-      screen.getByRole('button', { name: 'medical Medical' }).getAttribute('aria-pressed'),
+      screen.getByRole('button', { name: 'Medical' }).getAttribute('aria-pressed'),
     ).toBe('true');
     expect(document.activeElement).toBe(input);
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));

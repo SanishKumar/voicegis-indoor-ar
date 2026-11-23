@@ -80,15 +80,7 @@ The retained checkpoint `headingAccuracyDegrees` tuning is an unused legacy
 fingerprint field, not a measurement of the phone. No sensor model was newly
 admitted, and no camera frames or new personal data are recorded.
 
-## Verification and remaining work
-
-The five initial QR/NFC/derivation/evidence regressions failed against the actual
-unchanged code before implementation. Additional tests cover position retention,
-uncertainty, later calibration, invalidation, wrong-frame/source/axis/uncertainty
-refusals, legacy recording rejection and frozen runtime recovery. Direct-filter
-bypasses were also reproduced before closing them. Existing motion and bounds
-fixtures now declare their synthetic calibration separately, retaining the
-original displacement, numeric-bound and tampering assertions.
+## Calibration requirements
 
 The subsequent [interrupted-IMU continuity slice](imu-continuity.md) invalidates
 stale integration across missing rates, material sample gaps and lifecycle

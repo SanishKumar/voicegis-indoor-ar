@@ -3,9 +3,6 @@
 Deliberately unfinished work, recorded so it is not rediscovered as a bug. Each
 entry says what is incomplete, why it was left, and what finishing it involves.
 
-Current Visitor checkpoint and prioritized software work:
-[visitor readiness](../visitor-readiness.md), updated 1 October 2026.
-
 ## Imported closure expiry is guarded; live policy delivery is unfinished
 
 Visitor route decisions no longer reuse the import's historical clock. Active
@@ -27,8 +24,7 @@ As of 26 September 2026, immersive AR no longer places a route on an estimated
 stable, upward-facing surface and shows a target. The visitor must identify it
 as the floor. Height is then fixed until re-alignment, pose/reference-space loss
 or a storey change requires new observations and confirmation. No usable hit
-source means no placed route and an explanation with an exit. See
-[field testing](../field-testing.md) for provisional thresholds.
+source leaves the route hidden and shows an explanation with an exit.
 
 This is a level-floor placement guard, not semantic floor recognition, a
 survey, or a hardware accuracy result. A tabletop can qualify geometrically;
@@ -100,9 +96,8 @@ they are not a description of the current Visitor hook. Visitor now has opt-in
 live motion/XR guidance, single-owner progress, freshness/recovery holds,
 whole-venue alternative-path checks and bounded walking-based direction
 refinement. This does not satisfy device/venue qualification or promote Visitor
-estimates into recorded accuracy evidence. The current implementation is in
-[Visitor live tracking](../localization/visitor-live-tracking.md); the historical sequence is in
-[the visitor plan](../visitor-experience-plan.md#2-establish-the-localization-contract-and-replay-safety).
+estimates into recorded accuracy evidence. See
+[Visitor live tracking](../localization/visitor-live-tracking.md).
 
 ## Visitor 2D/3D switching is presentation, not tracking
 

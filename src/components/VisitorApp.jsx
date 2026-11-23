@@ -18,6 +18,7 @@ import SearchPanel from './SearchPanel.jsx';
 import StatusBar from './StatusBar.jsx';
 import WelcomeScreen from './WelcomeScreen.jsx';
 import './visitorAccessibility.css';
+import './visitorArchitecture.css';
 
 const VisitorMap = lazy(() => import('./VisitorMap.tsx'));
 const CameraPreview = lazy(() => import('./CameraPreview.jsx'));

@@ -1,11 +1,16 @@
 /** Documentation capture only. Not an entry point in either production build.
  * Synthetic camera, orientation and XR platform; unmodified application UI,
  * route rendering and floor-placement flow. Never use as field-test evidence. */
+import { renderCorridor } from './showcaseCorridor.js';
+
 if (!import.meta.env.DEV) throw new Error('The showcase is development-only.');
 const { Image, document, window, WebGLRenderingContext, WebGL2RenderingContext } = globalThis;
 
+const angle = Math.PI / 12;
+const cameraHeight = 1.4;
+const verticalFov = 55;
 const background = new Image();
-background.src = '/docs/media/hallway-simulation.png';
+background.src = renderCorridor(390, 844, cameraHeight, angle, verticalFov);
 await background.decode();
 const video = document.createElement('canvas');
 video.width = 390;
@@ -44,7 +49,7 @@ setInterval(() => {
 const style = document.createElement('style');
 style.textContent = `
   .showcase-label { position: fixed; z-index: 2000; left: 50%; top: 46%; transform: translateX(-50%); padding: 5px 10px; border-radius: 20px; background: #17233ade; color: white; font: 11px sans-serif; letter-spacing: .06em; white-space: nowrap; pointer-events: none; }
-  .camera-ar-overlay.is-active { background: url('/docs/media/hallway-simulation.png') center / 100% 100% !important; }
+  .camera-ar-overlay.is-active { background: url("${background.src}") center / 100% 100% !important; }
   .camera-ar-overlay > canvas.showcase-xr { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
   .camera-ar-overlay > :not(canvas) { position: relative; z-index: 1; }
 `;
@@ -80,11 +85,10 @@ Object.defineProperty(window, 'XRWebGLLayer', {
   },
   configurable: true,
 });
-const angle = Math.PI / 12;
 const c = Math.cos(angle),
   s = Math.sin(angle);
-const matrix = new Float32Array([1, 0, 0, 0, 0, c, -s, 0, 0, s, c, 0, 0, 1.4, 0, 1]);
-const focal = 1 / Math.tan((55 * Math.PI) / 360);
+const matrix = new Float32Array([1, 0, 0, 0, 0, c, -s, 0, 0, s, c, 0, 0, cameraHeight, 0, 1]);
+const focal = 1 / Math.tan((verticalFov * Math.PI) / 360);
 const projection = new Float32Array([
   (focal * 844) / 390,
   0,

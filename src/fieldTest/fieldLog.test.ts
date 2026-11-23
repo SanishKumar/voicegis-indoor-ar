@@ -6,6 +6,7 @@ import {
   fieldTestEnabled,
   logField,
   resetFieldTest,
+  stopFieldTest,
   subscribeFieldLog,
 } from './fieldLog';
 import { formatFieldReport, type HandsetFacts } from './fieldReport';
@@ -24,6 +25,13 @@ describe('the field test record', () => {
     expect(fieldEvents()).toEqual([]);
   });
 
+  it.each(['', '0', 'false', 'unexpected'])('does not opt in for fieldtest=%s', (flag) => {
+    window.history.replaceState(null, '', `/?fieldtest=${flag}`);
+    expect(fieldTestEnabled()).toBe(false);
+    logField('position', { progress: 2 });
+    expect(fieldEvents()).toEqual([]);
+  });
+
   it('is switched on from the address and stays on for the tab', () => {
     window.history.replaceState(null, '', '/?fieldtest=1#/visitor');
     expect(fieldTestEnabled()).toBe(true);
@@ -33,6 +41,37 @@ describe('the field test record', () => {
     expect(fieldTestEnabled()).toBe(true);
     window.history.replaceState(null, '', '/?fieldtest=0');
     resetFieldTest(null);
+    expect(fieldTestEnabled()).toBe(false);
+  });
+
+  it('persists stopping across a reload, clears memory and notifies subscribers', () => {
+    window.history.replaceState({ visit: 'kept' }, '', '/?fieldtest=1&venue=v#/visitor');
+    logField('position', { progress: 2 });
+    const listener = vi.fn();
+    const unsubscribe = subscribeFieldLog(listener);
+    stopFieldTest();
+    expect(fieldEvents()).toEqual([]);
+    expect(fieldTestEnabled()).toBe(false);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(window.history.state).toEqual({ visit: 'kept' });
+    resetFieldTest(null);
+    expect(fieldTestEnabled()).toBe(false);
+    // Subsequent app navigation can remove the query without re-enabling it.
+    window.history.replaceState(null, '', '/#/visitor');
+    resetFieldTest(null);
+    expect(fieldTestEnabled()).toBe(false);
+    unsubscribe();
+  });
+
+  it('stops even if storing the preference is blocked', () => {
+    resetFieldTest(true);
+    logField('position', { progress: 1 });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('Storage unavailable');
+    });
+    stopFieldTest();
+    logField('position', { progress: 2 });
+    expect(fieldEvents()).toEqual([]);
     expect(fieldTestEnabled()).toBe(false);
   });
 

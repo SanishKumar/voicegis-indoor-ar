@@ -78,13 +78,7 @@ motion carries either that observed stride or explicit `stride: null`. Any core
 refusal clears heading and latches recovery. Calibrated watchdog reads also detect
 silent tilt or motion without inventing a heartbeat.
 
-## Verification and remaining work
-
-The reducer has 22 synthetic tests and the subscription has 12 lifecycle/permission
-tests. The 27 harness tests include consent, cancellation, late results, replacement
-and Visitor isolation. Controlled desktop/mobile Chromium tests exercise the
-production operator build, including denial/retry and reachable 320 px controls.
-They are not physical iOS/Android sensor tests or mobility validation.
+## Handset qualification
 
 Before enabling qualified observations in the panel: establish a measured
 independent travel-axis source with a defensible venue frame and provenance;

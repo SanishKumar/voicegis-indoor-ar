@@ -25,6 +25,7 @@ import {
   type VisitorMapView,
 } from '../map/visitorCamera';
 import './visitorJourney.css';
+import HospitalModelViewer from './HospitalModelViewer';
 
 /** How close the camera sits while following a walk-through. */
 const FOLLOW_SCALE = 0.36;
@@ -803,6 +804,25 @@ export default function VisitorMap({
                   : 'Higher resolution with shadows.'}{' '}
               Your route and location are unchanged.
             </p>
+            <small className="map-model-credit">
+              Furnishings adapted from{' '}
+              <a
+                href="https://sketchfab.com/3d-models/hospital-9e77947654e24a73b6221ef2a878f766"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Hospital by neutralize
+              </a>
+              {' · '}
+              <a
+                href="https://creativecommons.org/licenses/by/4.0/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                CC BY 4.0
+              </a>
+            </small>
+            {buildingPackage.building.id === 'meridian-park-campus' && !state.route?.found && <HospitalModelViewer />}
           </div>
         )}
         {presentation.mode === '3d' && routeFloorCount > 1 && (

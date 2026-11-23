@@ -30,6 +30,29 @@ async function clearHttpCache(context: BrowserContext, page: Page) {
   }
 }
 
+test('an installed campus can open the hospital floor model for the first time offline', async ({
+  context,
+  page,
+}) => {
+  test.slow();
+  const campus = '/?venue=/venues/meridian-park-campus.package.json#/visitor';
+  await warmOfflineInstall(page, campus);
+  await clearHttpCache(context, page);
+  await context.setOffline(true);
+  await page.reload();
+  await expectOfflineReady(page);
+  await page.getByRole('button', { name: 'Graphics detail' }).click();
+  const floorBytes = page.waitForResponse((response) =>
+    new URL(response.url()).pathname.endsWith('.glb'),
+  );
+  await page.getByRole('button', { name: 'Explore hospital models' }).click();
+  expect((await floorBytes).fromServiceWorker()).toBe(true);
+  await expect(page.getByRole('button', { name: 'Fit whole floor' })).toBeVisible();
+  await expect(page.locator('iframe')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close model' }).click();
+  await expect(page.getByRole('button', { name: 'Explore hospital models' })).toBeFocused();
+});
+
 async function removeCachedVenueResponses(page: import('@playwright/test').Page) {
   await page.evaluate(async () => {
     for (const name of await caches.keys()) {

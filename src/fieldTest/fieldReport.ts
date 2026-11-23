@@ -5,8 +5,8 @@ export interface HandsetFacts {
   userAgent: string;
   screen: string;
   secureContext: boolean;
-  /** Whether the browser will run an immersive AR session; 'no-webxr' where it has no WebXR at all. */
-  immersiveAr: 'yes' | 'no' | 'no-webxr';
+  /** Advertised support, not a successful session. A failed or timed-out probe is unknown. */
+  immersiveAr: 'yes' | 'no' | 'no-webxr' | 'unknown';
   /** Which orientation events exist: absolute (compass-referenced) as well as relative, or neither. */
   orientation: 'absolute' | 'relative' | 'none';
   orientationAsks: boolean;
@@ -29,10 +29,20 @@ export async function probeHandset(): Promise<HandsetFacts> {
     navigator as unknown as { xr?: { isSessionSupported?: (mode: string) => Promise<boolean> } }
   ).xr;
   if (xr && typeof xr.isSessionSupported === 'function') {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      immersiveAr = (await xr.isSessionSupported('immersive-ar')) ? 'yes' : 'no';
+      // A platform probe must not prevent exporting the rest of the report.
+      // Do not request a session, camera or sensor permission just to inspect support.
+      immersiveAr = await Promise.race([
+        xr.isSessionSupported('immersive-ar').then((supported) => (supported ? 'yes' : 'no')),
+        new Promise<'unknown'>((resolve) => {
+          timeout = setTimeout(() => resolve('unknown'), 2_000);
+        }),
+      ]);
     } catch {
-      immersiveAr = 'no';
+      immersiveAr = 'unknown';
+    } finally {
+      clearTimeout(timeout);
     }
   }
   return {

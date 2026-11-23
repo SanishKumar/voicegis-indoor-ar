@@ -1,8 +1,11 @@
 import {
   BoxGeometry,
+  BufferGeometry,
   Color,
   CylinderGeometry,
+  DoubleSide,
   ExtrudeGeometry,
+  Float32BufferAttribute,
   Group,
   IcosahedronGeometry,
   InstancedMesh,
@@ -14,11 +17,12 @@ import {
   SphereGeometry,
   TorusGeometry,
   Vector3,
-  type BufferGeometry,
 } from 'three';
 import type { CompiledBuildingPackage } from '@voicegis/map-compiler';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { insetPolygon, roundCorners, type Point } from './softGeometry';
 import { createSiteArchitecture } from './siteArchitecture';
+import { withFinish } from './architecturalFinish';
 
 /*
  * What a venue with grounds looks like from outside.
@@ -52,19 +56,15 @@ interface GroundStyle {
   roughness: number;
 }
 
-/*
- * Soft, pale and a little translucent, like everything else on the model: a
- * lawn is mint, not grass green, so the route stays the only saturated thing.
- */
 const GROUND: Record<GroundKind, GroundStyle> = {
-  lawn: { color: 0xaac9a6, opacity: 0.98, height: 0.16, radius: 2.4, roughness: 0.95 },
-  planting: { color: 0x749a79, opacity: 1, height: 0.42, radius: 1.2, roughness: 0.95 },
+  lawn: { color: 0x94a66c, opacity: 1, height: 0.16, radius: 2.4, roughness: 0.95 },
+  planting: { color: 0x61784e, opacity: 1, height: 0.42, radius: 1.2, roughness: 0.95 },
   // Water lies in a lawn, so it is drawn a little above the grass round it.
-  water: { color: 0x8ec7f7, opacity: 0.85, height: 0.2, radius: 4, roughness: 0.15 },
-  paving: { color: 0xffffff, opacity: 0.7, height: 0.1, radius: 1, roughness: 0.9 },
+  water: { color: 0x659ca2, opacity: 0.95, height: 0.2, radius: 4, roughness: 0.2 },
+  paving: { color: 0xd6cdb9, opacity: 1, height: 0.1, radius: 1, roughness: 0.9 },
   // Dark enough for the white bay lines to show.
-  parking: { color: 0x7f8e9d, opacity: 1, height: 0.1, radius: 1.6, roughness: 0.9 },
-  road: { color: 0x596978, opacity: 1, height: 0.06, radius: 0, roughness: 0.9 },
+  parking: { color: 0x757a76, opacity: 1, height: 0.1, radius: 1.6, roughness: 0.9 },
+  road: { color: 0x515755, opacity: 1, height: 0.06, radius: 0, roughness: 0.9 },
 };
 
 /** The roofs are fully on with this much of the site in view, and gone by the other. */
@@ -105,6 +105,8 @@ export interface SiteScenery {
   setView(view: SiteView): { far: number };
   /** Whether a building is showing its rooms and not its roof. */
   isOpen(buildingId: string): boolean;
+  /** Includes the animated fade and route cutaways, so interiors appear as a roof lifts. */
+  coversInteriors(): boolean;
   /**
    * Moves every roof towards where it should be. True while any is still
    * moving, or moved this time: the scene has to be drawn again.
@@ -208,10 +210,11 @@ export function createSiteScenery(
     const style = GROUND[ground.kind];
     const outline =
       style.radius > 0 ? roundCorners(ground.polygon, style.radius, 6) : ground.polygon;
-    const mesh = new Mesh(
-      tile(outline, style.height, style.height + 0.04),
-      surface(style.color, style.opacity, style.roughness),
-    );
+    const material = surface(style.color, style.opacity, style.roughness);
+    if (ground.kind === 'lawn' || ground.kind === 'planting') withFinish(material, 'lawn');
+    if (ground.kind === 'paving') withFinish(material, 'tile');
+    if (ground.kind === 'water') withFinish(material, 'water');
+    const mesh = new Mesh(tile(outline, style.height, style.height + 0.04), material);
     mesh.receiveShadow = true;
     mesh.name = `site-ground-${ground.kind}`;
     // Drawn before anything that lies on it. Every tile here is translucent
@@ -269,12 +272,16 @@ export function createSiteScenery(
 
   function strokes(lines: Point[][], top: number) {
     const marks = new Group();
+    if (lines.length === 0) return marks;
     const material = surface(0xffffff, 0.9, 0.9);
-    for (const line of lines) {
-      const mark = new Mesh(tile(line, top, 0.03, 0), material);
-      mark.renderOrder = -2;
-      marks.add(mark);
-    }
+    // Coplanar paint can be batched for the entire car park or road.
+    const paint = new ExtrudeGeometry(lines.map(shapeFrom), { depth: 0.03, bevelEnabled: false });
+    paint.rotateX(Math.PI / 2);
+    paint.translate(0, top, 0);
+    disposables.push(paint);
+    const mark = new Mesh(paint, material);
+    mark.renderOrder = -2;
+    marks.add(mark);
     return marks;
   }
 
@@ -314,28 +321,111 @@ export function createSiteScenery(
   place(new CylinderGeometry(0.2, 0.32, 2.8, 8), surface(0x998872, 1, 0.95), trees, (o, p) =>
     o.position.copy(toWorld(p, 1.6)),
   );
-  const crowns = place(
-    new IcosahedronGeometry(2.4, 2),
-    surface(0xffffff, 1, 0.95),
-    trees,
-    (o, p, i) => {
-      o.position.copy(toWorld(p, 3 + 1.6 * size(i)));
-      o.scale.setScalar(size(i));
-      o.rotation.y = i * 1.7;
-    },
-  );
-  const leafColors = [0x779b75, 0x6a906e, 0x91aa7e, 0x7f9d89, 0x92ad92];
+  // Vary the outline in local coordinates so shared triangle edges stay closed.
+  function canopy(radius: number) {
+    const geometry = new IcosahedronGeometry(radius, radius > 2 ? 4 : 2);
+    const p = geometry.getAttribute('position');
+    const sunlight: number[] = [];
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i),
+        y = p.getY(i),
+        z = p.getZ(i);
+      const lobes =
+        1 + 0.095 * Math.sin(2.3 * x + z) * Math.cos(1.9 * y - z) + 0.07 * Math.cos(2.5 * z - x);
+      p.setXYZ(i, x * lobes, y * lobes, z * lobes);
+      const light = 0.74 + (0.16 * y) / radius + 0.11 * Math.sin(x * 4 - z) * Math.cos(y * 3 + z);
+      sunlight.push(light, light, light * 0.96);
+    }
+    geometry.setAttribute('color', new Float32BufferAttribute(sunlight, 3));
+    return geometry;
+  }
+  const leaves = withFinish(surface(0xffffff, 1, 0.95), 'foliage');
+  leaves.vertexColors = true;
+  leaves.flatShading = false;
+  const crowns = place(canopy(2.4), leaves, trees, (o, p, i) => {
+    o.position.copy(toWorld(p, 3 + 1.6 * size(i)));
+    const s = size(i);
+    o.scale.set(s * (1 + 0.13 * Math.cos(i)), s * (1 + 0.22 * Math.sin(i)), s);
+    o.rotation.y = i * 1.7;
+  });
+  const leafColors = [0x547248, 0x405d46, 0x7b865a, 0x5c764c, 0x77865a, 0x927477];
   trees.forEach((_, index) =>
     crowns?.setColorAt(index, new Color(leafColors[index % leafColors.length])),
   );
-  // A second, smaller mass on one side makes the crown read as a cloud of
-  // leaves and not a ball on a stick.
-  place(new IcosahedronGeometry(1.65, 1), surface(0x84a586, 1, 0.95), trees, (o, p, i) => {
-    const angle = i * 2.4;
-    const world = toWorld(p, 3.3 + 0.7 * size(i));
-    o.position.set(world.x + Math.cos(angle) * 1.25, world.y, world.z + Math.sin(angle) * 1.25);
-    o.scale.setScalar(size(i));
+  const branchPositions = trees.flatMap((p) => [p, p, p, p]);
+  const branches = place(canopy(1.4), leaves, branchPositions, (o, p, i) => {
+    const tree = Math.floor(i / 4);
+    const angle = tree * 2.4 + ((i % 4) * Math.PI) / 2;
+    const spread = (1.2 + 0.2 * Math.cos(i)) * size(tree);
+    const world = toWorld(p, 3.3 + 0.65 * size(tree) + 0.4 * Math.sin(i));
+    o.position.set(world.x + Math.cos(angle) * spread, world.y, world.z + Math.sin(angle) * spread);
+    o.scale.setScalar(size(tree));
   });
+  branchPositions.forEach((_, i) =>
+    branches?.setColorAt(
+      i,
+      new Color(leafColors[Math.floor(i / 4) % leafColors.length]).multiplyScalar(0.83),
+    ),
+  );
+
+  // Planting sweeps stay inside the existing lawn polygons. The centre of
+  // the healing garden stays open to its mapped destination and seating.
+  const bedVertices: number[] = [];
+  const shrubs: Point[] = [];
+  for (const ground of site.grounds) {
+    if (!['healing-garden-lawn', 'lawn-north-east', 'lawn-north-west'].includes(ground.id))
+      continue;
+    const xs = ground.polygon.map(([x]) => x),
+      ys = ground.polygon.map(([, y]) => y);
+    const x0 = Math.min(...xs),
+      x1 = Math.max(...xs),
+      y0 = Math.min(...ys),
+      y1 = Math.max(...ys);
+    const edge = (t: number, band: number, inset: number): Point => {
+      const x = x0 + 2.4 + (x1 - x0 - 4.8) * t;
+      const wave = Math.sin(Math.PI * t) * (0.08 + 0.09 * t);
+      const y = y0 + (y1 - y0) * (band === 0 ? 0.17 + wave : 0.86 - wave * 0.55);
+      return [x, y + inset * (0.35 + 1.15 * Math.sin(Math.PI * t))];
+    };
+    for (const band of [0, 1]) {
+      for (let i = 0; i < 24; i++) {
+        const t = i / 24,
+          next = (i + 1) / 24;
+        const strip = [
+          edge(t, band, -1),
+          edge(t, band, 1),
+          edge(next, band, 1),
+          edge(next, band, -1),
+        ];
+        if (!strip.every((p) => insideRing(p, ground.polygon))) continue;
+        for (const vertex of [0, 1, 2, 2, 3, 0]) {
+          const v = toWorld(strip[vertex], 0.25);
+          bedVertices.push(v.x, v.y, v.z);
+        }
+        if (i % 2 === 1) shrubs.push(edge(t, band, 0));
+      }
+    }
+  }
+  if (bedVertices.length) {
+    const soil = new BufferGeometry();
+    soil.setAttribute('position', new Float32BufferAttribute(bedVertices, 3));
+    soil.computeVertexNormals();
+    disposables.push(soil);
+    const bedMaterial = surface(0x797758, 1, 0.95);
+    bedMaterial.side = DoubleSide;
+    const beds = new Mesh(soil, bedMaterial);
+    beds.receiveShadow = true;
+    group.add(beds);
+    const borders = place(canopy(1), leaves, shrubs, (o, p, i) => {
+      o.position.copy(toWorld(p, 0.53));
+      o.scale.set(0.95 + (i % 3) * 0.13, 0.42 + (i % 4) * 0.07, 0.76);
+      o.rotation.y = i * 1.4;
+    });
+    const herbColors = [0x889271, 0x8d856e, 0x879755, 0x6a7d52];
+    shrubs.forEach((_, i) =>
+      borders?.setColorAt(i, new Color(herbColors[Math.floor(i / 3) % herbColors.length])),
+    );
+  }
 
   const white = surface(0xffffff, 1, 0.8);
   const fountains = of('fountain');
@@ -435,15 +525,21 @@ export function createSiteScenery(
       }
     }
   }
-  const bodies = place(new BoxGeometry(1.8, 0.65, 4.25), surface(0xffffff, 1, 0.5), cars, (o, p) =>
-    o.position.copy(toWorld(p, 0.72)),
+  const bodies = place(
+    new RoundedBoxGeometry(1.8, 0.65, 4.25, 1, 0.18),
+    surface(0xffffff, 1, 0.5),
+    cars,
+    (o, p) => o.position.copy(toWorld(p, 0.72)),
   );
   const carColors = [0xe7ebeb, 0x708da0, 0xb7b9ad, 0x586a79, 0xc4d0cc];
   cars.forEach((_, index) =>
     bodies?.setColorAt(index, new Color(carColors[index % carColors.length])),
   );
-  const cabins = place(new BoxGeometry(1.5, 0.6, 2.3), surface(0x456678, 1, 0.25), cars, (o, p) =>
-    o.position.copy(toWorld(p, 1.32)),
+  const cabins = place(
+    new RoundedBoxGeometry(1.5, 0.6, 2.3, 1, 0.27),
+    surface(0x456678, 1, 0.25),
+    cars,
+    (o, p) => o.position.copy(toWorld(p, 1.32)),
   );
   if (bodies) bodies.name = 'parking-car-bodies';
   if (cabins) cabins.name = 'parking-car-cabins';
@@ -543,6 +639,9 @@ export function createSiteScenery(
     buildingAt,
     isIndoors: (point) => buildingAt(point) !== null,
     isOpen,
+    coversInteriors: () =>
+      roofs.size > 0 &&
+      Array.from(roofs.values()).every((roof) => roof.shown * floorOpacity >= 0.93),
 
     setView(view) {
       far = Number(smoothstep(ROOF_NEAR_METRES, ROOF_FAR_METRES, view.metresVisible).toFixed(3));

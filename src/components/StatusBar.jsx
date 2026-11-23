@@ -4,56 +4,24 @@
  * Quiet visitor status line with route, floor, and connectivity context.
  */
 
-import { Download, Layers, MapPin, Wifi, WifiOff } from 'lucide-react';
-import { useNavigation, NAV_STATUS } from '../context/NavigationContext.jsx';
-import { startPointLabel } from '../capture/startLabel.ts';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { Download, Layers, Wifi, WifiOff } from 'lucide-react';
+import { useNavigation } from '../context/NavigationContext.jsx';
+import { useSyncExternalStore } from 'react';
+import { useOnline } from '../offline/useOnline';
 import {
   getOfflineAvailability,
   subscribeOfflineAvailability,
 } from '../offline/offlineAvailability.ts';
 
 export default function StatusBar() {
-  const { state, venue, checkIn, packageCacheStatus } = useNavigation();
-  const { navStatus, activeFloorId, startNodeId } = state;
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const { state, venue, packageCacheStatus } = useNavigation();
+  const isOnline = useOnline();
   const offlineAvailability = useSyncExternalStore(
     subscribeOfflineAvailability,
     getOfflineAvailability,
     getOfflineAvailability,
   );
-  const startNode = venue.getNodeById(startNodeId);
-  const activeFloor = venue.getFloorById(activeFloorId);
-  const labelNames = {
-    space: (id) => venue.getSpaceById(id)?.name ?? null,
-    floor: (id) => venue.getFloorById(id)?.name ?? null,
-  };
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  const statusLabel =
-    {
-      [NAV_STATUS.IDLE]: 'Ready',
-      [NAV_STATUS.ROUTING]: 'Computing route...',
-      [NAV_STATUS.NAVIGATING]: 'Route ready',
-      [NAV_STATUS.ARRIVED]: 'Arrival confirmed',
-    }[navStatus] || 'Ready';
-
-  const statusDotClass =
-    navStatus === NAV_STATUS.NAVIGATING
-      ? 'status-dot navigating'
-      : navStatus === NAV_STATUS.ARRIVED
-        ? 'status-dot active'
-        : 'status-dot';
+  const activeFloor = venue.getFloorById(state.activeFloorId);
 
   const offlineReady =
     offlineAvailability === 'available' && packageCacheStatus.state === 'verified';
@@ -75,18 +43,8 @@ export default function StatusBar() {
 
   return (
     <aside className="status-bar visitor-status-bar" id="status-bar" aria-label="Map status">
-      <div className="status-item status-primary">
-        <span className={statusDotClass} />
-        <span>{statusLabel}</span>
-      </div>
-
-      <div className="status-item status-location">
-        <MapPin size={11} />
-        <span>{startPointLabel(startNode, checkIn, labelNames, 'Starting point not set')}</span>
-      </div>
-
       <div className="status-item status-floor">
-        <Layers size={11} />
+        <Layers size={13} aria-hidden="true" />
         <span>{activeFloor?.name ?? 'Floor unavailable'}</span>
       </div>
 
@@ -97,7 +55,7 @@ export default function StatusBar() {
         aria-live="polite"
         title={`${connectivityLabel}. ${packageCacheStatus.detail}`}
       >
-        <ConnectivityIcon size={11} />
+        <ConnectivityIcon size={13} aria-hidden="true" />
         <span>{connectivityLabel}</span>
       </div>
     </aside>

@@ -6,7 +6,7 @@
  */
 
 import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { Search, X, Navigation, MapPin, ArrowRight } from 'lucide-react';
+import { Search, X, Navigation, MapPin, ChevronRight } from 'lucide-react';
 import { NAV_STATUS, useNavigation } from '../context/NavigationContext.jsx';
 import { searchPOIs, getAvailableCategories } from '../engine/searchIndex.js';
 import { formatDistance } from '../data/buildingConfig.js';
@@ -14,6 +14,7 @@ import { useDialogFocus } from './useDialogFocus.ts';
 import './SearchPanel.css';
 import MobilePanelHandle from './MobilePanelHandle';
 import { useMobilePanel } from './useMobilePanel';
+import PlaceIcon from './PlaceIcon';
 
 const RESULTS_PER_PAGE = 10;
 
@@ -195,12 +196,10 @@ export default function SearchPanel() {
               <Search size={19} />
             </span>
             <span className="search-trigger-copy">
-              <strong>Where do you want to go?</strong>
-              <small>Search rooms, services, and entrances</small>
+              <strong>Find a destination</strong>
             </span>
             <span className="search-trigger-action" aria-hidden="true">
-              Search
-              <ArrowRight size={15} />
+              <ChevronRight size={17} />
             </span>
           </button>
         </div>
@@ -244,10 +243,7 @@ export default function SearchPanel() {
         />
 
         <div className="search-panel-heading">
-          <div>
-            <span>Explore {venue.config.name}</span>
-            <h2 id="search-panel-title">Find a destination</h2>
-          </div>
+          <h2 id="search-panel-title">Find a destination</h2>
           <button type="button" onClick={dismissPanel} aria-label="Close destination search">
             <X size={18} />
           </button>
@@ -309,7 +305,7 @@ export default function SearchPanel() {
                 onClick={() => toggleCategory(catId)}
                 aria-pressed={activeCategory === catId}
               >
-                {cat.icon} {cat.label}
+                {cat.label}
               </button>
             );
           })}
@@ -352,7 +348,7 @@ export default function SearchPanel() {
                         aria-describedby={`search-meta-${node.id}`}
                       >
                         <div className="search-result-icon" aria-hidden="true">
-                          {node.poi.icon}
+                          <PlaceIcon category={node.poi.category} />
                         </div>
                         <div className="search-result-info">
                           <div className="search-result-name">{node.poi.name}</div>

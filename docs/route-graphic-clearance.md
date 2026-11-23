@@ -68,26 +68,3 @@ that omission. Pixel glow is decorative, not certified metric geometry.
 Floor changes are connector schematics, not floor ribbons between storeys.
 Nothing in this contract proves real-world AR registration, detects a table,
 provides depth occlusion, or avoids a newly observed obstacle.
-
-## Automated coverage
-
-- Geometry fixtures: narrow corridor/door, unused opening, shared-wall crossing,
-  disconnected rooms, forged coordinates, ambiguous portal corner, a tiny
-  concave notch, a wall enclosed inside a glyph, outlined tails at corners,
-  destination-ring clearance and accessibility/restriction declarations.
-- Routes to public destinations in all three synthetic packages, on standard
-  and step-free profiles; worker-transferable clearance evidence.
-- Rejected centerline versus written-guidance fallback for graphic-width failure.
-- Metric camera projection/near clipping, rejected footprints, and real XR
-  frames that omit glyphs without changing measured progress.
-- Visitor notice, disabled AR start with a reachable exit, and production-browser
-  2D/3D route continuity plus an injected worker-result width-failure scenario.
-
-These tests qualify the software contract, not any real venue or handset.
-
-Local verification: `npm run check` passes lint, types, 1,601 tests in 127 files,
-unchanged compiled/replay/QR artifacts and the public build. The final public
-build passes 76 targeted Chromium browser cases on desktop and phone-size
-viewports (clearance, camera/AR, journeys, map views/graphics, offline and lazy
-view recovery). No hosted CI, full operator suite or physical device result is
-claimed. Changes remain local and uncommitted.

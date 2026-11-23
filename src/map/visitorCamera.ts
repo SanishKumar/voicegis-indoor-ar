@@ -47,9 +47,9 @@ interface Goal {
 /**
  * The closest the camera comes. A scale is a share of the venue's span, so a
  * fixed floor that suits a building leaves a campus unable to reach its rooms:
- * the closest view never shows more than about 18 m across.
+ * manual inspection can show a patient bay on either a campus or an indoor map.
  */
-export const closestScale = (span: number) => Math.min(MIN_SCALE, 16 / Math.max(1, span));
+export const closestScale = (span: number) => Math.min(MIN_SCALE, 6 / Math.max(1, span));
 
 /** Shortest signed turn from one bearing to another. */
 function turnBetween(from: number, to: number) {
@@ -106,7 +106,9 @@ export function createVisitorCamera(span: number, saved = defaultMapView()) {
   let goal: Goal | null = null;
   let userMoved = false;
   const wantedTilt = () => (view.mode === '2d' ? 0 : view.tilt3d);
-  const closest = closestScale(span);
+  // Automatic framing keeps the route and its surroundings in view. The
+  // visitor can explicitly zoom closer to inspect a room.
+  const closest = Math.min(MIN_SCALE, 16 / Math.max(1, span));
   const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(closest, scale));
 
   /** The uncovered part of the canvas. Never smaller than a sliver. */
@@ -162,7 +164,7 @@ export function createVisitorCamera(span: number, saved = defaultMapView()) {
     zoomBy(factor: number) {
       if (!Number.isFinite(factor) || factor <= 0) return;
       userAction();
-      view.scale = clampScale(view.scale * factor);
+      view.scale = Math.min(MAX_SCALE, Math.max(closestScale(span), view.scale * factor));
     },
 
     pan(dx: number, dy: number, width: number, height: number) {

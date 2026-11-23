@@ -11,6 +11,7 @@ import { useNavigation } from '../context/NavigationContext.jsx';
 import { formatDistance, estimateWalkTime } from '../data/buildingConfig.js';
 import MobilePanelHandle from './MobilePanelHandle';
 import { useMobilePanel } from './useMobilePanel';
+import PlaceIcon from './PlaceIcon';
 
 export default function POICard() {
   const { state, actions, previewRoute, venue } = useNavigation();
@@ -87,7 +88,7 @@ export default function POICard() {
          */}
         <div className="poi-card-header">
           <div className="poi-card-icon" aria-hidden="true">
-            {poi.icon}
+            <PlaceIcon category={poi.category} size={22} />
           </div>
           <div className="poi-card-heading">
             <h2 className="poi-card-title" id="poi-card-title">

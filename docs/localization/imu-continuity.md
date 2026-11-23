@@ -83,21 +83,3 @@ Independently surveyed calibration/pose provenance, raw capture evolution,
 live observation-age policy and real iOS/Android/mobility testing remain required
 before automatic Visitor progress. These synthetic tests do not certify any
 stride model, sensor accuracy, safe deadline or real-building route.
-
-## Verification
-
-All 19 initial core regressions failed against the actual `3bb408c` implementation
-before restoration of the fix. All three initial handset/component regressions
-also failed before their fixes. Added coverage includes recovery, independent
-suspension gates, same-millisecond ordering, unlocated strides, cleanup, late
-permission grants and artifact decoding. The two non-positive artifact-limit
-tests first reproduced a hole in this slice's initial decoder implementation.
-A queued pre-resume orientation regression also failed against the initial
-visibility fix, before adding the timestamp boundary.
-
-Production-browser coverage dispatches explicitly synthetic motion, orientation
-and visibility events and validates the downloaded capture through the real
-capture parser. Both desktop and mobile tests failed against the actual prior
-handset/recorder implementation: the exported background/foreground boundaries
-were missing. This does not establish actual background delivery or iOS permission
-behavior. Final gate results are recorded in the visitor plan.

@@ -1,0 +1,138 @@
+.map-model-library {
+  grid-column: 1 / -1;
+}
+.map-model-library > button {
+  width: 100%;
+}
+.map-model-viewer {
+  box-sizing: border-box;
+  width: min(94vw, 960px);
+  max-height: 92dvh;
+  margin: auto;
+  padding: 16px;
+  border: 1px solid #a7b6af;
+  border-radius: 12px;
+  background: #f7f9f5;
+  color: #173936;
+  font:
+    1rem/1.4 var(--font-control),
+    sans-serif;
+  overflow: auto;
+}
+.map-model-viewer::backdrop {
+  background: rgb(15 34 31 / 72%);
+}
+.map-model-viewer[open] {
+  display: grid;
+  gap: 12px;
+}
+.map-model-heading,
+.map-model-viewer footer,
+.map-model-choices {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.map-model-heading,
+.map-model-viewer footer {
+  justify-content: space-between;
+}
+.map-model-heading h2 {
+  margin: 0;
+  font:
+    650 1.2rem/1.2 var(--font-control),
+    sans-serif;
+}
+.compiled-map-graphics .map-model-heading p {
+  margin: 4px 0 0;
+  color: #49625b;
+}
+.map-model-viewer iframe,
+.hospital-floor-stage {
+  display: block;
+  width: 100%;
+  height: min(58dvh, 620px);
+  border: 0;
+  border-radius: 5px;
+  background: #dce4df;
+}
+.hospital-floor-stage {
+  position: relative;
+  overflow: hidden;
+}
+.hospital-floor-stage canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+.hospital-floor-stage canvas:active {
+  cursor: grabbing;
+}
+.hospital-floor-stage canvas:focus-visible {
+  outline: 2px solid #174d43;
+  outline-offset: -3px;
+}
+.hospital-floor-notice {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  color: #24483f;
+  background: #e5ede6;
+  text-align: center;
+}
+.hospital-floor-tools {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 4px;
+}
+.compiled-map-graphics .hospital-floor-help {
+  margin: 7px 0 0;
+  color: #405952;
+  font-size: 0.8125rem;
+}
+.map-model-viewer footer {
+  flex-wrap: wrap;
+  color: #405952;
+  font-size: 0.8125rem;
+}
+.map-model-viewer footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #174d43;
+}
+.compiled-map-graphics .map-model-offline {
+  display: grid;
+  place-items: center;
+  min-height: 140px;
+  margin: 0;
+  padding: 20px;
+  color: #24483f;
+  background: #e5ede6;
+  border-radius: 5px;
+}
+.compiled-map-graphics .map-model-viewer button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px 10px;
+  color: #21443d;
+  background: #edf2ee;
+  border: 1px solid #94a69f;
+}
+.compiled-map-graphics .map-model-viewer button[aria-pressed='true'] {
+  background: #235b4e;
+  color: #fff;
+}
+.map-model-viewer :is(button, a):focus-visible {
+  outline: 2px solid #174d43;
+  outline-offset: 2px;
+}

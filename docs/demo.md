@@ -98,26 +98,22 @@ means a flaky camera cannot take the demo down.
    This does not make a first-ever offline visit possible. Installation needs
    one completed online load, arbitrary remote VenuePackage URLs remain subject
    to their origin and availability, and production hosting must be HTTPS (a
-   sub-path needs a build with that base; see docs/deployment.md). The
-   automated browser gate repeats fresh-page check-in and routing, and floor
-   switching with Chromium's network disabled. It separately proves that a
-   corrupted IndexedDB package is refused.
+   sub-path needs a build with that base; see docs/deployment.md).
 
 ## The campus: from a room in one building to a room in another
 
 The catalog opens on Asterion, one building. The second demo is Meridian Park
 Medical Campus: three buildings round a garden, with the walks between them
-routed like corridors. Reach it from the first screen with **Somewhere else?
-Choose the place**, or by its link:
+routed like corridors. Reach it from the first screen with **Change venue**,
+or by its link:
 
 ```text
 http://localhost:3000/?venue=/venues/meridian-park-campus.package.json#/visitor
 ```
 
-1. **Outside.** With nowhere to stand yet, the map is the whole site: each
-   building a block with its name on it, among the lawns, the pond and the car
-   park. Press a building and its roof comes off to show its rooms, furnished
-   by what they are for.
+1. **Outside.** The map opens on the whole site. Switch to **3D** to see the
+   hospital, emergency centre and wellness pavilion around the garden. Tap a
+   building to see the furnished rooms inside.
 2. **By a sign.** Open the link a sign inside the Emergency Centre would carry:
 
    ```text
@@ -150,17 +146,13 @@ outside version control, so recompiling a venue can strand it silently — the
 repository is consistent and the corridor is not. Reprinting after a venue
 change is a field procedure, not something a gate can enforce.
 
-Every payload is round-tripped through the same decoder an iPhone uses, in
-`qrRoundTrip.test.ts`, so a code that would not scan fails the build rather than
-the demo.
+## Position between signs
 
-## What is deliberately not claimed
-
-Check-in gives a **fix at a known point**, not continuous tracking. Between
-codes there is no live position — dead reckoning from phone sensors exists in
-`localization-core` but is not admitted as evidence, and the accuracy of a
-browser-derived walk has never been measured in a real building. See
-[Known seams](architecture/known-seams.md).
+A QR check-in gives the visitor a fix at a known point. **Track my walk**
+uses handset motion to estimate progress between signs. Guidance can pause
+and ask for another scan when that estimate becomes uncertain.
+The included venues are synthetic. Walking accuracy still needs validation
+against measured paths in a real building. See [Known seams](architecture/known-seams.md).
 
 The venues shipped here are synthetic benchmarks. No accuracy figure in this
 repository comes from a real building.

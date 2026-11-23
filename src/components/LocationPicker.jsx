@@ -5,7 +5,7 @@
  * Features search, category filtering, and a beautiful list.
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { Search, MapPin, X, ChevronRight, QrCode } from 'lucide-react';
 import { useNavigation } from '../context/NavigationContext.jsx';
 import QrCheckIn from './QrCheckIn.tsx';
@@ -14,11 +14,14 @@ import { scanProblemText } from '../capture/scanProblemText.ts';
 import { sharedOrientation } from '../ar/sharedOrientation';
 import MobilePanelHandle from './MobilePanelHandle';
 import { useMobilePanel } from './useMobilePanel';
+import { searchPOIs, getAvailableCategories } from '../engine/searchIndex';
+import PlaceIcon from './PlaceIcon';
 
 export default function LocationPicker({ isOpen, onClose }) {
   const { actions, venue } = useNavigation();
   const panel = useMobilePanel(isOpen);
   const [query, setQuery] = useState('');
+  const inputRef = useRef(null);
   const [activeCategory, setActiveCategory] = useState(null);
   const [scanning, setScanning] = useState(false);
   // Opened as 'scan' when the journey asks for a code, so re-anchoring is one
@@ -28,28 +31,23 @@ export default function LocationPicker({ isOpen, onClose }) {
   if (openedAs !== isOpen) {
     setOpenedAs(isOpen);
     if (isOpen === 'scan') setScanning(true);
-    else if (!isOpen) setScanning(false);
+    else if (!isOpen) {
+      setScanning(false);
+      setQuery('');
+      setActiveCategory(null);
+    }
   }
   const [scanProblem, setScanProblem] = useState(null);
   const allPOIs = useMemo(() => venue.getPOIs(), [venue]);
   const availableCategories = useMemo(
-    () => new Set(allPOIs.map((node) => node.poi.category)),
+    () => getAvailableCategories(allPOIs),
     [allPOIs],
   );
 
-  const filteredPOIs = useMemo(() => {
-    let results = allPOIs;
-    if (activeCategory) {
-      results = results.filter((n) => n.poi.category === activeCategory);
-    }
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      results = results.filter(
-        (n) => n.poi.name.toLowerCase().includes(q) || n.poi.description?.toLowerCase().includes(q),
-      );
-    }
-    return results;
-  }, [allPOIs, query, activeCategory]);
+  const filteredPOIs = useMemo(
+    () => searchPOIs(allPOIs, query, { category: activeCategory, limit: allPOIs.length }),
+    [allPOIs, query, activeCategory],
+  );
 
   const handleSelect = (node) => {
     actions.setStart(node.id);
@@ -78,6 +76,7 @@ export default function LocationPicker({ isOpen, onClose }) {
   // never took focus was only ever half a dialog.
   const { containerRef } = useDialogFocus(isOpen, {
     onEscape: onClose,
+    initialFocusRef: inputRef,
     trapFocus: !panel.collapsed,
   });
 
@@ -110,7 +109,6 @@ export default function LocationPicker({ isOpen, onClose }) {
             <h2 className="lp-title" id="location-picker-title">
               Set Your Location
             </h2>
-            <p className="lp-subtitle">Where are you right now?</p>
           </div>
           <button className="lp-close" onClick={onClose} aria-label="Close">
             <X size={20} />
@@ -137,20 +135,34 @@ export default function LocationPicker({ isOpen, onClose }) {
         <div className="lp-search mobile-panel-details" id="lp-search">
           <Search size={18} className="lp-search-icon" />
           <input
+            ref={inputRef}
             type="text"
-            placeholder="Search rooms, departments..."
+            placeholder="Room, service, entrance…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="lp-search-input"
-            autoFocus
+            autoComplete="off"
+            enterKeyHint="search"
             aria-label="Search starting locations"
           />
+          {query && (
+            <button
+              type="button"
+              className="lp-search-clear"
+              aria-label="Clear starting location search"
+              onClick={() => {
+                setQuery('');
+                inputRef.current?.focus();
+              }}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          )}
         </div>
 
         {/* Category Chips */}
         <div className="lp-categories mobile-panel-details" id="lp-categories">
-          {Object.values(venue.categories)
-            .filter((cat) => availableCategories.has(cat.id))
+          {availableCategories.map((id) => venue.getCategory(id)).filter(Boolean)
             .map((cat) => (
               <button
                 key={cat.id}
@@ -158,7 +170,7 @@ export default function LocationPicker({ isOpen, onClose }) {
                 onClick={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
                 aria-pressed={activeCategory === cat.id}
               >
-                {cat.icon} {cat.label}
+                {cat.label}
               </button>
             ))}
         </div>
@@ -169,9 +181,14 @@ export default function LocationPicker({ isOpen, onClose }) {
             <div className="lp-empty">
               <MapPin size={32} />
               <p>No locations found</p>
+              <button type="button" className="lp-clear-filters" onClick={() => {
+                if (!activeCategory) setQuery('');
+                setActiveCategory(null);
+                inputRef.current?.focus();
+              }}>{activeCategory ? 'Search all categories' : 'Try another search'}</button>
             </div>
           )}
-          {filteredPOIs.map((node) => {
+          {filteredPOIs.map(({ node }) => {
             // The place's own description opens with its name again, so the
             // second line said "Garden Café · Ground · Diagn…" under "Garden
             // Café" and was cut off before it reached anything new. Which floor
@@ -180,7 +197,7 @@ export default function LocationPicker({ isOpen, onClose }) {
               node.poi.where ?? venue.getFloorById(node.floor)?.name ?? node.poi.description;
             return (
               <button key={node.id} className="lp-result-item" onClick={() => handleSelect(node)}>
-                <div className="lp-result-icon">{node.poi.icon}</div>
+                <div className="lp-result-icon"><PlaceIcon category={node.poi.category} /></div>
                 <div className="lp-result-info">
                   <div className="lp-result-name">{node.poi.name}</div>
                   <div className="lp-result-desc">{floorName}</div>
